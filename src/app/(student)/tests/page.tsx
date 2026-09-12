@@ -19,7 +19,7 @@ export default async function StudentTestsPage() {
     supabase
       .from("tests")
       .select(
-        "id, title, status, opens_at, closes_at, duration_minutes, subjects(name), test_questions(count)"
+        "id, title, status, opens_at, closes_at, duration_minutes, subjects(name), question_count"
       )
       .order("opens_at", { ascending: false }),
     supabase
@@ -64,9 +64,7 @@ export default async function StudentTestsPage() {
             <div className="grid gap-3 sm:grid-cols-2">
               {items.map(({ t, attempt }) => {
                 const s = t.subjects as unknown as { name: string } | null;
-                const qc =
-                  (t.test_questions as unknown as { count: number }[])?.[0]
-                    ?.count ?? 0;
+                const qc = t.question_count;
                 return (
                   <Card key={t.id}>
                     <CardHeader>
