@@ -34,7 +34,7 @@ export default async function StudentsPage({
   let query = supabase
     .from("enrollments")
     .select(
-      "id, status, created_at, student_id, years(year_number, name), profiles!enrollments_student_id_fkey(full_name, email, last_login_at)"
+      "id, status, created_at, student_id, year_id, years(year_number, name), profiles!enrollments_student_id_fkey(full_name, email, last_login_at)"
     )
     .order("created_at", { ascending: false })
     .limit(200);
@@ -130,6 +130,7 @@ export default async function StudentsPage({
                     <EnrollmentActions
                       enrollmentId={e.id}
                       studentId={e.student_id}
+                      yearId={e.year_id}
                       status={e.status}
                     />
                   </TableCell>
