@@ -134,6 +134,7 @@ enabled = true
 # Store analytical data in S3 for running ETL jobs over Iceberg Catalog
 # This feature is only available on the hosted platform.
 [storage.analytics]
+# Iceberg catalog requires a paid Supabase plan; stays false on this project.
 enabled = false
 max_namespaces = 5
 max_tables = 10
@@ -252,13 +253,18 @@ otp_expiry = 3600
 
 # Branded MedVerse templates (navy/teal, logo) — docs/architecture.md brand colors.
 # Signup uses a 6-digit code ({{ .Token }}); recovery uses a link.
-[auth.email.template.confirmation]
-subject = "Your MedVerse LMS verification code"
-content_path = "./supabase/templates/confirmation.html"
+# NOTE: Supabase blocks ALL email template customization (even just the
+# subject line) on the free tier while using its shared default mailer —
+# "Email template modification is not available for free tier projects using
+# the default email provider." These stay commented out until a custom SMTP
+# relay is configured (see auth.email.smtp above); re-enable both blocks then.
+# [auth.email.template.confirmation]
+# subject = "Your MedVerse LMS verification code"
+# content_path = "./supabase/templates/confirmation.html"
 
-[auth.email.template.recovery]
-subject = "Reset your MedVerse LMS password"
-content_path = "./supabase/templates/recovery.html"
+# [auth.email.template.recovery]
+# subject = "Reset your MedVerse LMS password"
+# content_path = "./supabase/templates/recovery.html"
 
 [auth.sms]
 # Allow/disallow new user signups via SMS to your project.
@@ -306,8 +312,10 @@ max_enrolled_factors = 10
 
 # Control MFA via App Authenticator (TOTP)
 [auth.mfa.totp]
-enroll_enabled = false
-verify_enabled = false
+# Preserving the live project's current values here — not something this
+# session decided to change; avoid silently regressing it via config push.
+enroll_enabled = true
+verify_enabled = true
 
 # Configure MFA via Phone Messaging
 [auth.mfa.phone]
