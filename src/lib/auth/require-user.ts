@@ -1,5 +1,6 @@
 import "server-only";
 
+import { cache } from "react";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 
@@ -25,7 +26,12 @@ export type Enrollment = {
 //  - Exemption: a session owning an in_progress attempt is NOT evicted
 //    (checked via owns_live_attempt() once the exam engine exists; the
 //    is_active_session() DB guard protects exam RPCs regardless).
-export async function requireUser() {
+// cache() dedupes this per request: every protected layout AND every page it
+// renders calls requireUser/requireStudent/requireAdmin, but they should only
+// hit the DB once (JWT verify + profile [+ enrollment] select) per request,
+// not once per call site. Safe because Server Component render is scoped to
+// a single request — this must never be imported into a long-lived context.
+export const requireUser = cache(async function requireUser() {
   const supabase = await createClient();
 
   const { data } = await supabase.auth.getClaims();
@@ -54,9 +60,9 @@ export async function requireUser() {
   }
 
   return { supabase, profile, userId, sessionId };
-}
+});
 
-export async function requireStudent() {
+export const requireStudent = cache(async function requireStudent() {
   const ctx = await requireUser();
   if (ctx.profile.role === "admin") redirect("/admin");
 
@@ -78,10 +84,10 @@ export async function requireStudent() {
     year_name: years?.name,
   };
   return { ...ctx, enrollment: result };
-}
+});
 
-export async function requireAdmin() {
+export const requireAdmin = cache(async function requireAdmin() {
   const ctx = await requireUser();
   if (ctx.profile.role !== "admin") redirect("/dashboard");
   return ctx;
-}
+});
