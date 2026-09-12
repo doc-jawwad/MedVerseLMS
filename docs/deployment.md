@@ -27,7 +27,7 @@ CRON_SECRET=                    # guards /api/cron/auto-submit
 ## Cron (both must be configured)
 
 1. **pg_cron** (primary, in-database): `select cron.schedule('auto-submit', '* * * * *', $$select public.auto_submit_expired()$$);`
-2. **Vercel Cron** (backup): `vercel.json` schedules `GET /api/cron/auto-submit` every minute; route verifies `Authorization: Bearer $CRON_SECRET` then calls the same RPC with the service role.
+2. **Vercel Cron** (backup): `vercel.json` schedules `GET /api/cron/auto-submit`. On **Hobby**, Vercel only allows daily crons (`0 0 * * *`); minute-level Vercel Cron needs Pro. **pg_cron remains the primary every-minute sweeper.** Route verifies `Authorization: Bearer $CRON_SECRET` then calls the same RPC with the service role.
 
 ## Tests / CI
 
