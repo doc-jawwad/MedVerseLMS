@@ -1,5 +1,15 @@
 # Deployment & Operations
 
+## Live
+
+- **Production**: https://med-verse-lms.vercel.app (Vercel project `jawwad-seo/med-verse-lms`, linked via `.vercel/project.json`)
+- Deployment protection (Vercel SSO wall) is disabled so the site is
+  publicly reachable — the app's own auth (login/approval) is the real gate.
+- No custom domain yet; add one later via `vercel domains add` +
+  DNS, no redeploy or migration needed.
+- Deploy with `npx vercel --prod` from the repo root (env vars are already
+  set in the Vercel project for production/preview/development — see below).
+
 ## Environments
 
 | Env | Frontend | Database |
