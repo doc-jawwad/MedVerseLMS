@@ -4,9 +4,12 @@
 // BEGIN...ROLLBACK controls the transaction; nothing here ever commits
 // fixture data. Requires PGTAP_DB_URL (or falls back to SUPABASE_DB_URL
 // from .env.local) and the pgtap extension (installed on first run).
-const fs = require("fs");
-const path = require("path");
-const { Client } = require("pg");
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
+import { Client } from "pg";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 function loadEnvLocal() {
   const p = path.join(__dirname, "..", ".env.local");

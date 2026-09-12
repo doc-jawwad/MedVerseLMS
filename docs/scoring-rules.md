@@ -36,9 +36,11 @@ Per-question `void_policy` chosen by admin at void time, recorded in audit log:
 After each scoring (and after recompute):
 ```
 rank       = RANK() OVER (ORDER BY score DESC, submitted_at ASC)   -- earlier submit wins ties
-percentile = round(100.0 × (n − rank) / greatest(n − 1, 1), 2)     -- n = submitted attempts
+percentile = round(100.0 × (n − rank) / (n − 1), 2)                -- n = submitted attempts, n > 1
 ```
 Only `submitted` attempts rank; `invalidated` are excluded. Re-run `rank_test(test_id)` on every submit (cheap at class scale).
+
+**n ≤ 1 (unranked):** with only one submitted attempt there is no comparison group, so a percentile is not meaningful — neither 0 nor 100 describes anything real. `percentile` is `null` in this case (displayed as "—"), while `rank` is still `1`. This is an explicit exception to the formula above, not a value it happens to produce.
 
 ## Determinism
 

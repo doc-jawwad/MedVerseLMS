@@ -4,15 +4,20 @@ import { signOutAction } from "@/lib/actions/auth";
 import { Button } from "@/components/ui/button";
 import { SessionWatch } from "@/components/session-watch";
 import { Logo } from "@/components/logo";
+import { MobileNav, type NavItem } from "@/components/mobile-nav";
 
-const nav = [
-  { href: "/dashboard", label: "Dashboard" },
-  { href: "/materials", label: "Study Materials" },
-  { href: "/practice", label: "Practice MCQs" },
-  { href: "/tests", label: "Tests" },
-  { href: "/performance", label: "Performance" },
-  { href: "/profile", label: "My Account" },
+const nav: NavItem[] = [
+  { href: "/dashboard", label: "Dashboard", icon: "dashboard" },
+  { href: "/materials", label: "Study Materials", icon: "materials" },
+  { href: "/practice", label: "Practice MCQs", icon: "practice" },
+  { href: "/tests", label: "Tests", icon: "tests" },
+  { href: "/performance", label: "Performance", icon: "performance" },
+  { href: "/profile", label: "My Account", icon: "account" },
 ];
+
+// The 4 most-used links pinned to the mobile bottom tab bar; a 5th "More"
+// tab opens the drawer with the full list above (Study Materials + Account).
+const bottomNav = [nav[0], nav[2], nav[3], nav[4]];
 
 export default async function StudentLayout({
   children,
@@ -57,20 +62,14 @@ export default async function StudentLayout({
         </form>
       </aside>
       <div className="flex-1">
-        <header className="flex items-center justify-between border-b bg-sidebar p-4 text-sidebar-foreground md:hidden">
-          <Logo size={24} />
-          <form action={signOutAction}>
-            <Button
-              variant="ghost"
-              size="sm"
-              type="submit"
-              className="text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-            >
-              Sign out
-            </Button>
-          </form>
-        </header>
-        <main className="p-4 md:p-8">{children}</main>
+        <MobileNav
+          navItems={nav}
+          bottomItems={bottomNav}
+          userLabel={profile.full_name}
+          subLabel={enrollment.year_name}
+          signOutAction={signOutAction}
+        />
+        <main className="p-4 pb-24 md:p-8">{children}</main>
       </div>
     </div>
   );

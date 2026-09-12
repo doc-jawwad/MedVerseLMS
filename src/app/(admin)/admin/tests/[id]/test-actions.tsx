@@ -69,6 +69,79 @@ export function RemoveQuestionButton({ testId, questionId }: { testId: string; q
   );
 }
 
+// Subject/difficulty changes navigate immediately (instead of requiring a
+// separate "Filter" submit) so the filter shown here and the filter used by
+// AddRandomButton (a server-computed prop from searchParams) can never
+// diverge — that mismatch previously let "Add N random" silently pull
+// questions outside the visibly-selected subject.
+export function QuestionFilterForm({
+  subjects,
+  filter,
+}: {
+  subjects: { id: string; name: string }[];
+  filter: { subject_id?: string; difficulty?: string; q?: string };
+}) {
+  const router = useRouter();
+
+  function navigate(next: { subject?: string; difficulty?: string; q?: string }) {
+    const params = new URLSearchParams();
+    const subject = next.subject ?? filter.subject_id ?? "";
+    const difficulty = next.difficulty ?? filter.difficulty ?? "";
+    const q = next.q ?? filter.q ?? "";
+    if (subject) params.set("subject", subject);
+    if (difficulty) params.set("difficulty", difficulty);
+    if (q) params.set("q", q);
+    router.push(`?${params.toString()}`);
+  }
+
+  return (
+    <form
+      className="flex flex-wrap gap-2 text-sm"
+      onSubmit={(e) => {
+        e.preventDefault();
+        const form = e.currentTarget;
+        navigate({
+          q: (form.elements.namedItem("q") as HTMLInputElement).value,
+        });
+      }}
+    >
+      <select
+        name="subject"
+        defaultValue={filter.subject_id ?? ""}
+        onChange={(e) => navigate({ subject: e.target.value })}
+        className="h-9 rounded-md border bg-transparent px-2"
+      >
+        <option value="">All subjects</option>
+        {subjects.map((s) => (
+          <option key={s.id} value={s.id}>
+            {s.name}
+          </option>
+        ))}
+      </select>
+      <select
+        name="difficulty"
+        defaultValue={filter.difficulty ?? ""}
+        onChange={(e) => navigate({ difficulty: e.target.value })}
+        className="h-9 rounded-md border bg-transparent px-2"
+      >
+        <option value="">Any difficulty</option>
+        <option value="easy">easy</option>
+        <option value="medium">medium</option>
+        <option value="hard">hard</option>
+      </select>
+      <input
+        name="q"
+        defaultValue={filter.q ?? ""}
+        placeholder="Search text…"
+        className="h-9 w-56 rounded-md border bg-transparent px-2"
+      />
+      <Button type="submit" variant="secondary" size="sm">
+        Search
+      </Button>
+    </form>
+  );
+}
+
 export function AddRandomButton({
   testId,
   filter,
@@ -159,7 +232,7 @@ export function PublishButton({ testId, allPass }: { testId: string; allPass: bo
   );
 }
 
-export function KillSwitchPanel({ testId }: { testId: string }) {
+export function KillSwitchPanel({ testId, status }: { testId: string; status: string }) {
   const { pending, run } = useAction();
   const [invalidateOpen, setInvalidateOpen] = useState(false);
   const [reason, setReason] = useState("");
@@ -167,9 +240,11 @@ export function KillSwitchPanel({ testId }: { testId: string }) {
 
   return (
     <div className="flex flex-wrap gap-2">
-      <Button variant="outline" disabled={pending} onClick={() => setCloseOpen(true)}>
-        Close test now
-      </Button>
+      {status === "published" && (
+        <Button variant="outline" disabled={pending} onClick={() => setCloseOpen(true)}>
+          Close test now
+        </Button>
+      )}
       <Button variant="destructive" disabled={pending} onClick={() => setInvalidateOpen(true)}>
         Invalidate test
       </Button>

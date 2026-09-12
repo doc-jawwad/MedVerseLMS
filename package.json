@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test:db": "node scripts/run-pgtap.js",
+    "test:db": "node scripts/run-pgtap.mjs",
     "test:e2e": "playwright test"
   },
   "dependencies": {

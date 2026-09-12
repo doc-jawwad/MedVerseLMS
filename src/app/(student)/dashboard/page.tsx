@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { requireStudent } from "@/lib/auth/require-user";
+import { formatDateTime } from "@/lib/utils";
 import {
   Card,
   CardContent,
@@ -80,7 +81,7 @@ export default async function DashboardPage() {
               </p>
               <p className="text-sm text-muted-foreground">
                 Available until{" "}
-                {nextTest.closes_at && new Date(nextTest.closes_at).toLocaleString()}
+                {nextTest.closes_at && formatDateTime(nextTest.closes_at)}
               </p>
               <Button asChild className="w-fit">
                 <Link href={`/tests/${nextTest.id}/attempt`}>Start test</Link>

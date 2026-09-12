@@ -71,20 +71,20 @@ export function ExamPlayer({
   const [confirmSubmit, setConfirmSubmit] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  // clock: preview simulates from mount; live uses server skew
-  const skewRef = useRef(0);
-  const endRef = useRef(0);
-  if (endRef.current === 0) {
+  // clock: preview simulates from mount; live uses server skew.
+  // Computed once via useState's lazy initializer (React's sanctioned
+  // run-once-at-mount hook) rather than by mutating refs during render —
+  // refs are then just seeded from that single computation for the
+  // interval callback below to read imperatively.
+  const [clock] = useState(() => {
     if (mode === "live" && expiresAtMs && serverNowMs) {
-      skewRef.current = serverNowMs - Date.now();
-      endRef.current = expiresAtMs;
-    } else {
-      endRef.current = Date.now() + (durationMinutes ?? 60) * 60_000;
+      return { skew: serverNowMs - Date.now(), end: expiresAtMs };
     }
-  }
-  const [msLeft, setMsLeft] = useState(
-    () => endRef.current - (Date.now() + skewRef.current)
-  );
+    return { skew: 0, end: Date.now() + (durationMinutes ?? 60) * 60_000 };
+  });
+  const skewRef = useRef(clock.skew);
+  const endRef = useRef(clock.end);
+  const [msLeft, setMsLeft] = useState(() => clock.end - (Date.now() + clock.skew));
   const expiredFired = useRef(false);
 
   useEffect(() => {

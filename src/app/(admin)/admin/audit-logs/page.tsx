@@ -1,4 +1,5 @@
 import { requireAdmin } from "@/lib/auth/require-user";
+import { formatDateTime } from "@/lib/utils";
 import {
   Table,
   TableBody,
@@ -126,7 +127,7 @@ export default async function AuditLogPage({
               return (
                 <TableRow key={l.id}>
                   <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
-                    {new Date(l.created_at).toLocaleString()}
+                    {formatDateTime(l.created_at)}
                   </TableCell>
                   <TableCell>{actor?.full_name ?? "system"}</TableCell>
                   <TableCell>

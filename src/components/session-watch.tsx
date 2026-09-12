@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
@@ -9,7 +9,10 @@ import { createClient } from "@/lib/supabase/client";
 // notices at the next full navigation; this catches it immediately.
 export function SessionWatch({ userId }: { userId: string }) {
   const router = useRouter();
-  const supabase = useRef(createClient()).current;
+  // useState's lazy initializer (not useRef(createClient()).current) —
+  // guaranteed by React to run exactly once per mount, so the client isn't
+  // constructed and thrown away on every render.
+  const [supabase] = useState(() => createClient());
 
   useEffect(() => {
     let cancelled = false;

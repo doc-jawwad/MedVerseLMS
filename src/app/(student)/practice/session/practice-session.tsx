@@ -62,7 +62,10 @@ export function PracticeSession({
     return (data ?? []) as PracticeQuestion[];
   }, [supabase, scopeType, scopeId]);
 
+  const initialFetchStarted = useRef(false);
   useEffect(() => {
+    if (initialFetchStarted.current) return;
+    initialFetchStarted.current = true;
     void fetchBatch().then((batch) => setQueue(batch));
   }, [fetchBatch]);
 

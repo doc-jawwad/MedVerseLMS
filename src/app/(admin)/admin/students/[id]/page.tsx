@@ -1,12 +1,12 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireAdmin } from "@/lib/auth/require-user";
+import { formatDateTime } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -71,12 +71,12 @@ export default async function StudentProfilePage({
             <Row label="Year">{p.enrollment?.year_name ?? "—"}</Row>
             <Row label="Last login">
               {p.profile.last_login_at
-                ? new Date(p.profile.last_login_at).toLocaleString()
+                ? formatDateTime(p.profile.last_login_at)
                 : "Never"}
             </Row>
             <Row label="Last test">
               {p.performance.last_test_at
-                ? new Date(p.performance.last_test_at).toLocaleString()
+                ? formatDateTime(p.performance.last_test_at)
                 : "Never"}
             </Row>
           </CardContent>
@@ -94,7 +94,11 @@ export default async function StudentProfilePage({
               </div>
             ))}
             {p.subject_access.length === 0 && (
-              <p className="text-muted-foreground">No enrollment yet.</p>
+              <p className="text-muted-foreground">
+                {p.enrollment
+                  ? `No active access (enrollment is ${p.enrollment.status}).`
+                  : "No enrollment yet."}
+              </p>
             )}
           </CardContent>
         </Card>

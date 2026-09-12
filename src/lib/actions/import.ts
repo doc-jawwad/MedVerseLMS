@@ -17,6 +17,12 @@ export type ImportRow = {
   difficulty: string;
   tags: string[];
   status: string;
+  /** Client-side validation failures (missing options, bad correct key, …).
+   * When present, the server records an 'error' import_rows entry for this
+   * row and does not attempt to create a question from it — this is what
+   * gives every rejected row a permanent audit trail instead of only a
+   * transient client-side preview. */
+  client_errors?: string[];
 };
 
 export async function createImportBatch(filename: string, totalRows: number) {

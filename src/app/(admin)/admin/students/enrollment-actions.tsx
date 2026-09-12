@@ -192,7 +192,7 @@ export function EnrollmentActions({ enrollmentId, studentId, yearId, status }: P
               })}
               {access.subjects.length === 0 && (
                 <p className="text-sm text-muted-foreground">
-                  No subjects in this student's year yet.
+                  No subjects in this student&apos;s year yet.
                 </p>
               )}
             </div>

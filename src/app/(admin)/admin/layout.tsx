@@ -4,16 +4,21 @@ import { signOutAction } from "@/lib/actions/auth";
 import { Button } from "@/components/ui/button";
 import { SessionWatch } from "@/components/session-watch";
 import { Logo } from "@/components/logo";
+import { MobileNav, type NavItem } from "@/components/mobile-nav";
 
-const nav = [
-  { href: "/admin", label: "Overview" },
-  { href: "/admin/students", label: "Students" },
-  { href: "/admin/curriculum", label: "Curriculum" },
-  { href: "/admin/questions", label: "Question Bank" },
-  { href: "/admin/tests", label: "Tests" },
-  { href: "/admin/materials", label: "Materials" },
-  { href: "/admin/audit-logs", label: "Audit Log" },
+const nav: NavItem[] = [
+  { href: "/admin", label: "Overview", icon: "dashboard" },
+  { href: "/admin/students", label: "Students", icon: "students" },
+  { href: "/admin/curriculum", label: "Curriculum", icon: "curriculum" },
+  { href: "/admin/questions", label: "Question Bank", icon: "questions" },
+  { href: "/admin/tests", label: "Tests", icon: "tests" },
+  { href: "/admin/materials", label: "Materials", icon: "materialsFolder" },
+  { href: "/admin/audit-logs", label: "Audit Log", icon: "auditLog" },
 ];
+
+// The 4 most-used links pinned to the mobile bottom tab bar; a 5th "More"
+// tab opens the drawer with the full list above (Curriculum + Materials + Audit Log).
+const bottomNav = [nav[0], nav[1], nav[4], nav[3]];
 
 export default async function AdminLayout({
   children,
@@ -56,20 +61,14 @@ export default async function AdminLayout({
         </form>
       </aside>
       <div className="flex-1">
-        <header className="flex items-center justify-between border-b bg-sidebar p-4 text-sidebar-foreground md:hidden">
-          <Logo size={24} />
-          <form action={signOutAction}>
-            <Button
-              variant="ghost"
-              size="sm"
-              type="submit"
-              className="text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-            >
-              Sign out
-            </Button>
-          </form>
-        </header>
-        <main className="p-4 md:p-8">{children}</main>
+        <MobileNav
+          navItems={nav}
+          bottomItems={bottomNav}
+          userLabel={profile.full_name}
+          subLabel="Admin"
+          signOutAction={signOutAction}
+        />
+        <main className="p-4 pb-24 md:p-8">{children}</main>
       </div>
     </div>
   );

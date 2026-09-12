@@ -67,7 +67,7 @@ CRON_SECRET=                    # guards /api/cron/auto-submit
 
 - `npm run test:db` — runs the pgTAP suite in `supabase/tests/` (RLS matrix +
   scoring/exam-engine regressions) against `SUPABASE_DB_URL` in `.env.local`
-  via `scripts/run-pgtap.js`. Every file wraps its fixtures in
+  via `scripts/run-pgtap.mjs`. Every file wraps its fixtures in
   `BEGIN...ROLLBACK`, so it's safe to run against the shared dev/cloud
   database — nothing persists. Once local Supabase (Docker) is available,
   the same files work unmodified under `supabase test db`.

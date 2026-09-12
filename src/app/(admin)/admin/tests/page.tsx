@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { requireAdmin } from "@/lib/auth/require-user";
+import { formatDateTime } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -76,9 +77,9 @@ export default async function AdminTestsPage() {
                   <TableCell>{s?.name ?? "—"}</TableCell>
                   <TableCell>{qc}</TableCell>
                   <TableCell className="text-sm text-muted-foreground">
-                    {t.opens_at ? new Date(t.opens_at).toLocaleString() : "unscheduled"}
+                    {t.opens_at ? formatDateTime(t.opens_at) : "unscheduled"}
                     {" → "}
-                    {t.closes_at ? new Date(t.closes_at).toLocaleString() : "?"}
+                    {t.closes_at ? formatDateTime(t.closes_at) : "?"}
                   </TableCell>
                   <TableCell>
                     <Badge variant={statusVariant[t.status] ?? "outline"}>{t.status}</Badge>

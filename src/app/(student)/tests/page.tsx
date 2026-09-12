@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { requireStudent } from "@/lib/auth/require-user";
+import { formatDateTime } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -29,6 +30,7 @@ export default async function StudentTestsPage() {
       .neq("state", "invalidated"),
   ]);
 
+  // eslint-disable-next-line react-hooks/purity -- RSC renders once per request, never re-renders client-side
   const now = Date.now();
   const rows = (tests ?? []).map((t) => {
     const attempt = (attempts ?? []).find((a) => a.test_id === t.id);
@@ -77,10 +79,10 @@ export default async function StudentTestsPage() {
                     <CardContent className="grid gap-2 text-sm">
                       <p className="text-muted-foreground">
                         {t.opens_at && (
-                          <>Opens: {new Date(t.opens_at).toLocaleString()}<br /></>
+                          <>Opens: {formatDateTime(t.opens_at)}<br /></>
                         )}
                         {t.closes_at && (
-                          <>Closes: {new Date(t.closes_at).toLocaleString()}</>
+                          <>Closes: {formatDateTime(t.closes_at)}</>
                         )}
                       </p>
                       {sec.key === "available" && (

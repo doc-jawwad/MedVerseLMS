@@ -8,6 +8,7 @@ import {
   AudiencePicker,
   KillSwitchPanel,
   PublishButton,
+  QuestionFilterForm,
   RemoveQuestionButton,
   VoidQuestionButton,
 } from "./test-actions";
@@ -129,7 +130,9 @@ export default async function TestDetailPage({
             <Link href={`/admin/tests/${id}/results`}>Results</Link>
           </Button>
         )}
-        {test.status === "published" && <KillSwitchPanel testId={id} />}
+        {(test.status === "published" || test.status === "closed") && (
+          <KillSwitchPanel testId={id} status={test.status} />
+        )}
       </div>
 
       <Card>
@@ -204,25 +207,10 @@ export default async function TestDetailPage({
             <CardTitle className="text-base">Add questions</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-4">
-            <form className="flex flex-wrap gap-2 text-sm">
-              <select name="subject" defaultValue={filters.subject ?? ""}
-                className="h-9 rounded-md border bg-transparent px-2">
-                <option value="">All subjects</option>
-                {yearSubjects.map((s) => (
-                  <option key={s.id} value={s.id}>{s.name}</option>
-                ))}
-              </select>
-              <select name="difficulty" defaultValue={filters.difficulty ?? ""}
-                className="h-9 rounded-md border bg-transparent px-2">
-                <option value="">Any difficulty</option>
-                <option value="easy">easy</option>
-                <option value="medium">medium</option>
-                <option value="hard">hard</option>
-              </select>
-              <input name="q" defaultValue={filters.q ?? ""} placeholder="Search text…"
-                className="h-9 w-56 rounded-md border bg-transparent px-2" />
-              <Button type="submit" variant="secondary" size="sm">Filter</Button>
-            </form>
+            <QuestionFilterForm
+              subjects={yearSubjects}
+              filter={{ subject_id: filters.subject, difficulty: filters.difficulty, q: filters.q }}
+            />
 
             <AddRandomButton testId={id} filter={filter} poolSize={pool.length} />
 

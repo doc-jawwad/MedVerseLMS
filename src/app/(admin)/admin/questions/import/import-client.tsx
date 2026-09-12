@@ -9,6 +9,7 @@ import {
   importChunk,
   type ImportRow,
 } from "@/lib/actions/import";
+import { formatDateTime } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -99,12 +100,12 @@ function toImportRow(r: ParsedRow, subjectId: string, status: string): ImportRow
   return {
     row_number: r.row_number,
     subject_id: subjectId,
-    book: raw.book.trim(),
-    chapter: raw.chapter.trim(),
-    topic: raw.topic.trim(),
-    stem: raw.question.trim(),
+    book: (raw.book ?? "").trim(),
+    chapter: (raw.chapter ?? "").trim(),
+    topic: (raw.topic ?? "").trim(),
+    stem: (raw.question ?? "").trim(),
     options,
-    correct_key: raw.correct.trim().toUpperCase(),
+    correct_key: (raw.correct ?? "").trim().toUpperCase(),
     explanation: (raw.explanation ?? "").trim(),
     reference: (raw.reference ?? "").trim(),
     difficulty: (raw.difficulty ?? "medium").trim().toLowerCase() || "medium",
@@ -113,6 +114,7 @@ function toImportRow(r: ParsedRow, subjectId: string, status: string): ImportRow
       .map((t) => t.trim())
       .filter(Boolean),
     status,
+    ...(r.errors.length > 0 ? { client_errors: r.errors } : {}),
   };
 }
 
@@ -219,8 +221,11 @@ export function ImportClient({
       if ("error" in batchRes && batchRes.error) throw new Error(batchRes.error);
       const batchId = (batchRes as { id: string }).id;
 
-      const payload = validRows.map((r) => toImportRow(r, subjectId, status));
-      const totals = { inserted: 0, skipped: 0, errors: invalidRows.length };
+      // Every parsed row is sent — invalid ones carry `client_errors` so the
+      // server records a permanent 'error' import_rows entry for them too,
+      // instead of only showing up in this transient preview table.
+      const payload = rows.map((r) => toImportRow(r, subjectId, status));
+      const totals = { inserted: 0, skipped: 0, errors: 0 };
       const CHUNK = 100;
       for (let i = 0; i < payload.length; i += CHUNK) {
         setProgress(`Importing ${i + 1}–${Math.min(i + CHUNK, payload.length)} of ${payload.length}…`);
@@ -353,15 +358,16 @@ export function ImportClient({
               <div className="flex items-center gap-3">
                 <Button
                   onClick={runImport}
-                  disabled={importing || validRows.length === 0 || !subjectId}
+                  disabled={importing || rows.length === 0 || !subjectId}
                 >
                   {importing
                     ? progress || "Importing…"
-                    : `Import ${validRows.length} questions`}
+                    : `Import ${validRows.length} question${validRows.length === 1 ? "" : "s"}`}
                 </Button>
                 {invalidRows.length > 0 && (
                   <span className="text-sm text-muted-foreground">
-                    Rows with errors are skipped.
+                    {invalidRows.length} row{invalidRows.length === 1 ? "" : "s"} with errors
+                    will be recorded, not created.
                   </span>
                 )}
               </div>
@@ -404,7 +410,7 @@ export function ImportClient({
                     <TableCell>{b.skipped_duplicates}</TableCell>
                     <TableCell>{b.errors}</TableCell>
                     <TableCell>
-                      {new Date(b.created_at).toLocaleString()}
+                      {formatDateTime(b.created_at)}
                     </TableCell>
                   </TableRow>
                 ))}

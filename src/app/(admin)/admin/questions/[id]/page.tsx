@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { requireAdmin } from "@/lib/auth/require-user";
+import { formatDateTime } from "@/lib/utils";
 import { QuestionEditor } from "../question-editor";
 import { loadCurriculum } from "../curriculum-data";
 import { StatusControls } from "./status-controls";
@@ -73,7 +74,7 @@ export default async function EditQuestionPage({
         <ul className="grid gap-1 text-sm text-muted-foreground">
           {(history ?? []).map((v) => (
             <li key={v.id}>
-              v{v.version_no} — {new Date(v.created_at).toLocaleString()}
+              v{v.version_no} — {formatDateTime(v.created_at)}
               {v.id === q.current_version_id && " (current)"}
             </li>
           ))}

@@ -1,4 +1,5 @@
 import { requireAdmin } from "@/lib/auth/require-user";
+import { formatDate } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -128,7 +129,7 @@ export default async function StudentsPage({
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    {new Date(e.created_at).toLocaleDateString()}
+                    {formatDate(e.created_at)}
                   </TableCell>
                   <TableCell className="text-right">
                     <EnrollmentActions

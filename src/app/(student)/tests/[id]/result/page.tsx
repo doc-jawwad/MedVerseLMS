@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireStudent } from "@/lib/auth/require-user";
+import { formatDateTime } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -57,7 +58,7 @@ export default async function ResultPage({
   let review: Review | null = null;
   type LeaderRow = {
     rank: number;
-    percentile: number;
+    percentile: number | null;
     full_name: string;
     score: number;
     max_score: number;
@@ -120,11 +121,14 @@ export default async function ResultPage({
           {submitted.rank != null && (
             <div className="grid grid-cols-2 gap-3 sm:w-1/2">
               <Stat label="Rank" value={`#${submitted.rank}`} />
-              <Stat label="Percentile" value={`${submitted.percentile}`} />
+              <Stat
+                label="Percentile"
+                value={submitted.percentile != null ? `${submitted.percentile}` : "—"}
+              />
             </div>
           )}
           <p className="text-sm text-muted-foreground">
-            Submitted {submitted.submitted_at && new Date(submitted.submitted_at).toLocaleString()}
+            Submitted {submitted.submitted_at && formatDateTime(submitted.submitted_at)}
             {submitted.submit_source === "auto" && " (auto-submitted at time expiry)"}
             {Number(test.negative_mark) > 0 &&
               ` · negative marking −${test.negative_mark} per wrong answer`}
@@ -160,7 +164,7 @@ export default async function ResultPage({
               <CardContent className="pt-6 text-sm text-muted-foreground">
                 {review.reason === "review_disabled"
                   ? "Answer review is not available for this test."
-                  : `Answers and explanations become visible after the test closes (${new Date(test.closes_at).toLocaleString()}).`}
+                  : `Answers and explanations become visible after the test closes (${formatDateTime(test.closes_at)}).`}
               </CardContent>
             </Card>
           )}

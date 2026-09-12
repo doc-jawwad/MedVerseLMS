@@ -45,14 +45,17 @@ export async function updateTestConfig(testId: string, config: Partial<TestConfi
 
 export async function addQuestionToTest(testId: string, questionId: string) {
   const supabase = await createClient();
-  const { count } = await supabase
+  const { data: maxRow } = await supabase
     .from("test_questions")
-    .select("id", { count: "exact", head: true })
-    .eq("test_id", testId);
+    .select("position")
+    .eq("test_id", testId)
+    .order("position", { ascending: false })
+    .limit(1)
+    .maybeSingle();
   const { error } = await supabase.from("test_questions").insert({
     test_id: testId,
     question_id: questionId,
-    position: (count ?? 0) + 1,
+    position: (maxRow?.position ?? 0) + 1,
   });
   reval(testId);
   return { error: error?.message };
@@ -67,6 +70,9 @@ export type QuestionFilter = {
 };
 
 // "Add N randomly from this filtered set" — a builder convenience, not autopilot.
+// Always scoped to the test's own year — a test must never pull random
+// questions from a different year's curriculum regardless of what other
+// filters are (or aren't) applied.
 export async function addRandomQuestions(
   testId: string,
   filter: QuestionFilter,
@@ -74,13 +80,24 @@ export async function addRandomQuestions(
 ) {
   const supabase = await createClient();
 
+  const { data: test } = await supabase
+    .from("tests")
+    .select("year_id")
+    .eq("id", testId)
+    .single();
+  if (!test) return { error: "Test not found." };
+
   const { data: existing } = await supabase
     .from("test_questions")
     .select("question_id")
     .eq("test_id", testId);
   const excluded = new Set((existing ?? []).map((r) => r.question_id));
 
-  let q = supabase.from("questions").select("id").eq("status", "approved");
+  let q = supabase
+    .from("questions")
+    .select("id")
+    .eq("status", "approved")
+    .eq("year_id", test.year_id);
   if (filter.subject_id) q = q.eq("subject_id", filter.subject_id);
   if (filter.book_id) q = q.eq("book_id", filter.book_id);
   if (filter.chapter_id) q = q.eq("chapter_id", filter.chapter_id);

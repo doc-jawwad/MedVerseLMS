@@ -61,7 +61,10 @@ const ERROR_COPY: Record<string, { title: string; body: string }> = {
 
 export function AttemptClient({ testId }: { testId: string }) {
   const router = useRouter();
-  const supabase = useRef(createClient()).current;
+  // useState's lazy initializer — guaranteed to run exactly once per mount,
+  // unlike useRef(createClient()).current which constructs (and discards) a
+  // new client on every render.
+  const [supabase] = useState(() => createClient());
   const [payload, setPayload] = useState<StartPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [tabBlocked, setTabBlocked] = useState(false);
@@ -74,6 +77,13 @@ export function AttemptClient({ testId }: { testId: string }) {
   const flushingRef = useRef(false);
   const attemptIdRef = useRef<string | null>(null);
   const deviceIdRef = useRef<string>("");
+
+  // `flush` retries itself (via setTimeout) on failure. Referencing `flush`
+  // by name inside its own body is a real temporal-dead-zone hazard for
+  // static analysis (and stale-closure risk if its deps ever changed), so
+  // the recursive calls go through a ref that's populated post-render in an
+  // effect below — same timing/semantics as before, no self-reference.
+  const flushRef = useRef<() => void>(() => {});
 
   const flush = useCallback(async () => {
     if (flushingRef.current || !attemptIdRef.current) return;
@@ -110,13 +120,17 @@ export function AttemptClient({ testId }: { testId: string }) {
     flushingRef.current = false;
     if (failed > 0) {
       setSaveStatus(`Offline — ${pendingRef.current.size} unsaved, retrying…`);
-      setTimeout(() => void flush(), 4000);
+      setTimeout(() => flushRef.current(), 4000);
     } else if (pendingRef.current.size > 0) {
-      void flush();
+      flushRef.current();
     } else {
       setSaveStatus("Saved");
     }
   }, [supabase]);
+
+  useEffect(() => {
+    flushRef.current = () => void flush();
+  }, [flush]);
 
   const queueSave = useCallback(
     (qvId: string, state: AnswerState) => {
@@ -204,6 +218,10 @@ export function AttemptClient({ testId }: { testId: string }) {
     })();
   }, [supabase, testId, router]);
 
+  // Same ref-forwarding treatment as `flush` above — `submit` retries itself
+  // on failure via setTimeout.
+  const submitRef = useRef<() => void>(() => {});
+
   const submit = useCallback(async () => {
     if (!attemptIdRef.current) return;
     if (flushTimer.current) clearTimeout(flushTimer.current);
@@ -214,11 +232,15 @@ export function AttemptClient({ testId }: { testId: string }) {
     });
     if (error && !error.message.includes("already")) {
       setSaveStatus("Submit failed — retrying…");
-      setTimeout(() => void submit(), 3000);
+      setTimeout(() => submitRef.current(), 3000);
       return;
     }
     router.replace(`/tests/${testId}/result`);
   }, [flush, supabase, router, testId]);
+
+  useEffect(() => {
+    submitRef.current = () => void submit();
+  }, [submit]);
 
   if (tabBlocked) {
     return (

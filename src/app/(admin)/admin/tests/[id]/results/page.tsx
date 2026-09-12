@@ -137,7 +137,7 @@ export default async function TestResultsPage({
                     {r.score} / {r.max_score}
                   </TableCell>
                   <TableCell>{r.percentage}%</TableCell>
-                  <TableCell>{r.percentile}</TableCell>
+                  <TableCell>{r.percentile != null ? r.percentile : "—"}</TableCell>
                 </TableRow>
               ))}
               {(leaderboard ?? []).length === 0 && (
