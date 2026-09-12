@@ -2,6 +2,7 @@ import Link from "next/link";
 import { requireStudent } from "@/lib/auth/require-user";
 import { signOutAction } from "@/lib/actions/auth";
 import { Button } from "@/components/ui/button";
+import { SessionWatch } from "@/components/session-watch";
 
 const nav = [
   { href: "/dashboard", label: "Dashboard" },
@@ -17,10 +18,11 @@ export default async function StudentLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { profile, enrollment } = await requireStudent();
+  const { profile, enrollment, userId } = await requireStudent();
 
   return (
     <div className="flex min-h-svh">
+      <SessionWatch userId={userId} />
       <aside className="hidden w-60 shrink-0 flex-col border-r bg-muted/30 p-4 md:flex">
         <div className="mb-6">
           <div className="text-lg font-semibold">MedVerse LMS</div>
