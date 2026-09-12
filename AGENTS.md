@@ -7,3 +7,11 @@ This version has breaking changes — APIs, conventions, and file structure may 
 This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
 
 <!-- END:nextjs-agent-rules -->
+
+# MedVerse LMS project rules
+
+- `docs/` is canonical: architecture.md, database.md, permissions.md, exam-state-machine.md, scoring-rules.md, test-rules.md, deployment.md. **Do not invent alternative attempt states, transitions, grace periods, or access rules — change the doc first (with approval), then the code.**
+- All schema changes go through `supabase/migrations/*.sql` — never dashboard-only changes.
+- Everything security/correctness-critical is enforced in Postgres (RLS deny-by-default, constraints, security-definer RPCs). App checks are UX only.
+- Next.js 16: use `src/proxy.ts` (not middleware.ts); `cookies()`/`headers()`/`params`/`searchParams` are async.
+- No new tech (Redis, websockets, separate backend, etc.) — see docs/architecture.md exclusions.
