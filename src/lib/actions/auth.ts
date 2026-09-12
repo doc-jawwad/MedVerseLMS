@@ -148,3 +148,25 @@ export async function updatePassword(
     .single();
   redirect(profile?.role === "admin" ? "/admin" : "/dashboard");
 }
+
+// Voluntary password change from within the app (My Account) — unlike
+// updatePassword above, this stays on the page and doesn't touch the
+// session, since the user is already fully authenticated.
+export async function changePassword(
+  _prev: AuthResult | undefined,
+  formData: FormData
+): Promise<AuthResult> {
+  const password = String(formData.get("password") ?? "");
+  const confirm = String(formData.get("confirm") ?? "");
+  if (password.length < 8) {
+    return { error: "Password must be at least 8 characters." };
+  }
+  if (password !== confirm) {
+    return { error: "Passwords do not match." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.auth.updateUser({ password });
+  if (error) return { error: error.message };
+  return {};
+}
