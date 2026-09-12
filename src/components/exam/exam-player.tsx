@@ -1,0 +1,296 @@
+"use client";
+
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+
+export type ExamQuestion = {
+  question_version_id: string;
+  stem: string;
+  options: { key: string; text: string }[];
+};
+
+export type AnswerState = {
+  selected_key: string | null;
+  marked_for_review: boolean;
+};
+
+export type ExamPlayerProps = {
+  mode: "preview" | "live";
+  title: string;
+  questions: ExamQuestion[];
+  /** preview: minutes to simulate. */
+  durationMinutes?: number;
+  /** live: server timestamps for the authoritative countdown. */
+  expiresAtMs?: number;
+  serverNowMs?: number;
+  initialAnswers?: Record<string, AnswerState>;
+  /** live callbacks; the harness in the attempt page owns persistence. */
+  onAnswer?: (qvId: string, state: AnswerState) => void;
+  onSubmit?: () => Promise<void> | void;
+  /** e.g. "Saved", "Saving…", "Offline — 3 unsaved" */
+  saveStatus?: string;
+  /** auto-submit driven by the page (live) fires this when the clock hits 0 */
+  onExpired?: () => void;
+};
+
+function formatClock(msLeft: number) {
+  const total = Math.max(0, Math.floor(msLeft / 1000));
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${m}:${pad(s)}`;
+}
+
+export function ExamPlayer({
+  mode,
+  title,
+  questions,
+  durationMinutes,
+  expiresAtMs,
+  serverNowMs,
+  initialAnswers,
+  onAnswer,
+  onSubmit,
+  saveStatus,
+  onExpired,
+}: ExamPlayerProps) {
+  const [index, setIndex] = useState(0);
+  const [answers, setAnswers] = useState<Record<string, AnswerState>>(
+    initialAnswers ?? {}
+  );
+  const [confirmSubmit, setConfirmSubmit] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+
+  // clock: preview simulates from mount; live uses server skew
+  const skewRef = useRef(0);
+  const endRef = useRef(0);
+  if (endRef.current === 0) {
+    if (mode === "live" && expiresAtMs && serverNowMs) {
+      skewRef.current = serverNowMs - Date.now();
+      endRef.current = expiresAtMs;
+    } else {
+      endRef.current = Date.now() + (durationMinutes ?? 60) * 60_000;
+    }
+  }
+  const [msLeft, setMsLeft] = useState(
+    () => endRef.current - (Date.now() + skewRef.current)
+  );
+  const expiredFired = useRef(false);
+
+  useEffect(() => {
+    const t = setInterval(() => {
+      const left = endRef.current - (Date.now() + skewRef.current);
+      setMsLeft(left);
+      if (left <= 0 && !expiredFired.current) {
+        expiredFired.current = true;
+        onExpired?.();
+      }
+    }, 500);
+    return () => clearInterval(t);
+  }, [onExpired]);
+
+  const current = questions[index];
+  const answeredCount = useMemo(
+    () =>
+      questions.filter((q) => answers[q.question_version_id]?.selected_key)
+        .length,
+    [questions, answers]
+  );
+
+  if (!current) {
+    return <p className="text-muted-foreground">This test has no questions.</p>;
+  }
+
+  const state: AnswerState = answers[current.question_version_id] ?? {
+    selected_key: null,
+    marked_for_review: false,
+  };
+
+  function update(qvId: string, next: AnswerState) {
+    setAnswers((a) => ({ ...a, [qvId]: next }));
+    onAnswer?.(qvId, next);
+  }
+
+  async function submit() {
+    setConfirmSubmit(false);
+    setSubmitting(true);
+    try {
+      await onSubmit?.();
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  const low = msLeft < 5 * 60_000;
+
+  return (
+    <div className="grid gap-4 lg:grid-cols-[1fr_240px]">
+      {/* main */}
+      <div className="grid content-start gap-4">
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-3">
+          <div className="min-w-0">
+            <p className="truncate font-medium">{title}</p>
+            <p className="text-xs text-muted-foreground">
+              Question {index + 1} of {questions.length} · {answeredCount} answered
+            </p>
+          </div>
+          <div className="flex items-center gap-3">
+            {saveStatus && (
+              <span className="text-xs text-muted-foreground">{saveStatus}</span>
+            )}
+            <span
+              className={`rounded-md px-2 py-1 font-mono text-lg font-semibold ${
+                low ? "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300" : "bg-muted"
+              }`}
+              aria-label="time remaining"
+            >
+              {formatClock(msLeft)}
+            </span>
+          </div>
+        </div>
+
+        <Card>
+          <CardContent className="grid gap-3 pt-6">
+            <p className="whitespace-pre-wrap text-base leading-relaxed">
+              <span className="mr-2 font-semibold">{index + 1}.</span>
+              {current.stem}
+            </p>
+            <div className="grid gap-2">
+              {current.options.map((o) => {
+                const selected = state.selected_key === o.key;
+                return (
+                  <button
+                    key={o.key}
+                    onClick={() =>
+                      update(current.question_version_id, {
+                        ...state,
+                        selected_key: selected ? null : o.key,
+                      })
+                    }
+                    className={`rounded-md border p-3 text-left text-sm transition-colors ${
+                      selected
+                        ? "border-primary bg-accent font-medium"
+                        : "hover:bg-accent/50"
+                    }`}
+                  >
+                    <span className="mr-2 font-semibold">{o.key}.</span>
+                    {o.text}
+                  </button>
+                );
+              })}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Click a selected option again to clear it.
+            </p>
+          </CardContent>
+        </Card>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            variant="outline"
+            disabled={index === 0}
+            onClick={() => setIndex(index - 1)}
+          >
+            ← Previous
+          </Button>
+          <Button
+            variant="outline"
+            disabled={index === questions.length - 1}
+            onClick={() => setIndex(index + 1)}
+          >
+            Next →
+          </Button>
+          <Button
+            variant={state.marked_for_review ? "default" : "outline"}
+            onClick={() =>
+              update(current.question_version_id, {
+                ...state,
+                marked_for_review: !state.marked_for_review,
+              })
+            }
+          >
+            {state.marked_for_review ? "★ Marked" : "☆ Mark for review"}
+          </Button>
+          <div className="flex-1" />
+          <Button
+            variant="destructive"
+            disabled={submitting}
+            onClick={() => setConfirmSubmit(true)}
+          >
+            {submitting ? "Submitting…" : "Submit exam"}
+          </Button>
+        </div>
+      </div>
+
+      {/* palette */}
+      <div className="order-first rounded-md border p-3 lg:order-none">
+        <p className="mb-2 text-sm font-medium">Questions</p>
+        <div className="grid grid-cols-8 gap-1 sm:grid-cols-10 lg:grid-cols-5">
+          {questions.map((q, i) => {
+            const a = answers[q.question_version_id];
+            const isCurrent = i === index;
+            return (
+              <button
+                key={q.question_version_id}
+                onClick={() => setIndex(i)}
+                className={`flex h-8 items-center justify-center rounded text-xs font-medium transition-colors ${
+                  isCurrent
+                    ? "ring-2 ring-primary"
+                    : ""
+                } ${
+                  a?.marked_for_review
+                    ? "bg-amber-200 text-amber-900 dark:bg-amber-800 dark:text-amber-100"
+                    : a?.selected_key
+                      ? "bg-green-200 text-green-900 dark:bg-green-800 dark:text-green-100"
+                      : "bg-muted text-muted-foreground"
+                }`}
+                aria-label={`Question ${i + 1}`}
+              >
+                {i + 1}
+              </button>
+            );
+          })}
+        </div>
+        <div className="mt-3 grid gap-1 text-xs text-muted-foreground">
+          <span><span className="mr-1 inline-block h-2 w-2 rounded bg-green-300" /> answered</span>
+          <span><span className="mr-1 inline-block h-2 w-2 rounded bg-amber-300" /> marked for review</span>
+          <span><span className="mr-1 inline-block h-2 w-2 rounded bg-muted-foreground/30" /> unanswered</span>
+        </div>
+      </div>
+
+      <Dialog open={confirmSubmit} onOpenChange={setConfirmSubmit}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Submit the exam?</DialogTitle>
+            <DialogDescription>
+              You have answered {answeredCount} of {questions.length} questions.
+              {answeredCount < questions.length &&
+                ` ${questions.length - answeredCount} are blank.`}{" "}
+              {mode === "preview"
+                ? "This is a preview — nothing is recorded."
+                : "You cannot change answers after submitting."}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmSubmit(false)}>
+              Keep answering
+            </Button>
+            <Button variant="destructive" onClick={submit}>
+              Submit now
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
