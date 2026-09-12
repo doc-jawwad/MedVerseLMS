@@ -146,7 +146,9 @@ export function ExamPlayer({
           </div>
           <div className="flex items-center gap-3">
             {saveStatus && (
-              <span className="text-xs text-muted-foreground">{saveStatus}</span>
+              <span data-testid="save-status" className="text-xs text-muted-foreground">
+                {saveStatus}
+              </span>
             )}
             <span
               className={`rounded-md px-2 py-1 font-mono text-lg font-semibold ${
@@ -171,6 +173,8 @@ export function ExamPlayer({
                 return (
                   <button
                     key={o.key}
+                    data-testid={`option-${o.key}`}
+                    aria-pressed={selected}
                     onClick={() =>
                       update(current.question_version_id, {
                         ...state,
