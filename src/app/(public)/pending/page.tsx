@@ -8,6 +8,7 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { signOutAction } from "@/lib/actions/auth";
+import { Logo } from "@/components/logo";
 
 export const metadata = { title: "Pending approval — MedVerse LMS" };
 
@@ -23,6 +24,7 @@ export default async function PendingPage({
     <div className="flex min-h-svh items-center justify-center p-4">
       <Card className="w-full max-w-md">
         <CardHeader>
+          <Logo dark className="mb-2" />
           <CardTitle>
             {noEnrollment ? "No active enrollment" : "Awaiting approval"}
           </CardTitle>

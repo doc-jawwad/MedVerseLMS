@@ -4,6 +4,7 @@ import { useActionState } from "react";
 import Link from "next/link";
 import { signIn, type AuthResult } from "@/lib/actions/auth";
 import { Button } from "@/components/ui/button";
+import { Logo } from "@/components/logo";
 import {
   Card,
   CardContent,
@@ -24,8 +25,9 @@ export function LoginForm({ next, reason }: { next?: string; reason?: string }) 
   return (
     <Card className="w-full max-w-sm">
       <CardHeader>
-        <CardTitle>MedVerse LMS</CardTitle>
-        <CardDescription>Sign in to your account</CardDescription>
+        <Logo dark className="mb-2" />
+        <CardTitle>Sign in</CardTitle>
+        <CardDescription>Access your MedVerse LMS account</CardDescription>
       </CardHeader>
       <CardContent>
         {reason === "kicked" && (
@@ -43,7 +45,15 @@ export function LoginForm({ next, reason }: { next?: string; reason?: string }) 
             <Input id="email" name="email" type="email" required autoComplete="email" />
           </div>
           <div className="grid gap-2">
-            <Label htmlFor="password">Password</Label>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="password">Password</Label>
+              <Link
+                href="/forgot-password"
+                className="text-xs text-muted-foreground underline"
+              >
+                Forgot password?
+              </Link>
+            </div>
             <Input
               id="password"
               name="password"

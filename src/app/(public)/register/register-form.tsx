@@ -4,6 +4,7 @@ import { useActionState } from "react";
 import Link from "next/link";
 import { signUp, type AuthResult } from "@/lib/actions/auth";
 import { Button } from "@/components/ui/button";
+import { Logo } from "@/components/logo";
 import {
   Card,
   CardContent,
@@ -32,6 +33,7 @@ export function RegisterForm({ years }: { years: Year[] }) {
   return (
     <Card className="w-full max-w-sm">
       <CardHeader>
+        <Logo dark className="mb-2" />
         <CardTitle>Create your account</CardTitle>
         <CardDescription>
           Your account will need admin approval before you get access.

@@ -48,73 +48,82 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
+/* MedVerse Healthcare brand: navy #072855 + teal #05AEA9, sampled directly
+   from the logo (see docs/architecture.md). Keep these two in sync with the
+   logo if it's ever updated. */
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
+  --brand-navy: #072855;
+  --brand-teal: #05aea9;
+
+  --background: #ffffff;
+  --foreground: #0b1f3a;
+  --card: #ffffff;
+  --card-foreground: #0b1f3a;
+  --popover: #ffffff;
+  --popover-foreground: #0b1f3a;
+  --primary: var(--brand-teal);
+  --primary-foreground: #ffffff;
+  --secondary: #eef6f6;
+  --secondary-foreground: var(--brand-navy);
+  --muted: #f2f6f7;
+  --muted-foreground: #5b6b78;
+  --accent: #e3f3f2;
+  --accent-foreground: var(--brand-navy);
   --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
+  --border: #dbe6e7;
+  --input: #dbe6e7;
+  --ring: var(--brand-teal);
+  --chart-1: var(--brand-navy);
+  --chart-2: var(--brand-teal);
+  --chart-3: #3a6ea5;
+  --chart-4: #3fc9c2;
+  --chart-5: #8fa6b8;
   --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --sidebar: var(--brand-navy);
+  --sidebar-foreground: #eaf2f8;
+  --sidebar-primary: var(--brand-teal);
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #0f3868;
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: #12335e;
+  --sidebar-ring: var(--brand-teal);
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
+  --brand-navy: #072855;
+  --brand-teal: #05aea9;
+
+  --background: #081226;
+  --foreground: #eaf2f8;
+  --card: #0d1c38;
+  --card-foreground: #eaf2f8;
+  --popover: #0d1c38;
+  --popover-foreground: #eaf2f8;
+  --primary: var(--brand-teal);
+  --primary-foreground: #06231f;
+  --secondary: #12294d;
+  --secondary-foreground: #eaf2f8;
+  --muted: #10213e;
+  --muted-foreground: #8fa6b8;
+  --accent: #0f3868;
+  --accent-foreground: #eaf2f8;
   --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --border: #17325a;
+  --input: #17325a;
+  --ring: var(--brand-teal);
+  --chart-1: var(--brand-teal);
+  --chart-2: #3fc9c2;
+  --chart-3: #6fb4e0;
+  --chart-4: #3a6ea5;
+  --chart-5: #8fa6b8;
+  --sidebar: #05132a;
+  --sidebar-foreground: #eaf2f8;
+  --sidebar-primary: var(--brand-teal);
+  --sidebar-primary-foreground: #06231f;
+  --sidebar-accent: #0f3868;
+  --sidebar-accent-foreground: #eaf2f8;
+  --sidebar-border: #12335e;
+  --sidebar-ring: var(--brand-teal);
 }
 
 @layer base {
