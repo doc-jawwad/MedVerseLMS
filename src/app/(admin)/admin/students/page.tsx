@@ -115,7 +115,11 @@ export default async function StudentsPage({
               const y = e.years as unknown as { name: string };
               return (
                 <TableRow key={e.id}>
-                  <TableCell className="font-medium">{p?.full_name}</TableCell>
+                  <TableCell className="font-medium">
+                    <Link href={`/admin/students/${e.student_id}`} className="hover:underline">
+                      {p?.full_name}
+                    </Link>
+                  </TableCell>
                   <TableCell>{p?.email}</TableCell>
                   <TableCell>{y?.name}</TableCell>
                   <TableCell>
