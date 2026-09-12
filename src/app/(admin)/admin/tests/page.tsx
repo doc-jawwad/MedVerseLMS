@@ -50,6 +50,7 @@ export default async function AdminTestsPage() {
               <TableHead>Questions</TableHead>
               <TableHead>Window</TableHead>
               <TableHead>Status</TableHead>
+              <TableHead />
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -81,6 +82,16 @@ export default async function AdminTestsPage() {
                   </TableCell>
                   <TableCell>
                     <Badge variant={statusVariant[t.status] ?? "outline"}>{t.status}</Badge>
+                  </TableCell>
+                  <TableCell>
+                    {t.status !== "draft" && (
+                      <Link
+                        href={`/admin/tests/${t.id}/results`}
+                        className="text-sm text-muted-foreground hover:underline"
+                      >
+                        Results
+                      </Link>
+                    )}
                   </TableCell>
                 </TableRow>
               );

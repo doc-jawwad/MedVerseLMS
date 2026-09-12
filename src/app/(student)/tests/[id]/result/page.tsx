@@ -55,11 +55,23 @@ export default async function ResultPage({
 
   type Review = { allowed: boolean; reason?: string; items?: ReviewItem[] };
   let review: Review | null = null;
+  type LeaderRow = {
+    rank: number;
+    percentile: number;
+    full_name: string;
+    score: number;
+    max_score: number;
+    percentage: number;
+    is_me: boolean;
+  };
+  let leaderboard: LeaderRow[] = [];
   if (submitted) {
-    const { data } = await supabase.rpc("get_attempt_review", {
-      p_attempt_id: submitted.id,
-    });
-    review = (data as Review | null) ?? null;
+    const [{ data: reviewData }, { data: lbData }] = await Promise.all([
+      supabase.rpc("get_attempt_review", { p_attempt_id: submitted.id }),
+      supabase.rpc("test_leaderboard", { p_test_id: id }),
+    ]);
+    review = (reviewData as Review | null) ?? null;
+    leaderboard = (lbData as LeaderRow[] | null) ?? [];
   }
 
   return (
@@ -113,6 +125,31 @@ export default async function ResultPage({
             {Number(test.negative_mark) > 0 &&
               ` · negative marking −${test.negative_mark} per wrong answer`}
           </p>
+
+          {leaderboard.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Leaderboard</CardTitle>
+              </CardHeader>
+              <CardContent className="grid gap-1">
+                {leaderboard.map((r) => (
+                  <div
+                    key={r.rank}
+                    className={`flex items-center justify-between rounded-md px-2 py-1.5 text-sm ${
+                      r.is_me ? "bg-accent font-medium" : ""
+                    }`}
+                  >
+                    <span>
+                      #{r.rank} {r.is_me ? "YOU" : r.full_name}
+                    </span>
+                    <span className="text-muted-foreground">
+                      {r.score}/{r.max_score} ({r.percentage}%)
+                    </span>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )}
 
           {review && !review.allowed && (
             <Card>

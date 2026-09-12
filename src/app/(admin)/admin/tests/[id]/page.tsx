@@ -124,6 +124,11 @@ export default async function TestDetailPage({
         <Button asChild variant="outline" size="sm">
           <Link href={`/admin/tests/${id}/preview`}>Preview as student</Link>
         </Button>
+        {test.status !== "draft" && (
+          <Button asChild variant="outline" size="sm">
+            <Link href={`/admin/tests/${id}/results`}>Results</Link>
+          </Button>
+        )}
         {test.status === "published" && <KillSwitchPanel testId={id} />}
       </div>
 
