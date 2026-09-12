@@ -91,9 +91,13 @@ export default async function ResultPage({
       {!submitted ? (
         <Card>
           <CardHeader>
-            <CardTitle>No submitted attempt</CardTitle>
+            <CardTitle>
+              {invalidated.length > 0 ? "No valid result" : "No submitted attempt"}
+            </CardTitle>
             <CardDescription>
-              You haven&apos;t completed this test.
+              {invalidated.length > 0
+                ? "Your attempt on this test was invalidated by an admin — see the reason above. Ask your admin if you should be allowed a fresh attempt."
+                : "You haven't completed this test."}
             </CardDescription>
           </CardHeader>
           <CardContent>
