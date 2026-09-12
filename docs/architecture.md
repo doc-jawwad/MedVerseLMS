@@ -9,6 +9,16 @@ An online MCQ platform for MBBS students (Years 1–5) of a single academy:
 - **Students**: take admin-scheduled tests, practice MCQs from the question bank, browse study materials (Google Drive links), see performance/rank.
 - **Admin**: manages curriculum, question bank (with versioning + review workflow), tests (build → validate → preview → publish → kill-switch), enrollment/approval, access grants, results, analytics.
 
+## Brand
+
+MedVerse Healthcare identity: navy `#072855` + teal `#05AEA9`, sampled directly
+from the logo at `public/logo-icon.png` (source: `public/logo-full.png`).
+Theme tokens live in `src/app/globals.css`; the shared `Logo` component
+(`src/components/logo.tsx`) is the only place the wordmark/icon combination
+should be assembled — reuse it rather than re-implementing. If the logo is
+ever replaced, re-sample these two hex values from the new asset and update
+both this doc and `globals.css`.
+
 ## Stack (fixed — do not add technology)
 
 | Layer | Choice |
