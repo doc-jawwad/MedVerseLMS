@@ -10,6 +10,30 @@
 - Deploy with `npx vercel --prod` from the repo root (env vars are already
   set in the Vercel project for production/preview/development — see below).
 
+## Auth emails (known limitation — branding on hold)
+
+Signup verification (6-digit code) and password reset (link) both work
+today, sent by **Supabase's own default mailer** — functional, but plain
+default Supabase styling, not the MedVerse-branded look. The branded
+templates already exist (`supabase/templates/{confirmation,recovery}.html`,
+navy/teal, logo) and the config wiring is written in `supabase/config.toml`
+but **commented out**, because Supabase's free-tier shared mailer flatly
+refuses any template customization: `config push` returns
+`"Email template modification is not available for free tier projects using
+the default email provider."` User decision (2026-09-12): skip this for now.
+
+**To finish it later:** pick a custom SMTP relay (Gmail SMTP with an App
+Password is the fastest free option; Brevo/SendGrid free tier if you want a
+dedicated transactional service) — this is purely the mail server Supabase's
+*own* auth system sends through, not a third-party email API integrated into
+the app. Then:
+1. Fill in `[auth.email.smtp]` in `supabase/config.toml` with the host/port/
+   user/pass (use `env(VAR_NAME)` for the password, never a literal secret).
+2. Uncomment the two `[auth.email.template.*]` blocks right below it.
+3. `SUPABASE_ACCESS_TOKEN=<PAT> npx supabase config push` (CLI is already
+   linked to this project from this session; a token can be regenerated at
+   supabase.com/dashboard/account/tokens if the old one is gone).
+
 ## Environments
 
 | Env | Frontend | Database |
