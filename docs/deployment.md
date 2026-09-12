@@ -31,10 +31,21 @@ CRON_SECRET=                    # guards /api/cron/auto-submit
 
 ## Tests / CI
 
-- `npm run test` — Vitest unit tests.
-- `supabase test db` — pgTAP (RLS + scoring) against a fresh local db.
-- `npx playwright test` — e2e against local stack (or preview URL).
-- CI (GitHub Actions when repo is pushed): install → lint → build → supabase db reset + pgTAP → Playwright.
+- `npm run test:db` — runs the pgTAP suite in `supabase/tests/` (RLS matrix +
+  scoring/exam-engine regressions) against `SUPABASE_DB_URL` in `.env.local`
+  via `scripts/run-pgtap.js`. Every file wraps its fixtures in
+  `BEGIN...ROLLBACK`, so it's safe to run against the shared dev/cloud
+  database — nothing persists. Once local Supabase (Docker) is available,
+  the same files work unmodified under `supabase test db`.
+- `npm run test:e2e` — Playwright suite in `tests/e2e/` (`playwright.config.ts`)
+  against a running `npm run dev` on `localhost:3000`. Each spec provisions
+  and tears down its own isolated student/test fixtures via the service-role
+  API (`tests/e2e/fixtures.ts`) — no shared state between tests, no
+  dependency on seeded demo data. Covers the failure-scenario table in
+  docs/exam-state-machine.md: refresh/resume, same-device multi-tab lock,
+  cross-device lock, submit + idempotent re-visit, offline queue + flush.
+- CI (GitHub Actions, once the repo is pushed): install → lint → build →
+  `test:db` → `test:e2e` against a preview deploy.
 
 ## Production checklist (Phase 13/14)
 
