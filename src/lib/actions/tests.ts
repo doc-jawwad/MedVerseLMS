@@ -58,6 +58,64 @@ export async function addQuestionToTest(testId: string, questionId: string) {
     position: (maxRow?.position ?? 0) + 1,
   });
   reval(testId);
+  if (error) {
+    // unique(test_id, question_id) — normally unreachable since the pool
+    // already excludes questions already in the test, but a double-click
+    // race is possible; give the same friendly duplicate message the
+    // question-bank create flow uses rather than a raw constraint name.
+    return {
+      error:
+        error.code === "23505"
+          ? "That question is already in this test."
+          : error.message,
+    };
+  }
+  return { error: undefined };
+}
+
+// Swap `position` with the immediately-adjacent question (by current
+// order). Delegates to a single SECURITY DEFINER RPC (reorder_test_question,
+// 20260913000006_reorder_test_question_atomic.sql) so the swap is atomic —
+// an earlier version of this action did the swap as three sequential
+// client-side updates through a temporary position, which could leave a
+// row permanently stuck mid-swap on a partial failure (a real risk:
+// test_questions.position determines exam question order when
+// shuffle_questions is off). Only meaningful pre-publish —
+// protect_published_test_questions() already blocks any position change
+// once the test is no longer 'draft', unchanged by this RPC.
+export async function reorderQuestion(
+  testId: string,
+  questionId: string,
+  direction: "up" | "down"
+) {
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("reorder_test_question", {
+    p_test_id: testId,
+    p_question_id: questionId,
+    p_direction: direction,
+  });
+  reval(testId);
+  return { error: error?.message };
+}
+
+// Per-question marks override (test_questions.marks). null clears the
+// override, falling back to tests.marks_per_question — exactly the
+// coalesce(tq.marks, t.marks_per_question) already used by score_attempt.
+export async function setQuestionMarks(
+  testId: string,
+  questionId: string,
+  marks: number | null
+) {
+  if (marks !== null && !(marks > 0)) {
+    return { error: "Marks must be a positive number, or blank to use the test default." };
+  }
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("test_questions")
+    .update({ marks })
+    .eq("test_id", testId)
+    .eq("question_id", questionId);
+  reval(testId);
   return { error: error?.message };
 }
 

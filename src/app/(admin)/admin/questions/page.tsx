@@ -22,6 +22,13 @@ const statusVariant: Record<string, "default" | "secondary" | "destructive" | "o
   archived: "outline",
 };
 
+const PAGE_SIZE = 50;
+
+const SORT_OPTIONS = [
+  { value: "newest", label: "Newest first", column: "created_at", ascending: false },
+  { value: "oldest", label: "Oldest first", column: "created_at", ascending: true },
+] as const;
+
 export default async function QuestionsPage({
   searchParams,
 }: {
@@ -30,11 +37,18 @@ export default async function QuestionsPage({
     status?: string;
     year?: string;
     subject?: string;
+    book?: string;
+    chapter?: string;
+    topic?: string;
     difficulty?: string;
+    sort?: string;
+    page?: string;
   }>;
 }) {
   const { supabase } = await requireAdmin();
   const params = await searchParams;
+  const page = Math.max(1, Number.parseInt(params.page ?? "1", 10) || 1);
+  const sort = SORT_OPTIONS.find((s) => s.value === params.sort) ?? SORT_OPTIONS[0];
 
   const { data: years } = await supabase
     .from("years")
@@ -47,6 +61,29 @@ export default async function QuestionsPage({
         .eq("year_id", params.year)
         .order("name")
     : { data: null };
+  const { data: books } = params.subject
+    ? await supabase
+        .from("books")
+        .select("id, name")
+        .eq("subject_id", params.subject)
+        .order("name")
+    : { data: null };
+  const { data: chapters } = params.book
+    ? await supabase
+        .from("chapters")
+        .select("id, name")
+        .eq("book_id", params.book)
+        .order("sort_order")
+        .order("name")
+    : { data: null };
+  const { data: topics } = params.chapter
+    ? await supabase
+        .from("topics")
+        .select("id, name")
+        .eq("chapter_id", params.chapter)
+        .order("sort_order")
+        .order("name")
+    : { data: null };
 
   let query = supabase
     .from("questions")
@@ -54,20 +91,29 @@ export default async function QuestionsPage({
       "id, status, difficulty, tags, used_in_test, created_at, subjects(name), chapters(name), topics(name), question_versions!questions_current_version_fk(stem, version_no)",
       { count: "exact" }
     )
-    .order("created_at", { ascending: false })
-    .limit(100);
+    .order(sort.column, { ascending: sort.ascending })
+    .range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1);
 
   if (params.status) query = query.eq("status", params.status);
   if (params.year) query = query.eq("year_id", params.year);
   if (params.subject) query = query.eq("subject_id", params.subject);
+  if (params.book) query = query.eq("book_id", params.book);
+  if (params.chapter) query = query.eq("chapter_id", params.chapter);
+  if (params.topic) query = query.eq("topic_id", params.topic);
   if (params.difficulty) query = query.eq("difficulty", params.difficulty);
   if (params.q?.trim())
     query = query.ilike("stem_normalized", `%${params.q.trim().toLowerCase()}%`);
 
   const { data: questions, count, error } = await query;
+  const totalCount = count ?? 0;
+  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
+  const rangeStart = totalCount === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
+  const rangeEnd = Math.min(page * PAGE_SIZE, totalCount);
 
+  // Any filter/sort change resets to page 1, unless the patch is itself a
+  // page change (pagination links pass `page` explicitly).
   const filterLink = (patch: Record<string, string | undefined>) => {
-    const merged = { ...params, ...patch };
+    const merged = { ...params, page: undefined, ...patch };
     const qs = Object.entries(merged)
       .filter(([, v]) => v)
       .map(([k, v]) => `${k}=${encodeURIComponent(v!)}`)
@@ -81,7 +127,7 @@ export default async function QuestionsPage({
         <h1 className="text-2xl font-semibold">
           Question Bank{" "}
           <span className="text-base font-normal text-muted-foreground">
-            {count ?? 0} shown
+            {totalCount === 0 ? "0 shown" : `${rangeStart}–${rangeEnd} of ${totalCount}`}
           </span>
         </h1>
         <div className="flex gap-2">
@@ -146,10 +192,16 @@ export default async function QuestionsPage({
         </div>
         {subjects && (
           <div className="flex flex-wrap gap-1">
+            <Link
+              href={filterLink({ subject: undefined, book: undefined, chapter: undefined, topic: undefined })}
+              className={`rounded-md border px-2 py-1 ${!params.subject ? "bg-accent" : "hover:bg-accent/50"}`}
+            >
+              all subjects
+            </Link>
             {subjects.map((s) => (
               <Link
                 key={s.id}
-                href={filterLink({ subject: s.id })}
+                href={filterLink({ subject: s.id, book: undefined, chapter: undefined, topic: undefined })}
                 className={`rounded-md border px-2 py-1 ${
                   params.subject === s.id ? "bg-accent" : "hover:bg-accent/50"
                 }`}
@@ -159,6 +211,95 @@ export default async function QuestionsPage({
             ))}
           </div>
         )}
+        {books && (
+          <div className="flex flex-wrap gap-1">
+            <Link
+              href={filterLink({ book: undefined, chapter: undefined, topic: undefined })}
+              className={`rounded-md border px-2 py-1 ${!params.book ? "bg-accent" : "hover:bg-accent/50"}`}
+            >
+              all books
+            </Link>
+            {books.map((b) => (
+              <Link
+                key={b.id}
+                href={filterLink({ book: b.id, chapter: undefined, topic: undefined })}
+                className={`rounded-md border px-2 py-1 ${
+                  params.book === b.id ? "bg-accent" : "hover:bg-accent/50"
+                }`}
+              >
+                {b.name}
+              </Link>
+            ))}
+          </div>
+        )}
+        {chapters && (
+          <div className="flex flex-wrap gap-1">
+            <Link
+              href={filterLink({ chapter: undefined, topic: undefined })}
+              className={`rounded-md border px-2 py-1 ${!params.chapter ? "bg-accent" : "hover:bg-accent/50"}`}
+            >
+              all chapters
+            </Link>
+            {chapters.map((c) => (
+              <Link
+                key={c.id}
+                href={filterLink({ chapter: c.id, topic: undefined })}
+                className={`rounded-md border px-2 py-1 ${
+                  params.chapter === c.id ? "bg-accent" : "hover:bg-accent/50"
+                }`}
+              >
+                {c.name}
+              </Link>
+            ))}
+          </div>
+        )}
+        {topics && (
+          <div className="flex flex-wrap gap-1">
+            <Link
+              href={filterLink({ topic: undefined })}
+              className={`rounded-md border px-2 py-1 ${!params.topic ? "bg-accent" : "hover:bg-accent/50"}`}
+            >
+              all topics
+            </Link>
+            {topics.map((t) => (
+              <Link
+                key={t.id}
+                href={filterLink({ topic: t.id })}
+                className={`rounded-md border px-2 py-1 ${
+                  params.topic === t.id ? "bg-accent" : "hover:bg-accent/50"
+                }`}
+              >
+                {t.name}
+              </Link>
+            ))}
+          </div>
+        )}
+        <div className="flex gap-1">
+          {["", "easy", "medium", "hard"].map((d) => (
+            <Link
+              key={d || "all"}
+              href={filterLink({ difficulty: d || undefined })}
+              className={`rounded-md border px-2 py-1 ${
+                (params.difficulty ?? "") === d ? "bg-accent" : "hover:bg-accent/50"
+              }`}
+            >
+              {d || "any difficulty"}
+            </Link>
+          ))}
+        </div>
+        <div className="flex gap-1">
+          {SORT_OPTIONS.map((s) => (
+            <Link
+              key={s.value}
+              href={filterLink({ sort: s.value === "newest" ? undefined : s.value })}
+              className={`rounded-md border px-2 py-1 ${
+                sort.value === s.value ? "bg-accent" : "hover:bg-accent/50"
+              }`}
+            >
+              {s.label}
+            </Link>
+          ))}
+        </div>
       </div>
 
       {error && <p className="text-sm text-destructive">{error.message}</p>}
@@ -223,6 +364,34 @@ export default async function QuestionsPage({
           </TableBody>
         </Table>
       </div>
+
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between text-sm">
+          {page > 1 ? (
+            <Button asChild variant="outline" size="sm">
+              <Link href={filterLink({ page: page > 2 ? String(page - 1) : undefined })}>
+                ← Previous
+              </Link>
+            </Button>
+          ) : (
+            <Button variant="outline" size="sm" disabled>
+              ← Previous
+            </Button>
+          )}
+          <span className="text-muted-foreground">
+            Page {page} of {totalPages}
+          </span>
+          {page < totalPages ? (
+            <Button asChild variant="outline" size="sm">
+              <Link href={filterLink({ page: String(page + 1) })}>Next →</Link>
+            </Button>
+          ) : (
+            <Button variant="outline" size="sm" disabled>
+              Next →
+            </Button>
+          )}
+        </div>
+      )}
     </div>
   );
 }

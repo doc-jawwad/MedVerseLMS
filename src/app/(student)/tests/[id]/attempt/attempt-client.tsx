@@ -79,7 +79,6 @@ export function AttemptClient({ testId }: { testId: string }) {
   const pendingRef = useRef(new Map<string, PendingSave>());
   const seqRef = useRef(1);
   const flushTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const flushingRef = useRef(false);
   const attemptIdRef = useRef<string | null>(null);
   const deviceIdRef = useRef<string>("");
 
@@ -90,65 +89,81 @@ export function AttemptClient({ testId }: { testId: string }) {
   // effect below — same timing/semantics as before, no self-reference.
   const flushRef = useRef<() => void>(() => {});
 
-  const flush = useCallback(async () => {
-    if (flushingRef.current || !attemptIdRef.current) return;
-    const entries = [...pendingRef.current.entries()];
-    if (entries.length === 0) return;
-    flushingRef.current = true;
-    setSaveStatus("Saving…");
-    // Dispatch every pending question's save_answer concurrently instead of
-    // one-at-a-time: each entry has a distinct question_version_id (Map
-    // keys), so there's no shared-row race, and per-question success/
-    // failure tracking below is unchanged from the sequential version —
-    // this only removes the N-times-network-latency wait for a flush that
-    // covers multiple changed questions (docs/performance-baseline.md's
-    // autosave finding).
-    let failed = 0;
-    let terminal = false;
-    await Promise.all(
-      entries.map(async ([qvId, save]) => {
-        const { data, error } = await supabase.rpc("save_answer", {
-          p_attempt_id: attemptIdRef.current,
-          p_question_version_id: qvId,
-          p_selected_key: save.selected_key,
-          p_marked_for_review: save.marked_for_review,
-          p_save_seq: save.seq,
-          p_device_id: deviceIdRef.current,
-        });
-        if (error) {
-          if (
-            error.message.includes("attempt_finalized") ||
-            error.message.includes("attempt_expired")
-          ) {
-            terminal = true;
+  // Tracks the currently in-flight flush round (if any) so that a second
+  // caller — most importantly `submit()`'s `await flush()` — waits for that
+  // round to actually finish instead of getting an immediate no-op. Before
+  // this, a flush already in flight (e.g. from the debounce timer) meant a
+  // concurrent `await flush()` call returned right away without waiting,
+  // so `submit_attempt` could fire before a genuinely-in-flight
+  // `save_answer` resolved, risking exactly the "answer changed just
+  // before submit" scenario this project's failure-coverage table exists
+  // to prevent (docs/exam-state-machine.md).
+  const flushPromiseRef = useRef<Promise<void> | null>(null);
+
+  const flush = useCallback((): Promise<void> => {
+    if (flushPromiseRef.current) return flushPromiseRef.current;
+    const run = (async () => {
+      if (!attemptIdRef.current) return;
+      const entries = [...pendingRef.current.entries()];
+      if (entries.length === 0) return;
+      setSaveStatus("Saving…");
+      // Dispatch every pending question's save_answer concurrently instead
+      // of one-at-a-time: each entry has a distinct question_version_id
+      // (Map keys), so there's no shared-row race, and per-question
+      // success/failure tracking below is unchanged from the sequential
+      // version — this only removes the N-times-network-latency wait for a
+      // flush that covers multiple changed questions
+      // (docs/performance-baseline.md's autosave finding).
+      let failed = 0;
+      let terminal = false;
+      await Promise.all(
+        entries.map(async ([qvId, save]) => {
+          const { data, error } = await supabase.rpc("save_answer", {
+            p_attempt_id: attemptIdRef.current,
+            p_question_version_id: qvId,
+            p_selected_key: save.selected_key,
+            p_marked_for_review: save.marked_for_review,
+            p_save_seq: save.seq,
+            p_device_id: deviceIdRef.current,
+          });
+          if (error) {
+            if (
+              error.message.includes("attempt_finalized") ||
+              error.message.includes("attempt_expired")
+            ) {
+              terminal = true;
+            } else {
+              failed++;
+            }
           } else {
-            failed++;
+            // drop only if unchanged since we started sending it
+            const current = pendingRef.current.get(qvId);
+            if (current && current.seq === save.seq) pendingRef.current.delete(qvId);
+            // opportunistic clock resync: save_answer already returns
+            // server_now on every call, at zero extra request cost.
+            const serverNow = (data as { server_now?: string } | null)?.server_now;
+            if (serverNow) onServerTime?.(serverNow);
           }
-        } else {
-          // drop only if unchanged since we started sending it
-          const current = pendingRef.current.get(qvId);
-          if (current && current.seq === save.seq) pendingRef.current.delete(qvId);
-          // opportunistic clock resync: save_answer already returns
-          // server_now on every call, at zero extra request cost.
-          const serverNow = (data as { server_now?: string } | null)?.server_now;
-          if (serverNow) onServerTime?.(serverNow);
-        }
-      })
-    );
-    if (terminal) {
-      // attempt is finalized/expired: nothing further will be accepted.
-      pendingRef.current.clear();
-      failed = 0;
-    }
-    flushingRef.current = false;
-    if (failed > 0) {
-      setSaveStatus(`Offline — ${pendingRef.current.size} unsaved, retrying…`);
-      setTimeout(() => flushRef.current(), 4000);
-    } else if (pendingRef.current.size > 0) {
-      flushRef.current();
-    } else {
-      setSaveStatus("Saved");
-    }
+        })
+      );
+      if (terminal) {
+        // attempt is finalized/expired: nothing further will be accepted.
+        pendingRef.current.clear();
+        failed = 0;
+      }
+      if (failed > 0) {
+        setSaveStatus(`Offline — ${pendingRef.current.size} unsaved, retrying…`);
+        setTimeout(() => flushRef.current(), 4000);
+      } else if (pendingRef.current.size > 0) {
+        flushRef.current();
+      } else {
+        setSaveStatus("Saved");
+      }
+    })();
+    flushPromiseRef.current = run.finally(() => {
+      flushPromiseRef.current = null;
+    });
+    return flushPromiseRef.current;
   }, [supabase, onServerTime]);
 
   useEffect(() => {

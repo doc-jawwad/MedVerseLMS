@@ -19,5 +19,12 @@ join (values
 ) as s(year_number, name, ord) on s.year_number = y.year_number
 on conflict (year_id, name) do nothing;
 
--- Dev admin: sign up normally as admin@medverse.local, then run:
---   update public.profiles set role='admin' where email='admin@medverse.local';
+-- Dev admin / test accounts: do NOT use the real /register form for these —
+-- Supabase Auth's own signup validation rejects `.local` addresses (a
+-- reserved, non-deliverable TLD per RFC 6762) and, until a custom SMTP relay
+-- is configured, its shared free-tier mailer rate-limits confirmation emails
+-- to ~2/hour project-wide (docs/deployment.md "Auth emails"). Use the Admin
+-- API script instead — creates an already-confirmed account, no email round
+-- trip, `.local` addresses work fine through it:
+--   node scripts/create-dev-account.mjs admin@medverse.local "Passw0rd!23" "Dev Admin" --admin
+--   node scripts/create-dev-account.mjs student1@medverse.local "Passw0rd!23" "Test Student" 3

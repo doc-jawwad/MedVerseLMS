@@ -7,6 +7,8 @@ import {
   addQuestionToTest,
   addRandomQuestions,
   removeQuestionFromTest,
+  reorderQuestion,
+  setQuestionMarks,
   setAudienceYears,
   publishTest,
   closeTestNow,
@@ -53,6 +55,7 @@ export function AddQuestionButton({ testId, questionId }: { testId: string; ques
   const { pending, run } = useAction();
   return (
     <Button size="sm" variant="secondary" disabled={pending}
+      data-testid={`add-question-${questionId}`}
       onClick={() => run(() => addQuestionToTest(testId, questionId), "Added")}>
       Add
     </Button>
@@ -69,28 +72,154 @@ export function RemoveQuestionButton({ testId, questionId }: { testId: string; q
   );
 }
 
-// Subject/difficulty changes navigate immediately (instead of requiring a
-// separate "Filter" submit) so the filter shown here and the filter used by
-// AddRandomButton (a server-computed prop from searchParams) can never
-// diverge — that mismatch previously let "Add N random" silently pull
-// questions outside the visibly-selected subject.
+// Manual reorder — only rendered for draft tests (position is frozen and
+// immutable once published, same as everywhere else in this file).
+export function MoveQuestionButtons({
+  testId,
+  questionId,
+  isFirst,
+  isLast,
+}: {
+  testId: string;
+  questionId: string;
+  isFirst: boolean;
+  isLast: boolean;
+}) {
+  const { pending, run } = useAction();
+  return (
+    <div className="flex gap-1">
+      <Button size="sm" variant="ghost" disabled={pending || isFirst} aria-label="Move up"
+        data-testid={`move-up-${questionId}`}
+        onClick={() => run(() => reorderQuestion(testId, questionId, "up"))}>
+        ↑
+      </Button>
+      <Button size="sm" variant="ghost" disabled={pending || isLast} aria-label="Move down"
+        data-testid={`move-down-${questionId}`}
+        onClick={() => run(() => reorderQuestion(testId, questionId, "down"))}>
+        ↓
+      </Button>
+    </div>
+  );
+}
+
+// Per-question marks override — blank uses the test's default
+// marks_per_question (score_attempt already does
+// coalesce(tq.marks, t.marks_per_question); this just exposes it).
+export function QuestionMarksInput({
+  testId,
+  questionId,
+  marks,
+  defaultMarks,
+}: {
+  testId: string;
+  questionId: string;
+  marks: number | null;
+  defaultMarks: number;
+}) {
+  const { pending, run } = useAction();
+  const [value, setValue] = useState(marks !== null ? String(marks) : "");
+
+  function save() {
+    const trimmed = value.trim();
+    const parsed = trimmed === "" ? null : Number(trimmed);
+    if (parsed !== null && !(parsed > 0)) {
+      setValue(marks !== null ? String(marks) : "");
+      return;
+    }
+    run(() => setQuestionMarks(testId, questionId, parsed));
+  }
+
+  return (
+    <Input
+      type="number"
+      min={0.01}
+      step={0.25}
+      placeholder={String(defaultMarks)}
+      value={value}
+      disabled={pending}
+      onChange={(e) => setValue(e.target.value)}
+      onBlur={save}
+      className="h-8 w-20"
+      title="Marks for this question (blank = test default)"
+      aria-label="Marks for this question"
+      data-testid={`marks-input-${questionId}`}
+    />
+  );
+}
+
+// All filter changes (including cascading book/chapter/topic) navigate
+// immediately via the URL query string — the same source of truth both this
+// form and AddRandomButton's server-computed `filter` prop read from, so the
+// visible filter and "Add N random" can never diverge (a prior bug class:
+// see addRandomQuestions' comment on why it re-derives the test's own year
+// rather than trusting an arbitrary client-supplied one).
 export function QuestionFilterForm({
   subjects,
+  books,
+  chapters,
+  topics,
   filter,
 }: {
   subjects: { id: string; name: string }[];
-  filter: { subject_id?: string; difficulty?: string; q?: string };
+  books: { id: string; name: string; subject_id: string }[];
+  chapters: { id: string; name: string; book_id: string }[];
+  topics: { id: string; name: string; chapter_id: string }[];
+  filter: {
+    subject_id?: string;
+    book_id?: string;
+    chapter_id?: string;
+    topic_id?: string;
+    difficulty?: string;
+    q?: string;
+  };
 }) {
   const router = useRouter();
 
-  function navigate(next: { subject?: string; difficulty?: string; q?: string }) {
+  const visibleBooks = filter.subject_id
+    ? books.filter((b) => b.subject_id === filter.subject_id)
+    : [];
+  const visibleChapters = filter.book_id
+    ? chapters.filter((c) => c.book_id === filter.book_id)
+    : [];
+  const visibleTopics = filter.chapter_id
+    ? topics.filter((t) => t.chapter_id === filter.chapter_id)
+    : [];
+
+  function navigate(next: {
+    subject?: string;
+    book?: string;
+    chapter?: string;
+    topic?: string;
+    difficulty?: string;
+    q?: string;
+  }) {
+    const merged = {
+      subject: filter.subject_id ?? "",
+      book: filter.book_id ?? "",
+      chapter: filter.chapter_id ?? "",
+      topic: filter.topic_id ?? "",
+      difficulty: filter.difficulty ?? "",
+      q: filter.q ?? "",
+      ...next,
+    };
+    // Selecting a broader level clears anything narrower beneath it.
+    if (next.subject !== undefined) {
+      merged.book = "";
+      merged.chapter = "";
+      merged.topic = "";
+    } else if (next.book !== undefined) {
+      merged.chapter = "";
+      merged.topic = "";
+    } else if (next.chapter !== undefined) {
+      merged.topic = "";
+    }
     const params = new URLSearchParams();
-    const subject = next.subject ?? filter.subject_id ?? "";
-    const difficulty = next.difficulty ?? filter.difficulty ?? "";
-    const q = next.q ?? filter.q ?? "";
-    if (subject) params.set("subject", subject);
-    if (difficulty) params.set("difficulty", difficulty);
-    if (q) params.set("q", q);
+    if (merged.subject) params.set("subject", merged.subject);
+    if (merged.book) params.set("book", merged.book);
+    if (merged.chapter) params.set("chapter", merged.chapter);
+    if (merged.topic) params.set("topic", merged.topic);
+    if (merged.difficulty) params.set("difficulty", merged.difficulty);
+    if (merged.q) params.set("q", merged.q);
     router.push(`?${params.toString()}`);
   }
 
@@ -107,7 +236,7 @@ export function QuestionFilterForm({
     >
       <select
         name="subject"
-        defaultValue={filter.subject_id ?? ""}
+        value={filter.subject_id ?? ""}
         onChange={(e) => navigate({ subject: e.target.value })}
         className="h-9 rounded-md border bg-transparent px-2"
       >
@@ -118,9 +247,54 @@ export function QuestionFilterForm({
           </option>
         ))}
       </select>
+      {visibleBooks.length > 0 && (
+        <select
+          name="book"
+          value={filter.book_id ?? ""}
+          onChange={(e) => navigate({ book: e.target.value })}
+          className="h-9 rounded-md border bg-transparent px-2"
+        >
+          <option value="">All books</option>
+          {visibleBooks.map((b) => (
+            <option key={b.id} value={b.id}>
+              {b.name}
+            </option>
+          ))}
+        </select>
+      )}
+      {visibleChapters.length > 0 && (
+        <select
+          name="chapter"
+          value={filter.chapter_id ?? ""}
+          onChange={(e) => navigate({ chapter: e.target.value })}
+          className="h-9 rounded-md border bg-transparent px-2"
+        >
+          <option value="">All chapters</option>
+          {visibleChapters.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name}
+            </option>
+          ))}
+        </select>
+      )}
+      {visibleTopics.length > 0 && (
+        <select
+          name="topic"
+          value={filter.topic_id ?? ""}
+          onChange={(e) => navigate({ topic: e.target.value })}
+          className="h-9 rounded-md border bg-transparent px-2"
+        >
+          <option value="">All topics</option>
+          {visibleTopics.map((t) => (
+            <option key={t.id} value={t.id}>
+              {t.name}
+            </option>
+          ))}
+        </select>
+      )}
       <select
         name="difficulty"
-        defaultValue={filter.difficulty ?? ""}
+        value={filter.difficulty ?? ""}
         onChange={(e) => navigate({ difficulty: e.target.value })}
         className="h-9 rounded-md border bg-transparent px-2"
       >

@@ -184,7 +184,11 @@ enable_anonymous_sign_ins = false
 # Allow/disallow testing manual linking of accounts
 enable_manual_linking = false
 # Passwords shorter than this value will be rejected as weak. Minimum 6, recommended 8 or more.
-minimum_password_length = 6
+# Matches src/lib/actions/auth.ts's own `password.length < 8` check — was 6
+# here, meaning a caller hitting Supabase Auth directly (bypassing the app's
+# signup/reset forms) could previously set a password the app itself would
+# never have accepted. Config-only fix; takes effect on `config push`.
+minimum_password_length = 8
 # Passwords that do not meet the following requirements will be rejected as weak. Supported values
 # are: `letters_digits`, `lower_upper_letters_digits`, `lower_upper_letters_digits_symbols`
 password_requirements = ""

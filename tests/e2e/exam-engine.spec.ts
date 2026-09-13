@@ -138,4 +138,73 @@ test.describe("Exam engine", () => {
       await teardownExamFixture(fixture);
     }
   });
+
+  // P1 reliability audit: answering several questions inside one debounce
+  // window now dispatches their save_answer calls concurrently instead of
+  // sequentially (docs/performance-baseline.md §20). This verifies the
+  // concurrent dispatch doesn't drop or cross-wire any of them.
+  test("multiple questions answered in a burst are all saved (concurrent autosave dispatch)", async ({
+    page,
+  }) => {
+    const fixture = await provisionExamFixture({ questionCount: 3 });
+    try {
+      await login(page, fixture.email, fixture.password);
+      await startExam(page, fixture.testId);
+
+      // Answer all three questions in quick succession, well inside the
+      // 1500ms debounce window, so the eventual flush covers all three at
+      // once via Promise.all rather than one at a time.
+      await optionA(page).click();
+      await page.getByRole("button", { name: "Next →" }).click();
+      await optionA(page).click();
+      await page.getByRole("button", { name: "Next →" }).click();
+      await optionA(page).click();
+
+      await expect(saveStatus(page)).toHaveText("Saved", { timeout: 10000 });
+
+      // Reload and confirm all three answers actually persisted server-side
+      // (server-driven resume, not local UI state).
+      await page.reload();
+      await expect(page.getByText(/Question 1 of/)).toBeVisible({ timeout: 15000 });
+      await expect(optionA(page)).toHaveAttribute("aria-pressed", "true");
+      await page.getByRole("button", { name: "Next →" }).click();
+      await expect(optionA(page)).toHaveAttribute("aria-pressed", "true");
+      await page.getByRole("button", { name: "Next →" }).click();
+      await expect(optionA(page)).toHaveAttribute("aria-pressed", "true");
+    } finally {
+      await teardownExamFixture(fixture);
+    }
+  });
+
+  // P1 reliability audit: submit() awaits flush() before calling
+  // submit_attempt. Before this fix, if a flush triggered by the debounce
+  // timer was already in flight, a concurrent await from submit() returned
+  // immediately (the flushingRef guard), so submit_attempt could race ahead
+  // of a save_answer that was still in flight. This verifies an answer
+  // changed immediately before clicking Submit is never lost.
+  test("submitting immediately after an unsaved answer change does not lose the answer", async ({
+    page,
+  }) => {
+    const fixture = await provisionExamFixture({ questionCount: 1, negativeMark: 0 });
+    try {
+      await login(page, fixture.email, fixture.password);
+      await startExam(page, fixture.testId);
+
+      // Click the (correct) option and submit immediately — deliberately
+      // not waiting for "Saved" first, to race submit() against the
+      // debounce-triggered flush.
+      await optionA(page).click();
+      await page.getByRole("button", { name: "Submit exam" }).click();
+      await expect(page.getByText("Submit the exam?")).toBeVisible();
+      await page.getByRole("button", { name: "Submit now" }).click();
+
+      await page.waitForURL(/\/result/, { timeout: 15000 });
+      // If the pre-submit answer was lost, the score would read "0 / 1"
+      // instead of "1 / 1" (the fixture's only question is worth 1 mark,
+      // answered correctly with A, no negative marking).
+      await expect(page.getByText("1 / 1")).toBeVisible();
+    } finally {
+      await teardownExamFixture(fixture);
+    }
+  });
 });

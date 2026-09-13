@@ -7,6 +7,7 @@ Conventions: every table has `id uuid primary key default gen_random_uuid()`, `t
 **profiles** — pk = `auth.users.id`. `full_name`, `email`, `role text check (role in ('admin','student')) default 'student'`, `active_session_id uuid`, `last_login_at timestamptz`.
 - Created by trigger `handle_new_user()` on auth.users insert; role always `'student'` (admins promoted via SQL/service role only).
 - Trigger blocks any change to `role` unless performed by admin/service role.
+- Dev/test accounts: use `node scripts/create-dev-account.mjs` (Admin API, already-confirmed, no email round trip), not the real `/register` form — see docs/deployment.md "Auth emails" for why.
 
 ## Curriculum
 
@@ -26,6 +27,8 @@ Denormalized ids keep RLS join-free; maintained by trigger from the parent on in
 - `created_by uuid`
 
 Workflow: draft → review → approved → archived; any state may drop to `needs_revision`. Only `approved` questions are eligible for tests and practice.
+
+Status transitions are now enforced at the database level (`protect_question_status_transition()` trigger, `before update of status`, `20260913000005_question_status_transition_guard.sql`) — not app-code-only. The exact enforced graph (unchanged from the pre-existing `allowedTransitions` map in `src/lib/actions/questions.ts`, now also DB-guaranteed): `draft → {review, approved, archived}`, `review → {approved, needs_revision, draft, archived}`, `approved → {needs_revision, archived}`, `needs_revision → {review, approved, archived}`, `archived → {draft}`. **Note:** this graph is slightly richer than the one-sentence summary above (e.g. `draft`/`archived` cannot go directly to `needs_revision`; `review`→`draft` and `needs_revision`→`review`/`approved` are additionally allowed) — this predates the DB trigger and is preserved as-is rather than resolved in either direction, per this project's "change the doc first, with approval" convention (AGENTS.md).
 
 **question_versions** — **immutable, append-only**:
 - `question_id`, `version_no int` (unique per question), `stem text`, `options jsonb` (array of `{key:'A'..'E', text}` — 4 or 5 entries), `correct_key char(1)`, `explanation text`, `reference text`

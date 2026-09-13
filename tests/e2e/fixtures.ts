@@ -203,3 +203,128 @@ export async function teardownExamFixture(f: ExamFixture) {
     headers: svcHeaders(),
   });
 }
+
+// Admin credentials shared with the publish_test call above — reused here
+// so a Test Builder spec can drive the real admin UI end-to-end.
+export const ADMIN_EMAIL = "admin@medverse.local";
+export const ADMIN_PASSWORD = "AdminPass123!";
+
+export type QuestionPoolFixture = {
+  yearId: string;
+  subjectId: string;
+  bookId: string;
+  chapterId: string;
+  topicId: string;
+  questionIds: string[];
+  tag: string;
+};
+
+// Curriculum + N approved questions only — deliberately does NOT create or
+// publish a test, so a Test Builder spec can build one itself through the
+// admin UI (the thing actually under test) rather than having it
+// pre-provisioned like provisionExamFixture does for the student-side specs.
+export async function provisionQuestionPoolFixture(opts: {
+  questionCount?: number;
+}): Promise<QuestionPoolFixture> {
+  const suffix = Math.random().toString(36).slice(2, 10);
+  const tag = `E2E_TB_${suffix}`;
+
+  const yearRes = await fetch(`${BASE}/rest/v1/years?year_number=eq.1&select=id`, {
+    headers: svcHeaders(),
+  }).then((r) => r.json());
+  const yearId = yearRes[0].id;
+
+  const subjRes = await fetch(
+    `${BASE}/rest/v1/subjects?year_id=eq.${yearId}&select=id&limit=1`,
+    { headers: svcHeaders() }
+  ).then((r) => r.json());
+  const subjectId = subjRes[0].id;
+
+  const bookRes = await fetch(`${BASE}/rest/v1/books`, {
+    method: "POST",
+    headers: svcHeaders({ Prefer: "return=representation" }),
+    body: JSON.stringify({ subject_id: subjectId, name: tag }),
+  }).then((r) => r.json());
+  const chapterRes = await fetch(`${BASE}/rest/v1/chapters`, {
+    method: "POST",
+    headers: svcHeaders({ Prefer: "return=representation" }),
+    body: JSON.stringify({ book_id: bookRes[0].id, name: tag }),
+  }).then((r) => r.json());
+  const topicRes = await fetch(`${BASE}/rest/v1/topics`, {
+    method: "POST",
+    headers: svcHeaders({ Prefer: "return=representation" }),
+    body: JSON.stringify({ chapter_id: chapterRes[0].id, name: tag }),
+  }).then((r) => r.json());
+  const topicId = topicRes[0].id;
+
+  const n = opts.questionCount ?? 3;
+  const questionIds: string[] = [];
+  for (let i = 0; i < n; i++) {
+    const qRes = await fetch(`${BASE}/rest/v1/questions`, {
+      method: "POST",
+      headers: svcHeaders({ Prefer: "return=representation" }),
+      body: JSON.stringify({
+        topic_id: topicId,
+        status: "approved",
+        difficulty: "medium",
+        content_hash: `${tag}_${i}`,
+        stem_normalized: `${tag} question ${i}`,
+      }),
+    }).then((r) => r.json());
+    const qid = qRes[0].id;
+    await fetch(`${BASE}/rest/v1/question_versions`, {
+      method: "POST",
+      headers: svcHeaders(),
+      body: JSON.stringify({
+        question_id: qid,
+        version_no: 1,
+        stem: `${tag} builder fixture question ${i + 1}`,
+        options: [
+          { key: "A", text: "Option A" },
+          { key: "B", text: "Option B" },
+          { key: "C", text: "Option C" },
+          { key: "D", text: "Option D" },
+        ],
+        correct_key: "A",
+        explanation: "Fixture explanation.",
+        reference: "e2e fixture",
+      }),
+    });
+    const vRes = await fetch(
+      `${BASE}/rest/v1/question_versions?question_id=eq.${qid}&select=id`,
+      { headers: svcHeaders() }
+    ).then((r) => r.json());
+    await fetch(`${BASE}/rest/v1/questions?id=eq.${qid}`, {
+      method: "PATCH",
+      headers: svcHeaders(),
+      body: JSON.stringify({ current_version_id: vRes[0].id }),
+    });
+    questionIds.push(qid);
+  }
+
+  return { yearId, subjectId, bookId: bookRes[0].id, chapterId: chapterRes[0].id, topicId, questionIds, tag };
+}
+
+// Only deletes the test row (if any). question_versions are immutable —
+// forbid_version_mutation() blocks UPDATE/DELETE unconditionally, for every
+// role including service_role, with no bypass reachable via the Data API
+// (only a raw SQL session can use session_replication_role to work around
+// it, which e2e fixtures deliberately never use). That in turn blocks
+// deleting `questions` (question_versions.question_id references it
+// on delete cascade, and the trigger still fires on a cascaded delete) and
+// therefore `topics`/`chapters`/`books` too. This matches
+// teardownExamFixture's existing behavior above, which also never attempts
+// to delete question/curriculum rows — not an oversight there, the same
+// structural limitation applies. Tagged fixture rows (`E2E_TB_*`) are left
+// behind by design, same as the rest of this suite's fixtures.
+export async function teardownQuestionPoolFixture(
+  f: QuestionPoolFixture,
+  extra?: { testId?: string }
+) {
+  if (extra?.testId) {
+    await fetch(`${BASE}/rest/v1/tests?id=eq.${extra.testId}`, {
+      method: "DELETE",
+      headers: svcHeaders(),
+    });
+  }
+}
