@@ -87,6 +87,21 @@ export function ExamPlayer({
   const [msLeft, setMsLeft] = useState(() => clock.end - (Date.now() + clock.skew));
   const expiredFired = useRef(false);
 
+  // Re-derive skew whenever a fresher server_now arrives (autosave
+  // responses, periodic resync, or tab-visibility/reconnect resync — see
+  // attempt-client.tsx). `endRef` (the authoritative expiry instant) is
+  // never touched here or anywhere else on the client: this can only
+  // correct how much time is *displayed* as remaining, never extend it,
+  // since the server independently enforces expires_at on every RPC
+  // regardless of what the client believes or displays.
+  const lastAppliedServerNowMs = useRef(serverNowMs);
+  useEffect(() => {
+    if (mode !== "live" || !serverNowMs) return;
+    if (serverNowMs === lastAppliedServerNowMs.current) return;
+    lastAppliedServerNowMs.current = serverNowMs;
+    skewRef.current = serverNowMs - Date.now();
+  }, [mode, serverNowMs]);
+
   useEffect(() => {
     const t = setInterval(() => {
       const left = endRef.current - (Date.now() + skewRef.current);

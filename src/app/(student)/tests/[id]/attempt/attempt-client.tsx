@@ -69,6 +69,11 @@ export function AttemptClient({ testId }: { testId: string }) {
   const [error, setError] = useState<string | null>(null);
   const [tabBlocked, setTabBlocked] = useState(false);
   const [saveStatus, setSaveStatus] = useState("Saved");
+  // Latest known server timestamp (ISO string), used only to correct the
+  // exam timer's display for client-clock drift — expiry itself remains
+  // enforced server-side regardless of this value (docs/exam-state-machine.md).
+  const [serverNowIso, setServerNowIso] = useState<string | null>(null);
+  const onServerTime = useCallback((iso: string) => setServerNowIso(iso), []);
 
   // --- autosave queue ---
   const pendingRef = useRef(new Map<string, PendingSave>());
@@ -91,31 +96,49 @@ export function AttemptClient({ testId }: { testId: string }) {
     if (entries.length === 0) return;
     flushingRef.current = true;
     setSaveStatus("Saving…");
+    // Dispatch every pending question's save_answer concurrently instead of
+    // one-at-a-time: each entry has a distinct question_version_id (Map
+    // keys), so there's no shared-row race, and per-question success/
+    // failure tracking below is unchanged from the sequential version —
+    // this only removes the N-times-network-latency wait for a flush that
+    // covers multiple changed questions (docs/performance-baseline.md's
+    // autosave finding).
     let failed = 0;
-    for (const [qvId, save] of entries) {
-      const { error } = await supabase.rpc("save_answer", {
-        p_attempt_id: attemptIdRef.current,
-        p_question_version_id: qvId,
-        p_selected_key: save.selected_key,
-        p_marked_for_review: save.marked_for_review,
-        p_save_seq: save.seq,
-        p_device_id: deviceIdRef.current,
-      });
-      if (error) {
-        if (
-          error.message.includes("attempt_finalized") ||
-          error.message.includes("attempt_expired")
-        ) {
-          pendingRef.current.clear();
-          failed = 0;
-          break;
+    let terminal = false;
+    await Promise.all(
+      entries.map(async ([qvId, save]) => {
+        const { data, error } = await supabase.rpc("save_answer", {
+          p_attempt_id: attemptIdRef.current,
+          p_question_version_id: qvId,
+          p_selected_key: save.selected_key,
+          p_marked_for_review: save.marked_for_review,
+          p_save_seq: save.seq,
+          p_device_id: deviceIdRef.current,
+        });
+        if (error) {
+          if (
+            error.message.includes("attempt_finalized") ||
+            error.message.includes("attempt_expired")
+          ) {
+            terminal = true;
+          } else {
+            failed++;
+          }
+        } else {
+          // drop only if unchanged since we started sending it
+          const current = pendingRef.current.get(qvId);
+          if (current && current.seq === save.seq) pendingRef.current.delete(qvId);
+          // opportunistic clock resync: save_answer already returns
+          // server_now on every call, at zero extra request cost.
+          const serverNow = (data as { server_now?: string } | null)?.server_now;
+          if (serverNow) onServerTime?.(serverNow);
         }
-        failed++;
-      } else {
-        // drop only if unchanged since we started sending it
-        const current = pendingRef.current.get(qvId);
-        if (current && current.seq === save.seq) pendingRef.current.delete(qvId);
-      }
+      })
+    );
+    if (terminal) {
+      // attempt is finalized/expired: nothing further will be accepted.
+      pendingRef.current.clear();
+      failed = 0;
     }
     flushingRef.current = false;
     if (failed > 0) {
@@ -126,7 +149,7 @@ export function AttemptClient({ testId }: { testId: string }) {
     } else {
       setSaveStatus("Saved");
     }
-  }, [supabase]);
+  }, [supabase, onServerTime]);
 
   useEffect(() => {
     flushRef.current = () => void flush();
@@ -142,12 +165,39 @@ export function AttemptClient({ testId }: { testId: string }) {
     [flush]
   );
 
-  // flush on tab hide / reconnect
+  // Refresh the displayed clock's server-time reference. Reuses
+  // start_attempt, which is already safe to call repeatedly on an existing
+  // in-progress attempt (its INSERT is a no-op once one exists) and already
+  // returns server_now — no new RPC/endpoint added for this.
+  const resyncClock = useCallback(async () => {
+    if (!attemptIdRef.current || !deviceIdRef.current) return;
+    const { data, error } = await supabase.rpc("start_attempt", {
+      p_test_id: testId,
+      p_device_id: deviceIdRef.current,
+    });
+    if (!error) {
+      const serverNow = (data as { server_now?: string } | null)?.server_now;
+      if (serverNow) setServerNowIso(serverNow);
+    }
+    // Errors here (e.g. already submitted elsewhere) are ignored: this call
+    // exists only to refresh the displayed clock, never to change state.
+  }, [supabase, testId]);
+
+  // flush on tab hide / reconnect; resync the clock on tab show / reconnect
+  // (the two moments a background-tab suspend/resume or a network drop is
+  // most likely to have left the client's clock-skew estimate stale).
   useEffect(() => {
     const onVis = () => {
-      if (document.visibilityState === "hidden") void flush();
+      if (document.visibilityState === "hidden") {
+        void flush();
+      } else {
+        void resyncClock();
+      }
     };
-    const onOnline = () => void flush();
+    const onOnline = () => {
+      void flush();
+      void resyncClock();
+    };
     document.addEventListener("visibilitychange", onVis);
     window.addEventListener("online", onOnline);
     window.addEventListener("pagehide", onVis);
@@ -156,7 +206,7 @@ export function AttemptClient({ testId }: { testId: string }) {
       window.removeEventListener("online", onOnline);
       window.removeEventListener("pagehide", onVis);
     };
-  }, [flush]);
+  }, [flush, resyncClock]);
 
   // warn before leaving with unsaved answers
   useEffect(() => {
@@ -214,9 +264,24 @@ export function AttemptClient({ testId }: { testId: string }) {
       // resume any greater save_seq the server has seen
       const maxSeq = Math.max(0, ...p.answers.map((a) => a.save_seq));
       seqRef.current = maxSeq + 1;
+      setServerNowIso(p.server_now);
       setPayload(p);
     })();
   }, [supabase, testId, router]);
+
+  // --- periodic server-clock resync (docs/exam-state-machine.md: client
+  // timer is UX only; server-side expires_at is always authoritative,
+  // unaffected by any of this). Reuses start_attempt, which is already
+  // safe to call repeatedly on an existing in-progress attempt (no-op
+  // insert) and already returns server_now — no new RPC/endpoint added.
+  // save_answer's own server_now (in flush, above) covers the common case
+  // for free; this periodic call plus the visibility/online resync below
+  // covers long idle/backgrounded periods with no answer changes at all. ---
+  useEffect(() => {
+    if (!payload) return;
+    const interval = setInterval(() => void resyncClock(), 3 * 60_000);
+    return () => clearInterval(interval);
+  }, [payload, resyncClock]);
 
   // Same ref-forwarding treatment as `flush` above — `submit` retries itself
   // on failure via setTimeout.
@@ -272,7 +337,7 @@ export function AttemptClient({ testId }: { testId: string }) {
       title={payload.test_title}
       questions={payload.questions}
       expiresAtMs={new Date(payload.expires_at).getTime()}
-      serverNowMs={new Date(payload.server_now).getTime()}
+      serverNowMs={new Date(serverNowIso ?? payload.server_now).getTime()}
       initialAnswers={initialAnswers}
       saveStatus={saveStatus}
       onAnswer={queueSave}
