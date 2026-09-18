@@ -11,12 +11,31 @@ alter default privileges in schema test_helpers grant execute on functions to an
 
 -- Impersonate a signed-in user for the rest of the transaction (mirrors what
 -- PostgREST sets from a real JWT). auth.uid()/auth.jwt() read these GUCs.
-create or replace function test_helpers.as_user(p_user_id uuid, p_session_id uuid default null)
+-- Optional email / user_metadata match Cloud-issued access-token claims so
+-- ensure_profile() tests can provision without inserting auth.users.
+drop function if exists test_helpers.as_user(uuid, uuid);
+create or replace function test_helpers.as_user(
+  p_user_id uuid,
+  p_session_id uuid default null,
+  p_email text default null,
+  p_user_metadata jsonb default '{}'::jsonb
+)
 returns void language plpgsql as $$
+declare
+  v_claims jsonb;
 begin
-  perform set_config('request.jwt.claims',
-    jsonb_build_object('sub', p_user_id, 'role', 'authenticated', 'session_id', p_session_id)::text,
-    true);
+  v_claims := jsonb_build_object(
+    'sub', p_user_id,
+    'role', 'authenticated',
+    'session_id', p_session_id
+  );
+  if p_email is not null then
+    v_claims := v_claims || jsonb_build_object('email', p_email);
+  end if;
+  if p_user_metadata is not null and p_user_metadata <> '{}'::jsonb then
+    v_claims := v_claims || jsonb_build_object('user_metadata', p_user_metadata);
+  end if;
+  perform set_config('request.jwt.claims', v_claims::text, true);
   set local role authenticated;
 end;
 $$;
@@ -164,7 +183,36 @@ begin
     (v_id, '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated',
      v_id || '@test.invalid', '', now(), now(), now(), '{}',
      jsonb_build_object('full_name', p_name));
-  update public.profiles set role = 'admin' where id = v_id;
+  update public.profiles
+  set role = 'admin', is_main_admin = true
+  where id = v_id;
+  return v_id;
+end;
+$$;
+
+-- role=admin without Main Admin bypass. Optional catalog codes are granted
+-- as admin_permissions rows (the authorization mechanism, not a preset).
+create or replace function test_helpers.make_limited_admin(
+  p_name text default 'Limited Admin',
+  p_codes text[] default '{}'
+)
+returns uuid language plpgsql as $$
+declare v_id uuid := gen_random_uuid();
+begin
+  perform test_helpers.as_runner();
+  insert into auth.users
+    (id, instance_id, aud, role, email, encrypted_password, email_confirmed_at,
+     created_at, updated_at, raw_app_meta_data, raw_user_meta_data)
+  values
+    (v_id, '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated',
+     v_id || '@test.invalid', '', now(), now(), now(), '{}',
+     jsonb_build_object('full_name', p_name));
+  update public.profiles
+  set role = 'admin', is_main_admin = false
+  where id = v_id;
+  insert into public.admin_permissions (admin_id, permission_code)
+  select v_id, c from unnest(coalesce(p_codes, '{}')) as c
+  where c is not null and btrim(c) <> '';
   return v_id;
 end;
 $$;

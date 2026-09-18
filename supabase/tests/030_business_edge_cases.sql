@@ -66,12 +66,12 @@ grant select on t_year_a, t_subject, t_student_c, t_student_d to authenticated;
 
 select test_helpers.as_user((select id from t_admin));
 select lives_ok(
-  format('insert into public.access_grants (student_id, grant_type, subject_id) values (%L, ''practice_subject'', %L)',
+  format('select public.grant_access(%L, ''practice_subject'', %L)',
     (select id from t_student_a), (select subject_id from t_subject)),
   'first practice grant for this student+subject succeeds'
 );
 select throws_ok(
-  format('insert into public.access_grants (student_id, grant_type, subject_id) values (%L, ''practice_subject'', %L)',
+  format('select public.grant_access(%L, ''practice_subject'', %L)',
     (select id from t_student_a), (select subject_id from t_subject)),
   'duplicate key value violates unique constraint "access_grants_unique_target"',
   'duplicate practice grant for the same student+subject is rejected by the unique index'
@@ -103,6 +103,7 @@ select public.submit_attempt(
 ); -- also both blank, score 0 — a genuine tie
 
 select test_helpers.as_runner();
+select public.rank_dirty_tests();
 select is(
   (select count(distinct rank)::int from public.test_attempts
    where test_id = (select id from t_tie_test) and state = 'submitted'),

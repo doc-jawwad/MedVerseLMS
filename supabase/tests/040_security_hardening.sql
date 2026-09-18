@@ -3,7 +3,7 @@
 -- Verifies: admin-only RPCs remain callable by admins, are blocked at the
 -- grant level for anon, and still raise their existing 'admin only'
 -- business-logic error for a signed-in non-admin student; score_attempt/
--- rank_test (no legitimate direct caller) are blocked for both anon and
+-- rank_test / rank_dirty_tests (no legitimate direct caller) are blocked for both anon and
 -- authenticated; ordinary student exam RPCs (start_attempt/save_answer/
 -- submit_attempt) are unaffected; log_audit() now rejects a non-admin
 -- caller while still working correctly for a real admin, both called
@@ -11,7 +11,7 @@
 -- scoped fixtures, rolled back — nothing here persists.
 
 begin;
-select plan(14);
+select plan(16);
 
 select test_helpers.as_runner();
 select * into temp curriculum from test_helpers.make_curriculum();
@@ -103,10 +103,11 @@ select is(
 );
 
 ------------------------------------------------------------------
--- Group B: score_attempt / rank_test — no legitimate direct caller at
--- all, so both anon and authenticated (including a real admin) are
--- blocked at the grant level; only internal calls from other
--- SECURITY DEFINER functions (submit_attempt, etc.) can still reach them.
+-- Group B: score_attempt / rank_test / rank_dirty_tests — no legitimate
+-- direct caller at all, so both anon and authenticated (including a real
+-- admin) are blocked at the grant level; only internal calls from other
+-- SECURITY DEFINER functions (submit_attempt, auto_submit_expired, etc.)
+-- can still reach them.
 ------------------------------------------------------------------
 select test_helpers.as_anon();
 select throws_ok(
@@ -122,11 +123,23 @@ select throws_ok(
   'an authenticated student cannot call score_attempt directly'
 );
 
+select test_helpers.as_anon();
+select throws_ok(
+  'select public.rank_dirty_tests()',
+  'permission denied for function rank_dirty_tests',
+  'anon cannot call rank_dirty_tests directly'
+);
+
 select test_helpers.as_user((select id from t_admin));
 select throws_ok(
   format('select public.rank_test(%L)', (select id from t_test)),
   'permission denied for function rank_test',
   'even an authenticated admin cannot call rank_test directly (it has no legitimate direct caller)'
+);
+select throws_ok(
+  'select public.rank_dirty_tests()',
+  'permission denied for function rank_dirty_tests',
+  'even an authenticated admin cannot call rank_dirty_tests directly'
 );
 
 ------------------------------------------------------------------
@@ -157,7 +170,7 @@ select lives_ok(
     'select public.submit_attempt(%L, (select device_id from public.test_attempts where id = %L))',
     (select attempt_id from t_attempt), (select attempt_id from t_attempt)
   ),
-  'submit_attempt (which internally reaches score_attempt/rank_test) still works end-to-end for a real student'
+  'submit_attempt (which internally reaches score_attempt) still works end-to-end for a real student'
 );
 
 select * from finish();

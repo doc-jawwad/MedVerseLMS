@@ -2,7 +2,7 @@
 -- docs/exam-state-machine.md). Transaction-scoped fixtures, rolled back.
 
 begin;
-select plan(15);
+select plan(23);
 
 select test_helpers.as_runner();
 select * into temp curriculum from test_helpers.make_curriculum();
@@ -59,6 +59,20 @@ select is(
 select is(((select result from t_result1) ->> 'raw_correct')::int, 3, 'raw_correct = 3');
 select is(((select result from t_result1) ->> 'raw_wrong')::int, 1, 'raw_wrong = 1');
 select is(((select result from t_result1) ->> 'raw_blank')::int, 1, 'raw_blank = 1');
+
+select test_helpers.as_runner();
+select is(
+  (select rank from public.test_attempts where id = (select aid from t_q1 limit 1)),
+  null,
+  'submit_attempt scores synchronously but does not run rank_test inline'
+);
+select isnt(
+  (select count(*)::int from public.rank_dirty_queue where test_id = (select id from t_test1)),
+  0,
+  'submit_attempt marks the test rank-dirty for coalesced ranking'
+);
+
+select test_helpers.as_user((select id from t_student));
 
 ------------------------------------------------------------------
 -- 2) Idempotent submit: duplicate submit_attempt call returns identical result
@@ -165,6 +179,16 @@ select is(
   'auto',
   'auto-finalized attempt is tagged submit_source=auto'
 );
+select is(
+  (select rank from public.test_attempts where id = (select aid from t_ctx2)),
+  1,
+  'auto_submit_expired ranks affected tests once after scoring (n=1 rank still 1)'
+);
+select is(
+  (select percentile from public.test_attempts where id = (select aid from t_ctx2)),
+  null,
+  'auto_submit coalesced rank keeps n<=1 percentile null'
+);
 
 ------------------------------------------------------------------
 -- 9) Ranking: two attempts on the same test rank correctly with percentile
@@ -197,16 +221,43 @@ select public.submit_attempt(
 
 select test_helpers.as_runner();
 select is(
+  (select score from public.test_attempts
+   where test_id = (select id from t_test3) and student_id = (select id from t_student2)),
+  2::numeric,
+  'perfect-score attempt is scored immediately on submit (2 questions, no negative mark)'
+);
+select is(
+  (select score from public.test_attempts
+   where test_id = (select id from t_test3) and student_id = (select id from t_student)),
+  0::numeric,
+  'blank attempt is scored immediately on submit'
+);
+select is(
+  (select rank from public.test_attempts
+   where test_id = (select id from t_test3) and student_id = (select id from t_student2)),
+  null,
+  'second submit on the same test still does not rank synchronously'
+);
+select is(
+  (select rank from public.test_attempts
+   where test_id = (select id from t_test3) and student_id = (select id from t_student)),
+  null,
+  'first submit on the same test still does not rank synchronously'
+);
+
+select public.rank_dirty_tests();
+
+select is(
   (select rank from public.test_attempts
    where test_id = (select id from t_test3) and student_id = (select id from t_student2)),
   1,
-  'perfect-score attempt ranks #1'
+  'perfect-score attempt ranks #1 after one coalesced rank_dirty_tests call'
 );
 select is(
   (select rank from public.test_attempts
    where test_id = (select id from t_test3) and student_id = (select id from t_student)),
   2,
-  'zero-score attempt ranks #2'
+  'zero-score attempt ranks #2 after one coalesced rank_dirty_tests call'
 );
 
 select * from finish();
