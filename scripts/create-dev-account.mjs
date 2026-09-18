@@ -17,11 +17,13 @@
 // validation ever rejected them).
 //
 // Usage:
-//   node scripts/create-dev-account.mjs <email> <password> <full_name> [year_number] [--admin]
+//   Set DEV_ACCOUNT_PASSWORD in the environment (min 8 chars). Do not pass it
+//   as a CLI argument (it would land in shell history). Then:
+//   node scripts/create-dev-account.mjs <email> <full_name> [year_number] [--admin]
 //
 // Examples:
-//   node scripts/create-dev-account.mjs admin@medverse.local "Passw0rd!23" "Dev Admin" --admin
-//   node scripts/create-dev-account.mjs student1@medverse.local "Passw0rd!23" "Test Student" 3
+//   node scripts/create-dev-account.mjs admin@medverse.local "Dev Admin" --admin
+//   node scripts/create-dev-account.mjs student1@medverse.local "Test Student" 3
 //
 // Auth Admin API uses SUPABASE_SERVICE_ROLE_KEY (JWT or opaque sb_secret_*).
 // PostgREST calls never send opaque sb_secret_* as Authorization Bearer.
@@ -68,14 +70,21 @@ async function readJson(res) {
 }
 
 async function main() {
-  const [, , email, password, fullName, yearArg, ...rest] = process.argv;
+  const [, , email, fullName, yearArg, ...rest] = process.argv;
   const makeAdmin = rest.includes("--admin") || yearArg === "--admin";
+  const password = process.env.DEV_ACCOUNT_PASSWORD || "";
 
-  if (!email || !password || !fullName) {
+  if (!email || !fullName) {
     console.error(
-      "Usage: node scripts/create-dev-account.mjs <email> <password> <full_name> [year_number] [--admin]"
+      "Usage: node scripts/create-dev-account.mjs <email> <full_name> [year_number] [--admin]"
     );
+    console.error("Set DEV_ACCOUNT_PASSWORD in the environment; do not pass it as an argument.");
     process.exit(1);
+  }
+  if (!password) {
+    throw new Error(
+      "DEV_ACCOUNT_PASSWORD is required. Set it in the environment; do not pass the password as a CLI argument."
+    );
   }
   if (password.length < 8) {
     throw new Error("Password must be at least 8 characters (matches the app's own signup rule).");
@@ -136,7 +145,7 @@ async function main() {
     throw new Error(`Supabase Admin API error (${createResp.status}): ${detail}`);
   }
 
-  console.log(`Created auth user ${userRes.id} (${email}), already confirmed.`);
+  console.log(`Created auth user ${userRes.id}, already confirmed.`);
 
   const tokenResp = await fetch(`${base}/auth/v1/token?grant_type=password`, {
     method: "POST",
@@ -173,7 +182,7 @@ async function main() {
       body: "{}",
     });
     if (bootstrapResp.ok) {
-      console.log(`Promoted ${email} to Main Admin (bootstrap: no Main Admin existed).`);
+      console.log(`Promoted user ${userRes.id} to Main Admin (bootstrap: no Main Admin existed).`);
     } else {
       const body = await bootstrapResp.text();
       const mainExists = /main_admin_exists/i.test(body);
@@ -198,7 +207,7 @@ async function main() {
         throw new Error(`Failed to promote to limited admin: ${patchRes.status} ${await patchRes.text()}`);
       }
       console.log(
-        `Promoted ${email} to admin with no permissions. A Main Admin must grant codes before they can mutate.`
+        `Promoted user ${userRes.id} to admin with no permissions. A Main Admin must grant codes before they can mutate.`
       );
     }
   } else {
@@ -209,11 +218,11 @@ async function main() {
     const enrollRes = await readJson(enrollFetch);
     if (!enrollFetch.ok || !Array.isArray(enrollRes) || !enrollRes[0]) {
       console.warn(
-        `Warning: no active enrollment row found for ${email}. ` +
+        `Warning: no active enrollment row found for user ${userRes.id}. ` +
           `Check that year_id ${yearId} exists and ensure_profile() ran.`
       );
     } else {
-      console.log(`Active class enrollment confirmed for ${email}.`);
+      console.log(`Active class enrollment confirmed for user ${userRes.id}.`);
     }
   }
 

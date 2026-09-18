@@ -25,7 +25,11 @@ export async function GET(request: NextRequest) {
   const supabase = createAdminClient();
   const { data, error } = await supabase.rpc("auto_submit_expired");
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error("auto_submit_expired failed", {
+      code: error.code ?? null,
+      message: error.message ?? null,
+    });
+    return NextResponse.json({ error: "auto_submit_failed" }, { status: 500 });
   }
   return NextResponse.json({ finalized: data ?? 0 });
 }

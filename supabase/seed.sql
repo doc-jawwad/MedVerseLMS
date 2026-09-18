@@ -25,6 +25,7 @@ on conflict (year_id, name) do nothing;
 -- is configured, its shared free-tier mailer rate-limits confirmation emails
 -- to ~2/hour project-wide (docs/deployment.md "Auth emails"). Use the Admin
 -- API script instead — creates an already-confirmed account, no email round
--- trip, `.local` addresses work fine through it:
---   node scripts/create-dev-account.mjs admin@medverse.local "Passw0rd!23" "Dev Admin" --admin
---   node scripts/create-dev-account.mjs student1@medverse.local "Passw0rd!23" "Test Student" 3
+-- trip, `.local` addresses work fine through it. Set DEV_ACCOUNT_PASSWORD
+-- in the environment (do not pass a password as a CLI argument):
+--   node scripts/create-dev-account.mjs admin@medverse.local "Dev Admin" --admin
+--   node scripts/create-dev-account.mjs student1@medverse.local "Test Student" 3

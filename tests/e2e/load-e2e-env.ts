@@ -157,11 +157,8 @@ export function loadE2EEnv(): E2EEnv {
     adminEmail:
       merged.E2E_ADMIN_EMAIL ||
       merged.ADMIN_EMAIL ||
-      "admin@medverse.local",
-    adminPassword:
-      merged.E2E_ADMIN_PASSWORD ||
-      merged.ADMIN_PASSWORD ||
-      "AdminPass123!",
+      (target === "staging" ? "" : "admin@medverse.local"),
+    adminPassword: merged.E2E_ADMIN_PASSWORD || merged.ADMIN_PASSWORD || "",
     stagingStudentEmail: merged.E2E_STAGING_STUDENT_EMAIL,
     stagingStudentPassword: merged.E2E_STAGING_STUDENT_PASSWORD,
     stagingSsh: merged.E2E_STAGING_SSH,
@@ -173,6 +170,17 @@ export function loadE2EEnv(): E2EEnv {
     E2E_AUTH_URL: cfg.authUrl,
     E2E_REST_URL: cfg.restUrl,
   });
+
+  if (!cfg.adminPassword) {
+    throw new Error(
+      `E2E safety abort (${target}): missing E2E_ADMIN_PASSWORD (or ADMIN_PASSWORD). Refusing to use a built-in fallback.`
+    );
+  }
+  if (target === "staging" && !cfg.adminEmail) {
+    throw new Error(
+      "E2E safety abort (staging): missing E2E_ADMIN_EMAIL (or ADMIN_EMAIL)."
+    );
+  }
 
   if (target === "staging") {
     assertStagingTarget(cfg);

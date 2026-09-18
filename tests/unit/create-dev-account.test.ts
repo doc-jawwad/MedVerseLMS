@@ -66,4 +66,23 @@ describe("create-dev-account PostgREST usage", () => {
   it("does not PATCH enrollments through PostgREST", () => {
     assert.doesNotMatch(src, /\/rest\/v1\/enrollments\?[^`]*method:\s*"PATCH"/s);
   });
+
+  it("reads the password from DEV_ACCOUNT_PASSWORD, not argv", () => {
+    assert.match(src, /DEV_ACCOUNT_PASSWORD/);
+    assert.doesNotMatch(src, /<email> <password>/);
+    assert.doesNotMatch(src, /Passw0rd!23/);
+  });
+
+  it("does not log the account email", () => {
+    assert.doesNotMatch(src, /console\.log\([^)]*\$\{email\}/);
+    assert.doesNotMatch(src, /console\.warn\([^)]*\$\{email\}/);
+  });
+});
+
+describe("seed.sql example passwords", () => {
+  it("does not embed a sample password", () => {
+    const seed = fs.readFileSync(path.join(root, "supabase/seed.sql"), "utf8");
+    assert.doesNotMatch(seed, /Passw0rd!23/);
+    assert.match(seed, /DEV_ACCOUNT_PASSWORD/);
+  });
 });

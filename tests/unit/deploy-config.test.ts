@@ -139,6 +139,17 @@ describe("supabase clients do not use sb_* as PostgREST Bearer", () => {
     const src = read("src/app/api/cron/auto-submit/route.ts");
     assert.match(src, /isJwt/);
     assert.match(src, /service_role_jwt_required/);
+    assert.match(src, /auto_submit_failed/);
+    assert.doesNotMatch(src, /error:\s*error\.message/);
+  });
+
+  it("R2 probe does not log secret charset or length metadata", () => {
+    const rel = "deploy/scripts/_r2_probe.mjs";
+    if (!fs.existsSync(path.join(root, rel))) return;
+    const src = read(rel);
+    assert.doesNotMatch(src, /charsetFlags/);
+    assert.doesNotMatch(src, /typical_r2_secret_len/);
+    assert.doesNotMatch(src, /console\.log\("secret"/);
   });
 
   it("systemd auto-submit backup prefers local SQL over PostgREST", () => {
