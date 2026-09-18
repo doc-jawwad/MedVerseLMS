@@ -2,8 +2,17 @@
 
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { classifySignUpResult } from "@/lib/auth/signup-result";
+import { isBlockedAccountStatus } from "@/lib/auth/account-status";
 
 export type AuthResult = { error?: string };
+
+async function ensureProfile(
+  supabase: Awaited<ReturnType<typeof createClient>>
+): Promise<string | undefined> {
+  const { error } = await supabase.rpc("ensure_profile");
+  return error?.message;
+}
 
 export async function signUp(
   _prev: AuthResult | undefined,
@@ -22,14 +31,35 @@ export async function signUp(
   }
 
   const supabase = await createClient();
-  const { error } = await supabase.auth.signUp({
+  const { data, error } = await supabase.auth.signUp({
     email,
     password,
-    // handle_new_user() creates the profile + pending enrollment from this metadata
+    // user_metadata: handle_new_user() (managed Supabase) and ensure_profile()
+    // (VPS / Cloud Auth split) both read full_name + year_id from here.
     options: { data: { full_name: fullName, year_id: yearId } },
   });
 
-  if (error) return { error: error.message };
+  const classified = classifySignUpResult({
+    user: data.user,
+    session: data.session,
+    error,
+  });
+
+  if (classified.outcome === "error") {
+    return { error: classified.message };
+  }
+  if (classified.outcome === "existing_verified") {
+    redirect("/login?reason=exists");
+  }
+
+  // Confirmations-off / already-sessioned signup: provision immediately.
+  // Confirmations-on: no JWT yet; verifySignupCode / auth/confirm will provision.
+  if (classified.outcome === "session") {
+    const profileError = await ensureProfile(supabase);
+    if (profileError) return { error: profileError };
+  }
+
+  // New email or existing unverified — stay on the confirmation path.
   redirect(`/verify-email?email=${encodeURIComponent(email)}`);
 }
 
@@ -50,14 +80,22 @@ export async function signIn(
     return { error: "Invalid email or password." };
   }
 
-  // Layer 1 portal session: newest login wins (docs/permissions.md).
-  await supabase.rpc("register_session");
-  await supabase.auth.signOut({ scope: "others" });
+  const profileError = await ensureProfile(supabase);
+  if (profileError) return { error: profileError };
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("role")
+    .select("role, account_status")
     .single();
+
+  if (isBlockedAccountStatus(profile?.account_status)) {
+    await supabase.auth.signOut({ scope: "others" });
+    redirect(`/pending?state=${profile?.account_status}`);
+  }
+
+  // Layer 1 portal session: newest login wins (docs/permissions.md).
+  await supabase.rpc("register_session");
+  await supabase.auth.signOut({ scope: "others" });
 
   redirect(
     next && next.startsWith("/")
@@ -95,9 +133,12 @@ export async function verifySignupCode(
   });
   if (error) return { error: "That code is invalid or has expired." };
 
+  const profileError = await ensureProfile(supabase);
+  if (profileError) return { error: profileError };
+
   // Verifying establishes a session too; register it under the single-session policy.
   await supabase.rpc("register_session");
-  redirect("/pending");
+  redirect("/dashboard");
 }
 
 export async function resendSignupCode(email: string): Promise<AuthResult> {
@@ -140,12 +181,21 @@ export async function updatePassword(
   const { error } = await supabase.auth.updateUser({ password });
   if (error) return { error: error.message };
 
-  await supabase.rpc("register_session");
+  const profileError = await ensureProfile(supabase);
+  if (profileError) return { error: profileError };
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("role")
+    .select("role, account_status")
     .single();
+
+  if (isBlockedAccountStatus(profile?.account_status)) {
+    await supabase.auth.signOut({ scope: "others" });
+    redirect(`/pending?state=${profile?.account_status}`);
+  }
+
+  await supabase.rpc("register_session");
+
   redirect(profile?.role === "admin" ? "/admin" : "/dashboard");
 }
 

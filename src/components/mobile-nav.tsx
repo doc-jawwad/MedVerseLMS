@@ -15,6 +15,7 @@ import {
   Database,
   FolderOpen,
   History,
+  CreditCard,
 } from "lucide-react";
 import {
   Sheet,
@@ -37,6 +38,7 @@ const ICONS = {
   tests: ClipboardList,
   performance: BarChart3,
   account: UserRound,
+  subscription: CreditCard,
   students: Users,
   curriculum: BookOpen,
   questions: Database,

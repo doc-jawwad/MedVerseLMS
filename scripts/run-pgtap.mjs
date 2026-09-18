@@ -8,6 +8,7 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import { Client } from "pg";
+import { assertNotCloudProduction } from "./lib/env-guard.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -27,6 +28,13 @@ async function main() {
   const connectionString = process.env.PGTAP_DB_URL || env.SUPABASE_DB_URL;
   if (!connectionString) {
     console.error("Set PGTAP_DB_URL or SUPABASE_DB_URL in .env.local");
+    process.exit(1);
+  }
+
+  try {
+    assertNotCloudProduction(connectionString, { allowStaging: false });
+  } catch (err) {
+    console.error(err.message);
     process.exit(1);
   }
 

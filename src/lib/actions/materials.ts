@@ -65,3 +65,15 @@ export async function deleteMaterial(materialId: string) {
   revalidatePath("/materials");
   return { error: error?.message };
 }
+
+export async function openMaterial(materialId: string) {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("open_material", {
+    p_material_id: materialId,
+  });
+  if (error) return { error: error.message };
+  if (typeof data !== "string" || !data) {
+    return { error: "Unable to open this material." };
+  }
+  return { url: data };
+}

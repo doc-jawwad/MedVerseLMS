@@ -1,0 +1,7 @@
+# Host-based auth: local peers + loopback scram only.
+# Do not add 0.0.0.0/0 or ::/0. PostgREST connects from 127.0.0.1 as authenticator.
+
+local   all             postgres                                peer
+local   all             all                                     scram-sha-256
+host    all             all             127.0.0.1/32            scram-sha-256
+host    all             all             ::1/128                 scram-sha-256

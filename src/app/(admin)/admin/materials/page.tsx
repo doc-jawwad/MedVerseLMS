@@ -17,7 +17,7 @@ export default async function AdminMaterialsPage() {
         .order("name"),
       supabase
         .from("materials")
-        .select("id, folder_id, title, description, file_type, drive_url")
+        .select("id, folder_id, title, description, file_type")
         .order("sort_order")
         .order("title"),
     ]);

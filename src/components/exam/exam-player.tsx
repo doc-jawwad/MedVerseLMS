@@ -1,6 +1,14 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  applyServerExpiresAt,
+  msRemainingFromServerClock,
+} from "@/lib/exam/timer-deadline";
+import {
+  examOptionsFromRpc,
+  type ExamOption,
+} from "@/lib/exam/question-options";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -15,7 +23,8 @@ import {
 export type ExamQuestion = {
   question_version_id: string;
   stem: string;
-  options: { key: string; text: string }[];
+  /** Canonical array, or staging key→text object from start_attempt. */
+  options: ExamOption[] | Record<string, string>;
 };
 
 export type AnswerState = {
@@ -84,35 +93,48 @@ export function ExamPlayer({
   });
   const skewRef = useRef(clock.skew);
   const endRef = useRef(clock.end);
-  const [msLeft, setMsLeft] = useState(() => clock.end - (Date.now() + clock.skew));
+  const [msLeft, setMsLeft] = useState(() =>
+    msRemainingFromServerClock(clock.end, clock.skew + Date.now(), Date.now())
+  );
   const expiredFired = useRef(false);
 
-  // Re-derive skew whenever a fresher server_now arrives (autosave
-  // responses, periodic resync, or tab-visibility/reconnect resync — see
-  // attempt-client.tsx). `endRef` (the authoritative expiry instant) is
-  // never touched here or anywhere else on the client: this can only
-  // correct how much time is *displayed* as remaining, never extend it,
-  // since the server independently enforces expires_at on every RPC
-  // regardless of what the client believes or displays.
+  const syncDisplayFromClock = useCallback(() => {
+    const left = msRemainingFromServerClock(
+      endRef.current,
+      skewRef.current + Date.now(),
+      Date.now()
+    );
+    setMsLeft(left);
+    if (left <= 0 && !expiredFired.current) {
+      expiredFired.current = true;
+      onExpired?.();
+    }
+  }, [onExpired]);
+
+  // Re-derive skew when server_now arrives. Skew correction alone never
+  // extends the deadline — endRef moves earlier-only via expiresAtMs below.
   const lastAppliedServerNowMs = useRef(serverNowMs);
   useEffect(() => {
     if (mode !== "live" || !serverNowMs) return;
     if (serverNowMs === lastAppliedServerNowMs.current) return;
     lastAppliedServerNowMs.current = serverNowMs;
     skewRef.current = serverNowMs - Date.now();
-  }, [mode, serverNowMs]);
+    syncDisplayFromClock();
+  }, [mode, serverNowMs, syncDisplayFromClock]);
+
+  // Accept an earlier server expires_at immediately; ignore later values.
+  useEffect(() => {
+    if (mode !== "live" || expiresAtMs == null) return;
+    const next = applyServerExpiresAt(endRef.current, expiresAtMs);
+    if (next === endRef.current) return;
+    endRef.current = next;
+    syncDisplayFromClock();
+  }, [mode, expiresAtMs, syncDisplayFromClock]);
 
   useEffect(() => {
-    const t = setInterval(() => {
-      const left = endRef.current - (Date.now() + skewRef.current);
-      setMsLeft(left);
-      if (left <= 0 && !expiredFired.current) {
-        expiredFired.current = true;
-        onExpired?.();
-      }
-    }, 500);
+    const t = setInterval(() => syncDisplayFromClock(), 500);
     return () => clearInterval(t);
-  }, [onExpired]);
+  }, [syncDisplayFromClock]);
 
   const current = questions[index];
   const answeredCount = useMemo(
@@ -125,6 +147,8 @@ export function ExamPlayer({
   if (!current) {
     return <p className="text-muted-foreground">This test has no questions.</p>;
   }
+
+  const currentOptions = examOptionsFromRpc(current.options);
 
   const state: AnswerState = answers[current.question_version_id] ?? {
     selected_key: null,
@@ -183,7 +207,7 @@ export function ExamPlayer({
               {current.stem}
             </p>
             <div className="grid gap-2">
-              {current.options.map((o) => {
+              {currentOptions.map((o) => {
                 const selected = state.selected_key === o.key;
                 return (
                   <button

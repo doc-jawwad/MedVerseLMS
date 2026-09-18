@@ -1,10 +1,17 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { supabaseFetch } from "@/lib/supabase/postgrest-fetch";
+import {
+  SSR_TIMING_LOG_TAG,
+  sanitizeSsrTimingToken,
+  ssrTimingEnabled,
+} from "@/lib/observability/ssr-timing";
 
 // Next 16 proxy (formerly middleware): refresh the Supabase session cookie and do
 // OPTIMISTIC redirects only. Real authorization lives in RLS + layout guards
 // (docs/permissions.md); the single-session check runs in requireUser().
 export async function proxy(request: NextRequest) {
+  const { pathname } = request.nextUrl;
   let response = NextResponse.next({ request });
 
   // Captured before getClaims() runs: a failed refresh makes the Supabase
@@ -18,6 +25,7 @@ export async function proxy(request: NextRequest) {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
+      global: { fetch: supabaseFetch },
       cookies: {
         getAll() {
           return request.cookies.getAll();
@@ -36,10 +44,29 @@ export async function proxy(request: NextRequest) {
   );
 
   // IMPORTANT: keep this call — it refreshes expired auth tokens.
+  const timeProxy =
+    ssrTimingEnabled() &&
+    (pathname === "/tests" || /\/tests\/[^/]+\/result\/?$/.test(pathname));
+  const proxyT0 = timeProxy ? performance.now() : 0;
   const { data } = await supabase.auth.getClaims();
+  if (timeProxy) {
+    const ms = Math.round((performance.now() - proxyT0) * 10) / 10;
+    console.info(
+      JSON.stringify({
+        tag: SSR_TIMING_LOG_TAG,
+        layer: "proxy",
+        route: sanitizeSsrTimingToken(pathname, "unknown"),
+        req: sanitizeSsrTimingToken(request.headers.get("x-loadtest-req")),
+        run: sanitizeSsrTimingToken(request.headers.get("x-loadtest-run")),
+        total_ms: ms,
+        page_fn_ms: null,
+        html_ms: null,
+        spans: [{ name: "proxy.getClaims", start_ms: 0, ms }],
+      })
+    );
+  }
   const isAuthed = Boolean(data?.claims);
 
-  const { pathname } = request.nextUrl;
   const isPublic =
     pathname === "/" ||
     pathname.startsWith("/login") ||
@@ -48,7 +75,9 @@ export async function proxy(request: NextRequest) {
     pathname.startsWith("/forgot-password") ||
     pathname.startsWith("/reset-password") ||
     pathname.startsWith("/auth") ||
-    pathname.startsWith("/api/cron");
+    pathname.startsWith("/api/cron") ||
+    pathname === "/api/health" ||
+    pathname.startsWith("/api/health/");
 
   if (!isAuthed && !isPublic) {
     // Built fresh from request.url rather than request.nextUrl.clone(): a

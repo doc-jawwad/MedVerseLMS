@@ -3,55 +3,63 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import {
+  SESSION_WATCH_POLL_MS,
+  shouldKickForReplacedSession,
+} from "@/lib/auth/session-watch";
 
-// Realtime companion to the middleware/requireUser() session check
-// (docs/permissions.md Layer 1). Without this, an evicted session only
-// notices at the next full navigation; this catches it immediately.
+// Polling companion to requireUser() Layer 1 (docs/permissions.md).
+// VPS production does not run Supabase Realtime.
 export function SessionWatch({ userId }: { userId: string }) {
   const router = useRouter();
-  // useState's lazy initializer (not useRef(createClient()).current) —
-  // guaranteed by React to run exactly once per mount, so the client isn't
-  // constructed and thrown away on every render.
   const [supabase] = useState(() => createClient());
 
   useEffect(() => {
     let cancelled = false;
-    let channel: ReturnType<typeof supabase.channel> | null = null;
 
-    void (async () => {
+    async function check() {
       const { data: mySessionId } = await supabase.rpc("current_session_id");
       if (cancelled) return;
 
-      channel = supabase
-        .channel(`profile-${userId}`)
-        .on(
-          "postgres_changes",
-          {
-            event: "UPDATE",
-            schema: "public",
-            table: "profiles",
-            filter: `id=eq.${userId}`,
-          },
-          async (payload) => {
-            const newActive = (payload.new as { active_session_id: string | null })
-              .active_session_id;
-            if (newActive && newActive !== mySessionId) {
-              // Exam-session exemption: don't kick a tab mid-attempt.
-              const { data: exempt } = await supabase.rpc(
-                "owns_live_attempt_session"
-              );
-              if (exempt) return;
-              await supabase.auth.signOut({ scope: "local" });
-              router.replace("/login?reason=kicked");
-            }
-          }
-        )
-        .subscribe();
-    })();
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("active_session_id")
+        .eq("id", userId)
+        .maybeSingle();
+      if (cancelled) return;
+
+      const activeSessionId =
+        (profile?.active_session_id as string | null | undefined) ?? null;
+      if (
+        !shouldKickForReplacedSession({
+          mySessionId: mySessionId as string | null,
+          activeSessionId,
+        })
+      ) {
+        return;
+      }
+
+      const { data: exempt } = await supabase.rpc("owns_live_attempt_session");
+      if (cancelled || exempt) return;
+
+      await supabase.auth.signOut({ scope: "local" });
+      router.replace("/login?reason=kicked");
+    }
+
+    void check();
+    const id = window.setInterval(() => {
+      void check();
+    }, SESSION_WATCH_POLL_MS);
+
+    function onVisibility() {
+      if (document.visibilityState === "visible") void check();
+    }
+    document.addEventListener("visibilitychange", onVisibility);
 
     return () => {
       cancelled = true;
-      if (channel) supabase.removeChannel(channel);
+      window.clearInterval(id);
+      document.removeEventListener("visibilitychange", onVisibility);
     };
   }, [supabase, userId, router]);
 

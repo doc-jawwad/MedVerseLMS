@@ -5,6 +5,10 @@ import { Button } from "@/components/ui/button";
 import { SessionWatch } from "@/components/session-watch";
 import { Logo } from "@/components/logo";
 import { MobileNav, type NavItem } from "@/components/mobile-nav";
+import {
+  bindSsrTiming,
+  scheduleSsrTimingFlush,
+} from "@/lib/observability/ssr-timing-rsc";
 
 const nav: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: "dashboard" },
@@ -12,11 +16,12 @@ const nav: NavItem[] = [
   { href: "/practice", label: "Practice MCQs", icon: "practice" },
   { href: "/tests", label: "Tests", icon: "tests" },
   { href: "/performance", label: "Performance", icon: "performance" },
+  { href: "/subscription", label: "My Subscription", icon: "subscription" },
   { href: "/profile", label: "My Account", icon: "account" },
 ];
 
 // The 4 most-used links pinned to the mobile bottom tab bar; a 5th "More"
-// tab opens the drawer with the full list above (Study Materials + Account).
+// tab opens the drawer with the full list above (Materials + Subscription + Account).
 const bottomNav = [nav[0], nav[2], nav[3], nav[4]];
 
 export default async function StudentLayout({
@@ -24,6 +29,8 @@ export default async function StudentLayout({
 }: {
   children: React.ReactNode;
 }) {
+  await bindSsrTiming();
+  scheduleSsrTimingFlush();
   const { profile, enrollment, userId } = await requireStudent();
 
   return (

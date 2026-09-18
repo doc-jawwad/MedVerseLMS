@@ -11,46 +11,65 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { EnrollmentActions } from "./enrollment-actions";
+import { StudentManageActions } from "./student-actions";
 import Link from "next/link";
+import {
+  ACCOUNT_FILTERS,
+  accountStatusBadgeVariant,
+  accountStatusLabel,
+  enrollmentClassLabel,
+  matchesAccountFilter,
+  pickLiveEnrollment,
+  yearNameFromEnrollment,
+  type EnrollmentRow,
+} from "@/lib/admin/student-account-ui";
 
 export const metadata = { title: "Students — MedVerse Admin" };
 
-const statusVariant: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
-  active: "default",
-  pending: "secondary",
-  suspended: "outline",
-  expired: "outline",
-  revoked: "destructive",
+type ProfileRow = {
+  id: string;
+  full_name: string | null;
+  email: string | null;
+  account_status: string | null;
+  last_login_at: string | null;
+  created_at: string;
+  enrollments: EnrollmentRow[] | null;
 };
 
 export default async function StudentsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; status?: string }>;
+  searchParams: Promise<{ q?: string; account?: string }>;
 }) {
   const { supabase } = await requireAdmin();
-  const { q, status } = await searchParams;
+  const { q, account } = await searchParams;
 
-  let query = supabase
-    .from("enrollments")
-    .select(
-      "id, status, created_at, student_id, year_id, years(year_number, name), profiles!enrollments_student_id_fkey(full_name, email, last_login_at)"
-    )
-    .order("created_at", { ascending: false })
-    .limit(200);
+  const [{ data: profiles, error }, { data: liveAttempts }] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select(
+        "id, full_name, email, account_status, last_login_at, created_at, enrollments(id, status, year_id, years(name))"
+      )
+      .eq("role", "student")
+      .order("full_name", { ascending: true })
+      .limit(200),
+    supabase
+      .from("test_attempts")
+      .select("student_id")
+      .eq("state", "in_progress"),
+  ]);
 
-  if (status) query = query.eq("status", status);
-
-  const { data: enrollments, error } = await query;
+  const inProgress = new Set(
+    (liveAttempts ?? []).map((a) => a.student_id as string)
+  );
 
   const term = q?.toLowerCase().trim();
-  const rows = (enrollments ?? []).filter((e) => {
+  const rows = ((profiles ?? []) as ProfileRow[]).filter((p) => {
+    if (!matchesAccountFilter(p.account_status, account)) return false;
     if (!term) return true;
-    const p = e.profiles as unknown as { full_name: string; email: string };
     return (
-      p?.full_name?.toLowerCase().includes(term) ||
-      p?.email?.toLowerCase().includes(term)
+      p.full_name?.toLowerCase().includes(term) ||
+      p.email?.toLowerCase().includes(term)
     );
   });
 
@@ -65,23 +84,23 @@ export default async function StudentsPage({
             defaultValue={q ?? ""}
             className="w-64"
           />
-          {status && <input type="hidden" name="status" value={status} />}
+          {account && <input type="hidden" name="account" value={account} />}
           <Button type="submit" variant="secondary">
             Search
           </Button>
         </form>
       </div>
 
-      <div className="flex gap-2 text-sm">
-        {["", "pending", "active", "suspended", "revoked"].map((s) => (
+      <div className="flex flex-wrap gap-2 text-sm">
+        {ACCOUNT_FILTERS.map((s) => (
           <Link
-            key={s || "all"}
-            href={s ? `/admin/students?status=${s}` : "/admin/students"}
+            key={s.id || "all"}
+            href={s.id ? `/admin/students?account=${s.id}` : "/admin/students"}
             className={`rounded-md border px-3 py-1 ${
-              (status ?? "") === s ? "bg-accent" : "hover:bg-accent/50"
+              (account ?? "") === s.id ? "bg-accent" : "hover:bg-accent/50"
             }`}
           >
-            {s || "all"}
+            {s.label}
           </Link>
         ))}
       </div>
@@ -94,8 +113,8 @@ export default async function StudentsPage({
             <TableRow>
               <TableHead>Name</TableHead>
               <TableHead>Email</TableHead>
-              <TableHead>Year</TableHead>
-              <TableHead>Status</TableHead>
+              <TableHead>Class</TableHead>
+              <TableHead>LMS access</TableHead>
               <TableHead>Registered</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
@@ -108,35 +127,36 @@ export default async function StudentsPage({
                 </TableCell>
               </TableRow>
             )}
-            {rows.map((e) => {
-              const p = e.profiles as unknown as {
-                full_name: string;
-                email: string;
-              };
-              const y = e.years as unknown as { name: string };
+            {rows.map((p) => {
+              const live = pickLiveEnrollment(p.enrollments);
+              const classYear = yearNameFromEnrollment(live);
               return (
-                <TableRow key={e.id}>
+                <TableRow key={p.id}>
                   <TableCell className="font-medium">
-                    <Link href={`/admin/students/${e.student_id}`} className="hover:underline">
-                      {p?.full_name}
+                    <Link href={`/admin/students/${p.id}`} className="hover:underline">
+                      {p.full_name}
                     </Link>
                   </TableCell>
-                  <TableCell>{p?.email}</TableCell>
-                  <TableCell>{y?.name}</TableCell>
+                  <TableCell>{p.email}</TableCell>
                   <TableCell>
-                    <Badge variant={statusVariant[e.status] ?? "outline"}>
-                      {e.status}
+                    <div>{classYear}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {enrollmentClassLabel(live?.status ?? null)}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={accountStatusBadgeVariant(p.account_status)}>
+                      {accountStatusLabel(p.account_status)}
                     </Badge>
                   </TableCell>
-                  <TableCell>
-                    {formatDate(e.created_at)}
-                  </TableCell>
+                  <TableCell>{formatDate(p.created_at)}</TableCell>
                   <TableCell className="text-right">
-                    <EnrollmentActions
-                      enrollmentId={e.id}
-                      studentId={e.student_id}
-                      yearId={e.year_id}
-                      status={e.status}
+                    <StudentManageActions
+                      studentId={p.id}
+                      yearId={live?.year_id ?? p.enrollments?.[0]?.year_id ?? null}
+                      hasActiveClass={Boolean(live)}
+                      accountStatus={p.account_status ?? "active"}
+                      hasInProgressExam={inProgress.has(p.id)}
                     />
                   </TableCell>
                 </TableRow>

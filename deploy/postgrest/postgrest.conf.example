@@ -1,0 +1,23 @@
+# PostgREST — copy to /etc/medverse/postgrest.conf on the VPS.
+# Prefer EnvironmentFile (/etc/medverse/postgrest.env) for secrets; this file
+# documents the non-secret shape. Do not commit a filled copy.
+#
+# PostgREST listens on loopback only. Caddy is the public /rest/v1 entry.
+
+db-uri = "postgres://authenticator@127.0.0.1:5432/medverse"
+db-schemas = "public"
+db-anon-role = "anon"
+db-extra-search-path = "public"
+
+# HS256 secret MUST match the Cloud Auth project's JWT secret (server file).
+# Never NEXT_PUBLIC_. Rotation = Cloud dashboard + this file in the same change.
+# jwt-secret = "@/etc/medverse/jwt-secret"
+
+server-host = "127.0.0.1"
+server-port = 3001
+
+# Start small; tune from a PostgREST load test (docs/deployment.md). Not a capacity claim.
+db-pool = 10
+
+# Cloud-issued access tokens carry aud=authenticated and a role claim.
+jwt-aud = "authenticated"

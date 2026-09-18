@@ -32,12 +32,18 @@ type DifficultQuestion = {
 export default async function AdminOverviewPage() {
   const { supabase } = await requireAdmin();
 
-  const [{ data: pendingCount }, { data: summaryData }, { data: difficultyData }] =
+  const [{ data: blockedCount }, { data: summaryData }, { data: difficultyData }] =
     await Promise.all([
       supabase
-        .from("enrollments")
+        .from("profiles")
         .select("id", { count: "exact", head: true })
-        .eq("status", "pending")
+        .eq("role", "student")
+        .in("account_status", [
+          "restricted",
+          "suspended",
+          "deactivated",
+          "revoked",
+        ])
         .then((r) => ({ data: r.count })),
       supabase.rpc("admin_platform_summary"),
       supabase.rpc("question_difficulty_report", { p_limit: 5 }),
@@ -51,8 +57,8 @@ export default async function AdminOverviewPage() {
       <h1 className="text-2xl font-semibold">Overview</h1>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Link href="/admin/students?status=pending">
-          <Tile value={pendingCount ?? 0} label="Pending approvals" />
+        <Link href="/admin/students?account=blocked">
+          <Tile value={blockedCount ?? 0} label="Blocked accounts" />
         </Link>
         <Link href="/admin/students">
           <Tile value={s?.active_students ?? 0} label="Active students" />

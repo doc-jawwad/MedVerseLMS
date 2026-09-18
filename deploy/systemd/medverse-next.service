@@ -1,0 +1,25 @@
+[Unit]
+Description=MedVerse LMS Next.js
+Documentation=file:///opt/medverse/current/docs/deployment.md
+After=network.target
+# Intentionally not Bound to PostgREST/Postgres: pages should restart independently.
+
+[Service]
+Type=simple
+User=medverse
+Group=medverse
+WorkingDirectory=/opt/medverse/current
+EnvironmentFile=/etc/medverse/nextjs.env
+# Bind loopback only. Caddy is the public listener.
+Environment=HOST=127.0.0.1
+Environment=PORT=3000
+ExecStart=/usr/bin/npm run start
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+
+# Do not dump the environment (secrets) on failure.
+Environment=NODE_ENV=production
+
+[Install]
+WantedBy=multi-user.target

@@ -8,6 +8,7 @@ import {
   addMaterial,
   deleteMaterial,
 } from "@/lib/actions/materials";
+import { OpenMaterialButton } from "@/components/materials/open-material-button";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -30,7 +31,6 @@ type Material = {
   title: string;
   description: string;
   file_type: string;
-  drive_url: string;
 };
 
 export function MaterialsAdmin({
@@ -163,14 +163,12 @@ function FolderCard({
             className="flex items-center justify-between rounded-md border p-2 text-sm"
           >
             <div>
-              <a
-                href={m.drive_url}
-                target="_blank"
-                rel="noreferrer"
-                className="font-medium hover:underline"
+              <OpenMaterialButton
+                materialId={m.id}
+                className="h-auto p-0 font-medium"
               >
                 {m.title}
-              </a>
+              </OpenMaterialButton>
               <span className="ml-2 text-xs uppercase text-muted-foreground">
                 {m.file_type}
               </span>

@@ -9,8 +9,8 @@ draft ──publish_test()──▶ published ──closes_at passes / close now
 ```
 
 - `draft` — editable freely; students never see it.
-- `published` — frozen (see below); visible to its audience from `opens_at`. "Live" is **derived**: `status='published' AND now() BETWEEN opens_at AND closes_at` — never stored.
-- `closed` — window over; results visible per `show_review` setting.
+- `published` — frozen (see below); in the student **catalog** for its audience from `opens_at` (locked if not entitled). "Live" is **derived**: `status='published' AND now() BETWEEN opens_at AND closes_at` — never stored.
+- `closed` — window over. Owned **score / result summary** stays visible. Paid **review content** (stems, selected keys, correct keys, explanations) follows [access-eligibility-analytics.md](access-eligibility-analytics.md) §11 (live entitlement + `show_review`; server-gated).
 - `archived` — hidden from student lists; history intact.
 - `invalidated` — kill switch; attempts marked invalidated; hidden from results.
 
@@ -40,7 +40,7 @@ Later edits to a question create new versions; **published tests keep the frozen
 
 ## Kill switch (operational from Phase 6; every action audit-logged)
 
-- **Close test now** — `closes_at = now()`; in-progress attempts finalize via the normal expiry path (transport grace applies).
+- **Close test now** — `close_test_now`: set `closes_at = now()` and `status = 'closed'`, and **clamp** every live `in_progress` attempt `expires_at := least(expires_at, now())`. New starts are blocked. Existing `in_progress` attempts may **resume while closed** on the **same device** ([exam-state-machine.md](exam-state-machine.md)). Close-now does **not** force-submit and does **not** add a third grace. The existing **30s transport grace** and **60s auto-submit sweep** ([scoring-rules.md](scoring-rules.md)) apply to the **clamped** `expires_at`.
 - **Invalidate test** — status 'invalidated'; all attempts → invalidated; excluded from results/analytics.
 - **Void question** — for a wrong key discovered mid-test: set `test_questions.voided` + `void_policy` (exclude | credit_all), then `recompute_test()` rescores all submitted attempts and re-ranks. Safe while students are live — their in-progress answers are unaffected until scoring.
 
@@ -54,4 +54,13 @@ Manual only (no autopilot): filter the bank by year/subject/book/chapter/topic/d
 
 ## Access
 
-Audience = `test_audiences` (year cohorts) ∪ per-student `access_grants(test)`. A student not covered gets **0 rows** for that test at the DB level (`can_access_test` predicate in RLS) — `/tests/[id]` direct URL fails server-side, not just in UI.
+Catalog vs content are separate ([permissions.md](permissions.md)):
+
+- **Catalog (`can_view_test`):** published/closed test AND (year in `test_audiences` matches the student’s **active class enrollment** OR unrevoked `access_grants(test)`). Account must be `active` to see the LMS list. Paid tests in that catalog stay **listed and locked** until entitled.
+- **Content (`can_access_test`):** catalog plus entitlement (`free` / live subscription / matching plan / allow-grant) and **not** resource-denied. **New** `start_attempt` uses this. Existing tests are backfilled `free`.
+- **Resume** of an existing `in_progress` attempt skips catalog / window / `can_access_test` re-check (resume-while-closed and resume after paid expiry). Resume is **same-device only**. Interrupted papers have no extra state — they stay `in_progress` until submit / auto-submit / invalidate.
+- Unpublished/draft tests are never in the student catalog.
+- Direct URL to start a test without entitlement fails in the RPC (not only in UI). Listing a locked test is allowed; starting it is not.
+- Deny restrictions win over grants and subscription. Account-level block (`restricted`/`suspended`/`deactivated`/`revoked`) overrides all resource access (exam disposition: [exam-state-machine.md](exam-state-machine.md)).
+- **Current** `can_access_test` is not historical window-eligibility. A later subscription does not make a closed paid test eligible. Missed vs not-eligible: [access-eligibility-analytics.md](access-eligibility-analytics.md).
+- **Owned historical result (`get_own_test_result`):** the student’s own `submitted` attempt. Catalog visibility is not required. Paid review remains `get_attempt_review` (8J-A).

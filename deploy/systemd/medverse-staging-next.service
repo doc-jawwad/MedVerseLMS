@@ -1,0 +1,27 @@
+[Unit]
+Description=MedVerse LMS staging Next.js
+Documentation=file:///opt/medverse/current/docs/deployment.md
+After=network.target
+
+[Service]
+Type=simple
+User=medverse
+Group=medverse
+WorkingDirectory=/opt/medverse-staging/current
+EnvironmentFile=/etc/medverse-staging/nextjs.env
+Environment=HOST=127.0.0.1
+Environment=HOSTNAME=127.0.0.1
+Environment=PORT=3010
+Environment=NODE_ENV=production
+ExecStart=/usr/bin/npm run start -- -H 127.0.0.1 -p 3010
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+LimitNOFILE=65535
+MemoryHigh=768M
+MemoryMax=1G
+NoNewPrivileges=yes
+PrivateTmp=yes
+
+[Install]
+WantedBy=multi-user.target

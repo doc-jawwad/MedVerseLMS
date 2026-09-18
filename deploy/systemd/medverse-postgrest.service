@@ -1,0 +1,20 @@
+[Unit]
+Description=MedVerse LMS PostgREST
+Documentation=file:///opt/medverse/current/docs/deployment.md
+After=network.target postgresql.service
+# Independent of Next.js. Restarting this unit must not take the app process down.
+
+[Service]
+Type=simple
+User=medverse
+Group=medverse
+EnvironmentFile=/etc/medverse/postgrest.env
+# Config path and binary path are host-local; adjust at provision if the
+# distro package installs PostgREST elsewhere.
+ExecStart=/usr/bin/postgrest /etc/medverse/postgrest.conf
+Restart=on-failure
+RestartSec=3
+TimeoutStopSec=15
+
+[Install]
+WantedBy=multi-user.target

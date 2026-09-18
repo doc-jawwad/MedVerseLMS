@@ -38,6 +38,14 @@ export function LoginForm({ next, reason }: { next?: string; reason?: string }) 
             </AlertDescription>
           </Alert>
         )}
+        {reason === "exists" && (
+          <Alert className="mb-4">
+            <AlertDescription>
+              An account already exists with this email address. Please sign in
+              or reset your password.
+            </AlertDescription>
+          </Alert>
+        )}
         <form action={action} className="grid gap-4">
           <input type="hidden" name="next" value={next ?? ""} />
           <div className="grid gap-2">

@@ -51,6 +51,10 @@ next-env.d.ts
 .vercel
 # Playwright CLI output (may contain credentials)
 .playwright-cli/
+.playwright-mcp/
+
+# Local editor / MCP config
+.cursor/
 
 # Encrypted / raw dumps must never be committed
 *.dump

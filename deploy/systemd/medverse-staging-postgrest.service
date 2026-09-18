@@ -1,0 +1,24 @@
+[Unit]
+Description=MedVerse LMS staging PostgREST
+After=network.target postgresql@17-main.service
+Wants=postgresql@17-main.service
+
+[Service]
+Type=simple
+User=medverse
+Group=medverse
+EnvironmentFile=/etc/medverse-staging/postgrest.env
+ExecStart=/usr/local/bin/postgrest /etc/medverse-staging/postgrest.conf
+Restart=on-failure
+RestartSec=3
+TimeoutStopSec=15
+LimitNOFILE=65535
+MemoryMax=256M
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+
+[Install]
+WantedBy=multi-user.target

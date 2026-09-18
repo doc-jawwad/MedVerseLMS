@@ -7,6 +7,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { PERFORMANCE_GRAIN_COPY } from "@/lib/tests/student-dashboard-presentation";
 
 export const metadata = { title: "Performance — MedVerse LMS" };
 
@@ -77,17 +78,27 @@ export default async function PerformancePage() {
 
   return (
     <div className="grid gap-6">
-      <h1 className="text-2xl font-semibold">Performance</h1>
+      <div>
+        <h1 className="text-2xl font-semibold">Performance</h1>
+        <p className="text-sm text-muted-foreground">
+          Historical academic data stays attached to your account. Subscription
+          status does not erase submitted scores. Changing year does not remove
+          lifetime test history below.
+        </p>
+      </div>
 
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Overall</CardTitle>
+          <CardDescription>
+            {PERFORMANCE_GRAIN_COPY.overall}
+          </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4">
           <Bar
             label="Average test score"
             value={s?.average_percentage ?? 0}
-            sub={`across ${s?.tests_taken ?? 0} tests`}
+            sub={`across ${s?.tests_taken ?? 0} attempted`}
           />
           <Bar label="Best score" value={s?.best_percentage ?? 0} />
         </CardContent>
@@ -96,7 +107,9 @@ export default async function PerformancePage() {
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Subject performance</CardTitle>
-          <CardDescription>Test average and practice accuracy per subject</CardDescription>
+          <CardDescription>
+            {PERFORMANCE_GRAIN_COPY.subject}
+          </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4">
           {subjectRows.map((sub) => (
@@ -125,7 +138,7 @@ export default async function PerformancePage() {
           <CardHeader>
             <CardTitle className="text-base">Weak chapters</CardTitle>
             <CardDescription>
-              Lowest practice accuracy (minimum 3 attempts)
+              {PERFORMANCE_GRAIN_COPY.weakChapters}
             </CardDescription>
           </CardHeader>
           <CardContent className="grid gap-2">
@@ -150,7 +163,9 @@ export default async function PerformancePage() {
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Historical trend</CardTitle>
-          <CardDescription>Score percentage over your test history</CardDescription>
+          <CardDescription>
+            {PERFORMANCE_GRAIN_COPY.trend}
+          </CardDescription>
         </CardHeader>
         <CardContent>
           {trendRows.length === 0 ? (

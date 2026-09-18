@@ -1,0 +1,23 @@
+[Unit]
+Description=MedVerse LMS encrypted Postgres dump to Cloudflare R2
+Documentation=file:///opt/medverse/current/docs/deployment.md
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=medverse
+Group=medverse
+EnvironmentFile=/etc/medverse/backup.env
+# Default tag for the timer. Override for a pre-exam dump:
+#   systemctl start medverse-backup.service
+#   MEDVERSE_BACKUP_TAG=pre-exam /opt/medverse/current/deploy/scripts/backup-to-r2.sh
+Environment=MEDVERSE_BACKUP_TAG=scheduled
+ExecStart=/opt/medverse/current/deploy/scripts/backup-to-r2.sh
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+# EnvironmentFile values must not appear in logs; the script never echoes secrets.
+
+[Install]
+WantedBy=multi-user.target

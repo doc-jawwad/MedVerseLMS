@@ -23,39 +23,48 @@
 //   node scripts/create-dev-account.mjs admin@medverse.local "Passw0rd!23" "Dev Admin" --admin
 //   node scripts/create-dev-account.mjs student1@medverse.local "Passw0rd!23" "Test Student" 3
 //
-// Requires SUPABASE_SERVICE_ROLE_KEY in .env.local (server-only key — never
-// commit it, never expose it to the client). This script talks directly to
-// whatever project NEXT_PUBLIC_SUPABASE_URL in .env.local points at — check
-// that file before running this against anything you don't intend to write
-// real data into. There is currently only one Supabase project behind this
-// repo (dev and production are NOT separated); see docs/deployment.md.
+// Auth Admin API uses SUPABASE_SERVICE_ROLE_KEY (JWT or opaque sb_secret_*).
+// PostgREST calls never send opaque sb_secret_* as Authorization Bearer.
+// Env comes from the process environment, overlaying .env.local when present.
+// Check the target URL before running — this writes real Auth/app rows.
 
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import { assertNotCloudProduction } from "./lib/env-guard.mjs";
+import { authAdminHeaders, isJwt, postgrestHeaders } from "./lib/postgrest-auth.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-function loadEnvLocal() {
+function loadEnv() {
   const p = path.join(__dirname, "..", ".env.local");
-  if (!fs.existsSync(p)) {
-    throw new Error(".env.local not found — copy .env.local.example and fill it in first.");
-  }
   const out = {};
-  for (const line of fs.readFileSync(p, "utf8").split("\n")) {
-    const m = line.match(/^([A-Z_]+)=(.*)$/);
-    if (m) out[m[1]] = m[2];
+  if (fs.existsSync(p)) {
+    for (const line of fs.readFileSync(p, "utf8").split("\n")) {
+      const m = line.match(/^([A-Z_]+)=(.*)$/);
+      if (m) out[m[1]] = m[2];
+    }
+  }
+  for (const key of [
+    "NEXT_PUBLIC_SUPABASE_URL",
+    "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+    "SUPABASE_SERVICE_ROLE_KEY",
+    "MEDVERSE_ALLOW_PRODUCTION",
+    "MEDVERSE_ALLOW_CLOUD_STAGING",
+  ]) {
+    if (process.env[key]) out[key] = process.env[key];
   }
   return out;
 }
 
-function headers(serviceKey, extra = {}) {
-  return {
-    apikey: serviceKey,
-    Authorization: `Bearer ${serviceKey}`,
-    "Content-Type": "application/json",
-    ...extra,
-  };
+async function readJson(res) {
+  const text = await res.text();
+  if (!text) return {};
+  try {
+    return JSON.parse(text);
+  } catch {
+    return { message: text };
+  }
 }
 
 async function main() {
@@ -72,51 +81,56 @@ async function main() {
     throw new Error("Password must be at least 8 characters (matches the app's own signup rule).");
   }
 
-  const env = loadEnvLocal();
+  const env = loadEnv();
   const base = env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!base || !serviceKey) {
+  const anonKey = env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!base || !serviceKey || !anonKey) {
     throw new Error(
-      "NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must both be set in .env.local."
+      "NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, and SUPABASE_SERVICE_ROLE_KEY must all be set."
     );
   }
+
+  assertNotCloudProduction(base, { allowStaging: false });
 
   console.log(`Target project: ${base}`);
 
   let yearId;
   if (!makeAdmin) {
     const yearNumber = Number(yearArg) || 1;
-    const yearRes = await fetch(
-      `${base}/rest/v1/years?year_number=eq.${yearNumber}&select=id`,
-      { headers: headers(serviceKey) }
-    ).then((r) => r.json());
-    if (!yearRes[0]) {
+    const yearRes = await fetch(`${base}/rest/v1/rpc/list_years`, {
+      method: "POST",
+      headers: postgrestHeaders({ apikey: anonKey }),
+      body: "{}",
+    });
+    const years = await readJson(yearRes);
+    const yearRow = Array.isArray(years)
+      ? years.find((y) => Number(y.year_number) === yearNumber)
+      : null;
+    if (!yearRes.ok || !yearRow) {
+      const detail = Array.isArray(years) ? `no year_number=${yearNumber}` : JSON.stringify(years);
       throw new Error(
-        `No year row for year_number=${yearNumber} — run the years/subjects seed first (supabase/seed.sql).`
+        `No year row for year_number=${yearNumber} (${yearRes.status}): ${detail} — seed years first.`
       );
     }
-    yearId = yearRes[0].id;
+    yearId = yearRow.id;
   }
 
   const createResp = await fetch(`${base}/auth/v1/admin/users`, {
     method: "POST",
-    headers: headers(serviceKey),
+    headers: authAdminHeaders(serviceKey),
     body: JSON.stringify({
       email,
       password,
-      email_confirm: true, // skips /verify-email entirely — no email is sent
+      email_confirm: true,
       user_metadata: {
         full_name: fullName,
         ...(yearId ? { year_id: yearId } : {}),
       },
     }),
   });
-  const userRes = await createResp.json();
+  const userRes = await readJson(createResp);
 
-  // Checked by HTTP status, not response-body shape: the Admin API's error
-  // payload isn't consistently {error_code, msg} across failure types (e.g.
-  // "already registered" vs. a malformed request), so a shape-based check
-  // silently passed through some failures with `userRes.id` left undefined.
   if (!createResp.ok || !userRes.id) {
     const detail = userRes.msg || userRes.message || userRes.error_code || JSON.stringify(userRes);
     throw new Error(`Supabase Admin API error (${createResp.status}): ${detail}`);
@@ -124,43 +138,82 @@ async function main() {
 
   console.log(`Created auth user ${userRes.id} (${email}), already confirmed.`);
 
+  const tokenResp = await fetch(`${base}/auth/v1/token?grant_type=password`, {
+    method: "POST",
+    headers: {
+      apikey: anonKey,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ email, password }),
+  });
+  const tokenJson = await readJson(tokenResp);
+  if (!tokenResp.ok || !tokenJson.access_token) {
+    const detail =
+      tokenJson.msg || tokenJson.error_description || tokenJson.error || JSON.stringify(tokenJson);
+    throw new Error(`Could not sign in newly created user to ensure_profile (${tokenResp.status}): ${detail}`);
+  }
+  const accessToken = tokenJson.access_token;
+  if (!isJwt(accessToken)) {
+    throw new Error("Auth token endpoint did not return a JWT access_token.");
+  }
+
+  const ensureResp = await fetch(`${base}/rest/v1/rpc/ensure_profile`, {
+    method: "POST",
+    headers: postgrestHeaders({ apikey: anonKey, accessToken }),
+    body: "{}",
+  });
+  if (!ensureResp.ok) {
+    throw new Error(`ensure_profile failed (${ensureResp.status}): ${await ensureResp.text()}`);
+  }
+
   if (makeAdmin) {
-    // handle_new_user() always creates the profile as role='student'
-    // (docs/database.md) — promotion to admin is deliberately only possible
-    // via SQL/service role, never self-service.
-    const patchRes = await fetch(`${base}/rest/v1/profiles?id=eq.${userRes.id}`, {
-      method: "PATCH",
-      headers: headers(serviceKey, { Prefer: "return=minimal" }),
-      body: JSON.stringify({ role: "admin" }),
+    const bootstrapResp = await fetch(`${base}/rest/v1/rpc/bootstrap_first_main_admin`, {
+      method: "POST",
+      headers: postgrestHeaders({ apikey: anonKey, accessToken }),
+      body: "{}",
     });
-    if (!patchRes.ok) {
-      throw new Error(`Failed to promote to admin: ${patchRes.status} ${await patchRes.text()}`);
+    if (bootstrapResp.ok) {
+      console.log(`Promoted ${email} to Main Admin (bootstrap: no Main Admin existed).`);
+    } else {
+      const body = await bootstrapResp.text();
+      const mainExists = /main_admin_exists/i.test(body);
+      if (!mainExists) {
+        throw new Error(`bootstrap_first_main_admin failed (${bootstrapResp.status}): ${body}`);
+      }
+      if (!isJwt(serviceKey)) {
+        throw new Error(
+          `A Main Admin already exists. Additional --admin accounts must be promoted with set_admin_role by a Main Admin. Opaque service-role keys are not PostgREST Bearers.`
+        );
+      }
+      const patchRes = await fetch(`${base}/rest/v1/profiles?id=eq.${userRes.id}`, {
+        method: "PATCH",
+        headers: postgrestHeaders({
+          apikey: serviceKey,
+          accessToken: serviceKey,
+          extra: { Prefer: "return=minimal" },
+        }),
+        body: JSON.stringify({ role: "admin", is_main_admin: false }),
+      });
+      if (!patchRes.ok) {
+        throw new Error(`Failed to promote to limited admin: ${patchRes.status} ${await patchRes.text()}`);
+      }
+      console.log(
+        `Promoted ${email} to admin with no permissions. A Main Admin must grant codes before they can mutate.`
+      );
     }
-    console.log(`Promoted ${email} to admin.`);
   } else {
-    // handle_new_user() already created a 'pending' enrollment; activate it
-    // so the account is immediately usable without a separate admin-approval
-    // click during local dev/testing.
     const enrollFetch = await fetch(
-      `${base}/rest/v1/enrollments?student_id=eq.${userRes.id}&select=id`,
-      { headers: headers(serviceKey) }
+      `${base}/rest/v1/enrollments?student_id=eq.${userRes.id}&status=eq.active&select=id`,
+      { headers: postgrestHeaders({ apikey: anonKey, accessToken }) }
     );
-    const enrollRes = await enrollFetch.json();
+    const enrollRes = await readJson(enrollFetch);
     if (!enrollFetch.ok || !Array.isArray(enrollRes) || !enrollRes[0]) {
-      // handle_new_user() should always have inserted a 'pending' row for a
-      // valid year_id — surface this loudly rather than finishing silently
-      // with an account that has no enrollment to activate.
       console.warn(
-        `Warning: no enrollment row found for ${email} — the account was created but has no active enrollment. ` +
-          `Check that year_id ${yearId} exists and handle_new_user() ran.`
+        `Warning: no active enrollment row found for ${email}. ` +
+          `Check that year_id ${yearId} exists and ensure_profile() ran.`
       );
     } else {
-      await fetch(`${base}/rest/v1/enrollments?id=eq.${enrollRes[0].id}`, {
-        method: "PATCH",
-        headers: headers(serviceKey, { Prefer: "return=minimal" }),
-        body: JSON.stringify({ status: "active" }),
-      });
-      console.log(`Enrollment activated for ${email}.`);
+      console.log(`Active class enrollment confirmed for ${email}.`);
     }
   }
 

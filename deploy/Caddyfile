@@ -1,0 +1,65 @@
+# MedVerse LMS — unified public origin (docs/architecture.md, docs/deployment.md).
+#
+# Values are environment substitutions resolved when Caddy loads this file.
+# Supply them via systemd EnvironmentFile or `caddy set-env` — never commit secrets.
+#
+# Required at provision:
+#   MEDVERSE_ORIGIN       public hostname only, no scheme (example: lms.example.com)
+#   SUPABASE_AUTH_HOST    Cloud GoTrue host (example: <project-ref>.supabase.co)
+#
+# Optional (defaults match the systemd unit templates):
+#   NEXT_UPSTREAM         default 127.0.0.1:3000
+#   POSTGREST_UPSTREAM    default 127.0.0.1:3001
+#
+# TLS mode is pending (Cloudflare orange-cloud + origin cert vs DNS-only + ACME).
+# Uncomment exactly one tls block in the site below when the VPS exists.
+
+{
+	# Admin API is localhost-only; do not expose Caddy admin on the public NIC.
+	admin 127.0.0.1:2019
+}
+
+{$MEDVERSE_ORIGIN} {
+	encode gzip
+
+	# /auth/v1/* → Supabase Cloud GoTrue (Brevo SMTP lives on that project).
+	# Keep the /auth/v1 prefix; Cloud expects it. Host header must be the
+	# Cloud project host, not the public LMS hostname.
+	handle /auth/v1* {
+		reverse_proxy https://{$SUPABASE_AUTH_HOST} {
+			header_up Host {$SUPABASE_AUTH_HOST}
+			header_up X-Forwarded-Host {host}
+			header_up X-Forwarded-Proto {scheme}
+			transport http {
+				tls
+			}
+		}
+	}
+
+	# /rest/v1/* → local PostgREST. supabase-js always prefixes /rest/v1;
+	# PostgREST itself serves /rpc and tables at the root, so strip the prefix.
+	handle /rest/v1* {
+		uri strip_prefix /rest/v1
+		reverse_proxy {$POSTGREST_UPSTREAM:127.0.0.1:3001} {
+			header_up Host {host}
+		}
+	}
+
+	# Everything else → Next.js (pages, server actions, /api/cron, /api/health).
+	handle {
+		reverse_proxy {$NEXT_UPSTREAM:127.0.0.1:3000}
+	}
+
+	# TLS — uncomment ONE at provision time. Do not invent a mode here.
+	#
+	# Cloudflare Full (strict) with an origin certificate:
+	# tls /etc/medverse/tls/origin.pem /etc/medverse/tls/origin.key
+	#
+	# Let's Encrypt (Cloudflare DNS-only / grey-cloud):
+	# tls {
+	# 	issuer acme
+	# }
+	#
+	# VPS staging without a public cert (localhost / hosts-file only):
+	# tls internal
+}

@@ -7,7 +7,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { ResourceLockNotice } from "@/components/subscription/resource-lock-notice";
 
 export const metadata = { title: "Practice MCQs — MedVerse LMS" };
 
@@ -44,24 +44,27 @@ export default async function PracticePage() {
               className={
                 s.granted
                   ? "h-full transition-colors hover:bg-accent/40"
-                  : "h-full opacity-60"
+                  : "h-full opacity-90"
               }
             >
               <CardHeader>
                 <CardTitle className="flex items-center justify-between text-lg">
                   {s.subject_name}
-                  {!s.granted && <Badge variant="outline">locked</Badge>}
                 </CardTitle>
                 <CardDescription>
                   {s.approved_questions} questions available
                 </CardDescription>
               </CardHeader>
-              <CardContent className="text-sm text-muted-foreground">
-                {s.granted
-                  ? s.answered > 0
-                    ? `${s.answered} answered · ${acc}% correct`
-                    : "Not started yet"
-                  : "Ask your admin for access"}
+              <CardContent className="grid gap-3 text-sm text-muted-foreground">
+                {s.granted ? (
+                  s.answered > 0 ? (
+                    `${s.answered} answered · ${acc}% correct`
+                  ) : (
+                    "Not started yet"
+                  )
+                ) : (
+                  <ResourceLockNotice />
+                )}
               </CardContent>
             </Card>
           );

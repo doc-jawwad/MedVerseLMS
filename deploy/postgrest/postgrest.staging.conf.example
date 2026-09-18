@@ -1,0 +1,12 @@
+# Copy to /etc/medverse-staging/postgrest.conf
+# Staging PostgREST — loopback only. Production remains 127.0.0.1:3001.
+
+db-schemas = "public"
+db-anon-role = "anon"
+db-extra-search-path = "public"
+server-host = "127.0.0.1"
+server-port = 3011
+db-pool = 5
+jwt-aud = "authenticated"
+jwt-secret = "@/etc/medverse-staging/jwks.json"
+jwt-secret-is-base64 = "false"

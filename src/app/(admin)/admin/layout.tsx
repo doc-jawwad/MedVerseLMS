@@ -9,6 +9,8 @@ import { MobileNav, type NavItem } from "@/components/mobile-nav";
 const nav: NavItem[] = [
   { href: "/admin", label: "Overview", icon: "dashboard" },
   { href: "/admin/students", label: "Students", icon: "students" },
+  { href: "/admin/year-changes", label: "Year changes", icon: "students" },
+  { href: "/admin/subscriptions", label: "Subscriptions", icon: "subscription" },
   { href: "/admin/curriculum", label: "Curriculum", icon: "curriculum" },
   { href: "/admin/questions", label: "Question Bank", icon: "questions" },
   { href: "/admin/tests", label: "Tests", icon: "tests" },
@@ -17,8 +19,8 @@ const nav: NavItem[] = [
 ];
 
 // The 4 most-used links pinned to the mobile bottom tab bar; a 5th "More"
-// tab opens the drawer with the full list above (Curriculum + Materials + Audit Log).
-const bottomNav = [nav[0], nav[1], nav[4], nav[3]];
+// tab opens the drawer with the full list above.
+const bottomNav = [nav[0], nav[1], nav[5], nav[4]];
 
 export default async function AdminLayout({
   children,

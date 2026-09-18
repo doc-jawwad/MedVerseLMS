@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { requireStudent } from "@/lib/auth/require-user";
 import {
   Card,
@@ -7,19 +8,63 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { ChangePasswordForm } from "./change-password-form";
+import {
+  YearChangePanel,
+  type YearChangeRequestView,
+  type YearOption,
+} from "./year-change-panel";
 
 export const metadata = { title: "My Account — MedVerse LMS" };
 
 export default async function ProfilePage() {
   const { supabase, profile, enrollment, userId } = await requireStudent();
 
-  const { data: grants } = await supabase
-    .from("access_grants")
-    .select("grant_type, subjects(name), material_folders(name)")
-    .eq("student_id", userId)
-    .eq("grant_type", "practice_subject")
-    .is("revoked_at", null);
+  const [
+    { data: grants },
+    { data: live },
+    { data: yearRows },
+    { data: ycRows },
+  ] = await Promise.all([
+    supabase
+      .from("access_grants")
+      .select("grant_type, subjects(name), material_folders(name)")
+      .eq("student_id", userId)
+      .eq("grant_type", "practice_subject")
+      .is("revoked_at", null),
+    supabase.rpc("has_live_subscription"),
+    supabase.rpc("list_years"),
+    supabase
+      .from("year_change_requests")
+      .select(
+        "id, status, reason, review_note, created_at, reviewed_at, from_year_id, to_year_id"
+      )
+      .eq("student_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(20),
+  ]);
+
+  const years = (yearRows ?? []) as YearOption[];
+  const yearName = (id: string) =>
+    years.find((y) => y.id === id)?.name ?? null;
+
+  const mapped: YearChangeRequestView[] = (ycRows ?? []).map((r) => ({
+    id: r.id,
+    status: r.status,
+    reason: r.reason,
+    review_note: r.review_note,
+    created_at: r.created_at,
+    reviewed_at: r.reviewed_at,
+    from_year_id: r.from_year_id,
+    to_year_id: r.to_year_id,
+    from_name: yearName(r.from_year_id),
+    to_name: yearName(r.to_year_id),
+  }));
+
+  const pending = mapped.find((r) => r.status === "pending") ?? null;
+  const latestRejected =
+    mapped.find((r) => r.status === "rejected") ?? null;
 
   return (
     <div className="grid max-w-2xl gap-6">
@@ -38,6 +83,47 @@ export default async function ProfilePage() {
               {enrollment.status}
             </Badge>
           </Row>
+          <Row label="Subscription">
+            <Badge variant={live.data ? "default" : "outline"}>
+              {live.data ? "active" : "no active plan"}
+            </Badge>
+          </Row>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Academic year</CardTitle>
+          <CardDescription>
+            Your class year is fixed until an admin approves a change request.
+            Account status and subscription stay separate.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <YearChangePanel
+            currentYearId={enrollment.year_id}
+            currentYearName={enrollment.year_name}
+            years={years}
+            pending={pending}
+            latestRejected={pending ? null : latestRejected}
+          />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Subscription</CardTitle>
+          <CardDescription>
+            View status, payment instructions, and submit or update an
+            application.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button asChild>
+            <Link href="/subscription">
+              {live.data ? "My Subscription" : "Get Subscription"}
+            </Link>
+          </Button>
         </CardContent>
       </Card>
 

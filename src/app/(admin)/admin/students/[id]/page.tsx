@@ -10,6 +10,14 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { StudentManageActions } from "../student-actions";
+import {
+  accountStatusBadgeVariant,
+  accountStatusLabel,
+  enrollmentClassLabel,
+  pickLiveEnrollment,
+  yearNameFromEnrollment,
+} from "@/lib/admin/student-account-ui";
 
 export const metadata = { title: "Student profile — MedVerse Admin" };
 
@@ -33,19 +41,59 @@ export default async function StudentProfilePage({
   const { supabase } = await requireAdmin();
   const { id } = await params;
 
-  const [{ data }, { data: recentTests }] = await Promise.all([
-    supabase.rpc("admin_student_profile", { p_student_id: id }),
-    supabase
-      .from("test_attempts")
-      .select("id, test_id, score, max_score, percentage, rank, submitted_at, tests(title)")
-      .eq("student_id", id)
-      .eq("state", "submitted")
-      .order("submitted_at", { ascending: false })
-      .limit(10),
-  ]);
+  const [
+    { data },
+    { data: recentTests },
+    { data: accountRow },
+    { count: liveExamCount },
+    { data: enrollmentRows },
+  ] =
+    await Promise.all([
+      supabase.rpc("admin_student_profile", { p_student_id: id }),
+      supabase
+        .from("test_attempts")
+        .select("id, test_id, score, max_score, percentage, rank, submitted_at, tests(title)")
+        .eq("student_id", id)
+        .eq("state", "submitted")
+        .order("submitted_at", { ascending: false })
+        .limit(10),
+      supabase
+        .from("profiles")
+        .select("account_status")
+        .eq("id", id)
+        .maybeSingle(),
+      supabase
+        .from("test_attempts")
+        .select("id", { count: "exact", head: true })
+        .eq("student_id", id)
+        .eq("state", "in_progress")
+        .then((r) => ({ count: r.count })),
+      supabase
+        .from("enrollments")
+        .select("id, status, year_id, years(name)")
+        .eq("student_id", id),
+    ]);
 
   const p = data as Profile | null;
   if (!p || !p.profile) notFound();
+  const accountStatus =
+    (accountRow?.account_status as string | undefined) ?? "active";
+  const liveClass = pickLiveEnrollment(
+    (enrollmentRows ?? []) as {
+      id: string;
+      status: string;
+      year_id: string;
+      years?: { name?: string | null } | null;
+    }[]
+  );
+  const classYear =
+    liveClass
+      ? yearNameFromEnrollment(liveClass)
+      : (p.enrollment?.year_name ?? "—");
+  const classStatus = liveClass?.status ?? p.enrollment?.status ?? null;
+  const hasActiveClass = Boolean(liveClass);
+  const hasInProgressExam = (liveExamCount ?? 0) > 0;
+  const yearId = liveClass?.year_id ?? p.enrollment?.year_id ?? null;
 
   return (
     <div className="grid gap-6">
@@ -54,9 +102,18 @@ export default async function StudentProfilePage({
           <h1 className="text-2xl font-semibold">{p.profile.full_name}</h1>
           <p className="text-muted-foreground">{p.profile.email}</p>
         </div>
-        <Button asChild variant="outline">
-          <Link href="/admin/students">Back to students</Link>
-        </Button>
+        <div className="flex items-center gap-2">
+          <StudentManageActions
+            studentId={id}
+            yearId={yearId}
+            hasActiveClass={hasActiveClass}
+            accountStatus={accountStatus}
+            hasInProgressExam={hasInProgressExam}
+          />
+          <Button asChild variant="outline">
+            <Link href="/admin/students">Back to students</Link>
+          </Button>
+        </div>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
@@ -65,10 +122,16 @@ export default async function StudentProfilePage({
             <CardTitle className="text-base">Account</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-2 text-sm">
-            <Row label="Status">
-              <Badge>{p.enrollment?.status ?? "no enrollment"}</Badge>
+            <Row label="LMS access">
+              <Badge variant={accountStatusBadgeVariant(accountStatus)}>
+                {accountStatusLabel(accountStatus)}
+              </Badge>
             </Row>
-            <Row label="Year">{p.enrollment?.year_name ?? "—"}</Row>
+            {hasInProgressExam && (
+              <Row label="Open exam">
+                <span>In progress</span>
+              </Row>
+            )}
             <Row label="Last login">
               {p.profile.last_login_at
                 ? formatDateTime(p.profile.last_login_at)
@@ -84,9 +147,24 @@ export default async function StudentProfilePage({
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Access</CardTitle>
+            <CardTitle className="text-base">Class</CardTitle>
           </CardHeader>
-          <CardContent className="grid gap-1 text-sm">
+          <CardContent className="grid gap-2 text-sm">
+            <Row label="Year">{classYear}</Row>
+            <Row label="Class status">
+              <Badge variant="outline">
+                {enrollmentClassLabel(classStatus)}
+              </Badge>
+            </Row>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Practice grants</CardTitle>
+        </CardHeader>
+        <CardContent className="grid gap-1 text-sm">
             {p.subject_access.map((a) => (
               <div key={a.subject_id} className="flex items-center justify-between">
                 <span>{a.subject_name}</span>
@@ -95,14 +173,13 @@ export default async function StudentProfilePage({
             ))}
             {p.subject_access.length === 0 && (
               <p className="text-muted-foreground">
-                {p.enrollment
-                  ? `No active access (enrollment is ${p.enrollment.status}).`
-                  : "No enrollment yet."}
+                {hasActiveClass
+                  ? "No practice grants recorded for the current class."
+                  : "No current class assigned."}
               </p>
             )}
           </CardContent>
         </Card>
-      </div>
 
       <Card>
         <CardHeader>

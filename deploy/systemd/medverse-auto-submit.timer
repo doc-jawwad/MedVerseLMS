@@ -1,0 +1,12 @@
+[Unit]
+Description=MedVerse LMS auto-submit backup sweep every minute
+Documentation=file:///opt/medverse/current/docs/deployment.md
+
+[Timer]
+OnCalendar=*-*-* *:*:00
+AccuracySec=5s
+Persistent=true
+Unit=medverse-auto-submit.service
+
+[Install]
+WantedBy=timers.target

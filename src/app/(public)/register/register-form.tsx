@@ -61,19 +61,25 @@ export function RegisterForm({ years }: { years: Year[] }) {
             />
           </div>
           <div className="grid gap-2">
-            <Label>Your MBBS year</Label>
-            <Select name="year_id" required>
-              <SelectTrigger>
-                <SelectValue placeholder="Select your year" />
-              </SelectTrigger>
-              <SelectContent>
-                {years.map((y) => (
-                  <SelectItem key={y.id} value={y.id}>
-                    {y.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Label htmlFor="year_id">Your MBBS year</Label>
+            {years.length === 0 ? (
+              <p className="text-sm text-destructive">
+                Year list is unavailable. Please refresh or try again later.
+              </p>
+            ) : (
+              <Select name="year_id" required>
+                <SelectTrigger id="year_id" className="w-full">
+                  <SelectValue placeholder="Select your year" />
+                </SelectTrigger>
+                <SelectContent position="popper">
+                  {years.map((y) => (
+                    <SelectItem key={y.id} value={y.id}>
+                      {y.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
           </div>
           {state?.error && (
             <p className="text-sm text-destructive">{state.error}</p>

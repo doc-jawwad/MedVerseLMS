@@ -8,7 +8,9 @@
     "start": "next start",
     "lint": "eslint",
     "test:db": "node scripts/run-pgtap.mjs",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "test:e2e:staging": "node scripts/run-e2e-staging.mjs",
+    "test:unit": "node scripts/run-unit.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",

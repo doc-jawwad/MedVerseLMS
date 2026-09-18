@@ -1,0 +1,15 @@
+[Unit]
+Description=MedVerse LMS auto-submit backup sweep (HTTP)
+Documentation=file:///opt/medverse/current/docs/deployment.md
+After=network.target medverse-next.service
+
+[Service]
+Type=oneshot
+User=medverse
+Group=medverse
+EnvironmentFile=/etc/medverse/nextjs.env
+# Hits local Next.js. Secret stays in the environment, not unit-file argv.
+ExecStart=/opt/medverse/current/deploy/scripts/auto-submit-once.sh
+
+[Install]
+WantedBy=multi-user.target
