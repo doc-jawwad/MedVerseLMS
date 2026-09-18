@@ -58,7 +58,7 @@ The exam ends at `expires_at`, full stop. Nothing after it earns marks, as a mat
 ## Idempotent submission
 
 - `submit_attempt(p_attempt_id, p_device_id)`: `UPDATE ... SET state='submitted', submitted_at=now(), submit_source='student' WHERE id=$1 AND student_id=auth.uid() AND state='in_progress'`.
-  - 1 row updated → call `score_attempt` + `rank_test` in the same transaction; return the result summary.
+  - 1 row updated → call `score_attempt` in the same transaction (score fields only; marks the test dirty); return the result summary. Do **not** call `rank_test` inline.
   - 0 rows **and** state is already `submitted` → return the existing result as an **idempotent success**, not an error. A double-click or duplicate request must produce an identical response, never a second scoring pass or an error toast.
 - Client auto-fires `submit_attempt` at 0 on the countdown, but the server enforces expiry regardless of whether the client actually calls it.
 
@@ -92,7 +92,7 @@ The exam ends at `expires_at`, full stop. Nothing after it earns marks, as a mat
 - Score may be negative; percentage is **not clamped** — store the exact computed value (display may floor at 0, stored value must not).
 - Rounding: store `numeric` exact to 2 decimal places (`round(x, 2)`) for both score and percentage.
 - Voided questions: `void_policy = 'exclude'` removes the question from `max_score` and ignores its answers entirely; `void_policy = 'credit_all'` gives every attempt full marks for it while it stays in `max_score`. `recompute_test(test_id)` rescores every submitted attempt under current void flags and re-ranks; historical answer rows are untouched.
-- Ranking: `rank = RANK() OVER (ORDER BY score DESC, submitted_at ASC)` (earlier submit wins ties); `percentile = round(100.0 * (n - rank) / greatest(n - 1, 1), 2)` where `n` = submitted attempts. Only `submitted` attempts rank; `invalidated` are excluded. Re-run `rank_test(test_id)` on every submit.
+- Ranking: `rank = RANK() OVER (ORDER BY score DESC, submitted_at ASC)` (earlier submit wins ties); `percentile = round(100.0 * (n - rank) / (n - 1), 2)` for n > 1, else `null`. Only `submitted` attempts rank; `invalidated` are excluded. `score_attempt` writes scores and marks the test dirty; `rank_test` runs at most once per test per existing `* * * * *` auto-submit tick via `rank_dirty_tests()` — not inside every submit.
 - `score_attempt` must be a **pure function** of stored rows (answers + frozen versions + test config + void flags) — rescoring the same data must always reproduce identical results.
 - Practice mode is never scored/ranked: `submit_practice_answer` records `is_correct` and returns `correct_key` + `explanation` + `reference` immediately; practice stats feed analytics only.
 

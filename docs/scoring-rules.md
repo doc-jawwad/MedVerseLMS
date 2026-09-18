@@ -29,18 +29,34 @@ Per-question `void_policy` chosen by admin at void time, recorded in audit log:
 - `exclude` — question removed from max_score; answers to it ignored entirely.
 - `credit_all` — every attempt receives full marks for it regardless of answer; it stays in max_score.
 
-`recompute_test(test_id)` rescores every submitted attempt with current void flags, then re-ranks. Historical answer rows are untouched.
+`recompute_test(test_id)` rescores every submitted attempt with current void flags, then re-ranks **once**. Historical answer rows are untouched.
 
 ## Ranking
 
-After each scoring (and after recompute):
+### What (product semantics — unchanged)
+
 ```
 rank       = RANK() OVER (ORDER BY score DESC, submitted_at ASC)   -- earlier submit wins ties
 percentile = round(100.0 × (n − rank) / (n − 1), 2)                -- n = submitted attempts, n > 1
 ```
-Only `submitted` attempts rank; `invalidated` are excluded. Re-run `rank_test(test_id)` on every submit (cheap at class scale).
+Only `submitted` attempts rank; `invalidated` are excluded. Columns `test_attempts.rank` / `percentile` remain the only source anyone reads. Students who were **not eligible** during the window, and students who were eligible but never started, are **not** ranked and must **not** be stored as zero. Ranking population vs leaderboard **view** authorization: [access-eligibility-analytics.md](access-eligibility-analytics.md).
 
 **n ≤ 1 (unranked):** with only one submitted attempt there is no comparison group, so a percentile is not meaningful — neither 0 nor 100 describes anything real. `percentile` is `null` in this case (displayed as "—"), while `rank` is still `1`. This is an explicit exception to the formula above, not a value it happens to produce.
+
+### When (coalesced ranking)
+
+`rank_test(test_id)` must **not** run inside every `score_attempt` / `submit_attempt` on the live path. A burst of near-simultaneous submits each rewriting every submitted row is O(n²) work plus row-lock convoys. That cost is **independent of Vercel vs VPS**. Planning target (~1,500 concurrent participants) makes this a production requirement; it is **not** a measured 1,500-user proof — load-test before/after on the Data API path ([deployment.md](deployment.md)).
+
+Required design (same pattern `recompute_test` already uses: score many, rank once):
+
+1. `score_attempt` writes score fields only (pure function of stored rows — see Determinism) and marks the test dirty by inserting a `rank_dirty_queue` row. It must **not** `UPDATE tests` for that signal — concurrent same-test submits must not serialize on the tests row. (`tests.rank_dirty_at` remains a leftover drain source for older writers.)
+2. `rank_dirty_tests()` calls `rank_test` **at most once per distinct dirty test** and clears queue rows (and any leftover `rank_dirty_at`) **before** ranking so a concurrent submit during `rank_test` is picked up on the next tick. `test_attempts.rank` / `percentile` remain the only values anyone reads.
+3. Scheduling reuses the **already-documented** `medverse-auto-submit` pg_cron job (`* * * * *`). `auto_submit_expired()` scores any expired attempts, then always calls `rank_dirty_tests()` — including when zero attempts expired — so isolated student submits wait at most one existing auto-submit window. The HTTP backup cron (`GET /api/cron/auto-submit`) hits the same function. This is not a new debounce interval.
+4. `auto_submit_expired` therefore ranks each affected test **once** per tick, not once per attempt. `recompute_test` still ranks once at the end (admin void path) and clears the dirty marker.
+
+Isolated submits may see rank/percentile lag for up to one minute; score on the result payload stays immediate and correct.
+
+Do **not** introduce Redis, queues, or Workers to rank. Do **not** change RANK/percentile/tie-break formulas when relocating the call.
 
 ## Determinism
 
