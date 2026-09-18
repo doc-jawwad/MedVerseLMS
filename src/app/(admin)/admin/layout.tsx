@@ -9,6 +9,7 @@ import { MobileNav, type NavItem } from "@/components/mobile-nav";
 const nav: NavItem[] = [
   { href: "/admin", label: "Overview", icon: "dashboard" },
   { href: "/admin/students", label: "Students", icon: "students" },
+  { href: "/admin/admins", label: "Admins", icon: "admins" },
   { href: "/admin/year-changes", label: "Year changes", icon: "students" },
   { href: "/admin/subscriptions", label: "Subscriptions", icon: "subscription" },
   { href: "/admin/curriculum", label: "Curriculum", icon: "curriculum" },

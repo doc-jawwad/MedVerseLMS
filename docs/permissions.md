@@ -29,6 +29,7 @@ Role lives in `profiles.role`; users cannot change their own role (trigger-enfor
 - Other admins receive **granular** `admin_permissions` rows. They do not inherit full privilege.
 - Presets (Main Admin, Academic/MCQ, Operations, Custom) are **UI convenience only**. The database authorizes `has_permission(code)`, not the preset name.
 - The **last** Main Admin cannot be removed or demoted.
+- The **last active** Main Admin cannot be blocked (`restricted` / `suspended` / `deactivated` / `revoked`). That would lock the academy out of Main Admin recovery. Other admins may be disabled with `set_account_status`; targeting `role = 'admin'` also requires `manage_admins`.
 
 ## Account status
 
@@ -129,7 +130,9 @@ Admin-management primitives (authorization in Postgres; admin UI is separate):
 - `reject_subscription_application` — `review_subscription_applications`
 - `upsert_payment_settings` — `manage_payment_settings`
 
-`set_account_status` uses `activate_students` when restoring to `active`, otherwise `restrict_students`. Question create/version RPCs require `edit_questions` (create also allows `import_questions` so CSV import can insert). Test kill-switch / publish RPCs require `publish_tests`. Enrollment promote/status RPCs require `manage_year_changes`. Analytics RPCs require `view_analytics`. `admin_student_profile` requires `view_students`. `log_audit` remains `is_admin()` so permissioned RPCs can still write the log.
+`set_account_status` uses `activate_students` when restoring to `active`, otherwise `restrict_students`. When the target is `role = 'admin'`, `manage_admins` is also required. The last **active** Main Admin cannot be blocked. Question create/version RPCs require `edit_questions` (create also allows `import_questions` so CSV import can insert). Test kill-switch / publish RPCs require `publish_tests`. Enrollment promote/status RPCs require `manage_year_changes`. Analytics RPCs require `view_analytics`. `admin_student_profile` requires `view_students`. `log_audit` remains `is_admin()` so permissioned RPCs can still write the log.
+
+Admin accounts are created from the `/admin/admins` UI (`manage_admins`): Cloud Auth Admin `createUser` (already confirmed) plus `ensure_profile()` as that user, then `set_admin_role` and permission RPCs on the caller session. Promoting an existing student uses `set_admin_role` only. Removing an admin demotes them to student; Auth user-delete remains pending ([deployment.md](deployment.md)).
 
 ## Class enrollment (not subscription, not LMS approval)
 

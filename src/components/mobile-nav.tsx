@@ -16,6 +16,7 @@ import {
   FolderOpen,
   History,
   CreditCard,
+  Shield,
 } from "lucide-react";
 import {
   Sheet,
@@ -40,6 +41,7 @@ const ICONS = {
   account: UserRound,
   subscription: CreditCard,
   students: Users,
+  admins: Shield,
   curriculum: BookOpen,
   questions: Database,
   materialsFolder: FolderOpen,
