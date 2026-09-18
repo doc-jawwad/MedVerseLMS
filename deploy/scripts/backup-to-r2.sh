@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Encrypted pg_dump → temporary file → Cloudflare R2, then verify + retain 7–14 copies.
+# Encrypted pg_dump → temporary file → Cloudflare R2, then verify + retain 7–14 scheduled copies.
 # Canonical: docs/deployment.md. Do not run against Cloud hosted Postgres.
 set -euo pipefail
 
@@ -10,8 +10,10 @@ usage() {
 Usage: backup-to-r2.sh [--dry-run] [--tag TAG] [--help]
 
 Creates a custom-format pg_dump, encrypts it (openssl AES-256-CBC + PBKDF2),
-uploads to R2, HEADs the object, then deletes older copies beyond BACKUP_KEEP_COUNT
-(7–14). Local dump files are removed on success.
+uploads to R2, HEADs the object (size must match), then deletes older
+scheduled copies beyond BACKUP_KEEP_COUNT (7–14). Tagged dumps
+(pre-exam, pre-migration, …) are not pruned. Local dump files are
+removed on success.
 
 Environment (typically /etc/medverse/backup.env):
   MEDVERSE_ENV              local | vps-staging | production
@@ -63,6 +65,13 @@ is_cloud_host() {
   return 1
 }
 
+is_loopback_pghost() {
+  case "${1:-}" in
+    127.0.0.1|localhost|::1|/var/run/postgresql|/run/postgresql) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
 require_env() {
   local name="$1"
   if [[ -z "${!name:-}" ]]; then
@@ -96,7 +105,7 @@ if is_cloud_host "$PGHOST" || is_cloud_host "${PGDATABASE:-}" || is_cloud_host "
   exit 2
 fi
 
-if [[ "$PGHOST" != "127.0.0.1" && "$PGHOST" != "localhost" && "$PGHOST" != "::1" ]]; then
+if ! is_loopback_pghost "$PGHOST"; then
   echo "refusing non-loopback PGHOST (Postgres must not be reachable on the public internet)" >&2
   exit 2
 fi
@@ -123,6 +132,13 @@ if ! command -v pg_dump >/dev/null || ! command -v openssl >/dev/null || ! comma
   exit 2
 fi
 
+LOCK="${TMPDIR:-/tmp}/medverse-backup.lock"
+exec 9>"$LOCK"
+if ! flock -n 9; then
+  echo "refusing: another backup is already running" >&2
+  exit 3
+fi
+
 TMPDIR="$(mktemp -d "${TMPDIR:-/tmp}/medverse-dump.XXXXXX")"
 cleanup() {
   rm -rf "$TMPDIR"
@@ -140,7 +156,7 @@ openssl enc -aes-256-cbc -pbkdf2 -salt \
   -in "$DUMP" -out "$ENC"
 rm -f "$DUMP"
 
-BYTES="$(wc -c < "$ENC" | tr -d ' ')"
+BYTES="$(stat -c%s "$ENC")"
 echo "encrypted dump bytes=${BYTES}"
 
 export AWS_ACCESS_KEY_ID="$R2_ACCESS_KEY_ID"
@@ -151,38 +167,49 @@ unset AWS_DEBUG AWS_MAX_ATTEMPTS_DEBUG || true
 
 aws s3 cp "$ENC" "s3://${R2_BUCKET}/${OBJECT}" --endpoint-url "$ENDPOINT" --only-show-errors
 
-aws s3api head-object \
-  --bucket "$R2_BUCKET" \
-  --key "$OBJECT" \
-  --endpoint-url "$ENDPOINT" \
-  --query '{Length:ContentLength}' \
-  --output text >/dev/null
+REMOTE="$(
+  aws s3api head-object \
+    --bucket "$R2_BUCKET" \
+    --key "$OBJECT" \
+    --endpoint-url "$ENDPOINT" \
+    --query 'ContentLength' \
+    --output text
+)"
+REMOTE="${REMOTE//$'\r'/}"
+if [[ "$REMOTE" != "$BYTES" ]]; then
+  echo "HEAD size mismatch local=${BYTES} remote=${REMOTE}" >&2
+  exit 1
+fi
 
 echo "upload verified: s3://${R2_BUCKET}/${OBJECT}"
 
-# Retention: keep the newest KEEP objects under medverse/<env>/
-mapfile -t KEYS < <(
-  aws s3api list-objects-v2 \
-    --bucket "$R2_BUCKET" \
-    --prefix "medverse/${MEDVERSE_ENV}/" \
-    --endpoint-url "$ENDPOINT" \
-    --query 'sort_by(Contents,&LastModified)[].Key' \
-    --output text | tr '\t' '\n' | sed '/^$/d'
-)
-
-COUNT="${#KEYS[@]}"
-if [[ "$COUNT" -gt "$KEEP" ]]; then
-  DELETE_N=$((COUNT - KEEP))
-  for ((i = 0; i < DELETE_N; i++)); do
-    old="${KEYS[$i]}"
-    [[ -n "$old" ]] || continue
-    aws s3api delete-object \
+# Retention: prune only scheduled dumps. Tagged copies (pre-exam, etc.) stay.
+if [[ "$TAG" == "scheduled" ]]; then
+  PREFIX="medverse/${MEDVERSE_ENV}/scheduled/"
+  mapfile -t KEYS < <(
+    aws s3api list-objects-v2 \
       --bucket "$R2_BUCKET" \
-      --key "$old" \
+      --prefix "$PREFIX" \
       --endpoint-url "$ENDPOINT" \
-      --output text >/dev/null
-    echo "retention deleted older copy (key not printed)"
-  done
+      --query 'sort_by(Contents,&LastModified)[].Key' \
+      --output text | tr '\t' '\n' | sed '/^$/d;/^None$/d'
+  )
+
+  COUNT="${#KEYS[@]}"
+  if [[ "$COUNT" -gt "$KEEP" ]]; then
+    DELETE_N=$((COUNT - KEEP))
+    for ((i = 0; i < DELETE_N; i++)); do
+      old="${KEYS[$i]}"
+      [[ -n "$old" ]] || continue
+      [[ "$old" == "${PREFIX}"* ]] || continue
+      aws s3api delete-object \
+        --bucket "$R2_BUCKET" \
+        --key "$old" \
+        --endpoint-url "$ENDPOINT" \
+        --output text >/dev/null
+      echo "retention deleted older scheduled copy (key not printed)"
+    done
+  fi
 fi
 
 echo "backup complete"

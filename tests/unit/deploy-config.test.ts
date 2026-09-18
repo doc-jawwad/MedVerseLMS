@@ -66,6 +66,17 @@ describe("systemd units", () => {
     assert.equal(rest.includes("3001"), false);
   });
 
+  it("runs the backup timer daily at 02:00 local time with snap PATH", () => {
+    const timer = read("deploy/systemd/medverse-backup.timer");
+    const service = read("deploy/systemd/medverse-backup.service");
+    assert.match(timer, /OnCalendar=\*-\*-\* 02:00:00/);
+    assert.match(timer, /Persistent=true/);
+    assert.match(service, /\/snap\/bin/);
+    assert.match(service, /EnvironmentFile=\/etc\/medverse\/backup\.env/);
+    assert.match(service, /ExecStart=\/usr\/bin\/bash /);
+    assert.equal(service.includes("PASSWORD="), false);
+  });
+
   it("does not put JWT or passwords in unit files", () => {
     const dir = path.join(root, "deploy", "systemd");
     for (const name of fs.readdirSync(dir)) {

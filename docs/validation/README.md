@@ -5,6 +5,8 @@ Append-only records of environment validation and phase sign-offs.
 | Record | Scope | Status |
 |--------|--------|--------|
 | [8j-staging-signoff-20260916.md](8j-staging-signoff-20260916.md) | Phase 8J on VPS staging | **STAGING VALIDATED — 8J COMPLETE** |
+| [production-backup-readiness-20260918.md](production-backup-readiness-20260918.md) | Production backup/restore gate | **NOT READY — missing R2, dump key, aws CLI** |
+| [production-backup-dr-20260918.md](production-backup-dr-20260918.md) | Production backup/DR setup | **READY — daily timer enabled, restore drill passed** |
 
 Rules:
 

@@ -8,15 +8,21 @@ Wants=network-online.target
 Type=oneshot
 User=medverse
 Group=medverse
+UMask=0077
 EnvironmentFile=/etc/medverse/backup.env
+# systemd PATH does not include /snap/bin; AWS CLI v2 is installed as a snap.
+Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin
+Environment=HOME=/home/medverse
 # Default tag for the timer. Override for a pre-exam dump:
-#   systemctl start medverse-backup.service
 #   MEDVERSE_BACKUP_TAG=pre-exam /opt/medverse/current/deploy/scripts/backup-to-r2.sh
 Environment=MEDVERSE_BACKUP_TAG=scheduled
-ExecStart=/opt/medverse/current/deploy/scripts/backup-to-r2.sh
+ExecStart=/usr/bin/bash /opt/medverse/current/deploy/scripts/backup-to-r2.sh
+TimeoutStartSec=30min
 Nice=10
 IOSchedulingClass=best-effort
 IOSchedulingPriority=7
+StandardOutput=journal
+StandardError=journal
 # EnvironmentFile values must not appear in logs; the script never echoes secrets.
 
 [Install]

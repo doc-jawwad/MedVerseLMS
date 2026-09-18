@@ -111,13 +111,13 @@ Coalesced ranking, `ensure_profile()`, and dropping `profiles` → `auth.users` 
 ## Backups and disaster recovery
 
 - **Auth** (users, passwords, refresh tokens): Supabase Cloud. Survives VPS loss.
-- **Application data:** `deploy/scripts/backup-to-r2.sh` — custom-format `pg_dump`, openssl AES-256-CBC + PBKDF2, upload to Cloudflare R2, HEAD-verify, retain **7–14** copies (`BACKUP_KEEP_COUNT`, default 14). Local temp files are deleted on success. Secrets are not echoed.
-- **RPO / timer interval:** **pending approval**. `deploy/systemd/medverse-backup.timer` is a placeholder (`OnCalendar=daily`) — **do not enable** until RPO is decided. WAL archive to R2 is optional later, more ops.
+- **Application data:** `deploy/scripts/backup-to-r2.sh` — custom-format `pg_dump`, openssl AES-256-CBC + PBKDF2, upload to Cloudflare R2, HEAD-verify (local size must match `ContentLength`), retain **7–14 scheduled** copies (`BACKUP_KEEP_COUNT`, default 14). Tagged dumps (`pre-exam`, `pre-migration`, …) are not pruned. Local temp files are deleted on success. Secrets are not echoed.
+- **RPO / timer interval:** daily dump. `medverse-backup.timer` fires at **02:00 Asia/Karachi** (`Persistent=true`, up to 5 minutes jitter). That is about **24h RPO** without WAL. WAL archive to R2 remains optional later.
 - **Pre-exam (required regardless of RPO):** on the VPS, as `medverse`, with `/etc/medverse/backup.env` loaded:
   1. `MEDVERSE_BACKUP_TAG=pre-exam /opt/medverse/current/deploy/scripts/backup-to-r2.sh`
   2. Confirm the script prints `upload verified` (no keys in the log).
   3. Record the object key out-of-band (exam runbook).
-- **Restore drill (required before a real exam):** scratch/VPS clone → stack → `deploy/scripts/restore-from-r2.sh --key …` → same JWT secret → confirm login via Cloud Auth + data as of dump. DNS cutover to a replacement VPS is the host-death path.
+- **Restore drill (required before a real exam):** create a throwaway database (never `medverse` or `medverse_staging`) → `deploy/scripts/restore-from-r2.sh --key …` → compare row counts / migration head → drop the throwaway database. On the **same** VPS, `pg_cron` can exist only in `cron.database_name` (`medverse`); a same-host drill must set `MEDVERSE_RESTORE_EXCLUDE_EXTENSION=pg_cron`. A replacement VPS restore is a full dump with `cron.database_name=medverse`. Full host-death path: new VPS from this runbook → restore R2 dump into a new `medverse` only after the live DB is gone → same JWT secret → DNS to the new host.
 - Cloud Auth outage: pages may be up; sessions cannot refresh. Accepted dependency.
 
 ## Health and monitoring
@@ -148,7 +148,7 @@ Templates live in `deploy/`. Replace `REPLACE_*` values on the host only.
 7. **PostgREST.** Install the binary; copy `deploy/postgrest/postgrest.conf.example` + `deploy/env/postgrest.env.example` to `/etc/medverse/`. Bind `127.0.0.1:3001`. `systemctl enable --now medverse-postgrest`.
 8. **Next.js.** `git checkout` known revision → `npm ci && npm run build`. Copy `deploy/env/nextjs.env.example` to `/etc/medverse/nextjs.env`. `NEXT_PUBLIC_SUPABASE_URL` = `https://<MEDVERSE_ORIGIN>`. `systemctl enable --now medverse-next`.
 9. **Caddy.** Copy `deploy/Caddyfile`. Export `MEDVERSE_ORIGIN` and `SUPABASE_AUTH_HOST` (`deploy/Caddyfile.env.example`). Uncomment **one** `tls` block after the TLS decision. Caddy public; Next/PostgREST stay loopback.
-10. **Cron.** Verify `select * from cron.job;` shows `medverse-auto-submit`. Enable `medverse-auto-submit.timer` (every minute HTTP backup). Do **not** enable `medverse-backup.timer` until backup RPO is approved.
+10. **Cron.** Verify `select * from cron.job;` shows `medverse-auto-submit`. Enable `medverse-auto-submit.timer` (every minute HTTP backup). Enable `medverse-backup.timer` (daily 02:00 Asia/Karachi encrypted dump to R2).
 11. **Auth (separate approval).** Cloud `site_url` + redirect URLs = public origin; Brevo SMTP; `email_sent` limit pending.
 12. **Health.** `curl -sS https://<origin>/api/health` → `ok: true`. Ready: `curl -sS -H "Authorization: Bearer $CRON_SECRET" http://127.0.0.1:3000/api/health/ready`.
 13. **DNS cutover (separate approval).** Cloudflare A/AAAA (or CNAME) to the VPS; proxy/WAF as chosen. Freeze Cloud `public` writes after cutover.
@@ -217,7 +217,7 @@ Do not invent these in code or ops:
 - VPS region
 - Final VPS size (8 vCPU / 24 GB is an estimate only)
 - Paid Auth plan (Free pause would take login down even if the VPS is up — a paid Auth project is **recommended**, not silently chosen)
-- Backup RPO (dump interval vs WAL)
+- WAL archive to R2 (optional; daily dumps are the current RPO)
 - User-delete semantics without `ON DELETE CASCADE`
 - Auth email `email_sent` numeric limit after Brevo
 - When Cloud staging `vygtwrsshcyfahfzurgq` may be touched

@@ -1,17 +1,13 @@
 [Unit]
-Description=MedVerse LMS backup timer (placeholder until backup RPO is approved)
+Description=MedVerse LMS daily encrypted database backup to R2
 Documentation=file:///opt/medverse/current/docs/deployment.md
 
 [Timer]
-# Backup RPO is pending approval (docs/deployment.md). Do NOT enable this
-# timer until that decision is made. Pre-exam dumps are a separate manual
-# procedure regardless.
-#
-# After RPO is approved, set OnCalendar to match (examples, not chosen here):
-#   OnCalendar=daily
-#   OnCalendar=hourly
-# Persistent=true
-OnCalendar=daily
+# Daily 02:00 Asia/Karachi (VPS local time) ≈ 21:00 UTC. Low-traffic window.
+# Persistent=true runs a catch-up dump if the host was down at 02:00.
+OnCalendar=*-*-* 02:00:00
+RandomizedDelaySec=5min
+AccuracySec=1min
 Persistent=true
 Unit=medverse-backup.service
 

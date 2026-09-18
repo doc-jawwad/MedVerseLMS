@@ -20,4 +20,4 @@ Do **not** copy secrets into this directory. Host files belong in `/etc/medverse
 | `scripts/apply-staging-schema.sh` | Staging schema with pg_cron blocks stripped |
 | `scripts/provision-vps-staging.sh` | Same-host staging provision (run on VPS as root) |
 
-Pending at provision time (do not invent here): hostname, TLS mode, Cloud Auth host, JWT secret, R2 bucket, backup `OnCalendar` (RPO).
+Pending at provision time (do not invent here): hostname, TLS mode, Cloud Auth host, JWT secret, R2 bucket. Backup timer is daily 02:00 Asia/Karachi (`deploy/systemd/medverse-backup.timer`).
