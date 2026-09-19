@@ -41,8 +41,8 @@ export default function ContactUsPage() {
                       aria-hidden
                     />
                   </CardTitle>
-                  <CardDescription className="break-all text-xs leading-relaxed sm:text-sm">
-                    {item.detail ?? item.href}
+                  <CardDescription className="text-xs leading-relaxed sm:text-sm">
+                    {item.detail ?? "Open channel"}
                   </CardDescription>
                 </CardHeader>
               </Card>

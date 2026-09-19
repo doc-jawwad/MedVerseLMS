@@ -7,6 +7,8 @@ import { MEDVERSE_CONTACT_LINKS } from "../../src/lib/contact/medverse-contact.t
 import {
   isHistoryTestsPageState,
   isIncomingDashboardTest,
+  displayTestTitle,
+  formatMcqCount,
   testPricingLabel,
 } from "../../src/lib/tests/student-test-state.ts";
 
@@ -44,7 +46,7 @@ describe("admin year id", () => {
 });
 
 describe("contact links", () => {
-  it("includes hardcoded MedVerse channels", () => {
+  it("includes hardcoded MedVerse channels with friendly labels (no raw URL copy)", () => {
     const hrefs = MEDVERSE_CONTACT_LINKS.map((l) => l.href);
     assert.ok(hrefs.includes("https://wa.me/923019569240"));
     assert.ok(hrefs.includes("https://wa.me/medversepk"));
@@ -61,6 +63,19 @@ describe("contact links", () => {
     assert.ok(hrefs.some((h) => h.includes("instagram.com/medverse_pakistan")));
     assert.ok(hrefs.some((h) => h.includes("youtube.com/@medversepakistan")));
     assert.ok(hrefs.some((h) => h.includes("facebook.com/share")));
+
+    const labels = MEDVERSE_CONTACT_LINKS.map((l) => l.label);
+    assert.ok(labels.includes("Instagram"));
+    assert.ok(labels.includes("YouTube"));
+    assert.ok(labels.includes("Facebook"));
+    assert.ok(labels.includes("Nursing Channel"));
+    for (const link of MEDVERSE_CONTACT_LINKS) {
+      assert.ok(link.detail, `missing detail for ${link.id}`);
+      assert.ok(
+        !link.detail.includes("https://"),
+        `detail must not be a raw URL for ${link.id}`
+      );
+    }
   });
 });
 
@@ -74,5 +89,16 @@ describe("test surface split", () => {
     assert.equal(testPricingLabel("free"), "FREE");
     assert.equal(testPricingLabel("any_subscription"), "PAID");
     assert.equal(testPricingLabel("plan"), "PAID");
+  });
+
+  it("formats MCQ counts and strips redundant FREE/PAID title prefixes", () => {
+    assert.equal(formatMcqCount(1), "1 MCQ");
+    assert.equal(formatMcqCount(2), "2 MCQs");
+    assert.equal(formatMcqCount(0), "0 MCQs");
+    assert.equal(displayTestTitle("FREE Weekly Quiz", "FREE"), "Weekly Quiz");
+    assert.equal(displayTestTitle("PAID: Mock Exam", "PAID"), "Mock Exam");
+    assert.equal(displayTestTitle("Freedom of choice", "FREE"), "Freedom of choice");
+    assert.equal(displayTestTitle("Paid internship talk", "PAID"), "Paid internship talk");
+    assert.equal(displayTestTitle("FREE STGVAL Demo", "FREE"), "STGVAL Demo");
   });
 });

@@ -154,7 +154,7 @@ Practice list RPCs return catalog rows with a lock flag; start/fetch RPCs enforc
 - `pdf` — private R2 `r2_object_key` under `study-content/`; optional `cover_object_key`; no Drive URL / body.
 - `guideline` — `body_text` (markdown/plain); no Drive URL / PDF object.
 
-**Two student surfaces, one store:** Free Resources lists only accessible (`can_access_*`) published items grouped by library type / MCQ subject / pearls. Main library hubs list the year catalog for that type. Do not duplicate educational rows to mark free vs paid — use entitlement columns (and grants/restrictions).
+**Two student surfaces, one store:** Free Resources lists only curated `entitlement = 'free'` items and/or unrevoked personal grants (not restricted) — never paid-only items that a subscriber can open merely via live subscription. Main library hubs list the year catalog for that type. Do not duplicate educational rows to mark free vs paid — use entitlement columns (and grants/restrictions).
 
 Student catalog SELECT must **not** expose `drive_url`, `body_text`, or R2 keys. Table-level `SELECT` is revoked and re-granted on metadata columns only. Students see **published** items in folders they `can_view`. `open_material(id)` returns a Drive URL only for `kind = 'drive'` after student entitlement or `manage_materials`. `open_study_item(id)` returns guideline body (or PDF catalog metadata without the object key) after the same folder content check. `authorize_study_object(id)` returns the R2 key for Next.js to sign; students must not obtain PDF bytes without that path.
 

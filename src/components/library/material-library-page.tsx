@@ -14,6 +14,7 @@ import { SectionLock } from "@/components/subscription/section-lock";
 import { PageHeader } from "@/components/student/page-header";
 import { StudentPage } from "@/components/student/student-page";
 import { EmptyState } from "@/components/student/empty-state";
+import { belongsOnFreeResources } from "@/lib/library/free-surface";
 import { getStudentHasLiveSubscription } from "@/lib/subscriptions/student-live-access";
 import { studentHasPaidLmsSections } from "@/lib/subscriptions/student-section-access";
 import { LIBRARY_META, type FolderLibraryType } from "@/lib/library/types";
@@ -23,6 +24,7 @@ type Folder = {
   name: string;
   subject_id: string | null;
   library_type: string;
+  entitlement: string;
 };
 
 type Material = {
@@ -41,7 +43,7 @@ export async function MaterialLibraryPage({
   libraryType: FolderLibraryType;
   mode: "full" | "free";
 }) {
-  const { supabase } = await requireStudent();
+  const { supabase, userId } = await requireStudent();
   const meta = LIBRARY_META[libraryType];
   const hasLiveAccess = await getStudentHasLiveSubscription();
 
@@ -54,32 +56,54 @@ export async function MaterialLibraryPage({
     );
   }
 
-  const [{ data: folders }, { data: materials }, { data: subjects }, { data: accessible }] =
-    await Promise.all([
-      supabase
-        .from("material_folders")
-        .select("id, name, subject_id, library_type")
-        .eq("library_type", libraryType)
-        .order("sort_order")
-        .order("name"),
-      supabase
-        .from("materials")
-        .select("id, folder_id, title, description, file_type, kind")
-        .order("sort_order")
-        .order("title"),
-      supabase.from("subjects").select("id, name").order("name"),
-      supabase.rpc("accessible_folder_ids"),
-    ]);
+  const [
+    { data: folders },
+    { data: materials },
+    { data: subjects },
+    { data: accessible },
+    { data: grants },
+  ] = await Promise.all([
+    supabase
+      .from("material_folders")
+      .select("id, name, subject_id, library_type, entitlement")
+      .eq("library_type", libraryType)
+      .order("sort_order")
+      .order("name"),
+    supabase
+      .from("materials")
+      .select("id, folder_id, title, description, file_type, kind")
+      .order("sort_order")
+      .order("title"),
+    supabase.from("subjects").select("id, name").order("name"),
+    supabase.rpc("accessible_folder_ids"),
+    mode === "free"
+      ? supabase
+          .from("access_grants")
+          .select("folder_id")
+          .eq("student_id", userId)
+          .eq("grant_type", "materials_folder")
+          .is("revoked_at", null)
+      : Promise.resolve({ data: null }),
+  ]);
 
   const entitled = new Set(
     (accessible ?? []).map((row: { id: string }) => row.id)
+  );
+  const grantedFolders = new Set(
+    ((grants ?? []) as { folder_id: string }[]).map((g) => g.folder_id)
   );
   const subjectName = (id: string | null) =>
     subjects?.find((s) => s.id === id)?.name ?? "General";
 
   let visibleFolders = (folders ?? []) as Folder[];
   if (mode === "free") {
-    visibleFolders = visibleFolders.filter((f) => entitled.has(f.id));
+    visibleFolders = visibleFolders.filter((f) =>
+      belongsOnFreeResources({
+        entitlement: f.entitlement,
+        hasPersonalGrant: grantedFolders.has(f.id),
+        accessible: entitled.has(f.id),
+      })
+    );
   }
 
   const mats = (materials ?? []) as Material[];

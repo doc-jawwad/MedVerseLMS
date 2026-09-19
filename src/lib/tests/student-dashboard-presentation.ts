@@ -251,7 +251,7 @@ export function buildStudentDashboardPresentation(input: {
       eligibleApprox: approximateCatalogEligibleCount(counts),
       counts,
       scopeNote:
-        "Missed and Not eligible below are from currently visible catalog tests using the same 8J-F overlap heuristic as the Tests page — not a complete historical eligibility snapshot.",
+        "Based on tests currently listed for your class. Missed means the window closed without a submitted attempt while you could have sat it. Not eligible means you were not entitled during that window.",
     },
   };
 }

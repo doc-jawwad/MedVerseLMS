@@ -23,39 +23,79 @@ type PracticeSubject = {
 };
 
 export default async function FreeResourcesPage() {
-  const { supabase } = await requireStudent();
+  const { supabase, userId } = await requireStudent();
   const hasLiveAccess = await getStudentHasLiveSubscription();
 
   const [
     { data: practiceRows },
+    { data: subjectEntitlements },
     { data: folders },
     { data: materials },
     { data: accessibleFolders },
     { data: pearls },
     { data: accessiblePearls },
+    { data: grants },
   ] = await Promise.all([
     supabase.rpc("practice_subjects"),
+    supabase.from("subjects").select("id, entitlement"),
     supabase
       .from("material_folders")
-      .select("id, library_type, subject_id, updated_at")
+      .select("id, library_type, subject_id, entitlement, updated_at")
       .order("name"),
     supabase.from("materials").select("folder_id, updated_at"),
     supabase.rpc("accessible_folder_ids"),
     supabase
       .from("pearl_points")
-      .select("id, subject_id, updated_at")
+      .select("id, subject_id, entitlement, updated_at")
       .eq("status", "published"),
     supabase.rpc("accessible_pearl_ids"),
+    supabase
+      .from("access_grants")
+      .select("grant_type, subject_id, folder_id")
+      .eq("student_id", userId)
+      .is("revoked_at", null),
   ]);
 
+  const subjectEntitlement = new Map(
+    ((subjectEntitlements ?? []) as { id: string; entitlement: string }[]).map(
+      (s) => [s.id, s.entitlement]
+    )
+  );
+  const grantedSubjectIds = new Set(
+    ((grants ?? []) as { grant_type: string; subject_id: string | null }[])
+      .filter((g) => g.grant_type === "practice_subject" && g.subject_id)
+      .map((g) => g.subject_id as string)
+  );
+  const grantedFolderIds = (
+    (grants ?? []) as { grant_type: string; folder_id: string | null }[]
+  )
+    .filter((g) => g.grant_type === "materials_folder" && g.folder_id)
+    .map((g) => g.folder_id as string);
+
   const categories = buildFreeResourceCategories({
-    practice: (practiceRows ?? []) as PracticeSubject[],
-    folders: folders ?? [],
+    practice: ((practiceRows ?? []) as PracticeSubject[]).map((s) => ({
+      ...s,
+      entitlement: subjectEntitlement.get(s.subject_id) ?? "any_subscription",
+      hasPersonalGrant: grantedSubjectIds.has(s.subject_id),
+    })),
+    folders: (folders ?? []) as {
+      id: string;
+      library_type: string;
+      subject_id: string | null;
+      entitlement: string;
+      updated_at?: string | null;
+    }[],
     accessibleFolderIds: (accessibleFolders ?? []).map(
       (row: { id: string }) => row.id
     ),
+    grantedFolderIds,
     materials: materials ?? [],
-    pearls: pearls ?? [],
+    pearls: (pearls ?? []) as {
+      id: string;
+      subject_id: string;
+      entitlement: string;
+      updated_at?: string | null;
+    }[],
     accessiblePearlIds: (accessiblePearls ?? []).map(
       (row: { id: string }) => row.id
     ),

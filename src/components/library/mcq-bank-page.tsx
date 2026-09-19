@@ -12,6 +12,7 @@ import { SectionLock } from "@/components/subscription/section-lock";
 import { PageHeader } from "@/components/student/page-header";
 import { StudentPage } from "@/components/student/student-page";
 import { EmptyState } from "@/components/student/empty-state";
+import { belongsOnFreeResources } from "@/lib/library/free-surface";
 import { getStudentHasLiveSubscription } from "@/lib/subscriptions/student-live-access";
 import { studentHasPaidLmsSections } from "@/lib/subscriptions/student-section-access";
 
@@ -25,7 +26,7 @@ type PracticeSubject = {
 };
 
 export async function McqBankPage({ mode }: { mode: "full" | "free" }) {
-  const { supabase } = await requireStudent();
+  const { supabase, userId } = await requireStudent();
   const hasLiveAccess = await getStudentHasLiveSubscription();
 
   if (mode === "full" && !studentHasPaidLmsSections(hasLiveAccess)) {
@@ -37,10 +38,41 @@ export async function McqBankPage({ mode }: { mode: "full" | "free" }) {
     );
   }
 
-  const { data } = await supabase.rpc("practice_subjects");
-  const subjects = ((data ?? []) as PracticeSubject[]).filter((s) =>
-    mode === "free" ? s.granted : true
+  const [{ data }, { data: subjectRows }, { data: grants }] = await Promise.all([
+    supabase.rpc("practice_subjects"),
+    mode === "free"
+      ? supabase.from("subjects").select("id, entitlement")
+      : Promise.resolve({ data: null }),
+    mode === "free"
+      ? supabase
+          .from("access_grants")
+          .select("subject_id")
+          .eq("student_id", userId)
+          .eq("grant_type", "practice_subject")
+          .is("revoked_at", null)
+      : Promise.resolve({ data: null }),
+  ]);
+
+  const entitlementById = new Map(
+    ((subjectRows ?? []) as { id: string; entitlement: string }[]).map((s) => [
+      s.id,
+      s.entitlement,
+    ])
   );
+  const grantedSubjectIds = new Set(
+    ((grants ?? []) as { subject_id: string }[]).map((g) => g.subject_id)
+  );
+
+  const subjects = ((data ?? []) as PracticeSubject[]).filter((s) => {
+    if (mode !== "free") return true;
+    return (
+      belongsOnFreeResources({
+        entitlement: entitlementById.get(s.subject_id) ?? "any_subscription",
+        hasPersonalGrant: grantedSubjectIds.has(s.subject_id),
+        accessible: s.granted,
+      }) && s.approved_questions > 0
+    );
+  });
 
   return (
     <StudentPage>

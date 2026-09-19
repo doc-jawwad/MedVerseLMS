@@ -4,6 +4,7 @@ import { PageHeader } from "@/components/student/page-header";
 import { StudentPage } from "@/components/student/student-page";
 import { EmptyState } from "@/components/student/empty-state";
 import { SectionLock } from "@/components/subscription/section-lock";
+import { belongsOnFreeResources } from "@/lib/library/free-surface";
 import { getStudentHasLiveSubscription } from "@/lib/subscriptions/student-live-access";
 import { studentHasPaidLmsSections } from "@/lib/subscriptions/student-section-access";
 
@@ -49,11 +50,19 @@ export async function PearlPointsLibraryPage({
       subject_id: p.subject_id,
       chapter_id: p.chapter_id,
       topic_id: p.topic_id,
+      entitlement: p.entitlement as string,
       accessible: allowed.has(p.id),
       subject_name:
         (p.subjects as unknown as { name: string } | null)?.name ?? null,
     }))
-    .filter((p) => (mode === "free" ? p.accessible : true));
+    .filter((p) =>
+      mode === "free"
+        ? belongsOnFreeResources({
+            entitlement: p.entitlement,
+            accessible: p.accessible,
+          })
+        : true
+    );
 
   const filterSubjects =
     mode === "free"

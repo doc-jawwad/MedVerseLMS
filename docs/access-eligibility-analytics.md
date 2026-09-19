@@ -105,7 +105,7 @@ Nothing in 8D/pre-8J is obsolete. What is **missing** is historical window-eligi
 **CURRENT IMPLEMENTATION:**
 
 - Student shell builds nav from `has_live_subscription()` via `buildStudentShellNav` (desktop + mobile share the same items / lock flags). Main Pearl Points / MCQ Bank / typed material hubs are locked without live subscription; Free Resources stays unlocked.
-- Free Resources landing: `/free-resources` (populated categories only). Free subset routes under `/free-resources/{type}`.
+- Free Resources landing: `/free-resources` (populated free/grant categories only). Free subset routes under `/free-resources/{type}` filter by `entitlement = 'free'` and/or personal grant — not by live-subscription access alone.
 - Full-library hubs render `SectionLock` when `has_live_subscription()` is false (no protected paid catalog payloads).
 - Deep links to free/granted practice subjects, accessible folders/items, or accessible tests remain usable without unlocking the full-library hub.
 - Existing rows may still be `entitlement = 'free'` (compatibility). Admins set paid entitlement on resources that should require subscription.

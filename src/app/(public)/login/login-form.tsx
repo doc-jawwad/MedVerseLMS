@@ -40,6 +40,13 @@ export function LoginForm({ next, reason }: { next?: string; reason?: string }) 
             </AlertDescription>
           </Alert>
         )}
+        {reason === "session_expired" && (
+          <Alert className="mb-4">
+            <AlertDescription>
+              Your session ended. Sign in again to continue.
+            </AlertDescription>
+          </Alert>
+        )}
         {reason === "exists" && (
           <Alert className="mb-4">
             <AlertDescription>

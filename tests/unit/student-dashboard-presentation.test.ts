@@ -160,6 +160,16 @@ describe("student dashboard presentation (8J-G)", () => {
     }
   });
 
+  it("uses student-friendly catalog copy without internal jargon", () => {
+    const view = buildStudentDashboardPresentation({
+      subscriptionKind: "none",
+      lifetime,
+      catalogStates: ["missed", "not_eligible"],
+    });
+    assert.doesNotMatch(view.catalog.scopeNote, /8J-F|heuristic|catalog participation/i);
+    assert.match(view.catalog.scopeNote, /listed for your class/i);
+  });
+
   it("lifetime analytics labels remain submitted-only Attempted", () => {
     const view = buildStudentDashboardPresentation({
       subscriptionKind: "active",
