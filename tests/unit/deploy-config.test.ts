@@ -119,11 +119,11 @@ describe("env examples", () => {
   });
 });
 
-describe("vercel.json preserved", () => {
-  it("still declares the Hobby-shaped cron", () => {
+describe("vercel.json legacy surface retired", () => {
+  it("does not schedule residual auto-submit cron on Vercel", () => {
     const v = JSON.parse(read("vercel.json"));
-    assert.equal(v.crons[0].path, "/api/cron/auto-submit");
-    assert.equal(v.crons[0].schedule, "0 0 * * *");
+    assert.equal(Array.isArray(v.crons) ? v.crons.length : 0, 0);
+    assert.equal(Object.prototype.hasOwnProperty.call(v, "crons"), false);
   });
 });
 

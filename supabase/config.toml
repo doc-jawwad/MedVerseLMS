@@ -156,15 +156,17 @@ max_indexes = 5
 enabled = true
 # The base URL of your website. Used as an allow-list for redirects and for constructing URLs used
 # in emails.
-site_url = "https://med-verse-lms.vercel.app"
+site_url = "http://localhost:3000"
 # The public URL that Auth serves on. Defaults to the API external URL with `/auth/v1` appended.
 # external_url = ""
 # A list of *exact* URLs that auth providers are permitted to redirect to post authentication.
+# Local Docker Auth only. Cloud Auth site_url / allowlist is configured in the dashboard
+# (production public origin is https://lms.medversepk.com — not Vercel).
 additional_redirect_urls = [
-  "https://med-verse-lms.vercel.app",
-  "https://med-verse-lms.vercel.app/reset-password",
   "http://localhost:3000",
   "http://localhost:3000/reset-password",
+  "http://127.0.0.1:3000",
+  "http://127.0.0.1:3000/reset-password",
 ]
 # How long tokens are valid for, in seconds. Defaults to 3600 (1 hour), maximum 604,800 (1 week).
 jwt_expiry = 3600

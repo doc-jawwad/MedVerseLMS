@@ -4,12 +4,13 @@ Target production architecture is approved conceptually ([architecture.md](archi
 
 Do **not**, as part of repository work: provision a VPS, modify production or Cloud staging Supabase, modify Vercel, DNS, Cloudflare, or Brevo, or run a production dump/load-test.
 
-## Live today (not yet the VPS origin)
+## Live today
 
-- **Current public site**: https://med-verse-lms.vercel.app (Vercel project `jawwad-seo/med-verse-lms`, `.vercel/project.json`). Deployment protection is off; app login/approval is the gate.
-- **Supabase Cloud (application + Auth, today):** `pxoxijlhcvbrostrquft` (`ap-southeast-1`, Postgres 17). This is still a **full** hosted database, not Auth-only.
-- **Supabase Cloud (staging, `vygtwrsshcyfahfzurgq`, `ap-southeast-1`):** application schema for 8B–8F plus Vercel **Preview**. Do not point Vercel Production at this project.
-- `vercel.json` stays in the repo for a possible return to Vercel; it is not the VPS runtime.
+- **Current public LMS origin**: `https://lms.medversepk.com` (Cloudflare → Caddy → Next.js / PostgREST / Cloud Auth on the VPS). DNS for this hostname must not be pointed at Vercel.
+- **Legacy Vercel project** `jawwad-seo/med-verse-lms` (`https://med-verse-lms.vercel.app`): **paused** (public surface returns `503 DEPLOYMENT_PAUSED`). Env vars empty; Git integration disconnected; project retained (not deleted) until Auth redirect allowlist / Preview dependency is conclusively cleared. Do **not** put production credentials back into Vercel.
+- **Supabase Cloud Auth (production):** `pxoxijlhcvbrostrquft` (`ap-southeast-1`). Application data for production lives on VPS Postgres; Cloud project remains Auth (+ legacy hosted DB until Auth-only cutover is approved).
+- **Supabase Cloud (staging, `vygtwrsshcyfahfzurgq`, `ap-southeast-1`):** staging Auth / schema for VPS staging. Do not point any live Production frontend at this project.
+- Repo `vercel.json` no longer schedules crons (VPS cron is the production path). Pausing the Vercel project stops residual cron hits from serving the old app.
 
 ## Target production
 
@@ -60,9 +61,10 @@ Do **not** treat Cloud staging as migrated to VPS. Do **not** convert either Clo
 | Env | Frontend | Database / Auth | Rule |
 |---|---|---|---|
 | Local Docker | `npm run dev` | `supabase start` (`http://127.0.0.1:54321`) | Preferred for pgTAP and schema work |
-| Vercel Preview | Preview deployment | Cloud staging `vygtwrsshcyfahfzurgq` | Subscription UI validation. Do not point Preview at production. |
+| Vercel Preview (legacy, project paused) | Do not rely on for launch | Cloud staging `vygtwrsshcyfahfzurgq` | Prefer local or VPS staging. Do not point Preview at production. |
 | Local against Cloud staging | `npm run dev` + `.env.local` staging keys | Cloud staging `vygtwrsshcyfahfzurgq` | Requires `MEDVERSE_ALLOW_CLOUD_STAGING=yes` for ops scripts |
-| Vercel Production | `https://med-verse-lms.vercel.app` | Cloud production `pxoxijlhcvbrostrquft` | Do not change Production env vars for staging work |
+| Vercel Production (legacy) | `https://med-verse-lms.vercel.app` (**paused**) | Was Cloud production; env vars removed | Keep paused; do not restore production secrets |
+| VPS production | `https://lms.medversepk.com` | VPS Postgres + Cloud Auth `pxoxijlhcvbrostrquft` | Sole public LMS origin |
 | VPS staging / load-test | Caddy + Next on `staging.medversepk.com` (same VPS, dual-stack) | VPS DB `medverse_staging` + Cloud Auth `vygtwrsshcyfahfzurgq` | Same-host isolation; no production ports/DB; no staging pg_cron |
 
 Do **not** use production Auth/DB for student subscription UI tests. Do not copy production `SUPABASE_SERVICE_ROLE_KEY` into Preview.
