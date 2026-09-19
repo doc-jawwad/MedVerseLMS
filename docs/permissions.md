@@ -9,9 +9,9 @@ Four independent concepts. Do not collapse them:
 | **Subscription** | `subscriptions` (+ applications) | Paid/complimentary time-bounded plan. Not the class year. |
 | **Resource entitlement** | resource policy + grants + restrictions | Whether a visible catalog item can be **used** (start test, open file, practice) |
 
-Email verification does **not** require admin approval. After verification, an **active** student enters the LMS immediately. Free students use Dashboard (incoming tests), Tests (history), **Free Resources** (only categories that have published free/granted items for their class), Contact Us, Career Counselling, and Get iMD & StepWise MD. Full-library hubs (MCQ Bank, Pearl Points, Guidelines, OSPE Material, OSPE Lectures, Books, Notes, Lectures) stay **visible but locked** until a **live** subscription. Free-entitled (and granted) items remain usable via Free Resources and content RPCs — the same records as the full library, not copies. Paid resources stay locked inside subscribed catalogs until entitled. Pearl Points is not assumed free or paid — each row’s entitlement columns decide. The main Pearl Points hub is a full-library section; free pearls appear under Free Resources.
+Email verification does **not** require admin approval. After verification, an **active** student enters the LMS immediately. Free students use Dashboard (incoming tests + Top 3 leaderboard card), Tests (history), **Resources** (same academic tree; only Admin-unlocked / free / granted nodes open), Contact Us, Career Counselling, and Get iMD & StepWise MD. The **full library** remains a separate subscribed surface over the **same** educational rows (no duplicate free copies). Paid resources stay locked until entitled. Pearl Points is not assumed free or paid — each row’s entitlement columns decide.
 
-Do **not** infer historical test eligibility or academic history from current subscription. Lifetime analytics, missed vs not-eligible, and leaderboard population: [access-eligibility-analytics.md](access-eligibility-analytics.md).
+Do **not** infer historical test eligibility or academic history from current subscription. Lifetime analytics, missed vs not-eligible, and leaderboard population: [access-eligibility-analytics.md](access-eligibility-analytics.md). Class model, Blocks, Resources label, class lock, and limited-admin assigned classes: [architecture.md](architecture.md) “Product structure freeze”.
 
 `/pending` is kept as a route for backward compatibility. It is **not** the registration-approval gate. It may send blocked accounts (`restricted` / `suspended` / `deactivated` / `revoked`) to a clear blocked notice.
 
@@ -24,10 +24,11 @@ Role lives in `profiles.role`; users cannot change their own role (trigger-enfor
 
 ### Main Admin vs other admins
 
-- **Main Admin** (`profiles.is_main_admin`): all permissions. The first migration sets every existing `role = 'admin'` row to Main Admin.
+- **Main Admin** (`profiles.is_main_admin`): all permissions **and** all classes. The first migration sets every existing `role = 'admin'` row to Main Admin.
 - **First Main Admin bootstrap:** `bootstrap_first_main_admin()` promotes the **caller** to Main Admin only when **no** `is_main_admin` row exists. Used by `scripts/create-dev-account.mjs --admin` on VPS staging/local where opaque `sb_secret_*` is not a PostgREST JWT. Additional admins still go through `set_admin_role` (Main Admin / `manage_admins`). The RPC does not accept `sb_secret_*` as a Bearer and does not grant PostgREST `service_role`.
 - Other admins receive **granular** `admin_permissions` rows. They do not inherit full privilege.
-- Presets (Main Admin, Academic/MCQ, Operations, Custom) are **UI convenience only**. The database authorizes `has_permission(code)`, not the preset name.
+- **Assigned-class scope (SPEC FREEZE):** limited admins additionally require a **separate** assigned-class relationship (admin ↔ `years`). Existing permission codes remain separate. **Main Admin** sees all classes without assignment rows. Limited Admin requires **both** an assigned class **and** the relevant permission code for that action. UI year cookies/selectors are not authorization.
+- Presets (Main Admin, Academic/MCQ, Operations, Custom) are **UI convenience only**. The database authorizes `has_permission(code)` (and, once migrated, assigned-class checks), not the preset name.
 - The **last** Main Admin cannot be removed or demoted.
 - The **last active** Main Admin cannot be blocked (`restricted` / `suspended` / `deactivated` / `revoked`). That would lock the academy out of Main Admin recovery. Other admins may be disabled with `set_account_status`; targeting `role = 'admin'` also requires `manage_admins`.
 
@@ -57,7 +58,7 @@ Production Auth is **Supabase Cloud**; application rows are **VPS PostgreSQL** (
 
 - `profiles.id` is the Auth user UUID (`JWT sub`). On the VPS it is **not** a foreign key to `auth.users` (that table is not on the VPS).
 - RLS and SECURITY DEFINER helpers keep using `(select auth.uid())` and `auth.jwt() ->> 'session_id'`. Those read PostgREST JWT GUCs after PostgREST verifies the Cloud-issued access token. They do not query Cloud `auth.users`.
-- Idempotent `ensure_profile()` creates `profiles` (`account_status` default `active`) and an **active** class enrollment from JWT `user_metadata.year_id` when that year exists and the student has **never** had any `enrollments` row (true first provision/signup only). Losing or ending an enrollment must not let the student pick another year via editable `user_metadata`. Later year changes are admin-mediated (`manage_year_changes` / year-change requests). Call it after signup (when a session exists) / verify / signIn, before `register_session()`. It never writes `role`, `account_status` (on update), or `is_main_admin`. `handle_new_user()` on `auth.users` remains in migrations for managed-Supabase portability; it will not fire across the Auth/DB split.
+- Idempotent `ensure_profile()` creates `profiles` (`account_status` default `active`) and an **active** class enrollment from JWT `user_metadata.year_id` when that year exists and the student has **never** had any `enrollments` row (true first provision/signup only). Losing or ending an enrollment must not let the student pick another year via editable `user_metadata` alone. Later year changes follow SPEC FREEZE class-lock rules (free self-serve vs pending/active subscription lock; subscribed changes remain admin-mediated via `manage_year_changes` / year-change requests). Call it after signup (when a session exists) / verify / signIn, before `register_session()`. It never writes `role`, `account_status` (on update), or `is_main_admin`. `handle_new_user()` on `auth.users` remains in migrations for managed-Supabase portability; it will not fire across the Auth/DB split.
 - Deleting a user in Cloud Auth does **not** cascade to VPS `profiles` / attempts. Exact user-delete semantics are **pending approval** ([deployment.md](deployment.md)).
 
 ## Session policy — two explicit layers
@@ -138,19 +139,29 @@ Admin accounts are created from the `/admin/admins` UI (`manage_admins`): Cloud 
 
 ## Class enrollment (not subscription, not LMS approval)
 
-After email verification, `ensure_profile()` inserts `enrollments.status = 'active'` for the registration year. The student cannot `UPDATE` `year_id`.
+After email verification, `ensure_profile()` inserts `enrollments.status = 'active'` for the registration year.
 
 Live class: partial unique index `(student_id) WHERE status = 'active'` — one assigned year at a time.
 
-Previous classes: `expired` (promotion or approved year change).
+Previous classes: `expired` (promotion, approved year change, or free self-serve class change).
 
-`promote_student(student_id)` remains: expire current, insert `active` for year+1, audit-logged. Requires `manage_year_changes`.
+**Class-change product law (SPEC FREEZE)** — see also [architecture.md](architecture.md) / [database.md](database.md):
 
-**Year-change requests:** student submits a request for **any** year (`create_year_change_request` / `update_pending_year_change_request`). One pending request per student. Admin approves or rejects (`approve_year_change_request` / `reject_year_change_request`, permission `manage_year_changes`). Approve expires the current class row and inserts `active` for the requested year without changing `account_status`. Students never write `enrollments` directly.
+| State | Class change |
+|---|---|
+| Free (no live subscription, no pending application) | Self-serve; student may change class **freely**. |
+| Pending subscription application | Class **locked** while pending. Application stores selected purchase class (`subscription_applications.year_id`). |
+| Live / active subscription | Class **locked** to `subscriptions.year_id`. Change only via admin-mediated `year_change_requests` / `promote_student`, keeping subscription class in sync. |
+
+`promote_student(student_id)` remains: expire current, insert `active` for year+1, audit-logged. Requires `manage_year_changes`. Align live `subscriptions.year_id` when present.
+
+**Year-change requests:** for **subscribed / class-locked** students needing admin approval (`create_year_change_request` / `update_pending_year_change_request`). One pending request per student. Admin approves or rejects (`approve_year_change_request` / `reject_year_change_request`, permission `manage_year_changes`). Approve expires the current class row and inserts `active` for the requested year without changing `account_status`; keep `subscriptions.year_id` in sync. Students never write `enrollments` directly.
 
 **Migration:** existing `enrollments.status = 'pending'` rows are **auto-activated** (LMS-approval model retired).
 
 Enrollment-level `suspended` / `revoked` are **retired as LMS gates**. Account blocking uses `profiles.account_status`. Mapping of any pre-existing enrollment rows still in `suspended`/`revoked` onto account status is a **pending owner decision** (do not guess in migrations).
+
+**Historical note:** pre-freeze docs required every student (including free) to use year-change requests. That is superseded by the free self-serve / lock rules above.
 
 ## Subscriptions
 
@@ -168,12 +179,12 @@ Not enrollment. Absence of a live subscription row = non-active (free catalog st
 
 ### Applications (manual bank transfer; no payment gateway)
 
-Student: Get Subscription → configured payment instructions → enter **amount** → upload screenshot → submit. Admin decides whether the amount is acceptable.
+Student: Get Subscription → configured payment instructions → enter **amount** → upload screenshot → submit (also confirms **selected purchase class** — SPEC FREEZE; stored on the application). Admin decides whether the amount is acceptable.
 
 | Application status | Meaning |
 |---|---|
-| `pending` | Unresolved. Student may **edit/resubmit** this same row (amount, screenshot). One pending per student (partial unique). |
-| `approved` | Terminal. Creates/activates/extends the subscription. |
+| `pending` | Unresolved. Student may **edit/resubmit** this same row (amount, screenshot). One pending per student (partial unique). **Class locked** while pending. |
+| `approved` | Terminal. Creates/activates/extends the subscription and stores the **purchased class** on `subscriptions.year_id` (align enrollment). |
 | `rejected` | Terminal for that row. Student may submit a **new** application. |
 | `cancelled` | Abandoned pending row (if used). |
 
@@ -185,26 +196,34 @@ Admin lists are queries: Applied (`pending` applications), Active (live subscrip
 
 ## Resource access
 
-Do **not** hard-code “paid = menu X” as entitlement. **Navigation visibility** (which hubs look active vs locked) is Layer 10 UX driven by live subscription. **Catalog visibility** (see the item, lock state) and **content entitlement** (use it) remain separate. Free students get active Dashboard, Tests (history), Free Resources, Contact Us, Career Counselling, Get iMD, My Subscription, and My Account. Full-library hubs stay visible but locked until `has_live_subscription()` is true. Locked hubs must **not** fetch paid catalog payloads merely to blur them. Content RPCs still enforce free / grant / paid rules, including per-pearl and per-folder PDF/guideline/Drive/YouTube access. Deep links to a free/granted item remain usable without unlocking the full-library hub.
+Do **not** hard-code “paid = menu X” as entitlement. **Navigation visibility** (which surfaces look active vs locked) is Layer 10 UX driven by live subscription and the academic tree. **Catalog visibility** (see the item, lock state) and **content entitlement** (use it) remain separate.
+
+**Resources (SPEC FREEZE):** free-student surface label is **Resources** (historical name “Free Resources” may still appear in routes/code until renamed). Same academic tree as the full library; only Admin-unlocked / free-entitled / granted nodes open; no duplicate educational rows. Full library remains a separate subscribed surface over the same store. Locked nodes must **not** fetch paid item payloads merely to blur them. Content RPCs still enforce free / grant / paid rules. Deep links to a free/granted item remain usable without unlocking the full library.
 
 **Account-level blocking always overrides** resource access: non-`active` accounts get no LMS catalog and no content RPCs (except the explicit in-progress exam disposition in [exam-state-machine.md](exam-state-machine.md)).
 
 For an **active** student, evaluate:
 
-1. Catalog: **current** assigned class year (and test audience / equivalent) **or** an allow-grant that names the item. Unpublished tests stay hidden. After an approved year change, previous-year catalog rows disappear unless explicitly granted. Guessing another year’s id via PostgREST/RPC must return no row / RPC denial — not a UI-only hide.
+1. Catalog: **current** assigned class year (and test audience / equivalent) **or** an allow-grant that names the item. Unpublished tests stay hidden. After an approved year change (or free self-serve class change), previous-year catalog rows disappear unless explicitly granted. Guessing another year’s id via PostgREST/RPC must return no row / RPC denial — not a UI-only hide.
 2. **Deny** (`access_restrictions`, unrevoked) → cannot use. **Deny wins** over grant and subscription.
 3. **Allow** (`access_grants`, unrevoked) → can use (still subject to deny and `account_allows_lms()`). Off-year grants are the only way to keep a previous year’s item after a year change.
 4. Else resource entitlement: `free` | `any_subscription` | `plan` (specific `required_plan_id`), using live subscription **including grace**. If the student’s live subscription is `paid_access_mode = grants_only`, paid entitlement does **not** unlock; only a grant (or free entitlement) can.
 
-Locked paid items remain **listed** with a lock. Secrets (Drive URL, signed URL, question payload, `correct_key`) must not ride on catalog SELECT. Content RPCs (`start_attempt` new starts, practice fetch, `open_material`, `get_attempt_review` items, future signed book/video URL) enforce entitlement. Owned score/result summary is not a content start.
+Locked paid items remain **listed** with a lock where the tree shows them. Secrets (Drive URL, signed URL, question payload, `correct_key`) must not ride on catalog SELECT. Content RPCs (`start_attempt` new starts, practice fetch, `open_material`, `get_attempt_review` items, future signed book/video URL) enforce entitlement. Owned score/result summary is not a content start.
 
-**Practice:** Main Admin configures **each subject** as free / subscription / plan. Do not hard-code practice as always free or always paid.
+**Practice:** Main Admin configures **each subject/Block** as free / subscription / plan. Do not hard-code practice as always free or always paid. Practice product filters (All / Remaining / Done / Marked, reset, %, timer, report) are SPEC FREEZE in [architecture.md](architecture.md) / [database.md](database.md) — separate from exams; no `test_attempts` reuse.
+
+**Notes** remains its own library category (SPEC FREEZE).
+
+**Search (SPEC FREEZE):** tree/folder/subfolder **names** only.
 
 **Compatibility:** existing tests, material folders, and practice subjects are backfilled to entitlement **`free`** so current year-based access is preserved. New resources may be free, subscription-required, or plan-specific.
 
 **Note:** today’s practice UI already lists subjects with a lock unless `access_grants(practice_subject)` exists. After backfill to `free`, those existing subjects become usable without a grant unless the admin reconfigures entitlement or adds a restriction. Grants remain the allow overlay.
 
 Future books/videos use the same visibility/entitlement split and **protected temporary URLs** after an access check ([architecture.md](architecture.md)).
+
+**Identity / ensure_profile note:** `ensure_profile()` still creates the **first** enrollment from `user_metadata.year_id` only when the student has never had an enrollment row. Free self-serve class change (SPEC FREEZE) is a separate RPC path after provision — not editable Auth metadata as the security boundary.
 
 ## In-app notifications
 

@@ -50,7 +50,7 @@ Companion analyses (not canonical): subscription-vs-dashboard canvas; eligibilit
 | 7 | **Restriction (deny overlay)** | Unrevoked `access_restrictions` | Exception: named item cannot be used. **Deny wins** over grant, plan, and subscription. Not the same as account `restricted`. |
 | 8 | **Test eligibility (window)** | Could the student have called `start_attempt` during `[opens_at, closes_at)`? | Historical. Not current subscription. See §7. |
 | 9 | **Current resource access** | `can_access_*` / `resource_content_allowed` / exam window | Start test, open file, fetch practice **now**. |
-| 10 | **Navigation visibility** | Which menu items the shell shows as active vs locked | UX over live subscription. Free **active:** Dashboard, Tests (history), Free Resources, Contact Us, Career Counselling, Get iMD, My Subscription, My Account. Free **locked full-library hubs:** MCQ Bank, Pearl Points, Guidelines, OSPE Material, OSPE Lectures, Books, Notes, Lectures (and Performance). Pearl Points **item** access is Layer 9. Locked hubs must not load paid catalog payloads. **Not content entitlement.** |
+| 10 | **Navigation visibility** | Which menu items the shell shows as active vs locked | UX over live subscription. Free **active:** Dashboard (incl. Top 3 leaderboard card), Tests (history), **Resources** (same academic tree; unlocked nodes only), Contact Us, Career Counselling, Get iMD, My Subscription, My Account. Full library is a separate subscribed surface over the same rows (no duplicate free copies). Locked nodes must not load paid item payloads. **Notes** remains its own category. **Not content entitlement.** |
 | 11 | **Catalog visibility** | `can_view_*` — listed, including locked paid | See the item. Unpublished tests stay hidden. |
 | 12 | **Dashboard visibility** | Which cards, locks, previews, and history links render | UX over 9–11 plus owned history. Must not leak secrets. |
 
@@ -90,25 +90,26 @@ Nothing in 8D/pre-8J is obsolete. What is **missing** is historical window-eligi
 **CONFIRMED PRODUCT LAW:**
 
 - After email verification, an **active** student enters the LMS **without** a paid subscription. No admin enrollment approval.
-- Absence of a live subscription (`has_live_subscription() = false`) = free student. Pending applications are **not** live access. Expired / deactivated subscriptions do not unlock paid LMS sections.
-- **Accessible shell sections (active nav):** Dashboard, **Tests** (history / completed / in-progress), **Free Resources**, Contact Us, Career Counselling Series, Get iMD & StepWise MD, My Subscription, My Account.
-- **Locked shell sections (visible, intentionally locked chrome + section lock page):** MCQ Bank, Pearl Points, Guidelines, OSPE Material, OSPE Lectures, Books, Notes, Lectures, Performance. Clicking a locked item opens a polished lock with Get Subscription + Contact MedVerse (not a broken empty page and not a blurred paid catalog). Pending ≠ unlocked.
-- **Free Resources** is **not** the full library. It lists only categories that currently contain Admin-published items the student can use **now** (`entitlement = 'free'` and/or an unrevoked personal grant, and not restricted). Empty categories are omitted. Nested routes (`/free-resources/mcq-bank`, `/free-resources/pearl-points`, …) open that free subset. No parallel entitlement system and no duplicate storage tables. Folder types use `material_folders.library_type`; MCQ Bank uses practice subjects; Pearl Points uses `pearl_points`.
+- Absence of a live subscription (`has_live_subscription() = false`) = free student. Pending applications are **not** live paid access. Expired / deactivated subscriptions do not unlock paid LMS sections.
+- **Class change (SPEC FREEZE):** free students may change class **freely**. A **pending** subscription application **locks** class. A **live** subscription locks class to `subscriptions.year_id` (see [architecture.md](architecture.md) / [permissions.md](permissions.md)).
+- **Accessible shell sections (active nav):** Dashboard (incoming tests + **Top 3** leaderboard card: rank, profile picture, name, college, Score), **Tests** (history / completed / in-progress), **Resources** (same academic tree; only Admin-unlocked / free / granted nodes open), Contact Us, Career Counselling Series, Get iMD & StepWise MD, My Subscription, My Account.
+- **Resources** is **not** the full library and must **not** duplicate educational rows. It presents the same tree with locks on paid nodes. Empty unlocked categories may be omitted. No parallel entitlement system and no duplicate storage tables. Folder types use `material_folders.library_type` (**Notes** stays its own category); MCQ/practice uses subjects/Blocks; Pearl Points uses `pearl_points`.
 - Dashboard lists **incoming** scheduled tests (open + upcoming) with FREE/PAID, datetime, countdown, and existing eligibility/lock rules. Tests page is **history**.
-- Free educational content is **not** mass-converted to paid. Admin continues to mark free vs paid per resource. Free items stay usable via Free Resources (and content RPCs); paid items stay denied by content RPCs until live subscription / grant rules allow.
-- Subscribed students open full-library hubs according to entitlement; Free Resources remains the curated free subset and does not replace the main library.
-- Secrets (Drive URL, signed URL, question payload, `correct_key`, other students’ private data) must **never** be sent to the client merely because a card is locked, blurred, or previewed.
-- Dashboard may show lifetime score **summaries** and free-access banners. The dedicated Performance section remains locked without a live subscription (same analytics RPCs power Dashboard summaries — see §19 / implementation note).
+- Free educational content is **not** mass-converted to paid. Admin continues to mark free vs paid per resource. Free items stay usable via Resources (and content RPCs); paid items stay denied by content RPCs until live subscription / grant rules allow.
+- Subscribed students open the full library according to entitlement; Resources remains the curated free/unlocked subset and does not replace the main library.
+- Secrets (Drive URL, signed URL, question payload, `correct_key`, other students’ private data beyond approved leaderboard projection) must **never** be sent to the client merely because a card is locked, blurred, or previewed.
+- Dashboard may show lifetime score **summaries** and free-access banners, plus the Top 3 card. Dedicated Performance charts remain a product surface separate from ranking law (see §13).
 
-**Navigation vs entitlement:** Layer 10 (nav chrome / section hubs) is UX over Layer 3 (live subscription). Layer 9 (content RPCs) remains authoritative for **starting** paid tests, opening paid materials, and fetching paid practice. Free / grant content RPCs remain callable without a live subscription so Free Resources can work.
+**Navigation vs entitlement:** Layer 10 (nav chrome / section hubs) is UX over Layer 3 (live subscription). Layer 9 (content RPCs) remains authoritative for **starting** paid tests, opening paid materials, and fetching paid practice. Free / grant content RPCs remain callable without a live subscription so Resources can work.
 
 **CURRENT IMPLEMENTATION:**
 
-- Student shell builds nav from `has_live_subscription()` via `buildStudentShellNav` (desktop + mobile share the same items / lock flags). Main Pearl Points / MCQ Bank / typed material hubs are locked without live subscription; Free Resources stays unlocked.
-- Free Resources landing: `/free-resources` (populated free/grant categories only). Free subset routes under `/free-resources/{type}` filter by `entitlement = 'free'` and/or personal grant — not by live-subscription access alone.
-- Full-library hubs render `SectionLock` when `has_live_subscription()` is false (no protected paid catalog payloads).
-- Deep links to free/granted practice subjects, accessible folders/items, or accessible tests remain usable without unlocking the full-library hub.
+- Student shell still builds nav from `has_live_subscription()` via `buildStudentShellNav` (historical “Free Resources” label and category-first hubs may still be present until the class-first Resources IA ships). SPEC FREEZE product law above wins for future work.
+- Free Resources landing historically: `/free-resources` (populated free/grant categories only). Rename/relabel to **Resources** and same-tree locks are SPEC FREEZE, not yet assumed shipped.
+- Full-library hubs may still render `SectionLock` when `has_live_subscription()` is false (no protected paid catalog payloads).
+- Deep links to free/granted practice subjects, accessible folders/items, or accessible tests remain usable without unlocking the full library.
 - Existing rows may still be `entitlement = 'free'` (compatibility). Admins set paid entitlement on resources that should require subscription.
+- Free self-serve class change and subscription `year_id` lock are **product law**; current code may still require year-change requests for all students — treat as ARCHITECTURAL GAP until migrated.
 
 ---
 
@@ -123,9 +124,9 @@ Nothing in 8D/pre-8J is obsolete. What is **missing** is historical window-eligi
 - Dashboard **Start** on paid tests/practice/materials follows current entitlement.
 - Historical free (and any earlier paid) academic data remains on the same lifetime series. No second analytics island.
 
-**PROPOSED ARCHITECTURE:** subscribed students may de-emphasise Free Resources because free items also appear inside the full-library hubs. Free Resources remains the curated free subset and does not replace the main library. **Not shown in navigation ≠ not entitled.**
+**PROPOSED ARCHITECTURE:** subscribed students may de-emphasise Resources because free items also appear inside the full library. Resources remains the curated free/unlocked subset and does not replace the main library. **Not shown in navigation ≠ not entitled.**
 
-**CURRENT IMPLEMENTATION:** navigation lock flags follow `has_live_subscription()`. Free Resources stays in the shared nav for both free and subscribed students. Inside subscribed catalogs, `accessible_test_ids` / `accessible_folder_ids` / `practice_subjects().granted` flip Start vs lock. Paid access is not stored in the JWT.
+**CURRENT IMPLEMENTATION:** navigation lock flags follow `has_live_subscription()`. Historical Free Resources stays in the shared nav for both free and subscribed students. Inside subscribed catalogs, `accessible_test_ids` / `accessible_folder_ids` / `practice_subjects().granted` flip Start vs lock. Paid access is not stored in the JWT.
 
 ---
 
@@ -392,7 +393,7 @@ Do **not** create a duplicate analytics history or a “paid-only from activatio
 
 ## 13. Leaderboards
 
-### 13.1 Individual test leaderboard (ships today)
+### 13.1 Individual test leaderboard (ships today; presentation freeze)
 
 **CONFIRMED PRODUCT LAW — ranking:**
 
@@ -403,8 +404,18 @@ Do **not** create a duplicate analytics history or a “paid-only from activatio
 - **Not eligible:** not ranked, not inserted as zero.
 - **Eligible but missed:** not ranked as zero.
 - Started + submitted (including auto-submit): rank normally.
+- **`rank_test` is the only ranking source** (SPEC FREEZE). Dashboard Top 3 and Analytics Top 20 are presentation slices of the same ranked set — not a second engine.
 
-**CURRENT IMPLEMENTATION:** `rank_test` matches ranking law. It does **not** zero-fill absentees or ineligible students. Subscribing, expiring, or renewing does **not** rewrite other people’s ranks (no new submitted row).
+**CONFIRMED PRODUCT LAW — presentation (SPEC FREEZE):**
+
+| Surface | Rows | Fields |
+|---|---|---|
+| Student dashboard Top 3 | Top 3 of the relevant formal-test board | rank, profile picture, name, college, **Score** |
+| Analytics Top 20 | Top 20 | rank, profile picture, name, college, **Score** |
+
+College and profile picture require profile projection fields ([database.md](database.md)); additive schema is a future migration. Private contact fields must not appear on the board.
+
+**CURRENT IMPLEMENTATION:** `rank_test` matches ranking law. It does **not** zero-fill absentees or ineligible students. Subscribing, expiring, or renewing does **not** rewrite other people’s ranks (no new submitted row). Current `test_leaderboard` returns rank/name/score/% without college or photo; Dashboard Top 3 card is not yet assumed shipped.
 
 **CONFIRMED PRODUCT LAW — view authorization is a different question from ranking.** A student may own a historical result even if they cannot start the test now. Do not remove that result. Do not automatically drop them from **ranking** because entitlement changed.
 
@@ -414,15 +425,15 @@ Do **not** create a duplicate analytics history or a “paid-only from activatio
 - Expired student who **did** sit it currently cannot read classmates’ rows (own score on the result page still loads via attempt RLS).
 - Year change used to 404 the whole result page (`tests` SELECT via `can_view_test`) even though the attempt row exists — closed in 8J-B via `get_own_test_result`.
 
-**ARCHITECTURAL GAP.** Current entitlement is the wrong proxy for historical ownership and for historical eligibility.
+**ARCHITECTURAL GAP.** Current entitlement is the wrong proxy for historical ownership and for historical eligibility. Dashboard Top 3 for free students also conflicts with treating Performance as wholly paid until view/projection rules and IA are migrated.
 
-**OWNER DECISION.** Closed-test leaderboard visibility (§20.3). Candidate view rule (not implemented): allow if admin **OR** caller has a submitted attempt on that test **OR** currently entitled **OR** (if snapshot exists) was window-eligible. Ranking formula stays submitted-only regardless.
+**OWNER DECISION.** Closed-test leaderboard visibility (§20.3). Candidate view rule (not implemented): allow if admin **OR** caller has a submitted attempt on that test **OR** currently entitled **OR** (if snapshot exists) was window-eligible. Ranking formula stays submitted-only regardless. SPEC FREEZE presentation fields do not by themselves resolve view authorization.
 
 Optional admin overlay: eligible absentees as a **separate** list. Never merge them into `RANK()`.
 
 ### 13.2 Cumulative / class leaderboard
 
-**CONFIRMED PRODUCT LAW for this pass:** do **not** implement a cumulative class leaderboard. Dashboard `average_rank` is not one.
+**CONFIRMED PRODUCT LAW for this pass:** do **not** implement a cumulative class leaderboard. Dashboard `average_rank` is not one. Dashboard Top 3 / Analytics Top 20 are **per-test** `rank_test` slices, not cumulative boards.
 
 See §14.
 
@@ -450,9 +461,10 @@ See §14.
 
 ## 15. Year change
 
-**CONFIRMED PRODUCT LAW** (class rules already in [permissions.md](permissions.md)):
+**CONFIRMED PRODUCT LAW** (class rules in [permissions.md](permissions.md); SPEC FREEZE):
 
-- Approve year change: expire current enrollment, insert `active` for the new year. Does **not** change `account_status` or subscriptions.
+- **Free** students may change class freely (self-serve). **Pending** application locks class. **Live** subscription locks class to `subscriptions.year_id`.
+- Approve year-change request (subscribed / locked path): expire current enrollment, insert `active` for the new year; keep `subscriptions.year_id` in sync. Does **not** change `account_status`.
 - Previous-year **catalog** disappears unless an allow-grant names the item.
 - Guessing another year’s id must return no row / RPC denial — not a UI-only hide.
 
@@ -461,11 +473,11 @@ See §14.
 - Old-year **academic records remain attached** to the student.
 - Current-year **catalog and subject bars** may show only the live year.
 - **Result access** for an owned submitted attempt must not depend on current-year `can_view_test`. Owned **score / summary** is independent of current ability to **start** or **see the catalog row**. Paid **review content** still requires live entitlement + `show_review` (§11).
-- Per-test **ranking membership** is unchanged (submitted set on that test). The student is not removed from January’s board because they are now Year 4.
+- Per-test **ranking membership** is unchanged (submitted set on that test). The student is not removed from January’s board because they are now Year 4 / Final Year.
 - Dashboard lifetime summary/trend/recent must keep old-year submits.
 - Resource visibility for **new** starts follows the new year (plus grants).
 
-**CURRENT IMPLEMENTATION:** `/tests/[id]/result` loads the score/summary via `get_own_test_result` (owned `submitted` attempt). Year change and catalog hide no longer 404 an owned result. Paid review gate remains `get_attempt_review` (8J-A). **Remaining GAP:** `student_subject_performance` drops off-year subjects; `student_weak_chapters` does not.
+**CURRENT IMPLEMENTATION:** `/tests/[id]/result` loads the score/summary via `get_own_test_result` (owned `submitted` attempt). Year change and catalog hide no longer 404 an owned result. Paid review gate remains `get_attempt_review` (8J-A). Free self-serve class change and subscription `year_id` columns are **not** assumed shipped — ARCHITECTURAL GAP vs SPEC FREEZE. **Remaining GAP:** `student_subject_performance` drops off-year subjects; `student_weak_chapters` does not.
 
 **PROPOSED ARCHITECTURE.** Result **score** and own rank snapshot: authorize by **attempt ownership**. Review items: ownership + `show_review` + live paid entitlement when the test is paid. Catalog and Start: current year / grant. Do not mix Year 3 and Year 4 into one class cumulative board without OWNER DECISION.
 
@@ -587,8 +599,8 @@ Priority: **P0** correctness/fairness before teaching the UI new labels; **P1** 
 | `start_attempt` **new** start window | Closed → `test_window_closed` even with grant | Same unless late-sit action | No backfill sit | P2 | New RPC if approved | **Yes** (§20.4) |
 | `test_summary.registered` | Current audience enrollments | Window-eligible population | Inflates after late subscribe | P1 | Change after B | No (law in §16) |
 | `admin_platform_summary.participation_pct` | Current enrollments × any attempt ever | Per-test: participants / window-eligible; or honest label | Wrong if presented as test participation | P1 | SQL rewrite + label | Metric definition details |
-| Student nav | Free: Dashboard / Tests / Free Resources / Contact / Career / iMD / Subscription / Account active; full-library hubs locked. Subscribed: library hubs unlock. Shared `buildStudentShellNav`. | Same | Implemented | — | Keep | Nav chrome **yes** (product) |
-| Free Resources library | `/free-resources` presents only populated free/granted categories (existing tables/RPCs; `library_type` for folders) | Same; no parallel entitlement | Implemented (presentation) | — | Folder publish flag **later** optional | Types not hardcoded |
+| Student nav | Free: Dashboard / Tests / Free Resources / Contact / Career / iMD / Subscription / Account active; full-library hubs locked. Subscribed: library hubs unlock. Shared `buildStudentShellNav`. | SPEC FREEZE: Dashboard (+ Top 3), Tests, **Resources** same-tree locks; full library separate; Notes own category | Label/IA gap | P1 | Nav + tree | No (frozen in architecture.md) |
+| Free Resources library | `/free-resources` presents only populated free/granted categories (existing tables/RPCs; `library_type` for folders) | **Resources** label; same academic tree; no duplicate rows | Rename + tree IA | P1 | Presentation | No (frozen) |
 | Pearl Points | `pearl_points` + `open_pearl`; entitlement columns; not Question Bank | Same architecture | Implemented | — | Per-student pearl grants **later** | Overlay on `access_grants`? |
 | PDF / guidelines | `materials.kind` pdf\|guideline; folder entitlement; signed R2 `study-content/` | Same folders/entitlement | Implemented | — | Books/notes/video as extra kinds | No new CMS |
 | Group grants | None | Optional exception overlay | No group target | P2 | Schema if approved | **Yes** |
@@ -619,7 +631,7 @@ Do not put implementation preferences here. These are unresolved **product** cho
 
 **Settled (removed from this list):** post-expiry paid review — score KEEP, review content LOCK, server-side (`get_attempt_review` + no student `attempt_answers` SELECT). Classmate **leaderboard view** remains item 3 and is a different question.
 
-Related UX choices (not access law): whether subscribed students hide a Free Resources nav tab; whether trend charts mark free vs paid points; whether group grants ship; what a “controlled paid preview” may show besides a lock + CTA.
+Related UX choices (not access law): whether subscribed students hide a Resources nav tab; whether trend charts mark free vs paid points; whether group grants ship; what a “controlled paid preview” may show besides a lock + CTA.
 
 ---
 
@@ -643,6 +655,10 @@ Related UX choices (not access law): whether subscribed students hide a Free Res
 
 **STAGING VALIDATED — 8J COMPLETE.** Evidence (E2E 18/18, pgTAP including `020` / `162` / `163` and 8J-specific suites, frozen contract checks, production untouched) is recorded in [validation/8j-staging-signoff-20260916.md](validation/8j-staging-signoff-20260916.md). That sign-off does **not** authorize production deployment.
 
-Do not invent alternative attempt states, grace periods, ranking formulas, or “late subscriber gets zeros.” Eligibility snapshot and classmate leaderboard **view** stay deferred (OWNER DECISION 1 and 3).
+## SPEC FREEZE note (product structure)
+
+Architecture reconciliation is complete. Frozen product decisions for class model, Blocks, Notes, Resources label, class lock, limited-admin assigned classes, practice filters, Flashcards placeholder, search scope, theme, and leaderboard Top 3 / Top 20 fields live in [architecture.md](architecture.md) “Product structure freeze”. This document remains the source of truth for access vs eligibility vs analytics; where an older “Free Resources” / category-hub sentence conflicts with that freeze, the freeze wins for **product law**, and CURRENT IMPLEMENTATION notes call out gaps until migrated.
+
+Do not invent alternative attempt states, grace periods, ranking formulas, or “late subscriber gets zeros.” Eligibility snapshot and classmate leaderboard **view** stay deferred (OWNER DECISION 1 and 3). `rank_test` remains the only ranking source.
 
 Settled access/exam law that 8J must not regress: catalog vs content, deny-wins, `all_entitled` vs `grants_only`, subscription grace 0/1/2, year isolation, free-without-subscription, menus visible with locks, lifetime submitted analytics, submitted-only ranking, immutable attempts, 30s transport / 60s sweep, `expires_at = least(started_at + duration, closes_at)`, close-now clamp, resume-while-closed same-device, post-expiry score KEEP / review LOCK.

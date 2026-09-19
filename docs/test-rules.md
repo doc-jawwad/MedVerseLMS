@@ -74,3 +74,10 @@ Catalog vs content are separate ([permissions.md](permissions.md)):
 - Deny restrictions win over grants and subscription. Account-level block (`restricted`/`suspended`/`deactivated`/`revoked`) overrides all resource access (exam disposition: [exam-state-machine.md](exam-state-machine.md)).
 - **Current** `can_access_test` is not historical window-eligibility. A later subscription does not make a closed paid test eligible. Missed vs not-eligible: [access-eligibility-analytics.md](access-eligibility-analytics.md).
 - **Owned historical result (`get_own_test_result`):** the student’s own `submitted` attempt. Catalog visibility is not required. Paid review remains `get_attempt_review` (8J-A).
+
+## Formal exam vs practice (SPEC FREEZE)
+
+- Existing exam state machine, freeze-at-publish, kill switch, and attempt states in this document and [exam-state-machine.md](exam-state-machine.md) remain **frozen**.
+- **Test MCQ** remains a formal timed test on `tests` + attempt RPCs.
+- Practice remains a **separate** product surface (All / Remaining / Done / Marked, mark/unmark, Done→Remaining reset, % completion, forward timer, practice report) — see [architecture.md](architecture.md) / [database.md](database.md). Practice must **not** reuse `test_attempts`.
+- **`rank_test`** remains the only ranking source for Dashboard Top 3 and Analytics Top 20 ([access-eligibility-analytics.md](access-eligibility-analytics.md)).

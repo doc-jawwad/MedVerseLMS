@@ -4,10 +4,10 @@ Canonical documents. Code must follow these; **do not invent alternative states,
 
 ## What this is
 
-An online MCQ platform for MBBS students (Years 1–5) of a single academy:
+An online MCQ platform for MBBS students (Years 1–5 / Final Year) of a single academy:
 
-- **Students**: after email verification, enter the LMS immediately (no admin enrollment approval). Two distinct content surfaces share the same records: **Free Resources** (admin-curated `entitlement = 'free'` / grant subset, only populated categories) and the **full library** (MCQ Bank, Pearl Points, Guidelines, OSPE Material, OSPE Lectures, Books, Notes, Lectures). Free students see the full-library hubs **locked** (subscription CTA + Contact MedVerse) without paid catalog payloads. Dashboard shows incoming scheduled tests (FREE/PAID, datetime, countdown); Tests is history/completed. Apply for subscription via manual bank transfer.
-- **Admin**: Main Admin has all permissions; other admins have granular codes (presets are UI only). Content management is **class/year first**, then Free Resources vs full/paid library, Question Bank, and Tests. Also manages curriculum, question versioning + review, tests (build → validate → preview → publish → kill-switch), **account status**, year-change requests, **subscriptions and payment applications**, resource entitlements/grants/restrictions, results, analytics.
+- **Students**: after email verification, enter the LMS immediately (no admin enrollment approval). Two distinct content surfaces share the same records: **Resources** (free-student label for the admin-unlocked / `entitlement = 'free'` / grant subset of the academic tree) and the **full library** (same educational rows; subscribed students see the class → Block → category tree). Free students see paid nodes **locked** without paid catalog payloads. Dashboard shows incoming scheduled tests (FREE/PAID, datetime, countdown) plus a Top 3 leaderboard card for the relevant formal test; Tests is history/completed. Apply for subscription via manual bank transfer.
+- **Admin**: Main Admin has all permissions across all classes; limited admins have granular permission codes **and** a separate assigned-class relationship (both required). Content management is **class/year first**, then Resources unlock vs full library, Question Bank, and Tests. Also manages curriculum, question versioning + review, tests (build → validate → preview → publish → kill-switch), **account status**, year-change requests, **subscriptions and payment applications**, resource entitlements/grants/restrictions, results, analytics.
 
 This is a **one-academy, one-time LMS**, not a multi-tenant SaaS product. `tenant_id` remains on every table for a possible future split; it is a single constant today.
 
@@ -19,9 +19,10 @@ Use `public/logo-icon.png` (navy + teal) on light backgrounds and
 `public/logo-icon-on-dark.png` (white + teal) on navy/blue backgrounds —
 the shared `Logo` component (`src/components/logo.tsx`) picks the variant via
 its `dark` prop and is the only place the wordmark/icon combination should be
-assembled. Theme tokens live in `src/app/globals.css`. If the logo is ever
-replaced, re-sample these two hex values from the new asset and update both
-this doc and `globals.css`.
+assembled. Theme tokens live in `src/app/globals.css`. Product theme modes are
+**Light / Dark / System** (SPEC FREEZE). If the logo is ever replaced,
+re-sample these two hex values from the new asset and update both this doc
+and `globals.css`.
 
 ## Progressive Web App
 
@@ -91,7 +92,102 @@ JWT trust (unchanged claim semantics, split hosts):
 
 **Profile provisioning:** Cloud `INSERT` into `auth.users` cannot fire a trigger on VPS Postgres. Required RPC: idempotent `ensure_profile()` — creates `profiles` (`account_status` default `active`) and an **active** class enrollment from JWT `sub` + `user_metadata.year_id` only when the subject has **never** had an enrollment row (first provision). Call it after signup / verify / signIn. Email verification does **not** wait for admin approval. Keep `handle_new_user()` in migrations so a return to managed Supabase still auto-provisions when Auth and `public` share a database.
 
-**Access model (summary):** account status, class enrollment, subscription, and resource entitlement are separate. Free students enter after email verification. **Free Resources** is a presentation/curation surface over existing subjects, `pearl_points`, and `material_folders` — not a second content store. Main library hubs (`/mcq-bank`, `/pearl-points`, `/guidelines`, `/ospe-material`, `/ospe-lectures`, `/books`, `/notes`, `/lectures`) stay visible but **locked** until a live subscription (pending applications do not unlock). Tests (`/tests`) is history; incoming scheduled tests live on Dashboard. Free / grant items stay usable via Free Resources and content RPCs. Pearl Points is not assumed free or paid — each row’s entitlement columns decide; the main Pearl Points hub is a full-library section. Details in [permissions.md](permissions.md), [database.md](database.md), and [access-eligibility-analytics.md](access-eligibility-analytics.md). Historical eligibility, missed tests, dashboard analytics, and leaderboard population are in [access-eligibility-analytics.md](access-eligibility-analytics.md). `/pending` remains as a compatibility/blocked-account route, not a registration-approval gate.
+**Access model (summary):** account status, class enrollment, subscription, and resource entitlement are separate. Free students enter after email verification. **Resources** (free-student surface label) is a presentation/curation surface over the same academic tree — not a second content store; only Admin-unlocked / free-entitled / granted nodes open. The full library remains a separate subscribed surface over the **same** educational rows (no duplicate free copies). Pending applications do not unlock paid content. Tests (`/tests`) is history; incoming scheduled tests live on Dashboard. Pearl Points is not assumed free or paid — each row’s entitlement columns decide. Details in [permissions.md](permissions.md), [database.md](database.md), and [access-eligibility-analytics.md](access-eligibility-analytics.md). Historical eligibility, missed tests, dashboard analytics, and leaderboard population are in [access-eligibility-analytics.md](access-eligibility-analytics.md). `/pending` remains as a compatibility/blocked-account route, not a registration-approval gate.
+
+## Product structure freeze (SPEC FREEZE)
+
+**Status:** frozen product law. Canonical docs only. Do **not** treat this section as authorization to write code, migrations, rename live data, create tables, or change staging/production until a later implementation pass is explicitly approved.
+
+Architecture reconciliation (class-first academic tree) is complete. The decisions below supersede conflicting older product wording in these docs. They do **not** invent alternative exam states, scoring formulas, grace periods, or RLS precedence — those remain in [exam-state-machine.md](exam-state-machine.md), [scoring-rules.md](scoring-rules.md), and [permissions.md](permissions.md).
+
+### 1. Class model (`years`)
+
+Existing `years` rows remain the class model. Do **not** create a separate `classes` table.
+
+| `year_number` | Canonical display name |
+|---|---|
+| 1 | 1st Year MBBS |
+| 2 | 2nd Year MBBS |
+| 3 | 3rd Year MBBS |
+| 4 | 4th Year MBBS |
+| 5 | **Final Year MBBS** (existing Year 5 / “5th Year” may be **displayed** as Final Year MBBS; display rename is not a new class entity) |
+
+### 2. Academic structure (second level = Blocks / Final Year subjects)
+
+Student-facing second level under each class. Product names map onto existing `subjects` (reinterpreted) — see § migration risk. Do **not** invent a parallel `blocks` table.
+
+| Class | Second-level nodes |
+|---|---|
+| 1st Year MBBS | Block 1, Block 2, Block 3 |
+| 2nd Year MBBS | Block 4, Block 5, Block 6 |
+| 3rd Year MBBS | Block 7, Block 8, Block 9 |
+| 4th Year MBBS | Block 10, Block 11, Block 12 |
+| Final Year MBBS | Medicine, Surgery, Gynecology, Pediatrics |
+
+### 3. Notes
+
+**Notes** remains its **own** library category (not folded into Books or Past Papers). Preserve `material_folders.library_type` / category identity for Notes.
+
+### 4. Leaderboards (presentation; ranking source unchanged)
+
+- **Student dashboard Top 3** (formal-test board card): rank, profile picture, name, college, **Score**.
+- **Analytics Top 20**: rank, profile picture, name, college, **Score**.
+
+Population and ordering remain **`rank_test` on submitted formal-test attempts only** ([scoring-rules.md](scoring-rules.md), [access-eligibility-analytics.md](access-eligibility-analytics.md)). Do **not** invent a second ranking engine or a cumulative class board in this freeze.
+
+### 5. Limited Admin class scope
+
+- Separate **assigned-class** relationship (admin ↔ year), independent of `admin_permissions`.
+- Existing permission codes remain separate job authorization.
+- **Main Admin** sees all classes (no assignment rows required).
+- Limited Admin requires **both** class assignment **and** the relevant permission code.
+
+### 6. Free student vs subscription class lock
+
+| Student state | Class change |
+|---|---|
+| Free (no live subscription, no pending application) | May change class **freely** (self-serve). |
+| Pending subscription application | Class is **locked** for the pending period. |
+| Active / live subscription | Class is **locked** to `subscriptions.year_id` (purchased class). Change only via existing admin-mediated year-change / promote paths, keeping subscription class in sync. |
+
+Subscription **application** stores the selected purchase class. Subscription **approval** stores / activates that purchased class on the subscription row.
+
+### 7. Resources (free surface)
+
+- Free-student surface label: **Resources** (replaces “Free Resources” as the product label; routes/docs may still mention the old name as historical).
+- Same academic tree as the full library.
+- Only Admin-unlocked / free-entitled / granted nodes **open**.
+- Free resources **do not** duplicate educational rows — entitlement / grants / restrictions only.
+- Full library remains a **separate** subscribed surface over the same store.
+
+### 8. Formal exam model
+
+- Existing exam state machine remains frozen ([exam-state-machine.md](exam-state-machine.md)).
+- **Test MCQ** remains a formal timed test (`tests` + attempt RPCs).
+- Practice remains separate from exams.
+- **`rank_test`** remains the only ranking source.
+
+### 9. Practice (product law; separate from exams)
+
+Filters / states: **All / Remaining / Done / Marked**; mark/unmark; Done → Remaining reset; percentage completion; forward practice timer; practice report. **No** reuse of `test_attempts` for practice. Schema for practice progress is a future migration concern — see [database.md](database.md); do not invent attempt states.
+
+### 10. Flashcards
+
+**Placeholder only.** No flashcard engine and no flashcard content table in this freeze.
+
+### 11. Search
+
+Search is limited to **folders / subfolders / tree names** (class, Block/subject, folder, day/container names as those entities exist). No full-text search of stems, PDF bytes, or video.
+
+### 12. Theme
+
+Student/admin shell theme modes: **Light / Dark / System**.
+
+### Major data-migration risk (subjects → Blocks)
+
+**Existing `subjects` currently represent departments** (e.g. Anatomy, Physiology) and are **referenced by Question Bank / material / pearl data** (`questions`, folders, denormalized `subject_id` chains, CSV import taxonomy under subjects → books → chapters → topics).
+
+Reinterpreting `subjects` as Blocks 1–12 and Final Year clinical subjects **must** use a **controlled mapping / backfill**, not destructive renaming of live department rows in place. Do not drop FKs, mass-rename in production without a mapping plan, or invent a second parallel subject tree. Authoring taxonomy (`books` / `chapters` / `topics`) may continue to hang under the reinterpreted subject rows after an approved mapping migration — that migration is **out of scope** for this SPEC FREEZE pass.
 
 **VPS `profiles.id`:** UUID primary key equal to Auth `sub`. **No** `references auth.users (id) ON DELETE CASCADE` on the VPS — that FK cannot exist without a local `auth.users` table. User-delete semantics without CASCADE are **pending approval** (see [deployment.md](deployment.md)).
 
