@@ -64,12 +64,19 @@ test.describe("PWA installability", () => {
     await expect(install).toBeVisible();
     await expect(install).toHaveText(/Install MedVerse App/);
     await install.click();
-    await expect(page.getByText("Install on iPhone")).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Install on iPhone" })
+    ).toBeVisible();
     await expect(page.getByText(/Open MedVerse in Safari/)).toBeVisible();
-    await expect(page.getByText(/Add to Home Screen/)).toBeVisible();
-    await expect(page.getByText(/App Store download/i)).toBeVisible();
+    await expect(page.getByText("Tap Add to Home Screen")).toBeVisible();
+    await expect(page.getByText(/App Store download/i).first()).toBeVisible();
+    await expect(
+      page.getByText("Safari \u2192 Share \u2192 Add to Home Screen \u2192 Add")
+    ).toBeVisible();
     const overflow = await page.evaluate(
-      () => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1
+      () =>
+        document.documentElement.scrollWidth >
+        document.documentElement.clientWidth + 1
     );
     expect(overflow).toBeFalsy();
     await context.close();
@@ -81,7 +88,9 @@ test.describe("PWA installability", () => {
     await page.setViewportSize({ width: 360, height: 740 });
     await page.goto("/login");
     await page.getByTestId("install-medverse-app").click();
-    await expect(page.getByText(/does not expose a one-tap install prompt/i)).toBeVisible();
+    await expect(
+      page.getByText(/does not expose a one-tap install prompt/i)
+    ).toBeVisible();
   });
 
   test("standalone mode reports Installed and does not nag", async ({
@@ -122,23 +131,27 @@ test.describe("PWA installability", () => {
     });
     const page = await context.newPage();
     await page.goto("/login");
-    await page.evaluate(() => {
-      const event = new Event("beforeinstallprompt");
-      Object.defineProperty(event, "prompt", {
-        value: async () => {
-          (window as Window & { __medversePrompted?: boolean }).__medversePrompted =
-            true;
-        },
-      });
-      Object.defineProperty(event, "userChoice", {
-        value: Promise.resolve({ outcome: "accepted" }),
-      });
-      window.dispatchEvent(event);
-    });
+    await expect(page.getByTestId("install-medverse-app")).toBeVisible();
     await expect
-      .poll(async () =>
-        page.getByTestId("install-medverse-app").getAttribute("data-install-state")
-      )
+      .poll(async () => {
+        await page.evaluate(() => {
+          const event = new Event("beforeinstallprompt", { cancelable: true });
+          Object.defineProperty(event, "prompt", {
+            value: async () => {
+              (
+                window as Window & { __medversePrompted?: boolean }
+              ).__medversePrompted = true;
+            },
+          });
+          Object.defineProperty(event, "userChoice", {
+            value: Promise.resolve({ outcome: "accepted" }),
+          });
+          window.dispatchEvent(event);
+        });
+        return page
+          .getByTestId("install-medverse-app")
+          .getAttribute("data-install-state");
+      })
       .toBe("android-install");
     await page.getByTestId("install-medverse-app").click();
     await expect
@@ -146,7 +159,8 @@ test.describe("PWA installability", () => {
         page.evaluate(
           () =>
             Boolean(
-              (window as Window & { __medversePrompted?: boolean }).__medversePrompted
+              (window as Window & { __medversePrompted?: boolean })
+                .__medversePrompted
             )
         )
       )
@@ -154,14 +168,18 @@ test.describe("PWA installability", () => {
     await context.close();
   });
 
-  test("320px landing layout does not overflow horizontally", async ({
+  test("320px landing and login layout do not overflow horizontally", async ({
     page,
   }) => {
     await page.setViewportSize({ width: 320, height: 568 });
-    await page.goto("/");
-    const overflow = await page.evaluate(
-      () => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1
-    );
-    expect(overflow).toBeFalsy();
+    for (const pathName of ["/", "/login"] as const) {
+      await page.goto(pathName);
+      const overflow = await page.evaluate(
+        () =>
+          document.documentElement.scrollWidth >
+          document.documentElement.clientWidth + 1
+      );
+      expect(overflow, pathName).toBeFalsy();
+    }
   });
 });

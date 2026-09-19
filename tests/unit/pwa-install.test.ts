@@ -47,6 +47,16 @@ describe("PWA install surface", () => {
       }),
       "hidden"
     );
+    assert.equal(
+      resolveInstallSurface({
+        pathname: "/dashboard",
+        standalone: false,
+        platform: "android",
+        canPrompt: true,
+        examActive: true,
+      }),
+      "hidden"
+    );
     assert.equal(isExamLikePath("/admin/tests/xyz/preview"), true);
   });
 

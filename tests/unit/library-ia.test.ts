@@ -49,7 +49,15 @@ describe("contact links", () => {
     assert.ok(hrefs.includes("https://wa.me/923019569240"));
     assert.ok(hrefs.includes("https://wa.me/medversepk"));
     assert.ok(hrefs.some((h) => h.startsWith("mailto:medversepakistan@gmail.com")));
-    assert.ok(hrefs.some((h) => h.includes("whatsapp.com/channel")));
+    assert.ok(
+      hrefs.includes("https://whatsapp.com/channel/0029Vb6XYzXDTkJw6YgfVY2u")
+    );
+    assert.ok(
+      hrefs.includes("https://whatsapp.com/channel/0029VbALKkmFy72DxKuDRC0o")
+    );
+    assert.ok(
+      hrefs.includes("https://whatsapp.com/channel/0029Vb86c9u1CYoSr2yVDG3W")
+    );
     assert.ok(hrefs.some((h) => h.includes("instagram.com/medverse_pakistan")));
     assert.ok(hrefs.some((h) => h.includes("youtube.com/@medversepakistan")));
     assert.ok(hrefs.some((h) => h.includes("facebook.com/share")));

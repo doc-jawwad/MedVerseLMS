@@ -188,6 +188,7 @@ export function PwaRuntimeProvider({ children }: { children: ReactNode }) {
     standalone,
     platform,
     canPrompt,
+    examActive: examChrome,
   });
 
   const value = useMemo(

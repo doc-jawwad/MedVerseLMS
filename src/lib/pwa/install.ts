@@ -48,8 +48,10 @@ export function resolveInstallSurface(input: {
   standalone: boolean;
   platform: InstallPlatform;
   canPrompt: boolean;
+  /** In-progress live exam — never show install chrome over the player. */
+  examActive?: boolean;
 }): InstallSurfaceState {
-  if (isExamLikePath(input.pathname)) return "hidden";
+  if (input.examActive || isExamLikePath(input.pathname)) return "hidden";
   if (input.standalone) return "installed";
   if (input.platform === "ios") return "ios-guide";
   if (input.canPrompt) return "android-install";

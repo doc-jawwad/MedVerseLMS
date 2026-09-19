@@ -18,6 +18,9 @@ import { shouldShowDashboardInstallCard } from "@/lib/pwa/install";
 
 type Variant = "button" | "card" | "nav";
 
+const IOS_SHORTCUT =
+  "Safari \u2192 Share \u2192 Add to Home Screen \u2192 Add";
+
 export function InstallMedverseApp({
   variant = "button",
   className,
@@ -25,11 +28,11 @@ export function InstallMedverseApp({
   variant?: Variant;
   className?: string;
 }) {
-  const { state, promptInstall, standalone } = usePwaInstall();
+  const { state, promptInstall, standalone, examActive } = usePwaInstall();
   const [guideOpen, setGuideOpen] = useState(false);
   const [fallbackOpen, setFallbackOpen] = useState(false);
 
-  if (state === "hidden") return null;
+  if (examActive || state === "hidden") return null;
   if (variant === "card" && !shouldShowDashboardInstallCard(state)) {
     return null;
   }
@@ -110,7 +113,7 @@ export function InstallMedverseApp({
           <IosInstallGuide />
           <DialogFooter showCloseButton>
             <p className="mr-auto text-[11px] text-muted-foreground sm:self-center">
-              Share → Add to Home Screen → Open as Web App → Add
+              {IOS_SHORTCUT}
             </p>
           </DialogFooter>
         </DialogContent>
@@ -124,8 +127,8 @@ export function InstallMedverseApp({
               This browser does not expose a one-tap install prompt. Use the
               browser menu: look for <strong>Install app</strong> or{" "}
               <strong>Add to Home Screen</strong>. On iPhone, open MedVerse in
-              Safari and use Share → Add to Home Screen → Add. MedVerse is not
-              distributed on the App Store.
+              Safari and use {IOS_SHORTCUT.replace(/^Safari \u2192 /, "")}.
+              MedVerse is not distributed on the App Store.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter showCloseButton />

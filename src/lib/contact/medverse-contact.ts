@@ -4,7 +4,9 @@ export const MEDVERSE_CONTACT = {
   whatsappPhoneHref: "https://wa.me/923019569240",
   whatsappHandleHref: "https://wa.me/medversepk",
   email: "medversepakistan@gmail.com",
-  mdcatChannel: "https://whatsapp.com/channel/0029VbALKkmFy72DxKuDRC0o",
+  mdcatChannel: "https://whatsapp.com/channel/0029Vb6XYzXDTkJw6YgfVY2u",
+  additionalWhatsappChannel:
+    "https://whatsapp.com/channel/0029VbALKkmFy72DxKuDRC0o",
   instagram:
     "https://www.instagram.com/medverse_pakistan?igsh=MTRjZTl3cWFsNndpdQ==",
   youtube: "https://youtube.com/@medversepakistan-dradnan?si=mW6t1YzmKYfx9-HH",
@@ -28,7 +30,7 @@ export const MEDVERSE_CONTACT_LINKS: ContactLink[] = [
   },
   {
     id: "whatsapp-handle",
-    label: "WhatsApp (wa.me/medversepk)",
+    label: "WhatsApp",
     href: MEDVERSE_CONTACT.whatsappHandleHref,
     detail: "wa.me/medversepk",
   },
@@ -50,7 +52,7 @@ export const MEDVERSE_CONTACT_LINKS: ContactLink[] = [
   },
   {
     id: "youtube",
-    label: "MedVerse YouTube Channel",
+    label: "MedVerse YouTube",
     href: MEDVERSE_CONTACT.youtube,
   },
   {
@@ -60,7 +62,12 @@ export const MEDVERSE_CONTACT_LINKS: ContactLink[] = [
   },
   {
     id: "facebook",
-    label: "MedVerse Facebook Page",
+    label: "MedVerse Facebook",
     href: MEDVERSE_CONTACT.facebook,
+  },
+  {
+    id: "whatsapp-extra",
+    label: "Additional WhatsApp Channel",
+    href: MEDVERSE_CONTACT.additionalWhatsappChannel,
   },
 ];
