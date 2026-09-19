@@ -44,27 +44,18 @@ fi
 
 echo "=== remove previous $MARKER / open-443 rules ==="
 # Delete numbered rules matching our marker or unrestricted 443 (repeat until gone).
-# UFW renumbers after each delete; loop safely.
 i=0
 while [[ $i -lt 80 ]]; do
   i=$((i + 1))
-  mapfile -t lines < <(ufw status numbered | sed -n 's/^\[\([0-9]\+\)\][[:space:]]\+\(.*\)$/\1|\2/p')
-  del=""
-  for line in "${lines[@]}"; do
-    num="${line%%|*}"
-    rest="${line#*|}"
-    if echo "$rest" | grep -Fq "$MARKER"; then
-      del="$num"
-      break
-    fi
-    # Unrestricted public HTTPS (Anywhere / Anywhere (v6))
-    if echo "$rest" | grep -Eq '443/tcp[[:space:]]+ALLOW[[:space:]]+IN[[:space:]]+Anywhere'; then
-      del="$num"
-      break
-    fi
-  done
-  [[ -z "$del" ]] && break
-  ufw --force delete "$del" >/dev/null
+  line="$(ufw status numbered | grep -E '^\[[0-9]+\] 443/tcp' | grep -E 'Anywhere( \(v6\))?[[:space:]]*(# HTTPS)?$' | grep -v "$MARKER" | head -1 || true)"
+  if [[ -z "$line" ]]; then
+    # also remove prior marker rules before re-add
+    line="$(ufw status numbered | grep -F "$MARKER" | head -1 || true)"
+  fi
+  [[ -z "$line" ]] && break
+  num="$(echo "$line" | sed -n 's/^\[\([0-9]\+\)\].*/\1/p')"
+  [[ -n "$num" ]] || break
+  ufw --force delete "$num" >/dev/null
 done
 
 echo "=== add Cloudflare HTTPS allows ==="

@@ -27,14 +27,17 @@ if tar -tzf "$TGZ" | grep -E '^(deploy/\.rbac-overlay/|deploy/loadtest/|scripts/
   echo "FAIL: unrelated artifacts in archive" >&2
   exit 3
 fi
+LIST="$(mktemp)"
+tar -tzf "$TGZ" >"$LIST"
 for marker in \
   'src/lib/http/public-origin.ts' \
   'src/lib/http/safe-internal-path.ts' \
   'src/app/auth/confirm/route.ts' \
   'deploy/scripts/sync-cloudflare-ufw.sh'
 do
-  tar -tzf "$TGZ" | grep -Fq "$marker" || { echo "FAIL: missing $marker" >&2; exit 3; }
+  grep -Fq "$marker" "$LIST" || { echo "FAIL: missing $marker" >&2; rm -f "$LIST"; exit 3; }
 done
+rm -f "$LIST"
 
 install -d -m 0755 -o medverse -g medverse "$DST"
 tar -xzf "$TGZ" -C "$DST"
