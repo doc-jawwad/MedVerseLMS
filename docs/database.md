@@ -74,7 +74,7 @@ Status transitions are now enforced at the database level (`protect_question_sta
 - Partial unique `(student_id) WHERE status = 'pending'` — no simultaneous pending applications.
 - While `pending`, the student may edit/resubmit **that row** (amount, screenshot) via RPC.
 - `approved` is terminal and creates/activates/extends a subscription. `rejected` is terminal; student may insert a **new** application.
-- Screenshot bytes live in **private Cloudflare R2**; the table stores only the object key (`payment-proofs/{tenant_id}/{student_id}/{uuid}`). Never a public URL. Admin review uses a short-lived signed GET after `authorize_payment_screenshot_access` (`review_subscription_applications`).
+- Screenshot bytes live in **private Cloudflare R2**; the table stores only the object key (`payment-proofs/{tenant_id}/{student_id}/{uuid}`). Never a public URL. Admin review uses a short-lived signed GET after `authorize_payment_screenshot_access` (`review_subscription_applications`). On **replace**, the previous object is deleted after a successful update. On **reject**, the object is deleted after a successful reject (private proofs are not retained in R2). Failed attach after upload discards the new object.
 - Currency default is **PKR** (owner decision). Copied from `payment_settings.currency` when the student omits it.
 - No payment gateway. Admin decides whether `amount` is acceptable.
 

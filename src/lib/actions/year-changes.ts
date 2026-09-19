@@ -1,5 +1,7 @@
 "use server";
 
+import { actionRpcResult } from "@/lib/errors/safe-action-error";
+
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 
@@ -23,7 +25,7 @@ export async function createYearChangeRequest(
     p_reason: reason ?? null,
   });
   revalidateYearChangePaths();
-  if (error) return { error: error.message };
+  if (error) return actionRpcResult("action", error);
   return { id: data as string };
 }
 
@@ -39,7 +41,7 @@ export async function updatePendingYearChangeRequest(
     p_reason: reason ?? null,
   });
   revalidateYearChangePaths();
-  return { error: error?.message };
+  return actionRpcResult("action", error);
 }
 
 export async function approveYearChangeRequest(
@@ -52,7 +54,7 @@ export async function approveYearChangeRequest(
     p_review_note: reviewNote ?? null,
   });
   revalidateYearChangePaths();
-  return { error: error?.message };
+  return actionRpcResult("action", error);
 }
 
 export async function rejectYearChangeRequest(
@@ -65,5 +67,5 @@ export async function rejectYearChangeRequest(
     p_review_note: reviewNote ?? null,
   });
   revalidateYearChangePaths();
-  return { error: error?.message };
+  return actionRpcResult("action", error);
 }

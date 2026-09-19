@@ -275,7 +275,8 @@ export function AttemptClient({ testId }: { testId: string }) {
         const key = Object.keys(ERROR_COPY).find((k) =>
           error.message.includes(k)
         );
-        setError(key ?? error.message);
+        // Never surface raw Auth/DB text — only known RPC codes or a generic key.
+        setError(key ?? "unknown");
         return;
       }
       const p = data as StartPayload;
@@ -361,7 +362,10 @@ export function AttemptClient({ testId }: { testId: string }) {
     );
   }
   if (error) {
-    const copy = ERROR_COPY[error] ?? { title: "Cannot start exam", body: error };
+    const copy = ERROR_COPY[error] ?? {
+      title: "Cannot start exam",
+      body: "Something went wrong. Please try again.",
+    };
     return <Blocker title={copy.title} body={copy.body} />;
   }
   if (!payload || !mergedAnswers) {

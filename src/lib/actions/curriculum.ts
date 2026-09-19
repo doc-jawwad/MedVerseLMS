@@ -1,5 +1,7 @@
 "use server";
 
+import { actionRpcResult, toClientActionError } from "@/lib/errors/safe-action-error";
+
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 
@@ -34,7 +36,7 @@ function friendlyError(
   if (error.code === "23505") {
     return `A ${kindLabel[kind]} named "${name}" already exists here.`;
   }
-  return error.message;
+  return toClientActionError(error, "curriculum");
 }
 
 export async function addCurriculumNode(
@@ -75,5 +77,5 @@ export async function deleteCurriculumNode(kind: CurriculumKind, id: string) {
   const supabase = await createClient();
   const { error } = await supabase.from(kind).delete().eq("id", id);
   revalidatePath("/admin/curriculum");
-  return { error: error?.message };
+  return actionRpcResult("action", error);
 }

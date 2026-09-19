@@ -31,7 +31,7 @@ export default async function AdminPlansPage() {
         </p>
       </div>
       <SubscriptionAdminNav currentPath="/admin/subscriptions/plans" />
-      {error && <p className="text-sm text-destructive">{error.message}</p>}
+      {error && <p className="text-sm text-destructive">Could not load this page. Please try again.</p>}
       {!perms.manageSubscriptions && (
         <p className="text-sm text-muted-foreground">
           View only — you lack <code>manage_subscriptions</code>.

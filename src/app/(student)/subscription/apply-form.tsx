@@ -7,6 +7,7 @@ import {
   createSubscriptionApplication,
   updatePendingSubscriptionApplication,
   uploadPaymentScreenshot,
+  discardPaymentScreenshot,
 } from "@/lib/actions/subscription-applications";
 import {
   PAYMENT_SCREENSHOT_CONTENT_TYPES,
@@ -123,16 +124,18 @@ export function SubscriptionApplyForm({
     }
 
     startTransition(async () => {
+      let objectKey: string | undefined;
       try {
-        let objectKey: string | undefined;
         if (file) {
           setPhase("uploading");
           const fd = new FormData();
           fd.set("file", file);
           const uploaded = await uploadPaymentScreenshot(fd);
-          if (uploaded.error || !("objectKey" in uploaded)) {
+          if ("error" in uploaded || !("objectKey" in uploaded)) {
             setFormError(
-              studentSubscriptionErrorMessage(uploaded.error ?? "upload_failed")
+              studentSubscriptionErrorMessage(
+                "error" in uploaded ? uploaded.error : "upload_failed"
+              )
             );
             setPhase("idle");
             return;
@@ -149,6 +152,13 @@ export function SubscriptionApplyForm({
             currency: displayCurrency,
           });
           if (result.error) {
+            if (objectKey) {
+              try {
+                await discardPaymentScreenshot(objectKey);
+              } catch {
+                /* best-effort */
+              }
+            }
             setFormError(studentSubscriptionErrorMessage(result.error));
             setPhase("idle");
             return;
@@ -165,7 +175,12 @@ export function SubscriptionApplyForm({
             screenshotObjectKey: objectKey,
             currency: displayCurrency,
           });
-          if (result.error || !("id" in result)) {
+          if ("error" in result) {
+            try {
+              await discardPaymentScreenshot(objectKey);
+            } catch {
+              /* best-effort */
+            }
             setFormError(
               studentSubscriptionErrorMessage(result.error ?? "create_failed")
             );
@@ -179,6 +194,13 @@ export function SubscriptionApplyForm({
         if (fileRef.current) fileRef.current.value = "";
         router.refresh();
       } catch {
+        if (objectKey) {
+          try {
+            await discardPaymentScreenshot(objectKey);
+          } catch {
+            /* best-effort orphan cleanup */
+          }
+        }
         setFormError(studentSubscriptionErrorMessage("network_error"));
         setPhase("idle");
       }

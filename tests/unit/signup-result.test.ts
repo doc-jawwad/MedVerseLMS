@@ -68,7 +68,7 @@ describe("classifySignUpResult", () => {
     assert.deepEqual(result, { outcome: "existing_verified" });
   });
 
-  it("generic signUp error → error path", () => {
+  it("generic signUp error → sanitized error path", () => {
     const result = classifySignUpResult({
       user: null,
       session: null,
@@ -76,7 +76,7 @@ describe("classifySignUpResult", () => {
     });
     assert.deepEqual(result, {
       outcome: "error",
-      message: "Signup requires a valid password",
+      message: "Could not create your account. Please try again.",
     });
   });
 

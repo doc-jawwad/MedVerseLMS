@@ -1,5 +1,7 @@
 "use server";
 
+import { actionRpcResult, toClientActionError } from "@/lib/errors/safe-action-error";
+
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 
@@ -36,9 +38,10 @@ export async function createQuestion(content: QuestionContent, meta: QuestionMet
   revalidatePath("/admin/questions");
   if (error) {
     return {
-      error: error.code === "23505"
-        ? "An identical question already exists (duplicate)."
-        : error.message,
+      error:
+        error.code === "23505"
+          ? "An identical question already exists (duplicate)."
+          : toClientActionError(error, "createQuestion"),
     };
   }
   return { id: data as string };
@@ -57,7 +60,7 @@ export async function saveNewVersion(questionId: string, content: QuestionConten
   });
   revalidatePath(`/admin/questions/${questionId}`);
   revalidatePath("/admin/questions");
-  return { error: error?.message };
+  return actionRpcResult("action", error);
 }
 
 // Metadata (not content) may change in place on the identity row.
@@ -72,7 +75,7 @@ export async function updateQuestionMeta(
     .eq("id", questionId);
   revalidatePath(`/admin/questions/${questionId}`);
   revalidatePath("/admin/questions");
-  return { error: error?.message };
+  return actionRpcResult("action", error);
 }
 
 const allowedTransitions: Record<string, string[]> = {
@@ -99,5 +102,5 @@ export async function setQuestionStatus(
     .eq("status", from);
   revalidatePath(`/admin/questions/${questionId}`);
   revalidatePath("/admin/questions");
-  return { error: error?.message };
+  return actionRpcResult("action", error);
 }

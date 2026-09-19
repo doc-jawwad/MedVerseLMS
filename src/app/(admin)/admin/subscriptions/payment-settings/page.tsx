@@ -33,7 +33,7 @@ export default async function AdminPaymentSettingsPage() {
         </p>
       </div>
       <SubscriptionAdminNav currentPath="/admin/subscriptions/payment-settings" />
-      {error && <p className="text-sm text-destructive">{error.message}</p>}
+      {error && <p className="text-sm text-destructive">Could not load this page. Please try again.</p>}
       <PaymentSettingsForm
         initial={(data as PaymentSettingsRow | null) ?? null}
         canManage={perms.managePaymentSettings}

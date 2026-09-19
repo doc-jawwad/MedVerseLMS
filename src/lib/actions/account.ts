@@ -1,5 +1,7 @@
 "use server";
 
+import { actionRpcResult } from "@/lib/errors/safe-action-error";
+
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 
@@ -33,5 +35,5 @@ export async function setAccountStatus(
   });
   revalidatePath("/admin/students");
   revalidatePath(`/admin/students/${studentId}`);
-  return { error: error?.message };
+  return actionRpcResult("action", error);
 }

@@ -4,14 +4,29 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { classifySignUpResult } from "@/lib/auth/signup-result";
 import { isBlockedAccountStatus } from "@/lib/auth/account-status";
+import {
+  clearVerifyEmailCookie,
+  setVerifyEmailCookie,
+} from "@/lib/auth/verify-email-cookie";
+import {
+  clientActionFailed,
+  logServerError,
+  toClientActionError,
+} from "@/lib/errors/safe-action-error";
 
 export type AuthResult = { error?: string };
+
+const PROFILE_FAIL = "Could not finish signing in. Please try again.";
+const SIGNUP_FAIL = "Could not create your account. Please try again.";
+const PASSWORD_FAIL = "Could not update your password. Please try again.";
+const RESEND_FAIL = "Could not resend the code. Please try again.";
 
 async function ensureProfile(
   supabase: Awaited<ReturnType<typeof createClient>>
 ): Promise<string | undefined> {
   const { error } = await supabase.rpc("ensure_profile");
-  return error?.message;
+  if (!error) return undefined;
+  return toClientActionError(error, "ensureProfile", PROFILE_FAIL);
 }
 
 export async function signUp(
@@ -59,8 +74,9 @@ export async function signUp(
     if (profileError) return { error: profileError };
   }
 
-  // New email or existing unverified — stay on the confirmation path.
-  redirect(`/verify-email?email=${encodeURIComponent(email)}`);
+  // Carry email via httpOnly cookie — never put it in the URL query string.
+  await setVerifyEmailCookie(email);
+  redirect("/verify-email");
 }
 
 export async function signIn(
@@ -75,7 +91,8 @@ export async function signIn(
   const { error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) {
     if (error.message.toLowerCase().includes("email not confirmed")) {
-      redirect(`/verify-email?email=${encodeURIComponent(email)}`);
+      await setVerifyEmailCookie(email);
+      redirect("/verify-email");
     }
     return { error: "Invalid email or password." };
   }
@@ -131,11 +148,15 @@ export async function verifySignupCode(
     token,
     type: "signup",
   });
-  if (error) return { error: "That code is invalid or has expired." };
+  if (error) {
+    logServerError("verifySignupCode", error.message);
+    return { error: "That code is invalid or has expired." };
+  }
 
   const profileError = await ensureProfile(supabase);
   if (profileError) return { error: profileError };
 
+  await clearVerifyEmailCookie();
   // Verifying establishes a session too; register it under the single-session policy.
   await supabase.rpc("register_session");
   redirect("/dashboard");
@@ -144,7 +165,7 @@ export async function verifySignupCode(
 export async function resendSignupCode(email: string): Promise<AuthResult> {
   const supabase = await createClient();
   const { error } = await supabase.auth.resend({ type: "signup", email });
-  if (error) return { error: error.message };
+  if (error) return clientActionFailed("resendSignupCode", error, RESEND_FAIL);
   return {};
 }
 
@@ -163,6 +184,7 @@ export async function requestPasswordReset(
   const { error } = await supabase.auth.resetPasswordForEmail(email);
   // Never reveal whether the email exists — same response either way.
   if (error && !error.message.toLowerCase().includes("rate limit")) {
+    logServerError("requestPasswordReset", error.message);
     return {};
   }
   return {};
@@ -179,7 +201,9 @@ export async function updatePassword(
 
   const supabase = await createClient();
   const { error } = await supabase.auth.updateUser({ password });
-  if (error) return { error: error.message };
+  if (error) {
+    return clientActionFailed("updatePassword", error, PASSWORD_FAIL);
+  }
 
   const profileError = await ensureProfile(supabase);
   if (profileError) return { error: profileError };
@@ -217,6 +241,8 @@ export async function changePassword(
 
   const supabase = await createClient();
   const { error } = await supabase.auth.updateUser({ password });
-  if (error) return { error: error.message };
+  if (error) {
+    return clientActionFailed("changePassword", error, PASSWORD_FAIL);
+  }
   return {};
 }

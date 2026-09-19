@@ -3,7 +3,7 @@ import { createHmac, createHash } from "node:crypto";
 const DEFAULT_EXPIRES_SECONDS = 300;
 const DEFAULT_PREFIX = "payment-proofs";
 
-export type R2Method = "GET" | "PUT";
+export type R2Method = "GET" | "PUT" | "DELETE";
 
 export type R2Config = {
   accountId: string;
@@ -150,4 +150,20 @@ export async function putR2Object(options: {
   });
   if (!res.ok) return { error: "r2_upload_failed" };
   return {};
+}
+
+/** Best-effort delete of a private payment-proof object. 404 is treated as success. */
+export async function deleteR2Object(options: {
+  key: string;
+  config?: R2Config;
+}): Promise<{ error?: string }> {
+  const signed = presignR2Object({
+    method: "DELETE",
+    key: options.key,
+    config: options.config,
+  });
+  if ("error" in signed) return signed;
+  const res = await fetch(signed.url, { method: "DELETE" });
+  if (res.ok || res.status === 404) return {};
+  return { error: "r2_delete_failed" };
 }

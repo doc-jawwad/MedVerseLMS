@@ -1,5 +1,7 @@
 "use server";
 
+import { actionRpcResult } from "@/lib/errors/safe-action-error";
+
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 
@@ -17,7 +19,7 @@ export async function setEnrollmentStatus(
     p_status: status,
   });
   revalidatePath("/admin/students");
-  return { error: error?.message };
+  return actionRpcResult("action", error);
 }
 
 export async function grantPracticeSubject(studentId: string, subjectId: string) {
@@ -38,7 +40,7 @@ export async function grantResourceAccess(
     p_folder_id: target.folderId ?? null,
   });
   revalidatePath("/admin/students");
-  return { error: error?.message };
+  return actionRpcResult("action", error);
 }
 
 export async function revokeGrant(grantId: string) {
@@ -47,7 +49,7 @@ export async function revokeGrant(grantId: string) {
     p_grant_id: grantId,
   });
   revalidatePath("/admin/students");
-  return { error: error?.message };
+  return actionRpcResult("action", error);
 }
 
 export async function getStudentAccess(studentId: string, yearId: string) {
@@ -95,7 +97,7 @@ export async function promoteStudent(studentId: string) {
     p_student_id: studentId,
   });
   revalidatePath("/admin/students");
-  return { error: error?.message };
+  return actionRpcResult("action", error);
 }
 
 export async function restrictResourceAccess(
@@ -112,7 +114,7 @@ export async function restrictResourceAccess(
     p_folder_id: target.folderId ?? null,
   });
   revalidatePath("/admin/students");
-  return { error: error?.message };
+  return actionRpcResult("action", error);
 }
 
 export async function unrestrictResourceAccess(restrictionId: string) {
@@ -121,7 +123,7 @@ export async function unrestrictResourceAccess(restrictionId: string) {
     p_restriction_id: restrictionId,
   });
   revalidatePath("/admin/students");
-  return { error: error?.message };
+  return actionRpcResult("action", error);
 }
 
 export async function setResourceEntitlement(
@@ -143,5 +145,5 @@ export async function setResourceEntitlement(
   revalidatePath("/materials");
   revalidatePath("/practice");
   revalidatePath("/tests");
-  return { error: error?.message };
+  return actionRpcResult("action", error);
 }

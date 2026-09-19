@@ -43,9 +43,10 @@ export function classifySignUpResult(input: {
     if (isExplicitUserAlreadyRegistered(error)) {
       return { outcome: "existing_verified" };
     }
+    // Never forward raw Auth/DB text to the browser.
     return {
       outcome: "error",
-      message: error.message?.trim() || "Sign up failed.",
+      message: "Could not create your account. Please try again.",
     };
   }
 

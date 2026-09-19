@@ -109,7 +109,7 @@ export default async function AdminApplicationsPage({
         </form>
       </div>
 
-      {error && <p className="text-sm text-destructive">{error.message}</p>}
+      {error && <p className="text-sm text-destructive">Could not load this page. Please try again.</p>}
 
       <div className="overflow-x-auto rounded-md border">
         <Table>

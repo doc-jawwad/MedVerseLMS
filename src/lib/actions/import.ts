@@ -1,5 +1,7 @@
 "use server";
 
+import { actionRpcResult } from "@/lib/errors/safe-action-error";
+
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 
@@ -32,7 +34,7 @@ export async function createImportBatch(filename: string, totalRows: number) {
     .insert({ filename, total_rows: totalRows })
     .select("id")
     .single();
-  if (error) return { error: error.message };
+  if (error) return actionRpcResult("action", error);
   return { id: data.id as string };
 }
 
@@ -47,7 +49,7 @@ export async function importChunk(
     p_rows: rows,
     p_create_missing: createMissing,
   });
-  if (error) return { error: error.message };
+  if (error) return actionRpcResult("action", error);
   return {
     result: data as { inserted: number; skipped: number; errors: number },
   };

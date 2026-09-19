@@ -177,7 +177,7 @@ Student: Get Subscription → configured payment instructions → enter **amount
 | `rejected` | Terminal for that row. Student may submit a **new** application. |
 | `cancelled` | Abandoned pending row (if used). |
 
-Screenshot: **private Cloudflare R2** object key only (`payment-proofs/{tenant}/{student}/{uuid}`). Never a permanent public URL. Authorized admins fetch via short-lived signed GET after `authorize_payment_screenshot_access`.
+Screenshot: **private Cloudflare R2** object key only (`payment-proofs/{tenant}/{student}/{uuid}`). Never a permanent public URL. Authorized admins fetch via short-lived signed GET after `authorize_payment_screenshot_access`. Lifecycle: discard orphan uploads after a failed create/update attach; delete the previous object on successful screenshot replace; delete the object on reject (bytes are not kept in R2 after reject).
 
 Payment copy lives in `payment_settings` (Main Admin / `manage_payment_settings`), not hardcoded. Default currency is **PKR**.
 
@@ -368,5 +368,5 @@ Do not guess these in migrations:
 2. **Curriculum tree CRUD permission code:** years/subjects/books/chapters/topics writes stay `is_admin()` until a dedicated code is approved (not in the seeded list above).
 3. **R2 bucket name** for payment screenshots (private R2 is approved; prefix is `payment-proofs/`). Production requires dedicated `R2_PAYMENT_BUCKET` (no fallback to backup `R2_BUCKET`). Non-production may use `R2_PAYMENT_BUCKET` or `R2_BUCKET`.
 4. **Application `cancelled`:** whether the student UI exposes cancel, or only admin/system uses it. The status exists; no cancel RPC/UI in this step.
-5. **R2 object retention** after reject/replace/orphan upload: no lifecycle rule is configured.
+5. **R2 object retention** after reject/replace/orphan upload: **resolved for application security** — on successful **replace**, delete the previous object; on **reject**, delete the proof object (row keeps the key for audit metadata only; bytes are removed); after a successful R2 upload if create/update fails, **discard** the new object. Remaining race orphans (crash between upload and discard) are rare; do not expire the whole `payment-proofs/` prefix with a blind bucket lifecycle.
 6. **8L Student Notification Inbox UX** — route path, nav label/placement, exact kind copy, deep-link target, emit-on-inbox/dashboard-load vs lazy-only, mark-all, mark-unread, unread badge, empty-state wording, list retention/pagination. Settled backend/security rules and the OWNER DECISION list: § “8L — Student Notification Inbox” above. Optional pg_cron emit is **not** part of 8L MVP.

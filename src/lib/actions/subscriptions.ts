@@ -1,5 +1,7 @@
 "use server";
 
+import { actionRpcResult } from "@/lib/errors/safe-action-error";
+
 import { createClient } from "@/lib/supabase/server";
 import { revalidateAdminSubscriptionPaths } from "@/lib/actions/subscription-revalidate";
 
@@ -21,7 +23,7 @@ export async function activateSubscription(
     p_paid_access_mode: paidAccessMode ?? null,
   });
   revalidateAdminSubscriptionPaths();
-  return { error: error?.message };
+  return actionRpcResult("action", error);
 }
 
 export async function extendSubscription(
@@ -34,7 +36,7 @@ export async function extendSubscription(
     p_days: days ?? null,
   });
   revalidateAdminSubscriptionPaths();
-  return { error: error?.message };
+  return actionRpcResult("action", error);
 }
 
 export async function setSubscriptionAccess(
@@ -49,7 +51,7 @@ export async function setSubscriptionAccess(
     p_paid_access_mode: paidAccessMode ?? null,
   });
   revalidateAdminSubscriptionPaths();
-  return { error: error?.message };
+  return actionRpcResult("action", error);
 }
 
 export async function setSubscriptionEnd(
@@ -62,7 +64,7 @@ export async function setSubscriptionEnd(
     p_ends_at: endsAt,
   });
   revalidateAdminSubscriptionPaths();
-  return { error: error?.message };
+  return actionRpcResult("action", error);
 }
 
 export async function deactivateSubscription(subscriptionId: string) {
@@ -71,7 +73,7 @@ export async function deactivateSubscription(subscriptionId: string) {
     p_subscription_id: subscriptionId,
   });
   revalidateAdminSubscriptionPaths();
-  return { error: error?.message };
+  return actionRpcResult("action", error);
 }
 
 export async function restoreSubscription(subscriptionId: string) {
@@ -80,7 +82,7 @@ export async function restoreSubscription(subscriptionId: string) {
     p_subscription_id: subscriptionId,
   });
   revalidateAdminSubscriptionPaths();
-  return { error: error?.message };
+  return actionRpcResult("action", error);
 }
 
 export async function assignSubscriptionPlan(
@@ -93,7 +95,7 @@ export async function assignSubscriptionPlan(
     p_plan_id: planId,
   });
   revalidateAdminSubscriptionPaths();
-  return { error: error?.message };
+  return actionRpcResult("action", error);
 }
 
 export async function createSubscriptionPlan(input: {
@@ -114,7 +116,7 @@ export async function createSubscriptionPlan(input: {
     p_sort_order: input.sortOrder ?? 0,
   });
   revalidateAdminSubscriptionPaths();
-  if (error) return { error: error.message };
+  if (error) return actionRpcResult("action", error);
   return { id: data as string };
 }
 
@@ -138,5 +140,5 @@ export async function updateSubscriptionPlan(input: {
     p_sort_order: input.sortOrder ?? null,
   });
   revalidateAdminSubscriptionPaths();
-  return { error: error?.message };
+  return actionRpcResult("action", error);
 }

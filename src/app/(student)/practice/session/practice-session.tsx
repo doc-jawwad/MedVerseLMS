@@ -55,7 +55,7 @@ export function PracticeSession({
       setError(
         error.message.includes("practice_access_denied")
           ? "You don't have practice access for this subject. Ask your admin."
-          : error.message
+          : "Could not load practice questions. Please try again."
       );
       return [] as PracticeQuestion[];
     }
@@ -80,7 +80,7 @@ export function PracticeSession({
     });
     setChecking(false);
     if (error) {
-      setError(error.message);
+      setError("Could not check that answer. Please try again.");
       return;
     }
     const fb = (data as Feedback[])[0];

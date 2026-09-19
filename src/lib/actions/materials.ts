@@ -1,5 +1,7 @@
 "use server";
 
+import { actionRpcResult } from "@/lib/errors/safe-action-error";
+
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 
@@ -22,7 +24,7 @@ export async function addFolder(yearId: string, subjectId: string | null, name: 
   });
   revalidatePath("/admin/materials");
   revalidatePath("/materials");
-  return { error: error?.message };
+  return actionRpcResult("action", error);
 }
 
 export async function deleteFolder(folderId: string) {
@@ -33,7 +35,7 @@ export async function deleteFolder(folderId: string) {
     .eq("id", folderId);
   revalidatePath("/admin/materials");
   revalidatePath("/materials");
-  return { error: error?.message };
+  return actionRpcResult("action", error);
 }
 
 export async function addMaterial(
@@ -55,7 +57,7 @@ export async function addMaterial(
   });
   revalidatePath("/admin/materials");
   revalidatePath("/materials");
-  return { error: error?.message };
+  return actionRpcResult("action", error);
 }
 
 export async function deleteMaterial(materialId: string) {
@@ -63,7 +65,7 @@ export async function deleteMaterial(materialId: string) {
   const { error } = await supabase.from("materials").delete().eq("id", materialId);
   revalidatePath("/admin/materials");
   revalidatePath("/materials");
-  return { error: error?.message };
+  return actionRpcResult("action", error);
 }
 
 export async function openMaterial(materialId: string) {
@@ -71,7 +73,7 @@ export async function openMaterial(materialId: string) {
   const { data, error } = await supabase.rpc("open_material", {
     p_material_id: materialId,
   });
-  if (error) return { error: error.message };
+  if (error) return actionRpcResult("action", error);
   if (typeof data !== "string" || !data) {
     return { error: "Unable to open this material." };
   }

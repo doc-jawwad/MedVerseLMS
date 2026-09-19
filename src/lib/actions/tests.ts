@@ -1,5 +1,7 @@
 "use server";
 
+import { actionRpcResult, toClientActionError } from "@/lib/errors/safe-action-error";
+
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
@@ -31,7 +33,7 @@ export async function createTest(config: TestConfig) {
     .insert(config)
     .select("id")
     .single();
-  if (error) return { error: error.message };
+  if (error) return actionRpcResult("action", error);
   reval();
   redirect(`/admin/tests/${data.id}`);
 }
@@ -40,7 +42,7 @@ export async function updateTestConfig(testId: string, config: Partial<TestConfi
   const supabase = await createClient();
   const { error } = await supabase.from("tests").update(config).eq("id", testId);
   reval(testId);
-  return { error: error?.message };
+  return actionRpcResult("action", error);
 }
 
 export async function addQuestionToTest(testId: string, questionId: string) {
@@ -67,7 +69,7 @@ export async function addQuestionToTest(testId: string, questionId: string) {
       error:
         error.code === "23505"
           ? "That question is already in this test."
-          : error.message,
+          : toClientActionError(error, "addQuestionToTest"),
     };
   }
   return { error: undefined };
@@ -95,7 +97,7 @@ export async function reorderQuestion(
     p_direction: direction,
   });
   reval(testId);
-  return { error: error?.message };
+  return actionRpcResult("action", error);
 }
 
 // Per-question marks override (test_questions.marks). null clears the
@@ -116,7 +118,7 @@ export async function setQuestionMarks(
     .eq("test_id", testId)
     .eq("question_id", questionId);
   reval(testId);
-  return { error: error?.message };
+  return actionRpcResult("action", error);
 }
 
 export type QuestionFilter = {
@@ -163,7 +165,7 @@ export async function addRandomQuestions(
   if (filter.difficulty) q = q.eq("difficulty", filter.difficulty);
 
   const { data: pool, error } = await q.limit(2000);
-  if (error) return { error: error.message };
+  if (error) return actionRpcResult("action", error);
 
   const candidates = (pool ?? []).filter((r) => !excluded.has(r.id));
   // Fisher–Yates shuffle, take n
@@ -182,7 +184,7 @@ export async function addRandomQuestions(
       position: base + i + 1,
     }))
   );
-  if (insErr) return { error: insErr.message };
+  if (insErr) return actionRpcResult("addRandomQuestions.insert", insErr);
   reval(testId);
   return { added: picked.length };
 }
@@ -195,7 +197,7 @@ export async function removeQuestionFromTest(testId: string, questionId: string)
     .eq("test_id", testId)
     .eq("question_id", questionId);
   reval(testId);
-  return { error: error?.message };
+  return actionRpcResult("action", error);
 }
 
 export async function setAudienceYears(testId: string, yearIds: string[]) {
@@ -205,7 +207,7 @@ export async function setAudienceYears(testId: string, yearIds: string[]) {
     const { error } = await supabase
       .from("test_audiences")
       .insert(yearIds.map((y) => ({ test_id: testId, year_id: y })));
-    if (error) return { error: error.message };
+    if (error) return actionRpcResult("action", error);
   }
   reval(testId);
   return { error: undefined };
@@ -215,14 +217,14 @@ export async function publishTest(testId: string) {
   const supabase = await createClient();
   const { error } = await supabase.rpc("publish_test", { p_test_id: testId });
   reval(testId);
-  return { error: error?.message };
+  return actionRpcResult("action", error);
 }
 
 export async function closeTestNow(testId: string) {
   const supabase = await createClient();
   const { error } = await supabase.rpc("close_test_now", { p_test_id: testId });
   reval(testId);
-  return { error: error?.message };
+  return actionRpcResult("action", error);
 }
 
 export async function invalidateTest(testId: string, reason: string) {
@@ -232,7 +234,7 @@ export async function invalidateTest(testId: string, reason: string) {
     p_reason: reason,
   });
   reval(testId);
-  return { error: error?.message };
+  return actionRpcResult("action", error);
 }
 
 export async function voidTestQuestion(
@@ -247,5 +249,5 @@ export async function voidTestQuestion(
     p_policy: policy,
   });
   reval(testId);
-  return { error: error?.message };
+  return actionRpcResult("action", error);
 }

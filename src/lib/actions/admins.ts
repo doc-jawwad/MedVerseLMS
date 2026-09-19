@@ -1,5 +1,7 @@
 "use server";
 
+import { actionRpcResult, clientActionFailed, toClientActionError } from "@/lib/errors/safe-action-error";
+
 import { createClient as createJsClient } from "@supabase/supabase-js";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
@@ -56,7 +58,7 @@ async function grantCodes(
       p_admin_id: adminId,
       p_code: code,
     });
-    if (error) return error.message;
+    if (error) return toClientActionError(error, "grantCodes");
   }
   return null;
 }
@@ -91,7 +93,7 @@ export async function createAdminAccount(input: {
     user_metadata: { full_name: fullName },
   });
   if (created.error || !created.data.user?.id) {
-    return { error: created.error?.message ?? "Could not create the Auth user." };
+    return clientActionFailed("createAdminAccount.auth", created.error, "Could not create the admin account. Please try again.");
   }
   const userId = created.data.user.id;
 
@@ -99,13 +101,13 @@ export async function createAdminAccount(input: {
   const signedIn = await ephemeral.auth.signInWithPassword({ email, password });
   if (signedIn.error) {
     await adminApi.auth.admin.deleteUser(userId);
-    return { error: signedIn.error.message };
+    return clientActionFailed("createAdminAccount.signin", signedIn.error);
   }
   const ensured = await ephemeral.rpc("ensure_profile");
   await ephemeral.auth.signOut();
   if (ensured.error) {
     await adminApi.auth.admin.deleteUser(userId);
-    return { error: ensured.error.message };
+    return clientActionFailed("createAdminAccount.ensure", ensured.error);
   }
 
   const promoted = await gate.supabase.rpc("set_admin_role", {
@@ -114,7 +116,7 @@ export async function createAdminAccount(input: {
   });
   if (promoted.error) {
     revalidateAdmins();
-    return { error: promoted.error.message };
+    return clientActionFailed("admins.promote", promoted.error);
   }
 
   if (input.makeMainAdmin) {
@@ -124,7 +126,7 @@ export async function createAdminAccount(input: {
     });
     if (main.error) {
       revalidateAdmins();
-      return { error: main.error.message };
+      return clientActionFailed("admins.setMain", main.error);
     }
   } else {
     const grantError = await grantCodes(gate.supabase, userId, codes);
@@ -155,7 +157,7 @@ export async function promoteStudentToAdmin(input: {
     .select("id, role, email")
     .ilike("email", email)
     .limit(3);
-  if (lookupError) return { error: lookupError.message };
+  if (lookupError) return clientActionFailed("promoteStudentToAdmin.lookup", lookupError);
   const exact = (matches ?? []).filter(
     (p) => (p.email ?? "").toLowerCase() === email
   );
@@ -172,7 +174,7 @@ export async function promoteStudentToAdmin(input: {
     p_user_id: profile.id,
     p_is_admin: true,
   });
-  if (promoted.error) return { error: promoted.error.message };
+  if (promoted.error) return clientActionFailed("admins.promote", promoted.error);
 
   if (input.makeMainAdmin) {
     const main = await gate.supabase.rpc("set_main_admin", {
@@ -181,7 +183,7 @@ export async function promoteStudentToAdmin(input: {
     });
     if (main.error) {
       revalidateAdmins();
-      return { error: main.error.message };
+      return clientActionFailed("admins.setMain", main.error);
     }
   } else {
     const grantError = await grantCodes(gate.supabase, profile.id, codes);
@@ -209,7 +211,7 @@ export async function setAdminPermissions(
     .select("id, role, is_main_admin")
     .eq("id", adminId)
     .maybeSingle();
-  if (profileError) return { error: profileError.message };
+  if (profileError) return clientActionFailed("setAdminPermissions.profile", profileError);
   if (!profile || profile.role !== "admin") {
     return { error: "target is not an admin" };
   }
@@ -220,7 +222,7 @@ export async function setAdminPermissions(
         p_user_id: adminId,
         p_is_main: true,
       });
-      if (main.error) return { error: main.error.message };
+      if (main.error) return clientActionFailed("admins.setMain", main.error);
     }
     revalidateAdmins();
     return { error: undefined };
@@ -231,14 +233,14 @@ export async function setAdminPermissions(
       p_user_id: adminId,
       p_is_main: false,
     });
-    if (main.error) return { error: main.error.message };
+    if (main.error) return clientActionFailed("admins.setMain", main.error);
   }
 
   const { data: currentRows, error: currentError } = await gate.supabase
     .from("admin_permissions")
     .select("permission_code")
     .eq("admin_id", adminId);
-  if (currentError) return { error: currentError.message };
+  if (currentError) return clientActionFailed("setAdminPermissions.current", currentError);
 
   const current = new Set(
     (currentRows ?? []).map((r) => r.permission_code as string)
@@ -251,7 +253,7 @@ export async function setAdminPermissions(
         p_admin_id: adminId,
         p_code: code,
       });
-      if (error) return { error: error.message };
+      if (error) return actionRpcResult("action", error);
     }
   }
   for (const code of current) {
@@ -260,7 +262,7 @@ export async function setAdminPermissions(
         p_admin_id: adminId,
         p_code: code,
       });
-      if (error) return { error: error.message };
+      if (error) return actionRpcResult("action", error);
     }
   }
 
@@ -276,7 +278,7 @@ export async function demoteAdmin(adminId: string) {
     p_is_admin: false,
   });
   revalidateAdmins();
-  return { error: error?.message };
+  return actionRpcResult("action", error);
 }
 
 export async function setAdminAccountStatus(
@@ -292,5 +294,5 @@ export async function setAdminAccountStatus(
     p_reason: null,
   });
   revalidateAdmins();
-  return { error: error?.message };
+  return actionRpcResult("action", error);
 }
