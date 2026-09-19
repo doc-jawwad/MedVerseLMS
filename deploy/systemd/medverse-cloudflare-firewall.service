@@ -1,0 +1,8 @@
+[Unit]
+Description=Sync UFW HTTPS allows from Cloudflare published IP lists
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/bash /opt/medverse/current/deploy/scripts/sync-cloudflare-ufw.sh

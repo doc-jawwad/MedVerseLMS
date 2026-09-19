@@ -22,6 +22,14 @@ describe("Caddyfile", () => {
     assert.match(caddy, /POSTGREST_UPSTREAM:127\.0\.0\.1:3001/);
   });
 
+  it("forwards public Host to Next and sets baseline security headers", () => {
+    assert.match(caddy, /header_up Host \{host\}/);
+    assert.match(caddy, /X-Forwarded-Proto/);
+    assert.match(caddy, /X-Frame-Options DENY/);
+    assert.match(caddy, /X-Content-Type-Options nosniff/);
+    assert.match(caddy, /Referrer-Policy strict-origin-when-cross-origin/);
+  });
+
   it("does not hardcode secrets or a live project ref", () => {
     assert.equal(/eyJ[A-Za-z0-9_-]{20,}/.test(caddy), false);
     assert.equal(caddy.includes("pxoxijlhcvbrostrquft"), false);
@@ -37,6 +45,8 @@ describe("staging Caddy site", () => {
     assert.match(site, /vygtwrsshcyfahfzurgq\.supabase\.co/);
     assert.match(site, /127\.0\.0\.1:3010/);
     assert.match(site, /127\.0\.0\.1:3011/);
+    assert.match(site, /header_up Host \{host\}/);
+    assert.match(site, /X-Frame-Options DENY/);
     assert.equal(site.includes("pxoxijlhcvbrostrquft"), false);
     assert.equal(/https:\/\/lms\.medversepk\.com/.test(site), false);
   });

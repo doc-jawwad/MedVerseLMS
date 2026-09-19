@@ -7,6 +7,14 @@ https://staging.medversepk.com {
 	tls /etc/medverse/tls/origin.pem /etc/medverse/tls/origin.key
 	encode gzip
 
+	header {
+		X-Frame-Options DENY
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		-Server
+	}
+
 	handle /auth/v1* {
 		header Cache-Control "no-store"
 		reverse_proxy https://vygtwrsshcyfahfzurgq.supabase.co {
@@ -24,10 +32,16 @@ https://staging.medversepk.com {
 		uri strip_prefix /rest/v1
 		reverse_proxy 127.0.0.1:3011 {
 			header_up Host {host}
+			header_up X-Forwarded-Host {host}
+			header_up X-Forwarded-Proto https
 		}
 	}
 
 	handle {
-		reverse_proxy 127.0.0.1:3010
+		reverse_proxy 127.0.0.1:3010 {
+			header_up Host {host}
+			header_up X-Forwarded-Host {host}
+			header_up X-Forwarded-Proto https
+		}
 	}
 }

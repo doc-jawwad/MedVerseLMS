@@ -1,0 +1,101 @@
+{
+	admin 127.0.0.1:2019
+	auto_https off
+}
+
+https://lms.medversepk.com {
+	tls /etc/medverse/tls/origin.pem /etc/medverse/tls/origin.key
+	encode gzip
+
+	header {
+		X-Frame-Options DENY
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		-Server
+	}
+
+	# supabase-js uses {NEXT_PUBLIC_SUPABASE_URL}/auth/v1/* (same-origin via Caddy).
+	# Keep the /auth/v1 prefix; Cloud GoTrue expects it.
+	# Host must be the Cloud project host, not lms.medversepk.com.
+	handle /auth/v1* {
+		header Cache-Control "no-store"
+		reverse_proxy https://pxoxijlhcvbrostrquft.supabase.co {
+			header_up Host pxoxijlhcvbrostrquft.supabase.co
+			header_up X-Forwarded-Host {host}
+			header_up X-Forwarded-Proto https
+			transport http {
+				tls
+			}
+		}
+	}
+
+	# supabase-js prefixes /rest/v1; PostgREST serves /rpc and tables at root.
+	handle /rest/v1* {
+		header Cache-Control "no-store"
+		uri strip_prefix /rest/v1
+		reverse_proxy 127.0.0.1:3001 {
+			header_up Host {host}
+			header_up X-Forwarded-Host {host}
+			header_up X-Forwarded-Proto https
+		}
+	}
+
+	# Host MUST be the public hostname — otherwise Next request.url origin becomes
+	# http://localhost:3000 and /auth/confirm redirects break in production.
+	handle {
+		reverse_proxy 127.0.0.1:3000 {
+			header_up Host {host}
+			header_up X-Forwarded-Host {host}
+			header_up X-Forwarded-Proto https
+		}
+	}
+}
+
+# Append-only staging site for /etc/caddy/Caddyfile.
+# Do not replace or edit the production site block.
+# Hostname is staging.medversepk.com so the existing Origin CA
+# SAN (*.medversepk.com) covers TLS. A hostname under lms. would not.
+
+https://staging.medversepk.com {
+	tls /etc/medverse/tls/origin.pem /etc/medverse/tls/origin.key
+	encode gzip
+
+	header {
+		X-Frame-Options DENY
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		-Server
+	}
+
+	handle /auth/v1* {
+		header Cache-Control "no-store"
+		reverse_proxy https://vygtwrsshcyfahfzurgq.supabase.co {
+			header_up Host vygtwrsshcyfahfzurgq.supabase.co
+			header_up X-Forwarded-Host {host}
+			header_up X-Forwarded-Proto https
+			transport http {
+				tls
+			}
+		}
+	}
+
+	handle /rest/v1* {
+		header Cache-Control "no-store"
+		uri strip_prefix /rest/v1
+		reverse_proxy 127.0.0.1:3011 {
+			header_up Host {host}
+			header_up X-Forwarded-Host {host}
+			header_up X-Forwarded-Proto https
+		}
+	}
+
+	handle {
+		reverse_proxy 127.0.0.1:3010 {
+			header_up Host {host}
+			header_up X-Forwarded-Host {host}
+			header_up X-Forwarded-Proto https
+		}
+	}
+}

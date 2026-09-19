@@ -129,11 +129,12 @@ Logs: journald for Next, PostgREST, Postgres, Caddy. No paid APM required initia
 
 ## Server security (target)
 
-- SSH keys; host firewall allows **22 and 443** (and 80 only if used for ACME). Deny public 5432, 3000, 3001, 2019.
+- SSH keys; host firewall allows **22**. Public **443** is restricted to Cloudflare’s **live published** IP ranges (`deploy/scripts/sync-cloudflare-ufw.sh`, daily timer). Do not hardcode stale ranges. Rollback: `deploy/scripts/rollback-cloudflare-ufw.sh`. Deny public 5432, 3000, 3001, 2019.
 - Postgres `listen_addresses = 'localhost'` (`deploy/postgres/listen-localhost.conf`).
-- Cloudflare in front of 443; TLS mode **pending** (origin cert vs ACME). Caddyfile has commented `tls` blocks.
+- Cloudflare orange-cloud in front of the origin; Full (strict) with Origin CA. Caddy must `header_up Host {host}` (and `X-Forwarded-*`) to Next — otherwise `/auth/confirm` builds `localhost` redirects.
+- Baseline response headers on Caddy + Next: `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy` (not a broad CSP — browser→PostgREST exam traffic must keep working).
 - `service_role` and JWT secret only on the server (`/etc/medverse/`).
-- Do not publish Studio or 5432.
+- Do not publish Studio or 5432. Do not leave credential files world-readable under `/tmp`.
 
 ## First VPS setup (when provisioning is approved — do not run this against Cloud)
 

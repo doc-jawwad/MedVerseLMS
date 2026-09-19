@@ -13,6 +13,7 @@ import {
   logServerError,
   toClientActionError,
 } from "@/lib/errors/safe-action-error";
+import { safeInternalPath } from "@/lib/http/safe-internal-path";
 
 export type AuthResult = { error?: string };
 
@@ -85,7 +86,7 @@ export async function signIn(
 ): Promise<AuthResult> {
   const email = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
-  const next = String(formData.get("next") ?? "");
+  const next = safeInternalPath(String(formData.get("next") ?? ""), "");
 
   const supabase = await createClient();
   const { error } = await supabase.auth.signInWithPassword({ email, password });
@@ -115,7 +116,7 @@ export async function signIn(
   await supabase.auth.signOut({ scope: "others" });
 
   redirect(
-    next && next.startsWith("/")
+    next
       ? next
       : profile?.role === "admin"
         ? "/admin"

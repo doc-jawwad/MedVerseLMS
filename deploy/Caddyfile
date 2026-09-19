@@ -22,6 +22,15 @@
 {$MEDVERSE_ORIGIN} {
 	encode gzip
 
+	# Baseline browser protections (not a full CSP — exam uses browser→PostgREST).
+	header {
+		X-Frame-Options DENY
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		-Server
+	}
+
 	# /auth/v1/* → Supabase Cloud GoTrue (Brevo SMTP lives on that project).
 	# Keep the /auth/v1 prefix; Cloud expects it. Host header must be the
 	# Cloud project host, not the public LMS hostname.
@@ -42,12 +51,20 @@
 		uri strip_prefix /rest/v1
 		reverse_proxy {$POSTGREST_UPSTREAM:127.0.0.1:3001} {
 			header_up Host {host}
+			header_up X-Forwarded-Host {host}
+			header_up X-Forwarded-Proto {scheme}
 		}
 	}
 
 	# Everything else → Next.js (pages, server actions, /api/cron, /api/health).
+	# Host MUST be the public hostname — otherwise Next request.url origin becomes
+	# http://localhost:3000 and /auth/confirm redirects break in production.
 	handle {
-		reverse_proxy {$NEXT_UPSTREAM:127.0.0.1:3000}
+		reverse_proxy {$NEXT_UPSTREAM:127.0.0.1:3000} {
+			header_up Host {host}
+			header_up X-Forwarded-Host {host}
+			header_up X-Forwarded-Proto {scheme}
+		}
 	}
 
 	# TLS — uncomment ONE at provision time. Do not invent a mode here.
