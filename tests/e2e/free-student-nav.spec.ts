@@ -59,12 +59,12 @@ test.describe("Free student navigation", () => {
     await expect(page.getByRole("heading", { name: "Contact Us" })).toBeVisible({
       timeout: 15000,
     });
-    await expect(page.getByRole("link", { name: /WhatsApp/i }).first()).toBeVisible();
-    await expect(page.getByRole("link", { name: /^Email$/i })).toBeVisible();
-    await expect(page.getByRole("link", { name: /^Instagram$/i })).toBeVisible();
-    await expect(page.getByRole("link", { name: /^YouTube$/i })).toBeVisible();
-    await expect(page.getByRole("link", { name: /^Facebook$/i })).toBeVisible();
-    await expect(page.getByRole("link", { name: /Nursing Channel/i })).toBeVisible();
+    await expect(page.getByTestId("contact-link-whatsapp-phone")).toBeVisible();
+    await expect(page.getByTestId("contact-link-email")).toBeVisible();
+    await expect(page.getByTestId("contact-link-instagram")).toBeVisible();
+    await expect(page.getByTestId("contact-link-youtube")).toBeVisible();
+    await expect(page.getByTestId("contact-link-facebook")).toBeVisible();
+    await expect(page.getByTestId("contact-link-nursing")).toBeVisible();
     await expect(page.getByText(/https:\/\/whatsapp\.com\/channel/)).toHaveCount(0);
 
     await page.goto("/tests");
