@@ -5,6 +5,7 @@ import { actionRpcResult, toClientActionError } from "@/lib/errors/safe-action-e
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import type { QuestionContent, QuestionMeta } from "@/lib/actions/questions";
 
 export type TestConfig = {
   title: string;
@@ -73,6 +74,111 @@ export async function addQuestionToTest(testId: string, questionId: string) {
     };
   }
   return { error: undefined };
+}
+
+/** Bulk-add approved bank questions to a draft test; skips already-in-test ids. */
+export async function addQuestionsToTest(testId: string, questionIds: string[]) {
+  const supabase = await createClient();
+  const { data: test } = await supabase
+    .from("tests")
+    .select("status")
+    .eq("id", testId)
+    .maybeSingle();
+  if (!test) return { error: "Test not found." };
+  if (test.status !== "draft") {
+    return { error: "Only draft tests can be edited." };
+  }
+
+  const uniqueIds = [...new Set(questionIds.filter(Boolean))];
+  if (uniqueIds.length === 0) return { added: 0 };
+
+  const { data: existing } = await supabase
+    .from("test_questions")
+    .select("question_id")
+    .eq("test_id", testId);
+  const excluded = new Set((existing ?? []).map((r) => r.question_id));
+  const toAdd = uniqueIds.filter((id) => !excluded.has(id));
+  if (toAdd.length === 0) return { added: 0 };
+
+  const { data: maxRow } = await supabase
+    .from("test_questions")
+    .select("position")
+    .eq("test_id", testId)
+    .order("position", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const base = maxRow?.position ?? 0;
+
+  const { error } = await supabase.from("test_questions").insert(
+    toAdd.map((qid, i) => ({
+      test_id: testId,
+      question_id: qid,
+      position: base + i + 1,
+    }))
+  );
+  if (error) {
+    return {
+      error:
+        error.code === "23505"
+          ? "That question is already in this test."
+          : toClientActionError(error, "addQuestionsToTest"),
+    };
+  }
+  reval(testId);
+  return { added: toAdd.length };
+}
+
+/**
+ * Create an approved question via create_question (topic year must match the
+ * test year), then attach it to the draft test.
+ */
+export async function createManualTestQuestion(
+  testId: string,
+  content: QuestionContent,
+  meta: QuestionMeta
+) {
+  const supabase = await createClient();
+  const { data: test } = await supabase
+    .from("tests")
+    .select("id, year_id, status")
+    .eq("id", testId)
+    .maybeSingle();
+  if (!test) return { error: "Test not found." };
+  if (test.status !== "draft") {
+    return { error: "Only draft tests can be edited." };
+  }
+
+  const { data: topic } = await supabase
+    .from("topics")
+    .select("year_id")
+    .eq("id", meta.topic_id)
+    .maybeSingle();
+  if (!topic || topic.year_id !== test.year_id) {
+    return { error: "Topic must belong to the same year as this test." };
+  }
+
+  const { data: questionId, error } = await supabase.rpc("create_question", {
+    p_topic_id: meta.topic_id,
+    p_stem: content.stem,
+    p_options: content.options,
+    p_correct_key: content.correct_key,
+    p_explanation: content.explanation,
+    p_reference: content.reference,
+    p_difficulty: meta.difficulty,
+    p_tags: meta.tags ?? [],
+    p_status: "approved",
+  });
+  if (error) {
+    return {
+      error:
+        error.code === "23505"
+          ? "An identical question already exists (duplicate)."
+          : toClientActionError(error, "createManualTestQuestion"),
+    };
+  }
+
+  revalidatePath("/admin/questions");
+  return addQuestionToTest(testId, questionId as string);
 }
 
 // Swap `position` with the immediately-adjacent question (by current

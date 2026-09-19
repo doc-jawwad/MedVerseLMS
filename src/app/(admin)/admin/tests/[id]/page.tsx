@@ -7,8 +7,10 @@ import {
   TestPrepGuidelinesForm,
   TestStudentAccessForm,
 } from "../test-prep-form";
+import { TestDraftAudienceProvider } from "../test-draft-audience-context";
+import { TestBuilderManualMcq } from "../test-builder-manual-mcq";
+import { QuestionPoolMultiAdd } from "./question-pool-multi-add";
 import {
-  AddQuestionButton,
   AddRandomButton,
   AudiencePicker,
   KillSwitchPanel,
@@ -141,6 +143,10 @@ export default async function TestDetailPage({
   const poolTotalPages = Math.max(1, Math.ceil(poolCount / POOL_PAGE_SIZE));
 
   const yearSubjects = (subjects ?? []).filter((s) => s.year_id === test.year_id);
+  const yearLabel =
+    (years ?? []).find((y) => y.id === test.year_id)?.year_number != null
+      ? `Year ${(years ?? []).find((y) => y.id === test.year_id)!.year_number}`
+      : "this test year";
 
   const poolFilterLink = (patch: Record<string, string | undefined>) => {
     const merged = { ...filters, page: undefined, ...patch };
@@ -152,223 +158,222 @@ export default async function TestDetailPage({
   };
 
   return (
-    <div className="grid gap-6">
-      <div className="flex flex-wrap items-center gap-3">
-        <h1 className="text-2xl font-semibold">{test.title}</h1>
-        <Badge>{test.status}</Badge>
-        <Button asChild variant="outline" size="sm">
-          <Link href={`/admin/tests/${id}/preview`}>Preview as student</Link>
-        </Button>
-        {test.status !== "draft" && (
+    <TestDraftAudienceProvider
+      entitlement={test.entitlement ?? "free"}
+      status={test.status}
+    >
+      <div className="grid gap-6">
+        <div className="flex flex-wrap items-center gap-3">
+          <h1 className="text-2xl font-semibold">{test.title}</h1>
+          <Badge>{test.status}</Badge>
           <Button asChild variant="outline" size="sm">
-            <Link href={`/admin/tests/${id}/results`}>Results</Link>
+            <Link href={`/admin/tests/${id}/preview`}>Preview as student</Link>
           </Button>
-        )}
-        {(test.status === "published" || test.status === "closed") && (
-          <KillSwitchPanel testId={id} status={test.status} />
-        )}
-      </div>
-
-      <Card>
-        <CardHeader><CardTitle className="text-base">Configuration</CardTitle></CardHeader>
-        <CardContent>
-          <TestConfigForm
-            years={years ?? []}
-            subjects={subjects ?? []}
-            testId={id}
-            initial={test}
-            readOnly={!isDraft}
-          />
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader><CardTitle className="text-base">Year audience</CardTitle></CardHeader>
-        <CardContent>
-          <AudiencePicker
-            testId={id}
-            years={years ?? []}
-            selected={(audiences ?? []).map((a) => a.year_id)}
-          />
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader><CardTitle className="text-base">Student access</CardTitle></CardHeader>
-        <CardContent>
-          <TestStudentAccessForm
-            testId={id}
-            entitlement={test.entitlement ?? "free"}
-            status={test.status}
-          />
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader><CardTitle className="text-base">Preparation guidelines</CardTitle></CardHeader>
-        <CardContent>
-          <TestPrepGuidelinesForm
-            testId={id}
-            initial={typeof prepRes.data === "string" ? prepRes.data : ""}
-            readOnly={!isDraft}
-          />
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">
-            Questions ({orderedQuestions.length})
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="grid gap-2">
-          {orderedQuestions.map((tq, idx) => {
-            const qq = tq.questions as unknown as {
-              difficulty: string;
-              status: string;
-              subjects: { name: string } | null;
-              question_versions: { stem: string } | null;
-            } | null;
-            return (
-              <div key={tq.id}
-                className={`flex items-center justify-between gap-2 rounded-md border p-2 text-sm ${tq.voided ? "opacity-60" : ""}`}>
-                <div className="min-w-0">
-                  <span className="mr-2 text-muted-foreground">#{tq.position}</span>
-                  <span className="font-medium">{qq?.question_versions?.stem}</span>
-                  <span className="ml-2 text-xs text-muted-foreground">
-                    {qq?.subjects?.name} · {qq?.difficulty}
-                    {qq?.status !== "approved" && (
-                      <span className="text-destructive"> · {qq?.status}</span>
-                    )}
-                    {tq.voided && ` · voided (${tq.void_policy})`}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  {isDraft && (
-                    <>
-                      <QuestionMarksInput
-                        testId={id}
-                        questionId={tq.question_id}
-                        marks={tq.marks}
-                        defaultMarks={test.marks_per_question}
-                      />
-                      <MoveQuestionButtons
-                        testId={id}
-                        questionId={tq.question_id}
-                        isFirst={idx === 0}
-                        isLast={idx === orderedQuestions.length - 1}
-                      />
-                      <RemoveQuestionButton testId={id} questionId={tq.question_id} />
-                    </>
-                  )}
-                  {!isDraft && (test.status === "published" || test.status === "closed") && (
-                    <VoidQuestionButton testId={id} questionId={tq.question_id} voided={tq.voided} />
-                  )}
-                </div>
-              </div>
-            );
-          })}
-          {orderedQuestions.length === 0 && (
-            <p className="text-sm text-muted-foreground">No questions added yet.</p>
+          {test.status !== "draft" && (
+            <Button asChild variant="outline" size="sm">
+              <Link href={`/admin/tests/${id}/results`}>Results</Link>
+            </Button>
           )}
-        </CardContent>
-      </Card>
+          {(test.status === "published" || test.status === "closed") && (
+            <KillSwitchPanel testId={id} status={test.status} />
+          )}
+        </div>
 
-      {isDraft && (
+        <Card>
+          <CardHeader><CardTitle className="text-base">Configuration</CardTitle></CardHeader>
+          <CardContent>
+            <TestConfigForm
+              years={years ?? []}
+              subjects={subjects ?? []}
+              testId={id}
+              initial={test}
+              readOnly={!isDraft}
+            />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader><CardTitle className="text-base">Year audience</CardTitle></CardHeader>
+          <CardContent>
+            <AudiencePicker
+              testId={id}
+              years={years ?? []}
+              selected={(audiences ?? []).map((a) => a.year_id)}
+              readOnly={!isDraft}
+            />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader><CardTitle className="text-base">Student access</CardTitle></CardHeader>
+          <CardContent>
+            <TestStudentAccessForm
+              testId={id}
+              entitlement={test.entitlement ?? "free"}
+              status={test.status}
+              readOnly={!isDraft}
+            />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader><CardTitle className="text-base">Preparation guidelines</CardTitle></CardHeader>
+          <CardContent>
+            <TestPrepGuidelinesForm
+              testId={id}
+              initial={typeof prepRes.data === "string" ? prepRes.data : ""}
+              readOnly={!isDraft}
+            />
+          </CardContent>
+        </Card>
+
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Add questions</CardTitle>
+            <CardTitle className="text-base">
+              Questions ({orderedQuestions.length})
+            </CardTitle>
           </CardHeader>
-          <CardContent className="grid gap-4">
-            <QuestionFilterForm
-              subjects={yearSubjects}
-              books={curriculum.books}
-              chapters={curriculum.chapters}
-              topics={curriculum.topics}
-              filter={{
-                subject_id: filters.subject,
-                book_id: filters.book,
-                chapter_id: filters.chapter,
-                topic_id: filters.topic,
-                difficulty: filters.difficulty,
-                q: filters.q,
-              }}
-            />
-
-            {/* poolCount is an upper bound (matches the filter before
-                excluding already-added questions) — only used as the
-                input's max hint; addRandomQuestions itself always excludes
-                existing questions server-side regardless of this value. */}
-            <AddRandomButton testId={id} filter={filter} poolSize={poolCount} />
-
-            <div className="grid gap-1">
-              {pool.map((p) => (
-                <div key={p.id}
-                  className="flex items-center justify-between gap-2 rounded-md border p-2 text-sm">
-                  <div className="min-w-0 truncate">
-                    {p.stem}
+          <CardContent className="grid gap-2">
+            {orderedQuestions.map((tq, idx) => {
+              const qq = tq.questions as unknown as {
+                difficulty: string;
+                status: string;
+                subjects: { name: string } | null;
+                question_versions: { stem: string } | null;
+              } | null;
+              return (
+                <div key={tq.id}
+                  className={`flex items-center justify-between gap-2 rounded-md border p-2 text-sm ${tq.voided ? "opacity-60" : ""}`}>
+                  <div className="min-w-0">
+                    <span className="mr-2 text-muted-foreground">#{tq.position}</span>
+                    <span className="font-medium">{qq?.question_versions?.stem}</span>
                     <span className="ml-2 text-xs text-muted-foreground">
-                      {p.subject} · {p.difficulty}
+                      {qq?.subjects?.name} · {qq?.difficulty}
+                      {qq?.status !== "approved" && (
+                        <span className="text-destructive"> · {qq?.status}</span>
+                      )}
+                      {tq.voided && ` · voided (${tq.void_policy})`}
                     </span>
                   </div>
-                  <AddQuestionButton testId={id} questionId={p.id} />
+                  <div className="flex items-center gap-2">
+                    <Button asChild size="sm" variant="ghost">
+                      <Link href={`/admin/questions/${tq.question_id}`}>Edit</Link>
+                    </Button>
+                    {isDraft && (
+                      <>
+                        <QuestionMarksInput
+                          testId={id}
+                          questionId={tq.question_id}
+                          marks={tq.marks}
+                          defaultMarks={test.marks_per_question}
+                        />
+                        <MoveQuestionButtons
+                          testId={id}
+                          questionId={tq.question_id}
+                          isFirst={idx === 0}
+                          isLast={idx === orderedQuestions.length - 1}
+                        />
+                        <RemoveQuestionButton testId={id} questionId={tq.question_id} />
+                      </>
+                    )}
+                    {!isDraft && (test.status === "published" || test.status === "closed") && (
+                      <VoidQuestionButton testId={id} questionId={tq.question_id} voided={tq.voided} />
+                    )}
+                  </div>
                 </div>
-              ))}
-              {pool.length === 0 && (
-                <p className="text-sm text-muted-foreground">
-                  No more approved questions match this filter.
-                </p>
-              )}
-            </div>
-
-            {poolTotalPages > 1 && (
-              <div className="flex items-center justify-between text-sm">
-                {poolPage > 1 ? (
-                  <Button asChild variant="outline" size="sm">
-                    <Link href={poolFilterLink({ page: poolPage > 2 ? String(poolPage - 1) : undefined })}>
-                      ← Previous
-                    </Link>
-                  </Button>
-                ) : (
-                  <Button variant="outline" size="sm" disabled>← Previous</Button>
-                )}
-                <span className="text-muted-foreground">
-                  Page {poolPage} of {poolTotalPages} ({poolCount} approved questions match)
-                </span>
-                {poolPage < poolTotalPages ? (
-                  <Button asChild variant="outline" size="sm">
-                    <Link href={poolFilterLink({ page: String(poolPage + 1) })}>Next →</Link>
-                  </Button>
-                ) : (
-                  <Button variant="outline" size="sm" disabled>Next →</Button>
-                )}
-              </div>
+              );
+            })}
+            {orderedQuestions.length === 0 && (
+              <p className="text-sm text-muted-foreground">No questions added yet.</p>
             )}
           </CardContent>
         </Card>
-      )}
 
-      {isDraft && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Pre-publication checklist</CardTitle>
-          </CardHeader>
-          <CardContent className="grid gap-2">
-            {checklist.map((c, i) => (
-              <div key={i} className="flex items-center gap-2 text-sm">
-                <span className={c.pass ? "text-green-600" : "text-destructive"}>
-                  {c.pass ? "✓" : "✗"}
-                </span>
-                <span>{c.check}</span>
-                <span className="text-muted-foreground">— {c.detail}</span>
+        {isDraft && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Add questions</CardTitle>
+            </CardHeader>
+            <CardContent className="grid gap-4">
+              <TestBuilderManualMcq
+                testId={id}
+                yearId={test.year_id}
+                yearLabel={yearLabel}
+                curriculum={curriculum}
+              />
+
+              <QuestionFilterForm
+                subjects={yearSubjects}
+                books={curriculum.books}
+                chapters={curriculum.chapters}
+                topics={curriculum.topics}
+                filter={{
+                  subject_id: filters.subject,
+                  book_id: filters.book,
+                  chapter_id: filters.chapter,
+                  topic_id: filters.topic,
+                  difficulty: filters.difficulty,
+                  q: filters.q,
+                }}
+              />
+
+              {/* poolCount is an upper bound (matches the filter before
+                  excluding already-added questions) — only used as the
+                  input's max hint; addRandomQuestions itself always excludes
+                  existing questions server-side regardless of this value. */}
+              <AddRandomButton testId={id} filter={filter} poolSize={poolCount} />
+
+              <QuestionPoolMultiAdd testId={id} pool={pool} />
+
+              {poolTotalPages > 1 && (
+                <div className="flex items-center justify-between text-sm">
+                  {poolPage > 1 ? (
+                    <Button asChild variant="outline" size="sm">
+                      <Link href={poolFilterLink({ page: poolPage > 2 ? String(poolPage - 1) : undefined })}>
+                        ← Previous
+                      </Link>
+                    </Button>
+                  ) : (
+                    <Button variant="outline" size="sm" disabled>← Previous</Button>
+                  )}
+                  <span className="text-muted-foreground">
+                    Page {poolPage} of {poolTotalPages} ({poolCount} approved questions match)
+                  </span>
+                  {poolPage < poolTotalPages ? (
+                    <Button asChild variant="outline" size="sm">
+                      <Link href={poolFilterLink({ page: String(poolPage + 1) })}>Next →</Link>
+                    </Button>
+                  ) : (
+                    <Button variant="outline" size="sm" disabled>Next →</Button>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {isDraft && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Pre-publication checklist</CardTitle>
+            </CardHeader>
+            <CardContent className="grid gap-2">
+              {checklist.map((c, i) => (
+                <div key={i} className="flex items-center gap-2 text-sm">
+                  <span className={c.pass ? "text-green-600" : "text-destructive"}>
+                    {c.pass ? "✓" : "✗"}
+                  </span>
+                  <span>{c.check}</span>
+                  <span className="text-muted-foreground">— {c.detail}</span>
+                </div>
+              ))}
+              <div className="mt-2">
+                <PublishButton testId={id} allPass={allPass} />
               </div>
-            ))}
-            <div className="mt-2">
-              <PublishButton testId={id} allPass={allPass} />
-            </div>
-          </CardContent>
-        </Card>
-      )}
-    </div>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+    </TestDraftAudienceProvider>
   );
 }

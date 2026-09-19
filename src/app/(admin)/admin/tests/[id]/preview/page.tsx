@@ -38,6 +38,8 @@ export default async function TestPreviewPage({
 
   const { data: versions } = await supabase
     .from("question_versions")
+    // Preview never selects correct_key / explanation — stem + options only,
+    // matching the student exam payload (no answer key revealed in dry run).
     .select("id, stem, options")
     .in("id", versionIds.length > 0 ? versionIds : ["00000000-0000-0000-0000-000000000000"]);
 

@@ -7,7 +7,7 @@
 -- back — nothing here persists.
 
 begin;
-select plan(16);
+select plan(18);
 
 select test_helpers.as_runner();
 select * into temp curriculum from test_helpers.make_curriculum();
@@ -61,6 +61,18 @@ select is(
 );
 select is(
   (select (c ->> 'pass')::boolean from t_checks0, jsonb_array_elements(checks) c
+   where c ->> 'check' = 'no duplicate questions'),
+  true,
+  'an empty draft has no duplicate questions'
+);
+select is(
+  (select (c ->> 'pass')::boolean from t_checks0, jsonb_array_elements(checks) c
+   where c ->> 'check' = 'duration > 0'),
+  true,
+  'a positive duration_minutes passes the duration > 0 check'
+);
+select is(
+  (select (c ->> 'pass')::boolean from t_checks0, jsonb_array_elements(checks) c
    where c ->> 'check' = 'valid schedule'),
   true,
   'a well-formed schedule passes independent of question/audience state'
@@ -105,9 +117,9 @@ select is(
 );
 
 ------------------------------------------------------------------
--- 4) Duplicate question rejected by the DB constraint (this is what makes
---    "no duplicate questions" true by construction, not a separate
---    validate_test checklist item).
+-- 4) Duplicate question rejected by the DB constraint AND covered by
+--    the validate_test "no duplicate questions" checklist item
+--    (defense in depth; unique(test_id, question_id) is the hard gate).
 ------------------------------------------------------------------
 select test_helpers.as_runner();
 select throws_ok(

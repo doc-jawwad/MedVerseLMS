@@ -35,6 +35,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { useTestDraftAudience } from "../test-draft-audience-context";
 
 function useAction() {
   const router = useRouter();
@@ -343,10 +344,12 @@ export function AudiencePicker({
   testId,
   years,
   selected,
+  readOnly,
 }: {
   testId: string;
   years: { id: string; year_number: number }[];
   selected: string[];
+  readOnly?: boolean;
 }) {
   const { pending, run } = useAction();
   const [picked, setPicked] = useState<Set<string>>(new Set(selected));
@@ -357,6 +360,7 @@ export function AudiencePicker({
         <label key={y.id} className="flex items-center gap-2 text-sm">
           <Checkbox
             checked={picked.has(y.id)}
+            disabled={readOnly || pending}
             onCheckedChange={(c) => {
               const next = new Set(picked);
               if (c === true) next.add(y.id);
@@ -367,20 +371,29 @@ export function AudiencePicker({
           Year {y.year_number}
         </label>
       ))}
-      <Button size="sm" variant="secondary" disabled={pending}
-        onClick={() => run(() => setAudienceYears(testId, [...picked]), "Audience saved")}>
-        Save audience
-      </Button>
+      {!readOnly && (
+        <Button size="sm" variant="secondary" disabled={pending}
+          onClick={() => run(() => setAudienceYears(testId, [...picked]), "Audience saved")}>
+          Save audience
+        </Button>
+      )}
     </div>
   );
 }
 
 export function PublishButton({ testId, allPass }: { testId: string; allPass: boolean }) {
   const { pending, run } = useAction();
+  const { canPublish } = useTestDraftAudience();
   const [confirm, setConfirm] = useState(false);
+  const disabled = !allPass || !canPublish || pending;
   return (
     <>
-      <Button disabled={!allPass || pending} onClick={() => setConfirm(true)}>
+      {!canPublish && (
+        <p className="mb-2 text-sm text-destructive">
+          Student access is set to Neither — choose Free, Both, or Paid before publishing.
+        </p>
+      )}
+      <Button disabled={disabled} onClick={() => setConfirm(true)}>
         Publish test
       </Button>
       <Dialog open={confirm} onOpenChange={setConfirm}>

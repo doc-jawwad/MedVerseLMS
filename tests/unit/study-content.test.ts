@@ -25,13 +25,16 @@ const config: R2Config = {
 };
 
 describe("study content helpers", () => {
-  it("maps Free / Paid / Neither onto existing entitlement (no second enum)", () => {
+  it("maps Free / Both / Paid / Neither onto existing entitlement (no second enum)", () => {
     assert.equal(entitlementForTestAudience("free"), "free");
+    assert.equal(entitlementForTestAudience("both"), "free");
     assert.equal(entitlementForTestAudience("paid"), "any_subscription");
     assert.equal(entitlementForTestAudience("none"), null);
     assert.equal(canPublishToStudents("none"), false);
     assert.equal(canPublishToStudents("free"), true);
+    assert.equal(canPublishToStudents("both"), true);
     assert.equal(testAudienceFromEntitlement("any_subscription", "published"), "paid");
+    assert.equal(testAudienceFromEntitlement("free", "draft"), "both");
   });
 
   it("sorts upcoming tests by opens_at ascending", () => {

@@ -21,6 +21,7 @@ import { StatTile } from "@/components/student/stat-tile";
 import { SectionHeading } from "@/components/student/section-heading";
 import { EmptyState } from "@/components/student/empty-state";
 import { OpensCountdown } from "@/components/study/opens-countdown";
+import { StudyMarkdown } from "@/components/study/study-markdown";
 import { sortByOpensAtAsc } from "@/lib/study/upcoming";
 
 export const metadata = { title: "Dashboard — MedVerse LMS" };
@@ -52,6 +53,7 @@ export default async function DashboardPage() {
     { data: subscriptions },
     { data: applications },
     { data: grants },
+    { data: prepRows },
   ] = await Promise.all([
     supabase.rpc("student_test_summary"),
     supabase.rpc("student_recent_tests", { p_limit: 5 }),
@@ -93,8 +95,15 @@ export default async function DashboardPage() {
       .select("test_id, created_at, revoked_at")
       .eq("student_id", userId)
       .eq("grant_type", "test"),
+    supabase.rpc("accessible_test_prep"),
   ]);
 
+  const prepByTest = new Map(
+    ((prepRows ?? []) as { test_id: string; body_text: string }[]).map((row) => [
+      row.test_id,
+      row.body_text,
+    ])
+  );
   const entitled = new Set(
     (accessible ?? []).map((row: { id: string }) => row.id)
   );
@@ -243,6 +252,14 @@ export default async function DashboardPage() {
                   </p>
                   {state === "upcoming" && t.opens_at && (
                     <OpensCountdown opensAt={t.opens_at} />
+                  )}
+                  {entitled.has(t.id) && prepByTest.get(t.id) && (
+                    <div className="rounded-lg border bg-muted/40 p-3">
+                      <p className="mb-1 text-xs font-semibold tracking-wide text-[#05AEA9] uppercase">
+                        Preparation
+                      </p>
+                      <StudyMarkdown source={prepByTest.get(t.id)!} />
+                    </div>
                   )}
                   {canStart ? (
                     <Button asChild className="w-fit" size="sm">

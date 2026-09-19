@@ -16,17 +16,22 @@ draft ──publish_test()──▶ published ──closes_at passes / close now
 
 ## Pre-publication validation — `validate_test(test_id)` (its own component)
 
-Postgres function returning a checklist; the UI renders it on the test page and the **Publish button stays disabled until every item passes**. `publish_test()` re-runs it server-side and refuses on any failure.
+Postgres function returning a checklist; the UI renders it on the test page and the **Publish button stays disabled until every item passes**. `publish_test()` re-runs it server-side and refuses on any failure. Callers need `publish_tests` (via `require_permission`), not bare `is_admin()`.
 
-- ✓ question count ≥ `min_questions` (and > 0)
-- ✓ every question `status='approved'` (no draft/review/needs_revision/archived)
-- ✓ every current version has 4–5 complete options and a `correct_key` matching an option
-- ✓ no duplicate questions in the test
-- ✓ valid schedule: `opens_at < closes_at`, `closes_at` in the future
-- ✓ valid duration: `duration_minutes > 0` and ≤ window length
-- ✓ valid marking: `marks_per_question > 0`, `negative_mark ≥ 0`
-- ✓ (during publish) every `test_questions.question_version_id` freezes successfully
+Checklist order:
 
+1. ✓ question count ≥ `min_questions` **and** > 0
+2. ✓ no duplicate questions (`count(*) = count(distinct question_id)`)
+3. ✓ every question `status='approved'` (no draft/review/needs_revision/archived)
+4. ✓ every current version has 4–5 complete options and a `correct_key` matching an option
+5. ✓ valid schedule: `opens_at < closes_at`, `closes_at` in the future
+6. ✓ `duration_minutes > 0` (separate check)
+7. ✓ duration fits the window (≤ `closes_at - opens_at`)
+8. ✓ valid marking: `marks_per_question > 0`, `negative_mark ≥ 0`
+9. ✓ audience assigned (year in `test_audiences` or unrevoked student `access_grants`)
+10. ✓ (during publish) every `test_questions.question_version_id` freezes successfully
+
+Student audience **Neither** is a UI gate on Publish (stay draft); it is not a separate `validate_test` row.
 ## Publish = snapshot
 
 `publish_test(test_id)`: validate → set `question_version_id := questions.current_version_id` on every test_questions row → status 'published' → refresh `questions.used_in_test` cache → audit log. After publish, test config, `test_prep_guidelines.body_text`, and test_questions are immutable (triggers), except `voided`/`void_policy`. A test with student audience **Neither** must stay `draft` — unpublished tests are never catalogued. Free vs paid audience is `tests.entitlement` (`free` vs `any_subscription`), not a second access model. Subscription never removes `entitlement = 'free'`.
@@ -50,8 +55,13 @@ Admin → `invalidate_attempt(attempt_id, reason)` — **reason required**, audi
 
 ## Test builder
 
-Manual only (no autopilot): filter the bank by year/subject/book/chapter/topic/difficulty/status → tick questions, or **"add N randomly from this filtered set"** (builder convenience; admin still reviews the final list). Only `approved` questions selectable.
+Manual only (no autopilot). Admins can:
 
+- **Bank pick:** filter by year/subject/book/chapter/topic/difficulty/status → tick one or many questions → **Add selected**, or **"add N randomly from this filtered set"** (builder convenience; admin still reviews the final list). Only `approved` questions selectable; already-in-test ids are skipped.
+- **Inline create:** author a new MCQ on the draft test page (subject/book/chapter/topic locked to the test’s year). `create_question` with `status='approved'`, then attach to the draft. Topic year must match `tests.year_id`.
+- **Mix:** bank picks and inline creates can be combined on the same draft; reorder, per-question marks, and remove apply to the full list before publish.
+
+`validate_test` / Publish stay the gate — see checklist above.
 ## Access
 
 Catalog vs content are separate ([permissions.md](permissions.md)):

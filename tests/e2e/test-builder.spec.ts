@@ -77,23 +77,16 @@ test.describe("Test Builder", () => {
 
       // --- filter the question bank down to just this fixture's questions
       // (text search on the tag, since these are the only questions with it
-      // in their stem) and add the first two ---
+      // in their stem) and multi-select the first two ---
       await page.getByPlaceholder("Search text…").fill(fixture.tag);
       await page.getByRole("button", { name: "Search" }).click();
-      await expect(page.getByTestId(`add-question-${fixture.questionIds[0]}`)).toBeVisible();
+      await expect(page.getByTestId(`tick-question-${fixture.questionIds[0]}`)).toBeVisible();
 
-      // Wait for each Add to fully round-trip (its own button disappearing
-      // from the pool, since router.refresh() re-fetches and the just-added
-      // question drops out of the "available" list) before clicking the
-      // next one — a stronger signal than the count text alone under a
-      // loaded dev server, where consecutive rapid clicks can otherwise
-      // race the first mutation's refresh.
-      await page.getByTestId(`add-question-${fixture.questionIds[0]}`).click();
-      await expect(page.getByTestId(`add-question-${fixture.questionIds[0]}`)).toHaveCount(0, { timeout: 15000 });
-      await expect(page.getByText("Questions (1)")).toBeVisible();
-
-      await page.getByTestId(`add-question-${fixture.questionIds[1]}`).click();
-      await expect(page.getByTestId(`add-question-${fixture.questionIds[1]}`)).toHaveCount(0, { timeout: 15000 });
+      await page.getByTestId(`tick-question-${fixture.questionIds[0]}`).click();
+      await page.getByTestId(`tick-question-${fixture.questionIds[1]}`).click();
+      await page.getByTestId("add-selected-questions").click();
+      await expect(page.getByTestId(`tick-question-${fixture.questionIds[0]}`)).toHaveCount(0, { timeout: 15000 });
+      await expect(page.getByTestId(`tick-question-${fixture.questionIds[1]}`)).toHaveCount(0, { timeout: 15000 });
       await expect(page.getByText("Questions (2)")).toBeVisible();
 
       // --- reorder: question 0 was added first (position #1, so "move up"
