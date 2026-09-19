@@ -3,11 +3,14 @@ import { requireStudent } from "@/lib/auth/require-user";
 import { formatDateTime } from "@/lib/utils";
 import {
   classifyCatalogTestStates,
+  displayTestTitle,
+  formatMcqCount,
   isHistoryTestsPageState,
   studentTestListLabel,
   testPricingLabel,
   type StudentTestListState,
 } from "@/lib/tests/student-test-state";
+import { finalizeOwnExpiredAttempts } from "@/lib/tests/finalize-own-expired";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -35,6 +38,7 @@ type AttemptRow = {
   id: string;
   test_id: string;
   state: string;
+  expires_at: string | null;
   score: number | null;
   max_score: number | null;
   percentage: number | null;
@@ -45,6 +49,7 @@ type AttemptRow = {
 export default async function StudentTestsPage() {
   await bindSsrTiming("/tests");
   const { supabase, userId } = await requireStudent();
+  await finalizeOwnExpiredAttempts(supabase);
 
   const [
     { data: tests },
@@ -66,7 +71,7 @@ export default async function StudentTestsPage() {
       supabase
         .from("test_attempts")
         .select(
-          "id, test_id, state, score, max_score, percentage, rank, submitted_at"
+          "id, test_id, state, expires_at, score, max_score, percentage, rank, submitted_at"
         )
         .eq("student_id", userId)
         .neq("state", "invalidated")
@@ -162,16 +167,17 @@ export default async function StudentTestsPage() {
               {items.map(({ t, attempt, state }) => {
                 const s = t.subjects as unknown as { name: string } | null;
                 const qc = t.question_count;
+                const pricing = testPricingLabel(t.entitlement);
                 return (
                   <Card key={t.id} className="shadow-none">
                     <CardHeader>
                       <div className="flex flex-wrap items-start justify-between gap-2">
                         <CardTitle className="text-base text-[#072855]">
-                          {t.title}
+                          {displayTestTitle(t.title, pricing)}
                         </CardTitle>
                         <div className="flex shrink-0 flex-wrap gap-1">
                           <Badge variant="outline">
-                            {testPricingLabel(t.entitlement)}
+                            {pricing}
                           </Badge>
                           <Badge
                             variant={
@@ -188,7 +194,7 @@ export default async function StudentTestsPage() {
                       </div>
                       <CardDescription>
                         {s?.name && `${s.name} · `}
-                        {qc} MCQs · {t.duration_minutes} minutes
+                        {formatMcqCount(qc)} · {t.duration_minutes} minutes
                       </CardDescription>
                     </CardHeader>
                     <CardContent className="grid gap-2 text-sm">
@@ -211,7 +217,8 @@ export default async function StudentTestsPage() {
                           </Link>
                         </Button>
                       )}
-                      {state === "result" && attempt && (
+                      {state === "result" &&
+                        attempt?.state === "submitted" && (
                         <div className="flex flex-wrap items-center gap-3">
                           <span>
                             {attempt.score}/{attempt.max_score} (
@@ -224,6 +231,13 @@ export default async function StudentTestsPage() {
                           </Button>
                         </div>
                       )}
+                      {state === "result" &&
+                        attempt?.state !== "submitted" && (
+                          <p className="text-muted-foreground">
+                            This attempt has ended. Your result will appear
+                            shortly.
+                          </p>
+                        )}
                       {state === "missed" && (
                         <p className="text-muted-foreground">
                           You were eligible during the window but did not start.

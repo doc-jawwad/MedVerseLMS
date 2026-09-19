@@ -2,7 +2,14 @@ import Link from "next/link";
 import { requireStudent } from "@/lib/auth/require-user";
 import { formatDateTime } from "@/lib/utils";
 import { buildStudentDashboardPresentation } from "@/lib/tests/student-dashboard-presentation";
-import { classifyCatalogTestStates, isIncomingDashboardTest, testPricingLabel } from "@/lib/tests/student-test-state";
+import {
+  classifyCatalogTestStates,
+  displayTestTitle,
+  formatMcqCount,
+  isIncomingDashboardTest,
+  testPricingLabel,
+} from "@/lib/tests/student-test-state";
+import { finalizeOwnExpiredAttempts } from "@/lib/tests/finalize-own-expired";
 import { buildStudentSubscriptionView } from "@/lib/subscriptions/student-status";
 import { ResourceLockNotice } from "@/components/subscription/resource-lock-notice";
 import {
@@ -38,6 +45,7 @@ type RecentTest = {
 
 export default async function DashboardPage() {
   const { supabase, profile, enrollment, userId } = await requireStudent();
+  await finalizeOwnExpiredAttempts(supabase);
 
   const now = new Date();
   const nowIso = now.toISOString();
@@ -71,7 +79,7 @@ export default async function DashboardPage() {
       .select("id, status, opens_at, closes_at, entitlement"),
     supabase
       .from("test_attempts")
-      .select("test_id, state")
+      .select("test_id, state, expires_at")
       .eq("student_id", userId)
       .neq("state", "invalidated"),
     supabase.rpc("accessible_test_ids"),
@@ -226,9 +234,16 @@ export default async function DashboardPage() {
             incomingTests.map(({ t, state }) => {
               const subj = t.subjects as unknown as { name: string } | null;
               const pricing = testPricingLabel(t.entitlement);
+              const isEntitled = entitled.has(t.id);
               const canStart =
-                (state === "available" || state === "in_progress") &&
-                entitled.has(t.id);
+                state === "in_progress" ||
+                (state === "available" && isEntitled);
+              const showSubscriptionLock =
+                !isEntitled &&
+                state !== "in_progress" &&
+                (state === "locked" ||
+                  state === "available" ||
+                  state === "upcoming");
               return (
                 <div
                   key={t.id}
@@ -236,7 +251,7 @@ export default async function DashboardPage() {
                 >
                   <div className="flex flex-wrap items-start justify-between gap-2">
                     <p className="font-heading text-lg font-semibold text-[#072855]">
-                      {t.title}
+                      {displayTestTitle(t.title, pricing)}
                     </p>
                     <Badge variant={pricing === "FREE" ? "secondary" : "outline"}>
                       {pricing}
@@ -244,7 +259,8 @@ export default async function DashboardPage() {
                   </div>
                   <p className="text-sm text-muted-foreground">
                     {subj?.name && `${subj.name} · `}
-                    {t.question_count} MCQs · {t.duration_minutes} minutes
+                    {formatMcqCount(t.question_count)} · {t.duration_minutes}{" "}
+                    minutes
                   </p>
                   <p className="text-sm text-muted-foreground">
                     {t.opens_at && <>Opens {formatDateTime(t.opens_at)} · </>}
@@ -253,7 +269,7 @@ export default async function DashboardPage() {
                   {state === "upcoming" && t.opens_at && (
                     <OpensCountdown opensAt={t.opens_at} />
                   )}
-                  {entitled.has(t.id) && prepByTest.get(t.id) && (
+                  {isEntitled && prepByTest.get(t.id) && (
                     <div className="rounded-lg border bg-muted/40 p-3">
                       <p className="mb-1 text-xs font-semibold tracking-wide text-[#05AEA9] uppercase">
                         Preparation
@@ -267,9 +283,8 @@ export default async function DashboardPage() {
                         {state === "in_progress" ? "Resume test" : "Start test"}
                       </Link>
                     </Button>
-                  ) : state === "locked" ||
-                    (state === "available" && !entitled.has(t.id)) ? (
-                    <ResourceLockNotice compact />
+                  ) : showSubscriptionLock ? (
+                    <ResourceLockNotice />
                   ) : null}
                 </div>
               );
@@ -321,12 +336,12 @@ export default async function DashboardPage() {
 
       <div className="grid gap-3">
         <SectionHeading
-          title="Catalog participation"
+          title="Your tests at a glance"
           description={presentation.catalog.scopeNote}
         />
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <StatTile
-            label="Eligible (approx.)"
+            label="Listed for you"
             value={String(presentation.catalog.eligibleApprox)}
           />
           <StatTile

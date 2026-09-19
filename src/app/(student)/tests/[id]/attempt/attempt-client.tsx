@@ -8,6 +8,7 @@ import { getDeviceId } from "@/lib/exam/device";
 import { applyServerExpiresAtIso } from "@/lib/exam/timer-deadline";
 import { examOptionsFromRpc } from "@/lib/exam/question-options";
 import { startAttemptMeansAlreadySubmitted } from "@/lib/exam/start-attempt-result";
+import { matchStartAttemptError } from "@/lib/exam/start-attempt-error";
 import {
   clearAttemptDraft,
   loadAttemptDraft,
@@ -57,6 +58,14 @@ const ERROR_COPY: Record<string, { title: string; body: string }> = {
     title: "Already submitted",
     body: "You have already completed this test.",
   },
+  attempt_finalized: {
+    title: "Attempt closed",
+    body: "This attempt is no longer open. Open the result if it was submitted, or contact MedVerse if you need help.",
+  },
+  attempt_expired: {
+    title: "Time is up",
+    body: "This attempt has expired and is no longer open for answering.",
+  },
   test_window_closed: {
     title: "Test not open",
     body: "This test is not currently open.",
@@ -64,6 +73,10 @@ const ERROR_COPY: Record<string, { title: string; body: string }> = {
   test_access_denied: {
     title: "No access",
     body: "You don't have access to this test.",
+  },
+  account_blocked: {
+    title: "Account not eligible",
+    body: "Your account cannot take tests right now. Contact MedVerse if you need help.",
   },
   session_superseded: {
     title: "Signed in elsewhere",
@@ -272,11 +285,9 @@ export function AttemptClient({ testId }: { testId: string }) {
         return;
       }
       if (error) {
-        const key = Object.keys(ERROR_COPY).find((k) =>
-          error.message.includes(k)
-        );
+        const key = matchStartAttemptError(error.message);
         // Never surface raw Auth/DB text — only known RPC codes or a generic key.
-        setError(key ?? "unknown");
+        setError(key);
         return;
       }
       const p = data as StartPayload;

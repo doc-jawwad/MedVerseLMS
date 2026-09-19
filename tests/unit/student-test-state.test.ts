@@ -1,9 +1,11 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  classifyCatalogTestStates,
   getStudentTestListState,
   grantOverlapsTestWindow,
   hadHistoricalAccessEvidence,
+  isResumeEligibleInProgress,
   studentTestListLabel,
   studentTestListSection,
   subscriptionOverlapsTestWindow,
@@ -31,7 +33,7 @@ function base(
 }
 
 describe("getStudentTestListState — attempt priority", () => {
-  it("in_progress → In Progress (even if closed)", () => {
+  it("in_progress → In Progress (even if closed, while before auto-submit sweep)", () => {
     assert.equal(
       getStudentTestListState(
         base({
@@ -39,9 +41,25 @@ describe("getStudentTestListState — attempt priority", () => {
           nowMs: Date.parse("2026-02-01T00:00:00Z"),
           testStatus: "closed",
           currentlyEntitled: false,
+          expiresAtMs: Date.parse("2026-02-01T00:00:30Z"),
         })
       ),
       "in_progress"
+    );
+  });
+
+  it("overdue in_progress after the sweep is Result, not Resume", () => {
+    assert.equal(
+      getStudentTestListState(
+        base({
+          attemptState: "in_progress",
+          nowMs: Date.parse("2026-02-10T00:00:00Z"),
+          testStatus: "closed",
+          currentlyEntitled: false,
+          expiresAtMs: Date.parse("2026-02-01T00:00:00Z"),
+        })
+      ),
+      "result"
     );
   });
 
@@ -254,5 +272,66 @@ describe("labels and sections", () => {
     assert.equal(studentTestListSection("missed"), "previous");
     assert.equal(studentTestListSection("not_eligible"), "previous");
     assert.equal(studentTestListSection("result"), "previous");
+  });
+});
+
+describe("resume eligibility vs expiry", () => {
+  it("keeps Resume until the existing 60s sweep", () => {
+    assert.equal(
+      isResumeEligibleInProgress({
+        attemptState: "in_progress",
+        nowMs: Date.parse("2026-01-15T12:00:59Z"),
+        expiresAtMs: Date.parse("2026-01-15T12:00:00Z"),
+      }),
+      true
+    );
+  });
+
+  it("stops Resume after the sweep", () => {
+    assert.equal(
+      isResumeEligibleInProgress({
+        attemptState: "in_progress",
+        nowMs: Date.parse("2026-01-15T12:01:00Z"),
+        expiresAtMs: Date.parse("2026-01-15T12:00:00Z"),
+      }),
+      false
+    );
+  });
+
+  it("never treats submitted as Resume", () => {
+    assert.equal(
+      isResumeEligibleInProgress({
+        attemptState: "submitted",
+        nowMs: Date.parse("2026-01-15T12:00:00Z"),
+        expiresAtMs: Date.parse("2026-01-15T13:00:00Z"),
+      }),
+      false
+    );
+  });
+
+  it("classifyCatalogTestStates hides stale Resume using expires_at", () => {
+    const states = classifyCatalogTestStates({
+      nowMs: Date.parse("2026-02-10T00:00:00Z"),
+      tests: [
+        {
+          id: "t1",
+          status: "closed",
+          opens_at: "2026-01-01T00:00:00Z",
+          closes_at: "2026-01-31T00:00:00Z",
+          entitlement: "any_subscription",
+        },
+      ],
+      attempts: [
+        {
+          test_id: "t1",
+          state: "in_progress",
+          expires_at: "2026-01-31T00:00:00Z",
+        },
+      ],
+      accessibleIds: [],
+      subscriptions: [],
+      grants: [],
+    });
+    assert.equal(states[0], "result");
   });
 });

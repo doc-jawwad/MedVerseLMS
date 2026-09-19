@@ -20,6 +20,9 @@ export type AttemptStateForList = "in_progress" | "submitted" | null;
 
 export type TestEntitlementKind = "free" | "any_subscription" | "plan";
 
+/** exam-state-machine.md: auto_submit_expired / finalize_if_expired sweep. */
+export const AUTO_SUBMIT_SWEEP_MS = 60_000;
+
 export type StudentTestStateInput = {
   nowMs: number;
   opensAtMs: number;
@@ -30,6 +33,11 @@ export type StudentTestStateInput = {
   /** Current can_access_test (content). Not historical eligibility. */
   currentlyEntitled: boolean;
   attemptState: AttemptStateForList;
+  /**
+   * Server `test_attempts.expires_at`. Required to hide Resume after the
+   * effective deadline; omitted/null is treated as still live.
+   */
+  expiresAtMs?: number | null;
   /**
    * Partial historical clues (docs §7): subscription starts_at/ends_at
    * overlapped the test window.
@@ -109,6 +117,20 @@ function windowNotOpenYet(input: StudentTestStateInput): boolean {
 }
 
 /**
+ * Resume is the same in_progress attempt until the auto-submit sweep.
+ * After expires_at + 60s the paper must present as ended (result), not Resume.
+ */
+export function isResumeEligibleInProgress(input: {
+  attemptState: AttemptStateForList;
+  nowMs: number;
+  expiresAtMs?: number | null;
+}): boolean {
+  if (input.attemptState !== "in_progress") return false;
+  if (input.expiresAtMs == null) return true;
+  return input.nowMs < input.expiresAtMs + AUTO_SUBMIT_SWEEP_MS;
+}
+
+/**
  * Deterministic test-list state.
  * Priority: attempt → current window → current access → historical heuristic.
  */
@@ -116,7 +138,8 @@ export function getStudentTestListState(
   input: StudentTestStateInput
 ): StudentTestListState {
   if (input.attemptState === "submitted") return "result";
-  if (input.attemptState === "in_progress") return "in_progress";
+  if (isResumeEligibleInProgress(input)) return "in_progress";
+  if (input.attemptState === "in_progress") return "result";
 
   if (windowNotOpenYet(input) && !windowIsClosed(input)) {
     return "upcoming";
@@ -176,6 +199,30 @@ export function testPricingLabel(
   return entitlement === "free" ? "FREE" : "PAID";
 }
 
+/** Student-facing MCQ count: "1 MCQ" / "2 MCQs". */
+export function formatMcqCount(count: number): string {
+  const n = Number.isFinite(count) ? Math.max(0, Math.trunc(count)) : 0;
+  return n === 1 ? "1 MCQ" : `${n} MCQs`;
+}
+
+/**
+ * Prefer the FREE/PAID badge as the audience indicator. Strips a redundant
+ * leading FREE/PAID token from the displayed title only — DB title unchanged.
+ * Only exact uppercase FREE/PAID prefixes are removed so real titles are kept.
+ */
+export function displayTestTitle(
+  title: string,
+  pricing: "FREE" | "PAID"
+): string {
+  const trimmed = title.trim();
+  const re =
+    pricing === "FREE"
+      ? /^(FREE)(?:\s*[-–—:]\s*|\s+)/
+      : /^(PAID)(?:\s*[-–—:]\s*|\s+)/;
+  const stripped = trimmed.replace(re, "").trim();
+  return stripped.length > 0 ? stripped : trimmed;
+}
+
 export function studentTestListLabel(state: StudentTestListState): string {
   switch (state) {
     case "in_progress":
@@ -206,6 +253,7 @@ export type CatalogTestForState = {
 export type CatalogAttemptForState = {
   test_id: string;
   state: string;
+  expires_at?: string | null;
 };
 
 export type CatalogSubscriptionForState = {
@@ -273,6 +321,9 @@ export function classifyCatalogTestStates(input: {
       entitlement: t.entitlement ?? "free",
       currentlyEntitled: entitled.has(t.id),
       attemptState,
+      expiresAtMs: attempt?.expires_at
+        ? new Date(attempt.expires_at).getTime()
+        : null,
       subscriptionOverlappedWindow,
       grantOverlappedWindow,
     });

@@ -1,5 +1,12 @@
 import { test, expect, type Page, type BrowserContext } from "@playwright/test";
-import { provisionExamFixture, teardownExamFixture } from "./fixtures";
+import {
+  closeTestNow,
+  expireSubscription,
+  forceAttemptExpiry,
+  markTestPaidWithLiveSubscription,
+  provisionExamFixture,
+  teardownExamFixture,
+} from "./fixtures";
 
 // Walks the failure-scenario table in docs/exam-state-machine.md against a
 // real browser + the live exam engine. Each test provisions its own isolated
@@ -246,6 +253,76 @@ test.describe("Exam engine", () => {
       await expect(page.getByText(/Question 1 of/)).toBeVisible({ timeout: 15000 });
       await expect(optionA(page)).toHaveAttribute("aria-pressed", "true");
       await expect(page.getByTestId("skipped-mcqs")).toContainText("0");
+    } finally {
+      await teardownExamFixture(fixture);
+    }
+  });
+
+  test("resume continues after subscription expiry on the same device", async ({
+    page,
+  }) => {
+    const fixture = await provisionExamFixture({ questionCount: 2 });
+    let sub: Awaited<ReturnType<typeof markTestPaidWithLiveSubscription>> | null =
+      null;
+    try {
+      sub = await markTestPaidWithLiveSubscription(
+        fixture.testId,
+        fixture.studentId
+      );
+      await login(page, fixture.email, fixture.password);
+      await startExam(page, fixture.testId);
+      await optionA(page).click();
+      await expect(saveStatus(page)).toHaveText("Saved", { timeout: 10000 });
+
+      await expireSubscription(sub.subscriptionId);
+      await page.goto("/tests");
+      await expect(page.getByRole("link", { name: "Resume test" })).toBeVisible({
+        timeout: 15000,
+      });
+      await page.getByRole("link", { name: "Resume test" }).click();
+      await expect(page.getByText(/Question 1 of/)).toBeVisible({ timeout: 15000 });
+      await expect(optionA(page)).toHaveAttribute("aria-pressed", "true");
+      await expect(page.getByText(/signed in on another device/i)).toHaveCount(0);
+      await expect(page.getByText(/open on another device/i)).toHaveCount(0);
+      await expect(page.getByText(/requires a live subscription/i)).toHaveCount(0);
+    } finally {
+      if (sub) await sub.cleanup();
+      await teardownExamFixture(fixture);
+    }
+  });
+
+  test("closed expired attempt leaves history, not a stale Resume or kick", async ({
+    page,
+  }) => {
+    const fixture = await provisionExamFixture({
+      questionCount: 1,
+      negativeMark: 0,
+    });
+    try {
+      await login(page, fixture.email, fixture.password);
+      await startExam(page, fixture.testId);
+      await page.goto("/tests");
+      await expect(page.getByRole("link", { name: "Resume test" })).toBeVisible({
+        timeout: 15000,
+      });
+
+      await closeTestNow(fixture.testId);
+      await forceAttemptExpiry(fixture.testId, fixture.studentId);
+
+      await page.goto("/tests");
+      await expect(page.getByRole("link", { name: "Resume test" })).toHaveCount(0, {
+        timeout: 15000,
+      });
+      await expect(page.getByText(/signed in on another device/i)).toHaveCount(0);
+      await expect(page.getByRole("link", { name: "View result" })).toBeVisible({
+        timeout: 15000,
+      });
+
+      await page.goto(`/tests/${fixture.testId}/attempt`);
+      await page.waitForURL(/\/result/, { timeout: 15000 });
+      await expect(page.getByText("Your result")).toBeVisible();
+      await expect(page.getByText(/signed in on another device/i)).toHaveCount(0);
+      await expect(page.getByText(/open on another device/i)).toHaveCount(0);
     } finally {
       await teardownExamFixture(fixture);
     }
