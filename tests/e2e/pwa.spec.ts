@@ -46,8 +46,8 @@ test.describe("PWA installability", () => {
     expect(body).toContain("payment-proof");
     expect(body).not.toMatch(/addEventListener\("install"/);
     const onDisk = readFileSync(path.join(process.cwd(), "public/sw.js"), "utf8");
-    expect(body.replace(/\r\n/g, "\n")).toContain("medverse-static-v1");
-    expect(onDisk).toContain("medverse-static-v1");
+    expect(body.replace(/\r\n/g, "\n")).toContain("medverse-static-v2");
+    expect(onDisk).toContain("medverse-static-v2");
   });
 
   test("login offers Install MedVerse App and iOS guidance", async ({
