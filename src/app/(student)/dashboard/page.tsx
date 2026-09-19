@@ -2,7 +2,7 @@ import Link from "next/link";
 import { requireStudent } from "@/lib/auth/require-user";
 import { formatDateTime } from "@/lib/utils";
 import { buildStudentDashboardPresentation } from "@/lib/tests/student-dashboard-presentation";
-import { classifyCatalogTestStates } from "@/lib/tests/student-test-state";
+import { classifyCatalogTestStates, isIncomingDashboardTest, testPricingLabel } from "@/lib/tests/student-test-state";
 import { buildStudentSubscriptionView } from "@/lib/subscriptions/student-status";
 import { ResourceLockNotice } from "@/components/subscription/resource-lock-notice";
 import {
@@ -16,9 +16,12 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/student/page-header";
 import { StudentPage } from "@/components/student/student-page";
+import { InstallMedverseApp } from "@/components/pwa/install-medverse-app";
 import { StatTile } from "@/components/student/stat-tile";
 import { SectionHeading } from "@/components/student/section-heading";
 import { EmptyState } from "@/components/student/empty-state";
+import { OpensCountdown } from "@/components/study/opens-countdown";
+import { sortByOpensAtAsc } from "@/lib/study/upcoming";
 
 export const metadata = { title: "Dashboard — MedVerse LMS" };
 
@@ -55,13 +58,12 @@ export default async function DashboardPage() {
     supabase
       .from("tests")
       .select(
-        "id, title, subjects(name), duration_minutes, opens_at, closes_at, question_count, entitlement"
+        "id, title, subjects(name), duration_minutes, opens_at, closes_at, question_count, entitlement, status"
       )
       .eq("status", "published")
-      .lte("opens_at", nowIso)
       .gt("closes_at", nowIso)
-      .order("closes_at", { ascending: true })
-      .limit(10),
+      .order("opens_at", { ascending: true })
+      .limit(20),
     supabase
       .from("tests")
       .select("id, status, opens_at, closes_at, entitlement"),
@@ -96,12 +98,6 @@ export default async function DashboardPage() {
   const entitled = new Set(
     (accessible ?? []).map((row: { id: string }) => row.id)
   );
-  const attemptedIds = new Set(
-    (myAttempts ?? [])
-      .filter((a) => a.state === "submitted" || a.state === "in_progress")
-      .map((a) => a.test_id)
-  );
-  const nextTest = (upcoming ?? []).find((t) => !attemptedIds.has(t.id));
 
   const subRows = (subscriptions ?? []).map((s) => {
     const plan = s.subscription_plans as unknown as { name: string } | null;
@@ -156,8 +152,22 @@ export default async function DashboardPage() {
     catalogStates,
   });
 
-  const subj = nextTest?.subjects as unknown as { name: string } | null;
-  const nextEntitled = nextTest ? entitled.has(nextTest.id) : false;
+  const incomingStates = classifyCatalogTestStates({
+    nowMs: now.getTime(),
+    tests: upcoming ?? [],
+    attempts: myAttempts ?? [],
+    accessibleIds: (accessible ?? []).map((row: { id: string }) => row.id),
+    subscriptions: subRows.map((s) => ({
+      starts_at: s.starts_at,
+      ends_at: s.ends_at,
+    })),
+    grants: grants ?? [],
+  });
+  const incomingTests = sortByOpensAtAsc(upcoming ?? []).map((t) => {
+    const idx = (upcoming ?? []).findIndex((row) => row.id === t.id);
+    return { t, state: incomingStates[idx]! };
+  }).filter(({ state }) => isIncomingDashboardTest(state));
+
   const recentRows = (recent ?? []) as RecentTest[];
 
   return (
@@ -165,8 +175,10 @@ export default async function DashboardPage() {
       <PageHeader
         eyebrow={enrollment.year_name}
         title={`Welcome, ${profile.full_name || "Student"}`}
-        description="Your scheduled tests, practice, and lifetime results in one place."
+        description="Incoming scheduled tests for your class, plus lifetime results."
       />
+
+      <InstallMedverseApp variant="card" />
 
       {presentation.accessBanner && (
         <Card className="shadow-none">
@@ -195,41 +207,63 @@ export default async function DashboardPage() {
 
       <Card className="overflow-hidden shadow-none">
         <CardHeader className="border-b bg-[#072855] text-white">
-          <CardTitle className="text-base text-white">Available test</CardTitle>
+          <CardTitle className="text-base text-white">Incoming tests</CardTitle>
           <CardDescription className="text-white/70">
-            Current access only — historical eligibility is separate.
+            Scheduled and currently open tests for your class. History lives under Tests.
           </CardDescription>
         </CardHeader>
-        <CardContent className="pt-4">
-          {nextTest ? (
-            <div className="grid gap-3">
-              <p className="font-heading text-lg font-semibold text-[#072855]">
-                {nextTest.title}
-              </p>
-              <p className="text-sm text-muted-foreground">
-                {subj?.name && `${subj.name} · `}
-                {nextTest.question_count} MCQs · {nextTest.duration_minutes}{" "}
-                minutes
-              </p>
-              <p className="text-sm text-muted-foreground">
-                Available until{" "}
-                {nextTest.closes_at && formatDateTime(nextTest.closes_at)}
-              </p>
-              {nextEntitled ? (
-                <Button asChild className="w-fit">
-                  <Link href={`/tests/${nextTest.id}/attempt`}>Start test</Link>
-                </Button>
-              ) : (
-                <ResourceLockNotice compact />
-              )}
-            </div>
+        <CardContent className="grid gap-3 pt-4">
+          {incomingTests.length > 0 ? (
+            incomingTests.map(({ t, state }) => {
+              const subj = t.subjects as unknown as { name: string } | null;
+              const pricing = testPricingLabel(t.entitlement);
+              const canStart =
+                (state === "available" || state === "in_progress") &&
+                entitled.has(t.id);
+              return (
+                <div
+                  key={t.id}
+                  className="grid gap-2 rounded-xl border p-3"
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <p className="font-heading text-lg font-semibold text-[#072855]">
+                      {t.title}
+                    </p>
+                    <Badge variant={pricing === "FREE" ? "secondary" : "outline"}>
+                      {pricing}
+                    </Badge>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    {subj?.name && `${subj.name} · `}
+                    {t.question_count} MCQs · {t.duration_minutes} minutes
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    {t.opens_at && <>Opens {formatDateTime(t.opens_at)} · </>}
+                    {t.closes_at && <>Closes {formatDateTime(t.closes_at)}</>}
+                  </p>
+                  {state === "upcoming" && t.opens_at && (
+                    <OpensCountdown opensAt={t.opens_at} />
+                  )}
+                  {canStart ? (
+                    <Button asChild className="w-fit" size="sm">
+                      <Link href={`/tests/${t.id}/attempt`}>
+                        {state === "in_progress" ? "Resume test" : "Start test"}
+                      </Link>
+                    </Button>
+                  ) : state === "locked" ||
+                    (state === "available" && !entitled.has(t.id)) ? (
+                    <ResourceLockNotice compact />
+                  ) : null}
+                </div>
+              );
+            })
           ) : (
             <EmptyState
-              title="Nothing available right now"
-              description="When a scheduled test opens, it will appear here."
+              title="Nothing incoming right now"
+              description="When a test is scheduled for your class, it will appear here with date, time, and countdown."
               action={
                 <Button asChild variant="outline" size="sm">
-                  <Link href="/tests">See all tests</Link>
+                  <Link href="/tests">See test history</Link>
                 </Button>
               }
             />

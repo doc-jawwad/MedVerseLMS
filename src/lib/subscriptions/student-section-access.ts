@@ -1,15 +1,22 @@
 import type { IconKey, NavItem } from "@/components/mobile-nav";
+import { LIBRARY_LIST } from "../library/types.ts";
 
 /**
- * Paid LMS section hubs (Materials / Practice / Tests / Performance).
- * Live subscription (incl. grace / complimentary live plan) unlocks these.
- * Pending applications do not. Content entitlement for free/granted items
- * remains a separate layer (Free Resources + content RPCs).
+ * Full-library hubs locked for free / expired / pending students.
+ * Tests (history) and Free Resources stay unlocked. Content RPCs remain
+ * the authorization boundary for free/granted items.
  */
 export const PAID_LMS_SECTION_HREFS = [
+  "/mcq-bank",
+  "/pearl-points",
+  "/guidelines",
+  "/ospe-material",
+  "/ospe-lectures",
+  "/books",
+  "/notes",
+  "/lectures",
   "/materials",
   "/practice",
-  "/tests",
   "/performance",
 ] as const;
 
@@ -35,30 +42,26 @@ type NavDef = {
 
 const STUDENT_NAV_DEFS: NavDef[] = [
   { href: "/dashboard", label: "Dashboard", icon: "dashboard" },
+  { href: "/tests", label: "Tests", icon: "tests" },
   { href: "/free-resources", label: "Free Resources", icon: "freeResources" },
-  {
-    href: "/materials",
-    label: "Study Materials",
-    icon: "materials",
-    requiresPaidSections: true,
-  },
-  {
-    href: "/practice",
-    label: "Practice MCQs",
-    icon: "practice",
-    requiresPaidSections: true,
-  },
-  {
-    href: "/tests",
-    label: "Tests",
-    icon: "tests",
-    requiresPaidSections: true,
-  },
+  ...LIBRARY_LIST.map((lib) => ({
+    href: lib.href,
+    label: lib.label,
+    icon: lib.icon,
+    requiresPaidSections: true as const,
+  })),
   {
     href: "/performance",
     label: "Performance",
     icon: "performance",
     requiresPaidSections: true,
+  },
+  { href: "/contact", label: "Contact Us", icon: "contact" },
+  { href: "/career-counselling", label: "Career Counselling Series", icon: "career" },
+  {
+    href: "/imd-stepwise",
+    label: "Get iMD & StepWise MD Subscription",
+    icon: "imd",
   },
   { href: "/subscription", label: "My Subscription", icon: "subscription" },
   { href: "/profile", label: "My Account", icon: "account" },
@@ -76,11 +79,9 @@ export function buildStudentShellNav(hasLiveAccess: boolean): {
     locked: Boolean(def.requiresPaidSections) && !paid,
   }));
 
-  // Free: Dashboard, Free Resources, Subscription, Account.
-  // Subscribed: Dashboard, Practice, Tests, Performance (full catalog in More).
   const bottomHrefs = paid
-    ? ["/dashboard", "/practice", "/tests", "/performance"]
-    : ["/dashboard", "/free-resources", "/subscription", "/profile"];
+    ? ["/dashboard", "/tests", "/mcq-bank", "/pearl-points"]
+    : ["/dashboard", "/tests", "/free-resources", "/contact"];
 
   const byHref = new Map(items.map((i) => [i.href, i]));
   const bottomItems = bottomHrefs

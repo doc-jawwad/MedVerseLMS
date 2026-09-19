@@ -7,7 +7,7 @@ import { loadE2EEnv, STAGING_APP_ORIGIN } from "./load-e2e-env";
  * (non–live-subscription) student.
  */
 test.describe("Free student navigation", () => {
-  test("active Free Resources; locked paid hubs; pending ≠ live", async ({
+  test("active Free Resources and Tests; locked full-library hubs", async ({
     page,
   }) => {
     const e2e = loadE2EEnv();
@@ -29,23 +29,44 @@ test.describe("Free student navigation", () => {
     await page.waitForURL(/\/dashboard/, { timeout: 30000 });
 
     await expect(page.getByRole("link", { name: "Free Resources" })).toBeVisible();
-    await expect(page.getByRole("link", { name: "My Subscription" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Tests" }).first()).toBeVisible();
+    await expect(page.getByRole("link", { name: "Contact Us" })).toBeVisible();
     await expect(page.getByRole("link", { name: "My Account" })).toBeVisible();
 
-    // Locked chrome still links to the hub (polished lock page).
-    await page.getByRole("link", { name: "Practice MCQs" }).click();
-    await page.waitForURL(/\/practice$/, { timeout: 15000 });
+    await page.getByRole("link", { name: "MCQ Bank" }).click();
+    await page.waitForURL(/\/mcq-bank$/, { timeout: 15000 });
     await expect(page.getByText(/subscription required/i)).toBeVisible({
       timeout: 15000,
     });
     await expect(
       page.getByRole("link", { name: "Get Subscription" })
     ).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: "Contact MedVerse" })
+    ).toBeVisible();
+
+    await page.goto("/pearl-points");
+    await expect(page.getByText(/subscription required/i)).toBeVisible({
+      timeout: 15000,
+    });
 
     await page.goto("/free-resources");
     await expect(
       page.getByRole("heading", { name: "Free Resources" })
     ).toBeVisible({ timeout: 15000 });
+
+    await page.goto("/contact");
+    await expect(page.getByRole("heading", { name: "Contact Us" })).toBeVisible({
+      timeout: 15000,
+    });
+    await expect(page.getByRole("link", { name: /WhatsApp/i }).first()).toBeVisible();
+    await expect(page.getByRole("link", { name: /Gmail/i })).toBeVisible();
+
+    await page.goto("/tests");
+    await expect(page.getByRole("heading", { name: "Tests" })).toBeVisible({
+      timeout: 15000,
+    });
+    await expect(page.getByText(/subscription required/i)).toHaveCount(0);
 
     await page.goto("/performance");
     await expect(page.getByText(/subscription required/i)).toBeVisible({

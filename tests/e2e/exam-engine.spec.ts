@@ -207,4 +207,47 @@ test.describe("Exam engine", () => {
       await teardownExamFixture(fixture);
     }
   });
+
+  test("skip is unanswered, distinct from remaining, and survives refresh until answered", async ({
+    page,
+  }) => {
+    const fixture = await provisionExamFixture({ questionCount: 3 });
+    try {
+      await login(page, fixture.email, fixture.password);
+      await startExam(page, fixture.testId);
+
+      await expect(page.getByTestId("remaining-mcqs")).toContainText("3");
+      await expect(page.getByTestId("skipped-mcqs")).toContainText("0");
+
+      await page.getByTestId("skip-question").click();
+      await expect(page.getByTestId("skipped-mcqs")).toContainText("1");
+      await expect(page.getByTestId("remaining-mcqs")).toContainText("2");
+      await expect(saveStatus(page)).toHaveText("Saved", { timeout: 10000 });
+
+      await page.getByTestId("skipped-jump-1").click();
+      await expect(page.getByText(/Question 1 of/)).toBeVisible();
+      await expect(page.getByTestId("skip-question")).toHaveAttribute(
+        "aria-pressed",
+        "true"
+      );
+
+      await page.reload();
+      await expect(page.getByText(/Question 1 of/)).toBeVisible({ timeout: 15000 });
+      await page.getByTestId("skipped-jump-1").click();
+      await expect(page.getByTestId("skipped-mcqs")).toContainText("1");
+      await expect(optionA(page)).toHaveAttribute("aria-pressed", "false");
+
+      await optionA(page).click();
+      await expect(page.getByTestId("skipped-mcqs")).toContainText("0");
+      await expect(page.getByTestId("remaining-mcqs")).toContainText("2");
+      await expect(saveStatus(page)).toHaveText("Saved", { timeout: 10000 });
+
+      await page.reload();
+      await expect(page.getByText(/Question 1 of/)).toBeVisible({ timeout: 15000 });
+      await expect(optionA(page)).toHaveAttribute("aria-pressed", "true");
+      await expect(page.getByTestId("skipped-mcqs")).toContainText("0");
+    } finally {
+      await teardownExamFixture(fixture);
+    }
+  });
 });

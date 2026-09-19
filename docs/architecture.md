@@ -6,8 +6,8 @@ Canonical documents. Code must follow these; **do not invent alternative states,
 
 An online MCQ platform for MBBS students (Years 1–5) of a single academy:
 
-- **Students**: after email verification, enter the LMS immediately (no admin enrollment approval). Use **free** resources without a paid subscription; see **paid** resources locked until entitled. Apply for subscription via manual bank transfer. Take admin-scheduled tests, practice MCQs, browse study materials, see performance/rank.
-- **Admin**: Main Admin has all permissions; other admins have granular codes (presets are UI only). Manages curriculum, question bank (versioning + review), tests (build → validate → preview → publish → kill-switch), **account status**, **class/year** (including year-change requests), **subscriptions and payment applications**, resource entitlements/grants/restrictions, results, analytics.
+- **Students**: after email verification, enter the LMS immediately (no admin enrollment approval). Two distinct content surfaces share the same records: **Free Resources** (admin-curated `entitlement = 'free'` / grant subset, only populated categories) and the **full library** (MCQ Bank, Pearl Points, Guidelines, OSPE Material, OSPE Lectures, Books, Notes, Lectures). Free students see the full-library hubs **locked** (subscription CTA + Contact MedVerse) without paid catalog payloads. Dashboard shows incoming scheduled tests (FREE/PAID, datetime, countdown); Tests is history/completed. Apply for subscription via manual bank transfer.
+- **Admin**: Main Admin has all permissions; other admins have granular codes (presets are UI only). Content management is **class/year first**, then Free Resources vs full/paid library, Question Bank, and Tests. Also manages curriculum, question versioning + review, tests (build → validate → preview → publish → kill-switch), **account status**, year-change requests, **subscriptions and payment applications**, resource entitlements/grants/restrictions, results, analytics.
 
 This is a **one-academy, one-time LMS**, not a multi-tenant SaaS product. `tenant_id` remains on every table for a possible future split; it is a single constant today.
 
@@ -20,6 +20,20 @@ Theme tokens live in `src/app/globals.css`; the shared `Logo` component
 should be assembled — reuse it rather than re-implementing. If the logo is
 ever replaced, re-sample these two hex values from the new asset and update
 both this doc and `globals.css`.
+
+## Progressive Web App
+
+Native mobile apps remain excluded. Students and admins can **install the same
+Next.js origin** as a Progressive Web App (`display: standalone`) from Android
+Chrome (install prompt) or iOS Safari (Add to Home Screen). Installation does
+not change authorization: a free student stays a free student; subscription
+and exam rules stay server-enforced.
+
+The service worker may cache hashed `/_next/static` assets and public branding
+icons only. It must not cache HTML/RSC documents, PostgREST (`/rest/v1`), Auth
+(`/auth/v1`), exam attempt payloads, private R2 objects (payment proofs, PDFs),
+or other authenticated educational content. App updates wait until no live exam
+player is open; they must not interrupt an in-progress attempt.
 
 ## Stack (approved production target)
 
@@ -75,7 +89,7 @@ JWT trust (unchanged claim semantics, split hosts):
 
 **Profile provisioning:** Cloud `INSERT` into `auth.users` cannot fire a trigger on VPS Postgres. Required RPC: idempotent `ensure_profile()` — creates `profiles` (`account_status` default `active`) and an **active** class enrollment from JWT `sub` + `user_metadata.year_id` only when the subject has **never** had an enrollment row (first provision). Call it after signup / verify / signIn. Email verification does **not** wait for admin approval. Keep `handle_new_user()` in migrations so a return to managed Supabase still auto-provisions when Auth and `public` share a database.
 
-**Access model (summary):** account status, class enrollment, subscription, and resource entitlement are separate. Free students enter after email verification and use **Dashboard**, **Free Resources**, **My Subscription**, and **My Account**; Study Materials / Practice / Tests / Performance are locked section hubs until a live subscription (pending applications do not unlock). Free / grant content stays on Free Resources without converting every `entitlement = 'free'` row to paid. Details in [permissions.md](permissions.md), [database.md](database.md), and [access-eligibility-analytics.md](access-eligibility-analytics.md). Historical eligibility, missed tests, dashboard analytics, and leaderboard population are in [access-eligibility-analytics.md](access-eligibility-analytics.md). `/pending` remains as a compatibility/blocked-account route, not a registration-approval gate.
+**Access model (summary):** account status, class enrollment, subscription, and resource entitlement are separate. Free students enter after email verification. **Free Resources** is a presentation/curation surface over existing subjects, `pearl_points`, and `material_folders` — not a second content store. Main library hubs (`/mcq-bank`, `/pearl-points`, `/guidelines`, `/ospe-material`, `/ospe-lectures`, `/books`, `/notes`, `/lectures`) stay visible but **locked** until a live subscription (pending applications do not unlock). Tests (`/tests`) is history; incoming scheduled tests live on Dashboard. Free / grant items stay usable via Free Resources and content RPCs. Pearl Points is not assumed free or paid — each row’s entitlement columns decide; the main Pearl Points hub is a full-library section. Details in [permissions.md](permissions.md), [database.md](database.md), and [access-eligibility-analytics.md](access-eligibility-analytics.md). Historical eligibility, missed tests, dashboard analytics, and leaderboard population are in [access-eligibility-analytics.md](access-eligibility-analytics.md). `/pending` remains as a compatibility/blocked-account route, not a registration-approval gate.
 
 **VPS `profiles.id`:** UUID primary key equal to Auth `sub`. **No** `references auth.users (id) ON DELETE CASCADE` on the VPS — that FK cannot exist without a local `auth.users` table. User-delete semantics without CASCADE are **pending approval** (see [deployment.md](deployment.md)).
 
@@ -91,9 +105,13 @@ Ranking must be **coalesced** before a 1,500-submit event — hosting does not r
 
 **Payment screenshots (now):** private Cloudflare R2 object keys on `subscription_applications` (`payment-proofs/{tenant_id}/{student_id}/{uuid}`); short-lived signed upload/download; never a public URL. Same R2 platform as backups — not a new infrastructure category. **Production requires `R2_PAYMENT_BUCKET`** (dedicated payment bucket; never falls back to the backup `R2_BUCKET`). Non-production may use `R2_PAYMENT_BUCKET` or, as a convenience, `R2_BUCKET` for a shared private bucket.
 
-**Study materials today:** Google Drive URLs (`materials.drive_url`). Student catalog access must not leak that URL; open via an entitlement-checked RPC.
+**Study materials:** `materials.kind` is `drive` (Google Drive URL), `pdf` (private R2 object), or `guideline` (text body). Existing Drive rows stay `kind = 'drive'`. Student catalog SELECT must not leak `drive_url`, `body_text`, or R2 object keys; open via entitlement-checked RPCs. PDFs use the **same private objects bucket** as payment proofs (`R2_PAYMENT_BUCKET` in production; non-production may share `R2_BUCKET`) with prefix `study-content/`. Next.js signs a short-lived GET after `authorize_study_object` and streams bytes — the browser never receives a permanent public URL. Cover/thumbnail keys follow the same prefix. **No new Cloudflare bucket** for this phase.
 
-**Books/PDFs/video (FUTURE):** must not be stored as permanent VPS-local public files and must not expose ordinary permanent download URLs or public MP4s. Protected temporary R2 (or equivalent) access after an entitlement check.
+**Pearl points:** lightweight recall items in `pearl_points` (not `question_versions`). Same entitlement columns as tests/folders. Answers are RPC-only.
+
+**Test preparation guidelines:** optional `test_prep_guidelines` row keyed by `test_id`. Frozen after the test leaves `draft`. Student body is returned only after `can_access_test`. Catalog visibility of a test does not leak the guideline.
+
+**Books/notes/video (FUTURE):** add a `materials.kind` (or a similarly narrow table) and the same signed-R2 + entitlement pattern. Do not invent a generic CMS. Must not be stored as permanent VPS-local public files and must not expose ordinary permanent download URLs or public MP4s.
 
 ## Core principles
 

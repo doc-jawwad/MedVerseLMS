@@ -127,7 +127,7 @@ export async function unrestrictResourceAccess(restrictionId: string) {
 }
 
 export async function setResourceEntitlement(
-  kind: "practice_subject" | "test" | "materials_folder",
+  kind: "practice_subject" | "test" | "materials_folder" | "pearl_point",
   id: string,
   entitlement: "free" | "any_subscription" | "plan",
   requiredPlanId?: string | null
@@ -141,9 +141,13 @@ export async function setResourceEntitlement(
   });
   revalidatePath("/admin/students");
   revalidatePath("/admin/materials");
+  revalidatePath("/admin/free-resources");
+  revalidatePath("/admin/pearls");
   revalidatePath("/admin/tests");
   revalidatePath("/materials");
   revalidatePath("/practice");
   revalidatePath("/tests");
+  revalidatePath("/pearl-points");
+  revalidatePath("/free-resources");
   return actionRpcResult("action", error);
 }

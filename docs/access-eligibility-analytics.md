@@ -50,7 +50,7 @@ Companion analyses (not canonical): subscription-vs-dashboard canvas; eligibilit
 | 7 | **Restriction (deny overlay)** | Unrevoked `access_restrictions` | Exception: named item cannot be used. **Deny wins** over grant, plan, and subscription. Not the same as account `restricted`. |
 | 8 | **Test eligibility (window)** | Could the student have called `start_attempt` during `[opens_at, closes_at)`? | Historical. Not current subscription. See §7. |
 | 9 | **Current resource access** | `can_access_*` / `resource_content_allowed` / exam window | Start test, open file, fetch practice **now**. |
-| 10 | **Navigation visibility** | Which menu items the shell shows as active vs locked | UX over live subscription. Free: Dashboard / Free Resources / Subscription / Account active; Materials / Practice / Tests / Performance locked. **Not content entitlement.** |
+| 10 | **Navigation visibility** | Which menu items the shell shows as active vs locked | UX over live subscription. Free **active:** Dashboard, Tests (history), Free Resources, Contact Us, Career Counselling, Get iMD, My Subscription, My Account. Free **locked full-library hubs:** MCQ Bank, Pearl Points, Guidelines, OSPE Material, OSPE Lectures, Books, Notes, Lectures (and Performance). Pearl Points **item** access is Layer 9. Locked hubs must not load paid catalog payloads. **Not content entitlement.** |
 | 11 | **Catalog visibility** | `can_view_*` — listed, including locked paid | See the item. Unpublished tests stay hidden. |
 | 12 | **Dashboard visibility** | Which cards, locks, previews, and history links render | UX over 9–11 plus owned history. Must not leak secrets. |
 
@@ -91,11 +91,12 @@ Nothing in 8D/pre-8J is obsolete. What is **missing** is historical window-eligi
 
 - After email verification, an **active** student enters the LMS **without** a paid subscription. No admin enrollment approval.
 - Absence of a live subscription (`has_live_subscription() = false`) = free student. Pending applications are **not** live access. Expired / deactivated subscriptions do not unlock paid LMS sections.
-- **Accessible shell sections (active nav):** Dashboard, **Free Resources**, My Subscription, My Account.
-- **Locked shell sections (visible, intentionally locked chrome + section lock page):** Study Materials, Practice MCQs, Tests, Performance. Clicking a locked item opens a polished subscription CTA (not a broken empty page). Pending ≠ unlocked.
-- **Free Resources** lists items the student can use **now** under the existing entitlement model: global `entitlement = 'free'` and/or an unrevoked personal grant (and not restricted). No parallel entitlement system and no duplicate storage tables.
+- **Accessible shell sections (active nav):** Dashboard, **Tests** (history / completed / in-progress), **Free Resources**, Contact Us, Career Counselling Series, Get iMD & StepWise MD, My Subscription, My Account.
+- **Locked shell sections (visible, intentionally locked chrome + section lock page):** MCQ Bank, Pearl Points, Guidelines, OSPE Material, OSPE Lectures, Books, Notes, Lectures, Performance. Clicking a locked item opens a polished lock with Get Subscription + Contact MedVerse (not a broken empty page and not a blurred paid catalog). Pending ≠ unlocked.
+- **Free Resources** is **not** the full library. It lists only categories that currently contain Admin-published items the student can use **now** (`entitlement = 'free'` and/or an unrevoked personal grant, and not restricted). Empty categories are omitted. Nested routes (`/free-resources/mcq-bank`, `/free-resources/pearl-points`, …) open that free subset. No parallel entitlement system and no duplicate storage tables. Folder types use `material_folders.library_type`; MCQ Bank uses practice subjects; Pearl Points uses `pearl_points`.
+- Dashboard lists **incoming** scheduled tests (open + upcoming) with FREE/PAID, datetime, countdown, and existing eligibility/lock rules. Tests page is **history**.
 - Free educational content is **not** mass-converted to paid. Admin continues to mark free vs paid per resource. Free items stay usable via Free Resources (and content RPCs); paid items stay denied by content RPCs until live subscription / grant rules allow.
-- Subscribed students use the normal Materials / Practice / Tests / Performance catalogs; free and paid items inside those catalogs still follow `resource_content_allowed` / grants / restrictions.
+- Subscribed students open full-library hubs according to entitlement; Free Resources remains the curated free subset and does not replace the main library.
 - Secrets (Drive URL, signed URL, question payload, `correct_key`, other students’ private data) must **never** be sent to the client merely because a card is locked, blurred, or previewed.
 - Dashboard may show lifetime score **summaries** and free-access banners. The dedicated Performance section remains locked without a live subscription (same analytics RPCs power Dashboard summaries — see §19 / implementation note).
 
@@ -103,10 +104,10 @@ Nothing in 8D/pre-8J is obsolete. What is **missing** is historical window-eligi
 
 **CURRENT IMPLEMENTATION:**
 
-- Student shell builds nav from `has_live_subscription()` via `buildStudentShellNav` (desktop + mobile share the same items / lock flags).
-- Free Resources route: `/free-resources`.
-- Paid section hubs render `SectionLock` when `has_live_subscription()` is false (no protected paid catalog payloads).
-- Deep links to free/granted practice subjects or accessible tests remain usable without unlocking the full section hub.
+- Student shell builds nav from `has_live_subscription()` via `buildStudentShellNav` (desktop + mobile share the same items / lock flags). Main Pearl Points / MCQ Bank / typed material hubs are locked without live subscription; Free Resources stays unlocked.
+- Free Resources landing: `/free-resources` (populated categories only). Free subset routes under `/free-resources/{type}`.
+- Full-library hubs render `SectionLock` when `has_live_subscription()` is false (no protected paid catalog payloads).
+- Deep links to free/granted practice subjects, accessible folders/items, or accessible tests remain usable without unlocking the full-library hub.
 - Existing rows may still be `entitlement = 'free'` (compatibility). Admins set paid entitlement on resources that should require subscription.
 
 ---
@@ -122,7 +123,7 @@ Nothing in 8D/pre-8J is obsolete. What is **missing** is historical window-eligi
 - Dashboard **Start** on paid tests/practice/materials follows current entitlement.
 - Historical free (and any earlier paid) academic data remains on the same lifetime series. No second analytics island.
 
-**PROPOSED ARCHITECTURE:** subscribed students may de-emphasize Free Resources because free items also appear inside Materials / Practice / Tests. Free Resources remains available. **Not shown in navigation ≠ not entitled.**
+**PROPOSED ARCHITECTURE:** subscribed students may de-emphasise Free Resources because free items also appear inside the full-library hubs. Free Resources remains the curated free subset and does not replace the main library. **Not shown in navigation ≠ not entitled.**
 
 **CURRENT IMPLEMENTATION:** navigation lock flags follow `has_live_subscription()`. Free Resources stays in the shared nav for both free and subscribed students. Inside subscribed catalogs, `accessible_test_ids` / `accessible_folder_ids` / `practice_subjects().granted` flip Start vs lock. Paid access is not stored in the JWT.
 
@@ -586,15 +587,17 @@ Priority: **P0** correctness/fairness before teaching the UI new labels; **P1** 
 | `start_attempt` **new** start window | Closed → `test_window_closed` even with grant | Same unless late-sit action | No backfill sit | P2 | New RPC if approved | **Yes** (§20.4) |
 | `test_summary.registered` | Current audience enrollments | Window-eligible population | Inflates after late subscribe | P1 | Change after B | No (law in §16) |
 | `admin_platform_summary.participation_pct` | Current enrollments × any attempt ever | Per-test: participants / window-eligible; or honest label | Wrong if presented as test participation | P1 | SQL rewrite + label | Metric definition details |
-| Student nav | Free: Dashboard / Free Resources / Subscription / Account active; Materials / Practice / Tests / Performance locked chrome. Subscribed: paid sections unlock. Shared `buildStudentShellNav`. | Same | Implemented | — | Keep | Nav chrome **yes** (product) |
-| Free Resources library | `/free-resources` presents free-entitled and/or granted usable items (existing tables/RPCs) | Same; no parallel entitlement | Implemented (presentation) | — | Folder publish flag **later** optional | Types not hardcoded |
+| Student nav | Free: Dashboard / Tests / Free Resources / Contact / Career / iMD / Subscription / Account active; full-library hubs locked. Subscribed: library hubs unlock. Shared `buildStudentShellNav`. | Same | Implemented | — | Keep | Nav chrome **yes** (product) |
+| Free Resources library | `/free-resources` presents only populated free/granted categories (existing tables/RPCs; `library_type` for folders) | Same; no parallel entitlement | Implemented (presentation) | — | Folder publish flag **later** optional | Types not hardcoded |
+| Pearl Points | `pearl_points` + `open_pearl`; entitlement columns; not Question Bank | Same architecture | Implemented | — | Per-student pearl grants **later** | Overlay on `access_grants`? |
+| PDF / guidelines | `materials.kind` pdf\|guideline; folder entitlement; signed R2 `study-content/` | Same folders/entitlement | Implemented | — | Books/notes/video as extra kinds | No new CMS |
 | Group grants | None | Optional exception overlay | No group target | P2 | Schema if approved | **Yes** |
 | Cumulative class board | Does not exist (`average_rank` is personal mean) | Do not ship in this pass | None if we don’t ship | — | Do not add | **Yes** if ever ship |
 | Eligibility on dashboard after subscribe | Ahmad’s A/B/C unlabeled zeros (good) but “Not attempted” (bad) | Not eligible | Label gap only for averages | P1 | UI | No |
 | JWT / session | Entitlement not in JWT | Time-of-read | None | — | Keep | No |
 | Account vs resource restricted | Separate | Separate | None | — | Keep | Restricted-during-window **yes** (§20.7) |
 | `paid_access_mode` / grace | Implemented pre-8J | Keep | None | — | Keep | No |
-| Materials `drive_url` | Hidden; `open_material` | Same | None | — | Keep | No |
+| Materials secrets | `drive_url` / `body_text` / R2 keys hidden; RPCs + signed GET | Same | None | — | Keep | No |
 | Blur / preview paid analytics | Lock notice only; no classmate data in lock card | Previews must not leak | No paid-analytics blur layer yet | P1 | UX; still RPC-gated | What to preview |
 | `question_stats` / `test_stats` tables | Documented; summaries often live RPC | Unchanged by subscription | Not used as eligibility | — | Do not overload | No |
 

@@ -20,6 +20,17 @@ function nextWithPathname(request: NextRequest, pathname: string) {
 // (docs/permissions.md); the single-session check runs in requireUser().
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  // PWA install assets must not depend on Auth client construction.
+  if (
+    pathname === "/sw.js" ||
+    pathname === "/manifest.webmanifest" ||
+    pathname === "/manifest.json" ||
+    pathname.startsWith("/icons/")
+  ) {
+    return nextWithPathname(request, pathname);
+  }
+
   let response = nextWithPathname(request, pathname);
 
   // Captured before getClaims() runs: a failed refresh makes the Supabase
@@ -85,7 +96,11 @@ export async function proxy(request: NextRequest) {
     pathname.startsWith("/auth") ||
     pathname.startsWith("/api/cron") ||
     pathname === "/api/health" ||
-    pathname.startsWith("/api/health/");
+    pathname.startsWith("/api/health/") ||
+    pathname === "/sw.js" ||
+    pathname === "/manifest.webmanifest" ||
+    pathname === "/manifest.json" ||
+    pathname.startsWith("/icons/");
 
   if (!isAuthed && !isPublic) {
     // Built fresh from request.url rather than request.nextUrl.clone(): a
@@ -114,6 +129,6 @@ export async function proxy(request: NextRequest) {
 export const config = {
   matcher: [
     // everything except static assets
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|sw\\.js|manifest\\.webmanifest|icons/|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
   ],
 };

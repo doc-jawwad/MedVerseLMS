@@ -1,36 +1,78 @@
 import { requireAdmin } from "@/lib/auth/require-user";
 import { MaterialsAdmin } from "./materials-admin";
+import { requireAdminClass } from "@/lib/admin/require-admin-class";
+import { AdminLibraryTypeTabs } from "@/components/admin/library-type-tabs";
+import {
+  LIBRARY_LIST,
+  parseLibrarySlug,
+  yearDisplayName,
+  type FolderLibraryType,
+} from "@/lib/library/types";
 
-export const metadata = { title: "Materials — MedVerse Admin" };
+export const metadata = { title: "Full library — MedVerse Admin" };
 
-export default async function AdminMaterialsPage() {
+export default async function AdminMaterialsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ year?: string; type?: string }>;
+}) {
   const { supabase } = await requireAdmin();
+  const params = await searchParams;
+  const parsed = params.type ? parseLibrarySlug(params.type) : "notes";
+  const libraryType: FolderLibraryType =
+    parsed && LIBRARY_LIST.find((t) => t.id === parsed)?.folderType
+      ? (parsed as FolderLibraryType)
+      : "notes";
 
   const [{ data: years }, { data: subjects }, { data: folders }, { data: materials }] =
     await Promise.all([
-      supabase.from("years").select("id, year_number").order("year_number"),
+      supabase.from("years").select("id, year_number, name").order("year_number"),
       supabase.from("subjects").select("id, name, year_id").order("name"),
       supabase
         .from("material_folders")
-        .select("id, name, year_id, subject_id")
+        .select("id, name, year_id, subject_id, entitlement, library_type")
         .order("sort_order")
         .order("name"),
       supabase
         .from("materials")
-        .select("id, folder_id, title, description, file_type")
+        .select("id, folder_id, title, description, file_type, kind, status")
         .order("sort_order")
         .order("title"),
     ]);
 
-  return (
-    <div className="grid gap-6">
-      <h1 className="text-2xl font-semibold">Study Materials</h1>
-      <MaterialsAdmin
-        years={years ?? []}
-        subjects={subjects ?? []}
-        folders={folders ?? []}
-        materials={materials ?? []}
-      />
-    </div>
-  );
+  return requireAdminClass({
+    searchYear: params.year,
+    next: "/admin/materials",
+    children: (year) => (
+      <div className="grid gap-6">
+        <div>
+          <p className="text-[11px] font-semibold tracking-[0.16em] text-primary uppercase">
+            {yearDisplayName(year)} · Full library
+          </p>
+          <h1 className="font-heading text-2xl font-semibold text-[#072855]">
+            Paid / full resources
+          </h1>
+          <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+            Same records as Free Resources. Set access to Free or subscription-required.
+            Folders group subject → topic → items. New folders default to subscription-required.
+          </p>
+        </div>
+        <AdminLibraryTypeTabs
+          basePath="/admin/materials"
+          active={
+            LIBRARY_LIST.find((t) => t.id === libraryType)?.slug ?? "notes"
+          }
+        />
+        <MaterialsAdmin
+          years={years ?? []}
+          subjects={(subjects ?? []).filter((s) => s.year_id === year.id)}
+          folders={(folders ?? []).filter((f) => f.year_id === year.id)}
+          materials={materials ?? []}
+          lockedYearId={year.id}
+          libraryType={libraryType}
+          defaultEntitlement="any_subscription"
+        />
+      </div>
+    ),
+  });
 }

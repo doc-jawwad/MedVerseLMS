@@ -36,7 +36,7 @@ export function ResourceLockNotice({
           <Link href="/subscription">Get Subscription</Link>
         </Button>
         <Button asChild size="sm" variant="outline">
-          <Link href="/subscription#contact-admin">Contact Admin</Link>
+          <Link href="/contact">Contact MedVerse</Link>
         </Button>
       </div>
     </div>

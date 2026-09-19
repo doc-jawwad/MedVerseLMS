@@ -213,6 +213,18 @@ export async function setAudienceYears(testId: string, yearIds: string[]) {
   return { error: undefined };
 }
 
+export async function upsertTestPrepGuidelines(testId: string, bodyText: string) {
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("upsert_test_prep_guidelines", {
+    p_test_id: testId,
+    p_body_text: bodyText,
+  });
+  reval(testId);
+  revalidatePath(`/tests/${testId}/attempt`);
+  revalidatePath("/tests");
+  return actionRpcResult("action", error);
+}
+
 export async function publishTest(testId: string) {
   const supabase = await createClient();
   const { error } = await supabase.rpc("publish_test", { p_test_id: testId });

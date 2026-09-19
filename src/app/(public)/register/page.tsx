@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { RegisterForm } from "./register-form";
+import { AuthShell } from "@/components/student/auth-shell";
 
 export const metadata = { title: "Register — MedVerse LMS" };
 
@@ -38,8 +39,8 @@ export default async function RegisterPage() {
   const years = await loadYears();
 
   return (
-    <div className="flex min-h-svh items-center justify-center p-4">
+    <AuthShell>
       <RegisterForm years={years} />
-    </div>
+    </AuthShell>
   );
 }

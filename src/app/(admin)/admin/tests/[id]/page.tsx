@@ -4,6 +4,10 @@ import { requireAdmin } from "@/lib/auth/require-user";
 import { loadCurriculum } from "../../questions/curriculum-data";
 import { TestConfigForm } from "../test-config-form";
 import {
+  TestPrepGuidelinesForm,
+  TestStudentAccessForm,
+} from "../test-prep-form";
+import {
   AddQuestionButton,
   AddRandomButton,
   AudiencePicker,
@@ -66,6 +70,7 @@ export default async function TestDetailPage({
     { data: audiences },
     checklistRes,
     curriculum,
+    prepRes,
   ] = await Promise.all([
     supabase.from("years").select("id, year_number").order("year_number"),
     supabase.from("subjects").select("id, name, year_id").order("name"),
@@ -79,6 +84,7 @@ export default async function TestDetailPage({
     supabase.from("test_audiences").select("year_id").eq("test_id", id),
     isDraft ? supabase.rpc("validate_test", { p_test_id: id }) : Promise.resolve({ data: null }),
     loadCurriculum(supabase),
+    supabase.rpc("get_test_prep_guidelines", { p_test_id: id }),
   ]);
 
   const checklist = (checklistRes.data ?? []) as Check[];
@@ -177,12 +183,34 @@ export default async function TestDetailPage({
       </Card>
 
       <Card>
-        <CardHeader><CardTitle className="text-base">Audience</CardTitle></CardHeader>
+        <CardHeader><CardTitle className="text-base">Year audience</CardTitle></CardHeader>
         <CardContent>
           <AudiencePicker
             testId={id}
             years={years ?? []}
             selected={(audiences ?? []).map((a) => a.year_id)}
+          />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader><CardTitle className="text-base">Student access</CardTitle></CardHeader>
+        <CardContent>
+          <TestStudentAccessForm
+            testId={id}
+            entitlement={test.entitlement ?? "free"}
+            status={test.status}
+          />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader><CardTitle className="text-base">Preparation guidelines</CardTitle></CardHeader>
+        <CardContent>
+          <TestPrepGuidelinesForm
+            testId={id}
+            initial={typeof prepRes.data === "string" ? prepRes.data : ""}
+            readOnly={!isDraft}
           />
         </CardContent>
       </Card>

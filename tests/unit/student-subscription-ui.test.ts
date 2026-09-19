@@ -105,7 +105,7 @@ describe("student subscription status view", () => {
     assert.equal(studentHasPaidLmsSections(view.hasLiveAccess), false);
     assert.ok(
       buildStudentShellNav(view.hasLiveAccess).items.some(
-        (i) => i.href === "/practice" && i.locked
+        (i) => i.href === "/mcq-bank" && i.locked
       )
     );
   });

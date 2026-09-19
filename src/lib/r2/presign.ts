@@ -75,6 +75,20 @@ export function paymentScreenshotPrefix(): string {
   return process.env.R2_PAYMENT_PREFIX?.trim() || DEFAULT_PREFIX;
 }
 
+export function studyContentPrefix(): string {
+  return process.env.R2_STUDY_PREFIX?.trim() || "study-content";
+}
+
+export function isAllowedR2ObjectKey(key: string): boolean {
+  if (!key || key.includes("://") || key.includes("..") || /\s/.test(key)) {
+    return false;
+  }
+  return (
+    key.startsWith(`${paymentScreenshotPrefix()}/`) ||
+    key.startsWith(`${studyContentPrefix()}/`)
+  );
+}
+
 export function presignR2Object(options: {
   method: R2Method;
   key: string;
@@ -82,8 +96,8 @@ export function presignR2Object(options: {
   now?: Date;
   config?: R2Config;
 }): { url: string } | { error: string } {
-  if (!options.key.startsWith(`${paymentScreenshotPrefix()}/`)) {
-    return { error: "invalid_screenshot_object_key" };
+  if (!isAllowedR2ObjectKey(options.key)) {
+    return { error: "invalid_object_key" };
   }
   const config = options.config ?? getR2Config();
   if ("error" in config) return config;
@@ -166,4 +180,22 @@ export async function deleteR2Object(options: {
   const res = await fetch(signed.url, { method: "DELETE" });
   if (res.ok || res.status === 404) return {};
   return { error: "r2_delete_failed" };
+}
+
+export async function getR2Object(options: {
+  key: string;
+  config?: R2Config;
+}): Promise<{ body: Buffer; contentType: string } | { error: string }> {
+  const signed = presignR2Object({
+    method: "GET",
+    key: options.key,
+    config: options.config,
+  });
+  if ("error" in signed) return signed;
+  const res = await fetch(signed.url, { method: "GET" });
+  if (!res.ok) return { error: "r2_download_failed" };
+  const body = Buffer.from(await res.arrayBuffer());
+  const contentType =
+    res.headers.get("content-type") || "application/octet-stream";
+  return { body, contentType };
 }

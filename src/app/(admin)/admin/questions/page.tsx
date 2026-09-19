@@ -1,5 +1,8 @@
 import Link from "next/link";
 import { requireAdmin } from "@/lib/auth/require-user";
+import { resolveAdminYearId } from "@/lib/admin/selected-class";
+import { loadAdminYears } from "@/lib/admin/require-admin-class";
+import { AdminClassPicker } from "@/components/admin/class-picker";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -47,20 +50,23 @@ export default async function QuestionsPage({
 }) {
   const { supabase } = await requireAdmin();
   const params = await searchParams;
+  const yearFilter = params.year || (await resolveAdminYearId());
+  if (!yearFilter) {
+    const years = await loadAdminYears();
+    return <AdminClassPicker years={years} next="/admin/questions" />;
+  }
   const page = Math.max(1, Number.parseInt(params.page ?? "1", 10) || 1);
   const sort = SORT_OPTIONS.find((s) => s.value === params.sort) ?? SORT_OPTIONS[0];
 
   const { data: years } = await supabase
     .from("years")
-    .select("id, year_number")
+    .select("id, year_number, name")
     .order("year_number");
-  const { data: subjects } = params.year
-    ? await supabase
+  const { data: subjects } = await supabase
         .from("subjects")
         .select("id, name")
-        .eq("year_id", params.year)
-        .order("name")
-    : { data: null };
+        .eq("year_id", yearFilter)
+        .order("name");
   const { data: books } = params.subject
     ? await supabase
         .from("books")
@@ -95,7 +101,7 @@ export default async function QuestionsPage({
     .range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1);
 
   if (params.status) query = query.eq("status", params.status);
-  if (params.year) query = query.eq("year_id", params.year);
+  if (yearFilter) query = query.eq("year_id", yearFilter);
   if (params.subject) query = query.eq("subject_id", params.subject);
   if (params.book) query = query.eq("book_id", params.book);
   if (params.chapter) query = query.eq("chapter_id", params.chapter);
@@ -113,7 +119,7 @@ export default async function QuestionsPage({
   // Any filter/sort change resets to page 1, unless the patch is itself a
   // page change (pagination links pass `page` explicitly).
   const filterLink = (patch: Record<string, string | undefined>) => {
-    const merged = { ...params, page: undefined, ...patch };
+    const merged = { ...params, year: yearFilter, page: undefined, ...patch };
     const qs = Object.entries(merged)
       .filter(([, v]) => v)
       .map(([k, v]) => `${k}=${encodeURIComponent(v!)}`)
@@ -122,25 +128,30 @@ export default async function QuestionsPage({
   };
 
   return (
-    <div className="grid gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-2xl font-semibold">
-          Question Bank{" "}
-          <span className="text-base font-normal text-muted-foreground">
-            {totalCount === 0 ? "0 shown" : `${rangeStart}–${rangeEnd} of ${totalCount}`}
-          </span>
-        </h1>
-        <div className="flex gap-2">
-          <Button asChild variant="outline">
+    <div className="grid gap-5">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight text-[var(--brand-navy)]">
+            Question Bank
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {totalCount === 0
+              ? "No questions match these filters"
+              : `Showing ${rangeStart}–${rangeEnd} of ${totalCount}`}
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button asChild variant="outline" className="h-9">
             <Link href="/admin/questions/import">Import CSV/Excel</Link>
           </Button>
-          <Button asChild>
+          <Button asChild className="h-9">
             <Link href="/admin/questions/new">New question</Link>
           </Button>
         </div>
       </div>
 
-      <form className="flex flex-wrap gap-2">
+      <div className="grid gap-3 rounded-xl border border-border/80 bg-card p-3 sm:p-4">
+      <form className="flex flex-col gap-2 sm:flex-row sm:items-center">
         {Object.entries(params)
           .filter(([k, v]) => k !== "q" && v)
           .map(([k, v]) => (
@@ -150,40 +161,38 @@ export default async function QuestionsPage({
           name="q"
           placeholder="Search question text…"
           defaultValue={params.q ?? ""}
-          className="w-72"
+          className="h-9 min-w-0 flex-1 sm:max-w-md"
         />
-        <Button type="submit" variant="secondary">
+        <Button type="submit" variant="secondary" className="h-9 shrink-0">
           Search
         </Button>
       </form>
 
-      <div className="flex flex-wrap gap-4 text-sm">
-        <div className="flex gap-1">
+      <div className="grid gap-3 text-sm">
+        <div className="flex flex-wrap gap-1.5">
           {["", "draft", "review", "approved", "needs_revision", "archived"].map((s) => (
             <Link
               key={s || "all"}
               href={filterLink({ status: s || undefined })}
-              className={`rounded-md border px-2 py-1 ${
-                (params.status ?? "") === s ? "bg-accent" : "hover:bg-accent/50"
+              className={`rounded-full border px-2.5 py-1 text-xs capitalize transition-colors ${
+                (params.status ?? "") === s
+                  ? "border-[var(--brand-navy)] bg-[var(--brand-navy)] text-white"
+                  : "hover:bg-accent/60"
               }`}
             >
-              {s ? s.replace("_", " ") : "all"}
+              {s ? s.replace("_", " ") : "all statuses"}
             </Link>
           ))}
         </div>
-        <div className="flex gap-1">
-          <Link
-            href={filterLink({ year: undefined, subject: undefined })}
-            className={`rounded-md border px-2 py-1 ${!params.year ? "bg-accent" : "hover:bg-accent/50"}`}
-          >
-            all years
-          </Link>
+        <div className="flex flex-wrap gap-1.5">
           {(years ?? []).map((y) => (
             <Link
               key={y.id}
               href={filterLink({ year: y.id, subject: undefined })}
-              className={`rounded-md border px-2 py-1 ${
-                params.year === y.id ? "bg-accent" : "hover:bg-accent/50"
+              className={`rounded-full border px-2.5 py-1 text-xs transition-colors ${
+                yearFilter === y.id
+                  ? "border-[var(--brand-navy)] bg-[var(--brand-navy)] text-white"
+                  : "hover:bg-accent/60"
               }`}
             >
               Y{y.year_number}
@@ -194,7 +203,7 @@ export default async function QuestionsPage({
           <div className="flex flex-wrap gap-1">
             <Link
               href={filterLink({ subject: undefined, book: undefined, chapter: undefined, topic: undefined })}
-              className={`rounded-md border px-2 py-1 ${!params.subject ? "bg-accent" : "hover:bg-accent/50"}`}
+              className={`rounded-full border px-2.5 py-1 text-xs transition-colors ${!params.subject ? "border-[var(--brand-navy)] bg-[var(--brand-navy)] text-white" : "hover:bg-accent/60"}`}
             >
               all subjects
             </Link>
@@ -202,8 +211,8 @@ export default async function QuestionsPage({
               <Link
                 key={s.id}
                 href={filterLink({ subject: s.id, book: undefined, chapter: undefined, topic: undefined })}
-                className={`rounded-md border px-2 py-1 ${
-                  params.subject === s.id ? "bg-accent" : "hover:bg-accent/50"
+                className={`rounded-full border px-2.5 py-1 text-xs transition-colors ${
+                  params.subject === s.id ? "border-[var(--brand-navy)] bg-[var(--brand-navy)] text-white" : "hover:bg-accent/60"
                 }`}
               >
                 {s.name}
@@ -215,7 +224,7 @@ export default async function QuestionsPage({
           <div className="flex flex-wrap gap-1">
             <Link
               href={filterLink({ book: undefined, chapter: undefined, topic: undefined })}
-              className={`rounded-md border px-2 py-1 ${!params.book ? "bg-accent" : "hover:bg-accent/50"}`}
+              className={`rounded-full border px-2.5 py-1 text-xs transition-colors ${!params.book ? "border-[var(--brand-navy)] bg-[var(--brand-navy)] text-white" : "hover:bg-accent/60"}`}
             >
               all books
             </Link>
@@ -223,8 +232,8 @@ export default async function QuestionsPage({
               <Link
                 key={b.id}
                 href={filterLink({ book: b.id, chapter: undefined, topic: undefined })}
-                className={`rounded-md border px-2 py-1 ${
-                  params.book === b.id ? "bg-accent" : "hover:bg-accent/50"
+                className={`rounded-full border px-2.5 py-1 text-xs transition-colors ${
+                  params.book === b.id ? "border-[var(--brand-navy)] bg-[var(--brand-navy)] text-white" : "hover:bg-accent/60"
                 }`}
               >
                 {b.name}
@@ -236,7 +245,7 @@ export default async function QuestionsPage({
           <div className="flex flex-wrap gap-1">
             <Link
               href={filterLink({ chapter: undefined, topic: undefined })}
-              className={`rounded-md border px-2 py-1 ${!params.chapter ? "bg-accent" : "hover:bg-accent/50"}`}
+              className={`rounded-full border px-2.5 py-1 text-xs transition-colors ${!params.chapter ? "border-[var(--brand-navy)] bg-[var(--brand-navy)] text-white" : "hover:bg-accent/60"}`}
             >
               all chapters
             </Link>
@@ -244,8 +253,8 @@ export default async function QuestionsPage({
               <Link
                 key={c.id}
                 href={filterLink({ chapter: c.id, topic: undefined })}
-                className={`rounded-md border px-2 py-1 ${
-                  params.chapter === c.id ? "bg-accent" : "hover:bg-accent/50"
+                className={`rounded-full border px-2.5 py-1 text-xs transition-colors ${
+                  params.chapter === c.id ? "border-[var(--brand-navy)] bg-[var(--brand-navy)] text-white" : "hover:bg-accent/60"
                 }`}
               >
                 {c.name}
@@ -257,7 +266,7 @@ export default async function QuestionsPage({
           <div className="flex flex-wrap gap-1">
             <Link
               href={filterLink({ topic: undefined })}
-              className={`rounded-md border px-2 py-1 ${!params.topic ? "bg-accent" : "hover:bg-accent/50"}`}
+              className={`rounded-full border px-2.5 py-1 text-xs transition-colors ${!params.topic ? "border-[var(--brand-navy)] bg-[var(--brand-navy)] text-white" : "hover:bg-accent/60"}`}
             >
               all topics
             </Link>
@@ -265,8 +274,8 @@ export default async function QuestionsPage({
               <Link
                 key={t.id}
                 href={filterLink({ topic: t.id })}
-                className={`rounded-md border px-2 py-1 ${
-                  params.topic === t.id ? "bg-accent" : "hover:bg-accent/50"
+                className={`rounded-full border px-2.5 py-1 text-xs transition-colors ${
+                  params.topic === t.id ? "border-[var(--brand-navy)] bg-[var(--brand-navy)] text-white" : "hover:bg-accent/60"
                 }`}
               >
                 {t.name}
@@ -279,8 +288,8 @@ export default async function QuestionsPage({
             <Link
               key={d || "all"}
               href={filterLink({ difficulty: d || undefined })}
-              className={`rounded-md border px-2 py-1 ${
-                (params.difficulty ?? "") === d ? "bg-accent" : "hover:bg-accent/50"
+              className={`rounded-full border px-2.5 py-1 text-xs transition-colors ${
+                (params.difficulty ?? "") === d ? "border-[var(--brand-navy)] bg-[var(--brand-navy)] text-white" : "hover:bg-accent/60"
               }`}
             >
               {d || "any difficulty"}
@@ -292,8 +301,8 @@ export default async function QuestionsPage({
             <Link
               key={s.value}
               href={filterLink({ sort: s.value === "newest" ? undefined : s.value })}
-              className={`rounded-md border px-2 py-1 ${
-                sort.value === s.value ? "bg-accent" : "hover:bg-accent/50"
+              className={`rounded-full border px-2.5 py-1 text-xs transition-colors ${
+                sort.value === s.value ? "border-[var(--brand-navy)] bg-[var(--brand-navy)] text-white" : "hover:bg-accent/60"
               }`}
             >
               {s.label}
@@ -301,19 +310,20 @@ export default async function QuestionsPage({
           ))}
         </div>
       </div>
+      </div>
 
       {error && <p className="text-sm text-destructive">Could not load this page. Please try again.</p>}
 
-      <div className="overflow-x-auto rounded-md border">
+      <div className="overflow-x-auto rounded-xl border border-border/80 bg-card">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="max-w-md">Question</TableHead>
-              <TableHead>Subject</TableHead>
-              <TableHead>Chapter / Topic</TableHead>
+              <TableHead className="min-w-[12rem] max-w-md">Question</TableHead>
+              <TableHead className="hidden sm:table-cell">Subject</TableHead>
+              <TableHead className="hidden md:table-cell">Chapter / Topic</TableHead>
               <TableHead>Difficulty</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead>Ver.</TableHead>
+              <TableHead className="hidden lg:table-cell">Ver.</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -343,12 +353,13 @@ export default async function QuestionsPage({
                     </Link>
                     {q.used_in_test && (
                       <span className="text-xs text-muted-foreground">
+                        {" "}
                         used in test
                       </span>
                     )}
                   </TableCell>
-                  <TableCell>{subj?.name}</TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
+                  <TableCell className="hidden sm:table-cell">{subj?.name}</TableCell>
+                  <TableCell className="hidden text-sm text-muted-foreground md:table-cell">
                     {chap?.name} / {top?.name}
                   </TableCell>
                   <TableCell>{q.difficulty}</TableCell>
@@ -357,7 +368,9 @@ export default async function QuestionsPage({
                       {q.status.replace("_", " ")}
                     </Badge>
                   </TableCell>
-                  <TableCell>v{v?.version_no ?? "?"}</TableCell>
+                  <TableCell className="hidden lg:table-cell">
+                    v{v?.version_no ?? "?"}
+                  </TableCell>
                 </TableRow>
               );
             })}

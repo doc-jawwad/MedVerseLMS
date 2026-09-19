@@ -109,7 +109,7 @@ export function PracticeSession({
       <div className="mx-auto grid w-full max-w-2xl gap-4">
         <p className="text-destructive">{error}</p>
         <Button asChild variant="outline" className="w-fit">
-          <Link href="/practice">Back to practice</Link>
+          <Link href="/mcq-bank">Back to MCQ Bank</Link>
         </Button>
       </div>
     );
@@ -126,7 +126,7 @@ export function PracticeSession({
       <div className="mx-auto grid w-full max-w-2xl gap-4">
         <p className="text-muted-foreground">No questions available here yet.</p>
         <Button asChild variant="outline" className="w-fit">
-          <Link href="/practice">Back to practice</Link>
+          <Link href="/mcq-bank">Back to MCQ Bank</Link>
         </Button>
       </div>
     );
@@ -227,7 +227,7 @@ export function PracticeSession({
               </Button>
             )}
             <Button asChild variant="ghost">
-              <Link href="/practice">End session</Link>
+              <Link href="/mcq-bank">End session</Link>
             </Button>
           </div>
         </CardContent>

@@ -77,6 +77,18 @@ export const ADMIN_NAV: AdminNavDef[] = [
   },
   { href: "/admin/curriculum", label: "Curriculum", icon: "curriculum" },
   {
+    href: "/admin/library",
+    label: "Class library",
+    icon: "classLibrary",
+    anyOf: [
+      "manage_materials",
+      "edit_questions",
+      "import_questions",
+      "publish_tests",
+      "grant_resource_access",
+    ],
+  },
+  {
     href: "/admin/questions",
     label: "Question Bank",
     icon: "questions",
@@ -93,6 +105,18 @@ export const ADMIN_NAV: AdminNavDef[] = [
     label: "Materials",
     icon: "materialsFolder",
     anyOf: ["manage_materials"],
+  },
+  {
+    href: "/admin/pearls",
+    label: "Pearl Points",
+    icon: "pearlPoints",
+    anyOf: ["manage_materials"],
+  },
+  {
+    href: "/admin/free-resources",
+    label: "Free Resources",
+    icon: "freeResources",
+    anyOf: ["manage_materials", "grant_resource_access", "publish_tests"],
   },
   {
     href: "/admin/audit-logs",

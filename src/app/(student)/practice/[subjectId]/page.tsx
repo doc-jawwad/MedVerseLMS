@@ -48,8 +48,8 @@ export default async function PracticeSubjectPage({
     if (!allowed) {
       return (
         <SectionLock
-          title="Practice MCQs"
-          description="This practice subject requires a live subscription. Free practice stays under Free Resources."
+        title="MCQ Bank"
+        description="This subject requires a live subscription. Free practice stays under Free Resources."
         />
       );
     }

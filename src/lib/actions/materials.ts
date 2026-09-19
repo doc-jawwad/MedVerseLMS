@@ -14,16 +14,27 @@ function validDriveUrl(url: string) {
   }
 }
 
-export async function addFolder(yearId: string, subjectId: string | null, name: string) {
+export async function addFolder(
+  yearId: string,
+  subjectId: string | null,
+  name: string,
+  libraryType: string,
+  entitlement: "free" | "any_subscription" = "any_subscription"
+) {
   if (!name.trim()) return { error: "Folder name required." };
   const supabase = await createClient();
   const { error } = await supabase.from("material_folders").insert({
     year_id: yearId,
     subject_id: subjectId,
     name: name.trim(),
+    library_type: libraryType,
+    entitlement,
   });
   revalidatePath("/admin/materials");
+  revalidatePath("/admin/free-resources");
+  revalidatePath("/admin/library");
   revalidatePath("/materials");
+  revalidatePath("/free-resources");
   return actionRpcResult("action", error);
 }
 
@@ -60,14 +71,6 @@ export async function addMaterial(
   return actionRpcResult("action", error);
 }
 
-export async function deleteMaterial(materialId: string) {
-  const supabase = await createClient();
-  const { error } = await supabase.from("materials").delete().eq("id", materialId);
-  revalidatePath("/admin/materials");
-  revalidatePath("/materials");
-  return actionRpcResult("action", error);
-}
-
 export async function openMaterial(materialId: string) {
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("open_material", {
@@ -78,4 +81,14 @@ export async function openMaterial(materialId: string) {
     return { error: "Unable to open this material." };
   }
   return { url: data };
+}
+
+export async function deleteMaterial(materialId: string) {
+  const supabase = await createClient();
+  const { error } = await supabase.from("materials").delete().eq("id", materialId);
+  revalidatePath("/admin/materials");
+  revalidatePath("/admin/free-resources");
+  revalidatePath("/materials");
+  revalidatePath("/free-resources");
+  return actionRpcResult("action", error);
 }

@@ -58,6 +58,6 @@ describe("deleteR2Object signing (F5)", () => {
       key: "backups/dump.sql",
       config,
     });
-    assert.equal(result.error, "invalid_screenshot_object_key");
+    assert.equal(result.error, "invalid_object_key");
   });
 });

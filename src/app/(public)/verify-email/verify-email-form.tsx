@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Logo } from "@/components/logo";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export function VerifyEmailForm({ email: initialEmail }: { email: string }) {
   const [email, setEmail] = useState(initialEmail);
@@ -44,15 +44,16 @@ export function VerifyEmailForm({ email: initialEmail }: { email: string }) {
   }
 
   return (
-    <Card className="w-full max-w-sm">
-      <CardHeader>
-        <Logo dark className="mb-2" />
-        <CardTitle>Verify your email</CardTitle>
+    <Card className="w-full border-border/80 shadow-none">
+      <CardHeader className="space-y-1.5 pb-4">
+        <CardTitle className="text-xl text-[var(--brand-navy)]">
+          Verify your email
+        </CardTitle>
         <CardDescription>
           {initialEmail ? (
             <>
               We sent a 6-digit code to <strong>{initialEmail}</strong>. Enter it
-              below to confirm your account.
+              below to confirm your account and open the LMS.
             </>
           ) : (
             <>
@@ -74,6 +75,7 @@ export function VerifyEmailForm({ email: initialEmail }: { email: string }) {
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              className="h-10"
               readOnly={Boolean(initialEmail)}
             />
           </div>
@@ -87,13 +89,15 @@ export function VerifyEmailForm({ email: initialEmail }: { email: string }) {
               maxLength={6}
               placeholder="123456"
               required
-              className="text-center text-lg tracking-[0.5em]"
+              className="h-10 text-center text-lg tracking-[0.5em]"
             />
           </div>
           {state?.error && (
-            <p className="text-sm text-destructive">{state.error}</p>
+            <Alert variant="destructive">
+              <AlertDescription>{state.error}</AlertDescription>
+            </Alert>
           )}
-          <Button type="submit" disabled={pending}>
+          <Button type="submit" disabled={pending} className="h-10">
             {pending ? "Verifying…" : "Verify"}
           </Button>
           <Button

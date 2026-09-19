@@ -87,11 +87,11 @@ Each student-facing resource kind carries the same entitlement shape (columns on
 - `entitlement text check in ('free','any_subscription','plan')` default `'free'`
 - `required_plan_id uuid null references subscription_plans` — required iff `entitlement = 'plan'`.
 
-Applies to **tests**, **material_folders**, and **practice subjects** (`subjects`). Main Admin configures each practice subject independently. Do not hard-code practice as always free or always paid.
+Applies to **tests**, **material_folders**, **practice subjects** (`subjects`), and **pearl_points**. Main Admin configures each practice subject independently. Do not hard-code practice or pearls as always free or always paid. PDF files and text guidelines inherit **folder** entitlement — they are not a second policy.
 
 **Compatibility backfill:** existing tests, material folders, and practice subjects default to `entitlement = 'free'` so current year-based access is preserved. New resources may be free, subscription-required, or plan-specific.
 
-**access_grants** — allow overlay. `student_id`, `grant_type check in ('practice_subject','test','materials_folder')` (extend later for `book`/`video`), `subject_id`, `test_id`, `folder_id`, `granted_by`, `revoked_at` (null = live). CHECK: exactly one target column non-null and matching grant_type. Unique live target `(student_id, grant_type, coalesce(subject_id, test_id, folder_id)) WHERE revoked_at is null`.
+**access_grants** — allow overlay. `student_id`, `grant_type check in ('practice_subject','test','materials_folder')` (extend later for `pearl_point` / `book` / `video` when per-student pearl grants are needed), `subject_id`, `test_id`, `folder_id`, `granted_by`, `revoked_at` (null = live). CHECK: exactly one target column non-null and matching grant_type. Unique live target `(student_id, grant_type, coalesce(subject_id, test_id, folder_id)) WHERE revoked_at is null`. Pearl **item** access in this phase uses the same entitlement columns on `pearl_points` (plus year enrollment). Per-student pearl grant/restriction overlay is deferred — do not duplicate pearls into `questions`.
 
 **access_restrictions** — deny overlay. Same target shape as grants (`resource_kind` + matching id column, `student_id`, `set_by`, `revoked_at`). Unique live target. Writes via `restrict_access` / `unrestrict_access` (`grant_resource_access`). **Deny wins** over grant and subscription. Applies to an otherwise **active** account; it is not `profiles.account_status = 'restricted'`.
 
@@ -113,6 +113,9 @@ Helpers: `can_view_test` (catalog) vs `can_access_test` (content); `resource_con
 
 **tests** — `title`, `year_id`, `subject_id null`, `status text check in ('draft','published','closed','archived','invalidated') default 'draft'`, `opens_at`, `closes_at`, `duration_minutes int`, `marks_per_question numeric(6,2) default 1`, `negative_mark numeric(4,2) default 0`, `shuffle_questions bool default true`, `shuffle_options bool default false`, `show_review text check in ('after_submit','after_close','never') default 'after_close'`, `min_questions int default 1`, `created_by`, plus entitlement columns (`free` / `any_subscription` / `plan`; existing rows backfilled `free`).
 ("live" is derived: `status='published' and now() between opens_at and closes_at` — not a stored state.)
+Student-facing **Free / Paid** audience in the test form maps onto these entitlement columns (not a new enum): Free (including Free+Paid) → `free` (subscription never removes free access); Paid only → `any_subscription`; Neither → remain `draft` (unpublished tests are never in the student catalog). `test_audiences` remains year-cohort catalog membership.
+
+**test_prep_guidelines** — `test_id` PK → `tests` (`ON DELETE CASCADE`), `body_text`. Optional preparation / study notes for a test. No student table SELECT (`get_test_prep_guidelines` / `accessible_test_prep` after `can_access_test`). Writes allowed only while the test is `draft` (frozen after publish, same idea as `protect_published_test`). History keeps the row attached after submit/close; body still requires live content entitlement.
 - `rank_dirty_at timestamptz` — leftover coalesced-ranking drain source for older writers. New scoring must **not** `UPDATE` this column; `rank_dirty_tests()` still clears it when set.
 
 **rank_dirty_queue** — append-only dirty signal that a test's `rank`/`percentile` needs recomputation. `test_id` → `tests` (`ON DELETE CASCADE`). `score_attempt` inserts one row; `rank_dirty_tests()` distinct-drains then calls `rank_test` once per test. No student/admin table access (SECURITY DEFINER RPCs only). Concurrent same-test submits must not serialize on the `tests` row for this signal ([scoring-rules.md](scoring-rules.md)).
@@ -144,9 +147,20 @@ Practice list RPCs return catalog rows with a lock flag; start/fetch RPCs enforc
 
 ## Materials
 
-**material_folders** — `name`, `year_id`, `subject_id null`, `sort_order`, plus entitlement columns (existing folders backfilled `free`).
-**materials** — `folder_id`, `title`, `description`, `file_type text`, `drive_url text` with `CHECK (drive_url ~ '^https://[^[:space:]]+$')` (same https-only rule as the admin UI).
-Student catalog SELECT must **not** expose `drive_url`. Table-level `SELECT` is revoked and re-granted on metadata columns only (Postgres table-level `SELECT` would otherwise still expose `drive_url`). `open_material(id)` returns the URL only after student entitlement or `manage_materials` (Main Admin included via permission short-circuit). Future books/videos: no permanent public object URL; signed access after the same check.
+**material_folders** — `name`, `year_id`, `subject_id null`, `sort_order`, `library_type text check in ('guidelines','ospe_material','ospe_lectures','books','notes','lectures')` (existing folders: guideline-containing → `guidelines`, else `notes`), plus entitlement columns (existing folders backfilled `free`). Folder entitlement is the access policy for every item in the folder. `library_type` is the **student/admin library category** (Books vs Notes vs OSPE vs Lectures). Delivery `materials.kind` is **not** that category.
+
+**materials** — `folder_id`, `title`, `description`, `file_type text`, `kind text check in ('drive','pdf','guideline') default 'drive'`, `status text check in ('draft','published') default 'published'` (existing Drive rows backfilled published), optional `chapter_id` / `topic_id` / `reference_text`, plus kind-specific payload:
+- `drive` — `drive_url` https-only (YouTube or Google Drive / other https). No R2 key / body. Students open via `open_material` (never catalog SELECT of the URL).
+- `pdf` — private R2 `r2_object_key` under `study-content/`; optional `cover_object_key`; no Drive URL / body.
+- `guideline` — `body_text` (markdown/plain); no Drive URL / PDF object.
+
+**Two student surfaces, one store:** Free Resources lists only accessible (`can_access_*`) published items grouped by library type / MCQ subject / pearls. Main library hubs list the year catalog for that type. Do not duplicate educational rows to mark free vs paid — use entitlement columns (and grants/restrictions).
+
+Student catalog SELECT must **not** expose `drive_url`, `body_text`, or R2 keys. Table-level `SELECT` is revoked and re-granted on metadata columns only. Students see **published** items in folders they `can_view`. `open_material(id)` returns a Drive URL only for `kind = 'drive'` after student entitlement or `manage_materials`. `open_study_item(id)` returns guideline body (or PDF catalog metadata without the object key) after the same folder content check. `authorize_study_object(id)` returns the R2 key for Next.js to sign; students must not obtain PDF bytes without that path.
+
+## Pearl points
+
+**pearl_points** — high-yield one-line recall items. **Not** Question Bank MCQs (`questions` / `question_versions` stay 4–5 option scored items). Columns: `prompt`, `answer`, `explanation` (optional), `year_id`, `subject_id`, optional `chapter_id` / `topic_id`, `status` `draft|published`, entitlement columns, `sort_order`, `created_by`. Student catalog SELECT excludes `answer` / `explanation`. `open_pearl(id)` returns the reveal payload after `can_access_pearl`. `can_view_pearl` is published + active year enrollment + `account_allows_lms`. Content uses `resource_content_allowed` with kind `pearl_point` (grant overlay for this kind is not stored on `access_grants` yet).
 
 ## Import
 

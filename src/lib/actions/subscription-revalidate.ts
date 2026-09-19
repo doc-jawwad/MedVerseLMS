@@ -10,8 +10,12 @@ export function revalidateAdminSubscriptionPaths() {
   revalidatePath("/subscription");
   revalidatePath("/dashboard");
   revalidatePath("/practice");
+  revalidatePath("/mcq-bank");
   revalidatePath("/tests");
   revalidatePath("/tests", "layout");
   revalidatePath("/materials");
+  revalidatePath("/free-resources");
+  revalidatePath("/pearl-points");
+  revalidatePath("/guidelines");
   revalidatePath("/profile");
 }

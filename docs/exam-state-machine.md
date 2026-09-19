@@ -66,7 +66,7 @@ Reason mandatory. Sets state='invalidated', invalidated_reason, invalidated_by; 
 - Optimistic local state + durable localStorage draft (`medverse_attempt:{attemptId}`) holding only `{question_version_id, selected_key, marked_for_review, seq}` — never stems/options/keys/explanations. On resume, merge with server answers by **higher `save_seq` wins** (equal prefers server); local-ahead rows are re-queued. Draft entries clear on server ACK / submit / terminal finalize. Debounced ~1.5s save queue, retry with backoff; flush on `visibilitychange`, `beforeunload`, and `online`. Concurrent dispatch of pending `save_answer` calls is an allowed client optimization; the server still accepts one question per RPC.
 - Client auto-fires `submit_attempt` at 0 (server enforces anyway).
 - `device_id`: uuid in localStorage (`medverse_device_id`). Tabs on same device coordinate via BroadcastChannel — second tab shows a blocking overlay.
-- Mobile-friendly layout; palette shows answered / unanswered / marked-for-review.
+- Mobile-friendly layout; palette shows **answered** (`selected_key` set), **skipped** (`marked_for_review` and `selected_key` null), and **remaining** (neither). Skip is unanswered-only client UX persisted through existing `save_answer(p_marked_for_review)`; it is not a new attempt state and does not score. Selecting an option clears skip. Scoring still treats null `selected_key` as blank.
 - Exam RPCs remain `supabase.rpc(...)` from the browser against the unified origin (`/rest/v1`). Do not move save/submit into a custom Next.js REST layer.
 
 ## Failure coverage (must all hold)

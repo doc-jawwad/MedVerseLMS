@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { signOutAction } from "@/lib/actions/auth";
-import { Logo } from "@/components/logo";
+import { AuthShell } from "@/components/student/auth-shell";
 import { createClient } from "@/lib/supabase/server";
 import { isBlockedAccountStatus } from "@/lib/auth/account-status";
 
@@ -96,11 +96,10 @@ function PendingNotice({
   description: string;
 }) {
   return (
-    <div className="flex min-h-svh items-center justify-center p-4">
-      <Card className="w-full max-w-md">
+    <AuthShell>
+      <Card className="w-full shadow-none">
         <CardHeader>
-          <Logo dark className="mb-2" />
-          <CardTitle>{title}</CardTitle>
+          <CardTitle className="text-[#072855]">{title}</CardTitle>
           <CardDescription>{description}</CardDescription>
         </CardHeader>
         <CardContent className="flex gap-2">
@@ -114,6 +113,6 @@ function PendingNotice({
           </Button>
         </CardContent>
       </Card>
-    </div>
+    </AuthShell>
   );
 }

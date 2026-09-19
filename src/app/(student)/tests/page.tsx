@@ -3,8 +3,9 @@ import { requireStudent } from "@/lib/auth/require-user";
 import { formatDateTime } from "@/lib/utils";
 import {
   classifyCatalogTestStates,
+  isHistoryTestsPageState,
   studentTestListLabel,
-  studentTestListSection,
+  testPricingLabel,
   type StudentTestListState,
 } from "@/lib/tests/student-test-state";
 import { Badge } from "@/components/ui/badge";
@@ -16,14 +17,11 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { ResourceLockNotice } from "@/components/subscription/resource-lock-notice";
-import { SectionLock } from "@/components/subscription/section-lock";
 import { PageHeader } from "@/components/student/page-header";
 import { StudentPage } from "@/components/student/student-page";
 import { SectionHeading } from "@/components/student/section-heading";
 import { EmptyState } from "@/components/student/empty-state";
-import { getStudentHasLiveSubscription } from "@/lib/subscriptions/student-live-access";
-import { studentHasPaidLmsSections } from "@/lib/subscriptions/student-section-access";
+import { StudyMarkdown } from "@/components/study/study-markdown";
 import {
   bindSsrTiming,
   ssrMarkPageFnEnd,
@@ -47,16 +45,6 @@ type AttemptRow = {
 export default async function StudentTestsPage() {
   await bindSsrTiming("/tests");
   const { supabase, userId } = await requireStudent();
-  const hasLiveAccess = await getStudentHasLiveSubscription();
-  if (!studentHasPaidLmsSections(hasLiveAccess)) {
-    ssrMarkPageFnEnd();
-    return (
-      <SectionLock
-        title="Tests"
-        description="The full tests catalog unlocks with a live subscription. Free and granted tests stay under Free Resources."
-      />
-    );
-  }
 
   const [
     { data: tests },
@@ -64,6 +52,7 @@ export default async function StudentTestsPage() {
     { data: accessible },
     { data: subscriptions },
     { data: grants },
+    { data: prepRows },
   ] = await Promise.all([
     ssrSpan("fetch.tests", () =>
       supabase
@@ -98,6 +87,9 @@ export default async function StudentTestsPage() {
         .eq("student_id", userId)
         .eq("grant_type", "test")
     ),
+    ssrSpan("fetch.accessible_test_prep", () =>
+      supabase.rpc("accessible_test_prep")
+    ),
   ]);
 
   const { rows, sections } = ssrSpanSync("in_process.classify", () => {
@@ -126,19 +118,24 @@ export default async function StudentTestsPage() {
         t,
         attempt: attemptByTest.get(t.id) ?? null,
         state,
-        section: studentTestListSection(state),
       };
     });
 
     return {
-      rows,
+      rows: rows.filter((r) => isHistoryTestsPageState(r.state)),
       sections: [
-        { key: "available" as const, label: "Available now" },
-        { key: "upcoming" as const, label: "Upcoming" },
+        { key: "in_progress" as const, label: "In progress" },
         { key: "previous" as const, label: "Previous" },
       ],
     };
   });
+
+  const prepByTest = new Map(
+    ((prepRows ?? []) as { test_id: string; body_text: string }[]).map((row) => [
+      row.test_id,
+      row.body_text,
+    ])
+  );
 
   ssrMarkPageFnEnd();
 
@@ -146,11 +143,17 @@ export default async function StudentTestsPage() {
     <StudentPage>
       <PageHeader
         title="Tests"
-        description="Missed means you could have sat the test and did not. Not eligible means the test was not available to you during its window. Neither is a score of zero."
+        description="Completed, missed, and in-progress attempts. Incoming scheduled tests are on your Dashboard."
       />
 
       {sections.map((sec) => {
-        const items = rows.filter((r) => r.section === sec.key);
+        const items = rows.filter((r) =>
+          sec.key === "in_progress"
+            ? r.state === "in_progress"
+            : r.state === "result" ||
+              r.state === "missed" ||
+              r.state === "not_eligible"
+        );
         if (items.length === 0) return null;
         return (
           <div key={sec.key} className="grid gap-3">
@@ -166,18 +169,22 @@ export default async function StudentTestsPage() {
                         <CardTitle className="text-base text-[#072855]">
                           {t.title}
                         </CardTitle>
-                        <Badge
-                          variant={
-                            state === "available" || state === "in_progress"
-                              ? "default"
-                              : state === "result"
-                                ? "secondary"
-                                : "outline"
-                          }
-                          className="w-fit shrink-0"
-                        >
-                          {studentTestListLabel(state)}
-                        </Badge>
+                        <div className="flex shrink-0 flex-wrap gap-1">
+                          <Badge variant="outline">
+                            {testPricingLabel(t.entitlement)}
+                          </Badge>
+                          <Badge
+                            variant={
+                              state === "in_progress"
+                                ? "default"
+                                : state === "result"
+                                  ? "secondary"
+                                  : "outline"
+                            }
+                          >
+                            {studentTestListLabel(state)}
+                          </Badge>
+                        </div>
                       </div>
                       <CardDescription>
                         {s?.name && `${s.name} · `}
@@ -197,23 +204,12 @@ export default async function StudentTestsPage() {
                         )}
                       </p>
 
-                      {state === "available" && (
-                        <Button asChild className="w-fit">
-                          <Link href={`/tests/${t.id}/attempt`}>Start test</Link>
-                        </Button>
-                      )}
                       {state === "in_progress" && (
                         <Button asChild className="w-fit">
                           <Link href={`/tests/${t.id}/attempt`}>
                             Resume test
                           </Link>
                         </Button>
-                      )}
-                      {state === "locked" && <ResourceLockNotice />}
-                      {state === "upcoming" && (
-                        <p className="text-muted-foreground">
-                          This test is not open yet.
-                        </p>
                       )}
                       {state === "result" && attempt && (
                         <div className="flex flex-wrap items-center gap-3">
@@ -240,6 +236,18 @@ export default async function StudentTestsPage() {
                           window. A later subscription does not change that.
                         </p>
                       )}
+                      {prepByTest.get(t.id) &&
+                        (state === "upcoming" ||
+                          state === "available" ||
+                          state === "in_progress" ||
+                          state === "result") && (
+                          <div className="rounded-lg border bg-muted/40 p-3">
+                            <p className="mb-1 text-xs font-semibold tracking-wide text-[#05AEA9] uppercase">
+                              Preparation
+                            </p>
+                            <StudyMarkdown source={prepByTest.get(t.id)!} />
+                          </div>
+                        )}
                     </CardContent>
                   </Card>
                 );
@@ -251,8 +259,8 @@ export default async function StudentTestsPage() {
 
       {rows.length === 0 && (
         <EmptyState
-          title="No tests assigned to you yet"
-          description="When your academy publishes a test for your year, it will appear here."
+          title="No test history yet"
+          description="Incoming scheduled tests appear on your Dashboard. Completed, missed, and in-progress attempts appear here."
         />
       )}
     </StudentPage>

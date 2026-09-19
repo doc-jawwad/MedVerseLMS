@@ -4,31 +4,61 @@ import { Button } from "@/components/ui/button";
 
 export default function Home() {
   return (
-    <div className="flex min-h-svh flex-col items-center justify-center gap-6 p-8 text-center">
-      <Image
-        src="/logo-icon.png"
-        alt="MedVerse"
-        width={72}
-        height={72}
-        priority
+    <div className="relative flex min-h-svh flex-col overflow-hidden bg-[#072855] text-white">
+      <div
+        className="pointer-events-none absolute inset-0"
+        style={{
+          background:
+            "radial-gradient(ellipse at 15% 0%, #05aea955, transparent 50%), radial-gradient(ellipse at 90% 80%, #05aea922, transparent 40%)",
+        }}
       />
-      <div>
-        <h1 className="text-4xl font-bold tracking-tight">
-          Med<span className="text-primary">Verse</span> LMS
+      <header className="relative flex items-center justify-between px-6 py-5">
+        <div className="flex items-center gap-2">
+          <Image
+            src="/logo-icon.png"
+            alt="MedVerse"
+            width={32}
+            height={32}
+            priority
+          />
+          <span className="text-lg font-bold tracking-tight">
+            Med<span className="text-[#05AEA9]">Verse</span>
+          </span>
+        </div>
+        <div className="flex gap-2">
+          <Button asChild variant="ghost" className="text-white hover:bg-white/10 hover:text-white">
+            <Link href="/login">Sign in</Link>
+          </Button>
+          <Button asChild>
+            <Link href="/register">Register</Link>
+          </Button>
+        </div>
+      </header>
+      <main className="relative flex flex-1 flex-col items-center justify-center px-6 py-16 text-center">
+        <p className="text-[11px] font-semibold tracking-[0.2em] text-[#05AEA9] uppercase">
+          Medical education
+        </p>
+        <h1 className="mt-3 max-w-2xl font-heading text-4xl font-semibold tracking-tight sm:text-5xl">
+          MedVerse LMS
         </h1>
-        <p className="mt-2 max-w-md text-muted-foreground">
+        <p className="mt-4 max-w-lg text-sm leading-relaxed text-white/70 sm:text-base">
           Online MCQ tests and practice for MBBS students — all five years, all
           subjects.
         </p>
-      </div>
-      <div className="flex gap-3">
-        <Button asChild>
-          <Link href="/login">Sign in</Link>
-        </Button>
-        <Button asChild variant="outline">
-          <Link href="/register">Register</Link>
-        </Button>
-      </div>
+        <div className="mt-8 flex flex-wrap justify-center gap-3">
+          <Button asChild size="lg">
+            <Link href="/login">Sign in</Link>
+          </Button>
+          <Button
+            asChild
+            size="lg"
+            variant="outline"
+            className="border-white/25 bg-transparent text-white hover:bg-white/10 hover:text-white"
+          >
+            <Link href="/register">Register</Link>
+          </Button>
+        </div>
+      </main>
     </div>
   );
 }

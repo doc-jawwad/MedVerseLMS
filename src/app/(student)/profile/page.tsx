@@ -18,6 +18,7 @@ import {
 import { PageHeader } from "@/components/student/page-header";
 import { StudentPage } from "@/components/student/student-page";
 import { FieldRow } from "@/components/student/field-row";
+import { InstallMedverseApp } from "@/components/pwa/install-medverse-app";
 
 export const metadata = { title: "My Account — MedVerse LMS" };
 
@@ -72,6 +73,8 @@ export default async function ProfilePage() {
   return (
     <StudentPage width="narrow">
       <PageHeader title="My Account" />
+
+      <InstallMedverseApp variant="card" />
 
       <Card className="shadow-none">
         <CardHeader>

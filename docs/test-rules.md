@@ -9,7 +9,7 @@ draft ──publish_test()──▶ published ──closes_at passes / close now
 ```
 
 - `draft` — editable freely; students never see it.
-- `published` — frozen (see below); in the student **catalog** for its audience from `opens_at` (locked if not entitled). "Live" is **derived**: `status='published' AND now() BETWEEN opens_at AND closes_at` — never stored.
+- `published` — frozen (see below); in the student **catalog** for its audience from `opens_at` (locked if not entitled). "Live" is **derived**: `status='published' AND now() BETWEEN opens_at AND closes_at` — never stored. Upcoming published tests list immediately, sorted by `opens_at` ascending. Optional **preparation guidelines** (`test_prep_guidelines`) are readable after `can_access_test` (including before the window opens and after submit while entitlement remains). Guideline rows stay attached in Test History; they are not a new attempt state.
 - `closed` — window over. Owned **score / result summary** stays visible. Paid **review content** (stems, selected keys, correct keys, explanations) follows [access-eligibility-analytics.md](access-eligibility-analytics.md) §11 (live entitlement + `show_review`; server-gated).
 - `archived` — hidden from student lists; history intact.
 - `invalidated` — kill switch; attempts marked invalidated; hidden from results.
@@ -29,7 +29,7 @@ Postgres function returning a checklist; the UI renders it on the test page and 
 
 ## Publish = snapshot
 
-`publish_test(test_id)`: validate → set `question_version_id := questions.current_version_id` on every test_questions row → status 'published' → refresh `questions.used_in_test` cache → audit log. After publish, test config and test_questions are immutable (trigger), except `voided`/`void_policy`.
+`publish_test(test_id)`: validate → set `question_version_id := questions.current_version_id` on every test_questions row → status 'published' → refresh `questions.used_in_test` cache → audit log. After publish, test config, `test_prep_guidelines.body_text`, and test_questions are immutable (triggers), except `voided`/`void_policy`. A test with student audience **Neither** must stay `draft` — unpublished tests are never catalogued. Free vs paid audience is `tests.entitlement` (`free` vs `any_subscription`), not a second access model. Subscription never removes `entitlement = 'free'`.
 
 Later edits to a question create new versions; **published tests keep the frozen version forever** — history is never rewritten. Re-freezing to a newer version is allowed only while `now() < opens_at`, via an explicit admin action (audit-logged).
 

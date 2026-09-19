@@ -1,10 +1,9 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import Link from "next/link";
 import { signIn, type AuthResult } from "@/lib/actions/auth";
 import { Button } from "@/components/ui/button";
-import { Logo } from "@/components/logo";
 import {
   Card,
   CardContent,
@@ -15,18 +14,21 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { PasswordInput } from "@/components/ui/password-input";
 
 export function LoginForm({ next, reason }: { next?: string; reason?: string }) {
   const [state, action, pending] = useActionState<AuthResult | undefined, FormData>(
     signIn,
     undefined
   );
+  // Keep email/password across failed submissions (session memory only — never localStorage).
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
 
   return (
-    <Card className="w-full max-w-sm">
-      <CardHeader>
-        <Logo dark className="mb-2" />
-        <CardTitle>Sign in</CardTitle>
+    <Card className="w-full border-border/80 shadow-none">
+      <CardHeader className="space-y-1.5 pb-4">
+        <CardTitle className="text-xl text-[var(--brand-navy)]">Sign in</CardTitle>
         <CardDescription>Access your MedVerse LMS account</CardDescription>
       </CardHeader>
       <CardContent>
@@ -50,35 +52,49 @@ export function LoginForm({ next, reason }: { next?: string; reason?: string }) 
           <input type="hidden" name="next" value={next ?? ""} />
           <div className="grid gap-2">
             <Label htmlFor="email">Email</Label>
-            <Input id="email" name="email" type="email" required autoComplete="email" />
+            <Input
+              id="email"
+              name="email"
+              type="email"
+              required
+              autoComplete="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="h-10"
+              aria-invalid={Boolean(state?.error)}
+            />
           </div>
           <div className="grid gap-2">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-3">
               <Label htmlFor="password">Password</Label>
               <Link
                 href="/forgot-password"
-                className="text-xs text-muted-foreground underline"
+                className="text-xs text-muted-foreground underline underline-offset-2"
               >
                 Forgot password?
               </Link>
             </div>
-            <Input
+            <PasswordInput
               id="password"
               name="password"
-              type="password"
               required
               autoComplete="current-password"
+              value={password}
+              onChange={setPassword}
+              aria-invalid={Boolean(state?.error)}
             />
           </div>
           {state?.error && (
-            <p className="text-sm text-destructive">{state.error}</p>
+            <Alert variant="destructive">
+              <AlertDescription>{state.error}</AlertDescription>
+            </Alert>
           )}
-          <Button type="submit" disabled={pending}>
+          <Button type="submit" disabled={pending} className="h-10">
             {pending ? "Signing in…" : "Sign in"}
           </Button>
           <p className="text-center text-sm text-muted-foreground">
             New student?{" "}
-            <Link href="/register" className="underline">
+            <Link href="/register" className="font-medium text-[var(--brand-navy)] underline underline-offset-2">
               Create an account
             </Link>
           </p>

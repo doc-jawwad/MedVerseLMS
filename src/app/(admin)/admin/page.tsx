@@ -10,6 +10,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { InstallMedverseApp } from "@/components/pwa/install-medverse-app";
 
 export const metadata = { title: "Admin — MedVerse LMS" };
 
@@ -73,6 +74,7 @@ export default async function AdminOverviewPage() {
   return (
     <div className="grid gap-6">
       <h1 className="text-2xl font-semibold">Overview</h1>
+      <InstallMedverseApp variant="card" />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {canReadStudents ? (

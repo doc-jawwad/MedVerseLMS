@@ -148,6 +148,34 @@ export function studentTestListSection(
   }
 }
 
+export function isIncomingDashboardTest(
+  state: StudentTestListState
+): boolean {
+  return (
+    state === "upcoming" ||
+    state === "available" ||
+    state === "locked" ||
+    state === "in_progress"
+  );
+}
+
+export function isHistoryTestsPageState(
+  state: StudentTestListState
+): boolean {
+  return (
+    state === "result" ||
+    state === "missed" ||
+    state === "not_eligible" ||
+    state === "in_progress"
+  );
+}
+
+export function testPricingLabel(
+  entitlement: string | null | undefined
+): "FREE" | "PAID" {
+  return entitlement === "free" ? "FREE" : "PAID";
+}
+
 export function studentTestListLabel(state: StudentTestListState): string {
   switch (state) {
     case "in_progress":

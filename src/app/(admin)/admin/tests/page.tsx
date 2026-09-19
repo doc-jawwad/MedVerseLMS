@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { requireAdmin } from "@/lib/auth/require-user";
+import { requireAdminClass } from "@/lib/admin/require-admin-class";
+import { yearDisplayName } from "@/lib/library/types";
 import { formatDateTime } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -22,34 +24,51 @@ const statusVariant: Record<string, "default" | "secondary" | "destructive" | "o
   invalidated: "destructive",
 };
 
-export default async function AdminTestsPage() {
+export default async function AdminTestsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ year?: string }>;
+}) {
   const { supabase } = await requireAdmin();
+  const params = await searchParams;
 
-  const { data: tests } = await supabase
-    .from("tests")
-    .select(
-      "id, title, status, opens_at, closes_at, duration_minutes, years(year_number), subjects(name), test_questions(count)"
-    )
-    .order("created_at", { ascending: false });
+  return requireAdminClass({
+    searchYear: params.year,
+    next: "/admin/tests",
+    children: async (year) => {
+      const { data: tests } = await supabase
+        .from("tests")
+        .select(
+          "id, title, status, opens_at, closes_at, duration_minutes, years(year_number), subjects(name), test_questions(count)"
+        )
+        .eq("year_id", year.id)
+        .order("created_at", { ascending: false });
 
   return (
-    <div className="grid gap-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Tests</h1>
-        <Button asChild>
+    <div className="grid gap-5">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight text-[var(--brand-navy)]">
+            Tests
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {yearDisplayName(year)} — publish, schedule, and review assessments.
+          </p>
+        </div>
+        <Button asChild className="h-9">
           <Link href="/admin/tests/new">Create test</Link>
         </Button>
       </div>
 
-      <div className="overflow-x-auto rounded-md border">
+      <div className="overflow-x-auto rounded-xl border border-border/80 bg-card">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Title</TableHead>
-              <TableHead>Year</TableHead>
-              <TableHead>Subject</TableHead>
+              <TableHead className="min-w-[10rem]">Title</TableHead>
+              <TableHead className="hidden sm:table-cell">Year</TableHead>
+              <TableHead className="hidden md:table-cell">Subject</TableHead>
               <TableHead>Questions</TableHead>
-              <TableHead>Window</TableHead>
+              <TableHead className="hidden lg:table-cell">Window</TableHead>
               <TableHead>Status</TableHead>
               <TableHead />
             </TableRow>
@@ -73,10 +92,14 @@ export default async function AdminTestsPage() {
                       {t.title}
                     </Link>
                   </TableCell>
-                  <TableCell>Y{y?.year_number}</TableCell>
-                  <TableCell>{s?.name ?? "—"}</TableCell>
+                  <TableCell className="hidden sm:table-cell">
+                    Y{y?.year_number}
+                  </TableCell>
+                  <TableCell className="hidden md:table-cell">
+                    {s?.name ?? "—"}
+                  </TableCell>
                   <TableCell>{qc}</TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
+                  <TableCell className="hidden text-sm text-muted-foreground lg:table-cell">
                     {t.opens_at ? formatDateTime(t.opens_at) : "unscheduled"}
                     {" → "}
                     {t.closes_at ? formatDateTime(t.closes_at) : "?"}
@@ -102,4 +125,6 @@ export default async function AdminTestsPage() {
       </div>
     </div>
   );
+    },
+  });
 }
