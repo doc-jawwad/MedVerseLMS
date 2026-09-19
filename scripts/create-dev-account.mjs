@@ -42,7 +42,8 @@ function loadEnv() {
   const p = path.join(__dirname, "..", ".env.local");
   const out = {};
   if (fs.existsSync(p)) {
-    for (const line of fs.readFileSync(p, "utf8").split("\n")) {
+    const text = fs.readFileSync(p, "utf8").replace(/^\uFEFF/, "");
+    for (const line of text.split(/\r?\n/)) {
       const m = line.match(/^([A-Z_]+)=(.*)$/);
       if (m) out[m[1]] = m[2];
     }

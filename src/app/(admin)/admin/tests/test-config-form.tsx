@@ -39,12 +39,15 @@ export function TestConfigForm({
   testId,
   initial,
   readOnly,
+  lockYear,
 }: {
   years: Year[];
   subjects: Subject[];
   testId?: string;
   initial?: Partial<TestConfig>;
   readOnly?: boolean;
+  /** When true, Year is fixed to the selected admin class (create flow). */
+  lockYear?: boolean;
 }) {
   const [pending, startTransition] = useTransition();
   const [title, setTitle] = useState(initial?.title ?? "");
@@ -61,6 +64,7 @@ export function TestConfigForm({
   const [minQuestions, setMinQuestions] = useState(initial?.min_questions ?? 1);
 
   const yearSubjects = subjects.filter((s) => s.year_id === yearId);
+  const lockedYearLabel = years.find((y) => y.id === yearId);
 
   function buildConfig(): TestConfig {
     return {
@@ -105,14 +109,25 @@ export function TestConfigForm({
       <div className="grid grid-cols-2 gap-3">
         <div className="grid gap-2">
           <Label>Year</Label>
-          <Select value={yearId || undefined} onValueChange={(v) => { setYearId(v); setSubjectId(""); }} disabled={disabled}>
-            <SelectTrigger><SelectValue placeholder="Year" /></SelectTrigger>
-            <SelectContent>
-              {years.map((y) => (
-                <SelectItem key={y.id} value={y.id}>Year {y.year_number}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          {lockYear ? (
+            <div
+              data-testid="test-year-locked"
+              className="flex h-9 items-center rounded-md border bg-muted/40 px-3 text-sm"
+            >
+              {lockedYearLabel
+                ? `Year ${lockedYearLabel.year_number}`
+                : "Selected class"}
+            </div>
+          ) : (
+            <Select value={yearId || undefined} onValueChange={(v) => { setYearId(v); setSubjectId(""); }} disabled={disabled}>
+              <SelectTrigger data-testid="test-year-select"><SelectValue placeholder="Year" /></SelectTrigger>
+              <SelectContent>
+                {years.map((y) => (
+                  <SelectItem key={y.id} value={y.id}>Year {y.year_number}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
         </div>
         <div className="grid gap-2">
           <Label>Subject (optional)</Label>

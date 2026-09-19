@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { readAdminSelectedYearId } from "@/lib/admin/selected-class";
 import { actionRpcResult } from "@/lib/errors/safe-action-error";
 import { createClient } from "@/lib/supabase/server";
 
@@ -27,17 +28,29 @@ export type PearlInput = {
 };
 
 export async function createPearlPoint(input: PearlInput) {
-  if (!input.prompt.trim() || !input.answer.trim() || !input.yearId || !input.subjectId) {
-    return { error: "Prompt, answer, year, and subject are required." };
+  const selectedYearId = await readAdminSelectedYearId();
+  if (!selectedYearId) {
+    return { error: "Select a class before creating a pearl point." };
+  }
+  if (!input.prompt.trim() || !input.answer.trim() || !input.subjectId) {
+    return { error: "Prompt, answer, and subject are required." };
   }
   const supabase = await createClient();
+  const { data: subject } = await supabase
+    .from("subjects")
+    .select("year_id")
+    .eq("id", input.subjectId)
+    .maybeSingle();
+  if (!subject || subject.year_id !== selectedYearId) {
+    return { error: "Subject must belong to the selected class." };
+  }
   const { data, error } = await supabase
     .from("pearl_points")
     .insert({
       prompt: input.prompt.trim(),
       answer: input.answer.trim(),
       explanation: (input.explanation ?? "").trim(),
-      year_id: input.yearId,
+      year_id: selectedYearId,
       subject_id: input.subjectId,
       chapter_id: input.chapterId || null,
       topic_id: input.topicId || null,

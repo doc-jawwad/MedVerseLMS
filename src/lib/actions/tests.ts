@@ -4,6 +4,7 @@ import { actionRpcResult, toClientActionError } from "@/lib/errors/safe-action-e
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { readAdminSelectedYearId } from "@/lib/admin/selected-class";
 import { createClient } from "@/lib/supabase/server";
 import type { QuestionContent, QuestionMeta } from "@/lib/actions/questions";
 
@@ -28,10 +29,27 @@ function reval(testId?: string) {
 }
 
 export async function createTest(config: TestConfig) {
+  const selectedYearId = await readAdminSelectedYearId();
+  if (!selectedYearId) {
+    return { error: "Select a class before creating a test." };
+  }
+  // Class-first: create always binds to the selected admin class, not a
+  // stale/empty Year control on the form.
+  const bound: TestConfig = { ...config, year_id: selectedYearId };
   const supabase = await createClient();
+  if (config.subject_id) {
+    const { data: subject } = await supabase
+      .from("subjects")
+      .select("year_id")
+      .eq("id", config.subject_id)
+      .maybeSingle();
+    if (!subject || subject.year_id !== selectedYearId) {
+      return { error: "Subject must belong to the selected class." };
+    }
+  }
   const { data, error } = await supabase
     .from("tests")
-    .insert(config)
+    .insert(bound)
     .select("id")
     .single();
   if (error) return actionRpcResult("action", error);

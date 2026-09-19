@@ -7,6 +7,10 @@ import {
   writeAdminSelectedYearId,
 } from "@/lib/admin/selected-class";
 
+/**
+ * Sets the durable admin class cookie and redirects with `?year=` so
+ * shareable URLs and the cookie stay aligned (proxy also syncs URL → cookie).
+ */
 export async function setAdminClassAction(formData: FormData) {
   const yearId = String(formData.get("yearId") ?? "");
   const nextRaw = String(formData.get("next") ?? "/admin/library");

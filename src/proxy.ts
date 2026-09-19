@@ -1,5 +1,10 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import {
+  ADMIN_CLASS_COOKIE,
+  adminClassCookieOptions,
+  adminClassNeedsSync,
+} from "@/lib/admin/admin-class";
 import { supabaseFetch } from "@/lib/supabase/postgrest-fetch";
 import {
   SSR_TIMING_LOG_TAG,
@@ -110,17 +115,28 @@ export async function proxy(request: NextRequest) {
     const loginUrl = new URL("/login", request.url);
     loginUrl.searchParams.set("next", pathname);
     // A stale Supabase auth cookie with no valid claims means this browser
-    // *was* signed in and its refresh token was revoked — almost always by
-    // signIn()'s `signOut({ scope: "others" })` on a newer login elsewhere
-    // (docs/permissions.md Layer 1), not a token that merely expired from
-    // sitting idle. getClaims() failing here means requireUser()'s own
-    // active_session_id check (which sets reason=kicked) never gets a
-    // chance to run, so surface the same reason from the edge instead of
-    // falling through to the generic "please sign in" copy.
+    // lost a valid session (refresh revoked or idle expiry). Do not claim
+    // another device caused it — requireUser()/session-watch use reason=kicked
+    // only when active_session_id actually mismatches.
     if (hadSupabaseSession) {
-      loginUrl.searchParams.set("reason", "kicked");
+      loginUrl.searchParams.set("reason", "session_expired");
     }
     return NextResponse.redirect(loginUrl);
+  }
+
+  // Admin class SoT: cookie. Sync valid `?year=` onto the cookie so the
+  // layout selector and class-scoped pages cannot disagree.
+  if (pathname.startsWith("/admin")) {
+    const searchYear = request.nextUrl.searchParams.get("year");
+    const cookieYear = request.cookies.get(ADMIN_CLASS_COOKIE)?.value;
+    if (adminClassNeedsSync(cookieYear, searchYear)) {
+      request.cookies.set(ADMIN_CLASS_COOKIE, searchYear);
+      response.cookies.set(
+        ADMIN_CLASS_COOKIE,
+        searchYear,
+        adminClassCookieOptions()
+      );
+    }
   }
 
   return response;

@@ -35,12 +35,14 @@ export function PearlEditor({
   topics = [],
   pearlId,
   initial,
+  lockYear,
 }: {
   years: Year[];
   subjects: Subject[];
   chapters?: Chapter[];
   topics?: Topic[];
   pearlId?: string;
+  lockYear?: boolean;
   initial?: {
     prompt: string;
     answer: string;
@@ -66,6 +68,7 @@ export function PearlEditor({
   const yearSubjects = subjects.filter((s) => s.year_id === yearId);
   const subjectChapters = chapters.filter((c) => c.subject_id === subjectId);
   const chapterTopics = topics.filter((t) => t.chapter_id === chapterId);
+  const lockedYear = years.find((y) => y.id === yearId);
 
   function build(): PearlInput {
     return {
@@ -98,14 +101,20 @@ export function PearlEditor({
         <div className="grid grid-cols-2 gap-3">
           <div className="grid gap-2">
             <Label>Year</Label>
-            <Select value={yearId} onValueChange={(v) => { setYearId(v); setSubjectId(""); setChapterId(""); setTopicId(""); }}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {years.map((y) => (
-                  <SelectItem key={y.id} value={y.id}>{yearDisplayName(y)}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {lockYear ? (
+              <div className="flex h-9 items-center rounded-md border bg-muted/40 px-3 text-sm">
+                {lockedYear ? yearDisplayName(lockedYear) : "Selected class"}
+              </div>
+            ) : (
+              <Select value={yearId} onValueChange={(v) => { setYearId(v); setSubjectId(""); setChapterId(""); setTopicId(""); }}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {years.map((y) => (
+                    <SelectItem key={y.id} value={y.id}>{yearDisplayName(y)}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
           </div>
           <div className="grid gap-2">
             <Label>Subject</Label>

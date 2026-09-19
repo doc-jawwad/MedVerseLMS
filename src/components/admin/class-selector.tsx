@@ -51,7 +51,7 @@ export function AdminClassSelector({
           form.requestSubmit();
         }}
       >
-        <SelectTrigger className="h-9 min-w-48">
+        <SelectTrigger className="h-9 min-w-48" data-testid="admin-class-selector">
           <SelectValue placeholder="Select class / year" />
         </SelectTrigger>
         <SelectContent>
