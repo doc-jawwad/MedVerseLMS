@@ -732,6 +732,33 @@ export async function provisionQuestionPoolFixture(opts: {
   return { yearId, subjectId, bookId: bookRes[0].id, chapterId: chapterRes[0].id, topicId, questionIds, tag };
 }
 
+/** Draft test row only — Test Builder e2e adds questions through the admin UI. */
+export async function createDraftTestForBuilder(
+  fixture: QuestionPoolFixture,
+  title: string
+): Promise<string> {
+  const res = await fetch(`${REST}/rest/v1/tests`, {
+    method: "POST",
+    headers: await svcHeaders({ Prefer: "return=representation" }),
+    body: JSON.stringify({
+      title,
+      year_id: fixture.yearId,
+      status: "draft",
+      opens_at: new Date(Date.now() - 60_000).toISOString(),
+      closes_at: new Date(Date.now() + 2 * 3600_000).toISOString(),
+      duration_minutes: 60,
+      marks_per_question: 1,
+      negative_mark: 0,
+      min_questions: 1,
+    }),
+  }).then((r) => r.json());
+  const id = Array.isArray(res) ? res[0]?.id : null;
+  if (!id) {
+    throw new Error(`create draft test failed: ${JSON.stringify(res)}`);
+  }
+  return String(id);
+}
+
 // Only deletes the test row (if any). question_versions are immutable —
 // forbid_version_mutation() blocks UPDATE/DELETE unconditionally, for every
 // role including service_role, with no bypass reachable via the Data API

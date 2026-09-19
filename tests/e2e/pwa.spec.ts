@@ -67,12 +67,25 @@ test.describe("PWA installability", () => {
     await expect(
       page.getByRole("heading", { name: "Install on iPhone" })
     ).toBeVisible();
-    await expect(page.getByText(/Open MedVerse in Safari/)).toBeVisible();
-    await expect(page.getByText("Tap Add to Home Screen")).toBeVisible();
-    await expect(page.getByText(/App Store download/i).first()).toBeVisible();
+    await expect(page.getByText("Open MedVerse in Safari", { exact: true })).toBeVisible();
+    await expect(page.getByText("Tap Share", { exact: true })).toBeVisible();
     await expect(
-      page.getByText("Safari \u2192 Share \u2192 Add to Home Screen \u2192 Add")
+      page.getByText("Tap Add to Home Screen", { exact: true })
     ).toBeVisible();
+    await expect(page.getByText("Tap Add", { exact: true })).toBeVisible();
+    await expect(
+      page.getByText("Safari \u2192 Share \u2192 Add to Home Screen \u2192 Add", {
+        exact: true,
+      })
+    ).toBeVisible();
+    await expect(
+      page.getByText("There is no App Store download.")
+    ).toBeVisible();
+    await expect(
+      page.getByText(/it is not an App Store download/)
+    ).toBeVisible();
+    await expect(page.getByText(/download from the App Store/i)).toHaveCount(0);
+    await expect(page.getByText(/available on the App Store/i)).toHaveCount(0);
     const overflow = await page.evaluate(
       () =>
         document.documentElement.scrollWidth >

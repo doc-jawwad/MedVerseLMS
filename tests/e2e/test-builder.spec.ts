@@ -1,12 +1,10 @@
 import { test, expect } from "@playwright/test";
-import fs from "fs";
-import path from "path";
 import {
   ADMIN_EMAIL,
   ADMIN_PASSWORD,
+  createDraftTestForBuilder,
   provisionQuestionPoolFixture,
   teardownQuestionPoolFixture,
-  type QuestionPoolFixture,
 } from "./fixtures";
 
 // Covers the new/changed Test Builder behavior: cascading question filters,
@@ -14,43 +12,6 @@ import {
 // validate/publish/freeze flow end-to-end through the real admin UI.
 // Uses its own isolated question-pool fixture (no shared/seeded data) and
 // creates its own throwaway draft test, torn down afterward.
-
-function loadEnvLocal(): Record<string, string> {
-  const p = path.join(__dirname, "..", "..", ".env.local");
-  const out: Record<string, string> = {};
-  for (const line of fs.readFileSync(p, "utf8").split("\n")) {
-    const m = line.match(/^([A-Z_]+)=(.*)$/);
-    if (m) out[m[1]] = m[2];
-  }
-  return out;
-}
-const env = loadEnvLocal();
-const BASE = env.NEXT_PUBLIC_SUPABASE_URL;
-const SERVICE_KEY = env.SUPABASE_SERVICE_ROLE_KEY;
-
-async function createDraftTest(fixture: QuestionPoolFixture, title: string): Promise<string> {
-  const res = await fetch(`${BASE}/rest/v1/tests`, {
-    method: "POST",
-    headers: {
-      apikey: SERVICE_KEY,
-      Authorization: `Bearer ${SERVICE_KEY}`,
-      "Content-Type": "application/json",
-      Prefer: "return=representation",
-    },
-    body: JSON.stringify({
-      title,
-      year_id: fixture.yearId,
-      status: "draft",
-      opens_at: new Date(Date.now() - 60_000).toISOString(),
-      closes_at: new Date(Date.now() + 2 * 3600_000).toISOString(),
-      duration_minutes: 60,
-      marks_per_question: 1,
-      negative_mark: 0,
-      min_questions: 1,
-    }),
-  }).then((r) => r.json());
-  return res[0].id as string;
-}
 
 test.describe("Test Builder", () => {
   test("filter, add, reorder, set marks, validate, and publish a draft test", async ({ page }) => {
@@ -62,7 +23,7 @@ test.describe("Test Builder", () => {
     // correctly end-to-end. Not a flakiness workaround for a broken step.
     test.setTimeout(75_000);
     const fixture = await provisionQuestionPoolFixture({ questionCount: 3 });
-    const testId = await createDraftTest(fixture, `TB E2E ${fixture.tag}`);
+    const testId = await createDraftTestForBuilder(fixture, `TB E2E ${fixture.tag}`);
 
     try {
       // --- admin login ---
