@@ -7,8 +7,8 @@ if [[ "$(id -u)" -ne 0 ]]; then
   exit 2
 fi
 
-COMMIT="REPLACE_COMMIT"
-SHORT="REPLACE_SHORT"
+COMMIT="627d6b2133d1ad1ebc9c5abadf6fca2e10a26ef2"
+SHORT="627d6b2"
 STAMP="$(date -u +%Y%m%dT%H%M%SZ)-${SHORT}-check3-origin-security"
 DST="/opt/medverse/releases/${STAMP}"
 TGZ="/tmp/medverse-${SHORT}.tgz"
