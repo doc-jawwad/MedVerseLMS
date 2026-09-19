@@ -249,4 +249,5 @@ tests/{e2e,unit}
 - [scoring-rules.md](scoring-rules.md) — marking, grace policy, ranking **when** vs **what**
 - [test-rules.md](test-rules.md) — test lifecycle, validation, kill switch
 - [deployment.md](deployment.md) — environments, Caddy, cron, backups, health, cutover, pending approvals, `deploy/` templates
+- [schema-lane-integration-contract.md](schema-lane-integration-contract.md) — parallel-lane DB/RPC contract (schema lane exclusive)
 - [validation/README.md](validation/README.md) — append-only environment validation / phase sign-off archive (staging 8J complete ≠ production authorize)

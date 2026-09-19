@@ -26,6 +26,20 @@ with ins as (
 insert into public.enrollments (student_id, year_id, status)
 values ((select id from t_student), (select id from t_y3), 'active');
 
+-- SPEC FREEZE: year_change_requests requires class lock (live subscription).
+insert into public.subscriptions (
+  student_id, plan_id, status, starts_at, ends_at, year_id, grace_days, paid_access_mode
+)
+select
+  (select id from t_student),
+  (select id from public.subscription_plans where is_complimentary = false order by sort_order, name limit 1),
+  'active',
+  now() - interval '1 day',
+  now() + interval '30 days',
+  (select id from t_y3),
+  0,
+  'all_entitled';
+
 insert into public.subjects (year_id, name)
 values
   ((select id from t_y3), 'YI_Y3_subj'),

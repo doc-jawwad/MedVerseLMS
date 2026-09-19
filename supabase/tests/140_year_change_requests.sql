@@ -19,9 +19,42 @@ select id as id into temp t_year2
   from public.years where year_number = 2;
 select id as id into temp t_year3
   from public.years where year_number = 3;
+select id as id into temp t_year4
+  from public.years where year_number = 4;
+select id into temp t_plan
+  from public.subscription_plans
+  where is_complimentary = false
+  order by sort_order, name
+  limit 1;
+
+-- SPEC FREEZE: year_change_requests is the locked (subscribed) path.
+-- Give both students a live subscription so create_year_change_request is allowed.
+insert into public.subscriptions (
+  student_id, plan_id, status, starts_at, ends_at, year_id, grace_days, paid_access_mode
+) values
+  (
+    (select id from t_student),
+    (select id from t_plan),
+    'active',
+    now() - interval '1 day',
+    now() + interval '30 days',
+    (select year_id from curriculum),
+    0,
+    'all_entitled'
+  ),
+  (
+    (select id from t_other),
+    (select id from t_plan),
+    'active',
+    now() - interval '1 day',
+    now() + interval '30 days',
+    (select year_id from curriculum),
+    0,
+    'all_entitled'
+  );
 
 grant select on curriculum, t_student, t_other, t_admin, t_year_mgr, t_academic,
-  t_year2, t_year3
+  t_year2, t_year3, t_year4, t_plan
   to anon, authenticated;
 
 ------------------------------------------------------------------
