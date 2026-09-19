@@ -11,7 +11,7 @@
 -- scoped fixtures, rolled back — nothing here persists.
 
 begin;
-select plan(16);
+select plan(14);
 
 select test_helpers.as_runner();
 select * into temp curriculum from test_helpers.make_curriculum();
@@ -60,41 +60,26 @@ select lives_ok(
 );
 
 ------------------------------------------------------------------
--- log_audit() (20260913000004): must now reject a non-admin caller,
--- while still working correctly end-to-end for a real admin — both
--- called directly and reached internally from an admin RPC.
+-- log_audit(): no direct client EXECUTE (Check 5 Low). Students and
+-- admins are blocked at the grant level; mutation RPCs still write
+-- rows internally via SECURITY DEFINER.
 ------------------------------------------------------------------
 select test_helpers.as_user((select id from t_student));
 select throws_ok(
   format('select public.log_audit(''forged_action'', ''test'', %L, ''{}''::jsonb)', (select id from t_test)),
-  'admin only',
-  'an authenticated non-admin student can no longer call log_audit() directly (the fixed gap)'
+  'permission denied for function log_audit',
+  'an authenticated non-admin student cannot EXECUTE log_audit'
 );
 
 select test_helpers.as_user((select id from t_admin));
-select lives_ok(
+select throws_ok(
   format('select public.log_audit(''manual_admin_action'', ''test'', %L, ''{"note":"direct call"}''::jsonb)', (select id from t_test)),
-  'a real admin can still call log_audit() directly'
+  'permission denied for function log_audit',
+  'a real admin cannot call log_audit() directly either (internal RPC path only)'
 );
 
-select test_helpers.as_runner();
-select is(
-  (select actor_id from public.audit_logs
-   where action = 'manual_admin_action' and target_id = (select id from t_test)),
-  (select id from t_admin),
-  'the audit row from that direct admin call has the correct actor_id (existing INSERT behavior preserved)'
-);
-select is(
-  (select details from public.audit_logs
-   where action = 'manual_admin_action' and target_id = (select id from t_test)),
-  '{"note":"direct call"}'::jsonb,
-  'the audit row from that direct admin call has the correct details payload'
-);
-
--- close_test_now (Group A, above) is itself is_admin()-gated and calls
--- log_audit() internally — confirm that internal call still completed
--- (i.e. a real admin RPC caller that reaches log_audit() end-to-end is
--- unaffected by adding the guard inside log_audit() itself).
+-- close_test_now is itself is_admin()-gated and calls log_audit() internally —
+-- confirm that internal call still completed.
 select is(
   (select count(*)::int from public.audit_logs
    where action = 'test_closed_now' and target_id = (select id from t_test2)),

@@ -127,12 +127,12 @@ Admin-management primitives (authorization in Postgres; admin UI is separate):
 - `set_main_admin(user_id, is_main)` — `manage_admins`; target must already be `role=admin`
 - `grant_access` / `revoke_access` / `restrict_access` / `unrestrict_access` / `set_resource_entitlement` — `grant_resource_access` (replaces direct `access_grants` / `access_restrictions` / entitlement-column writes)
 - `create_subscription_plan` / `update_subscription_plan` / `activate_subscription` / `extend_subscription` / `set_subscription_end` / `deactivate_subscription` / `restore_subscription` / `assign_subscription_plan` — `manage_subscriptions`
-- `create_subscription_application` / `update_pending_subscription_application` / `allocate_payment_screenshot_object_key` / `authorize_payment_screenshot_access` / `get_payment_instructions` — authenticated **and** `account_allows_lms()` (own pending / active payment copy). Blocked account statuses cannot read payment instructions. Paid subscription state is independent. Admin screenshot read still uses `review_subscription_applications`.
+- `create_subscription_application` / `update_pending_subscription_application` / `allocate_payment_screenshot_object_key` / `authorize_payment_screenshot_access` / `authorize_payment_screenshot_discard` / `get_payment_instructions` — authenticated **and** `account_allows_lms()` where noted (own pending / active payment copy / orphan discard). Blocked account statuses cannot read payment instructions. Paid subscription state is independent. Admin screenshot read/discard still uses `review_subscription_applications`.
 - `approve_subscription_application` — `review_subscription_applications` **and** `manage_subscriptions` (approval activates/extends)
 - `reject_subscription_application` — `review_subscription_applications`
 - `upsert_payment_settings` — `manage_payment_settings`
 
-`set_account_status` uses `activate_students` when restoring to `active`, otherwise `restrict_students`. When the target is `role = 'admin'`, `manage_admins` is also required. The last **active** Main Admin cannot be blocked. Question create/version RPCs require `edit_questions` (create also allows `import_questions` so CSV import can insert). Test kill-switch / publish RPCs require `publish_tests`. Enrollment promote/status RPCs require `manage_year_changes`. Analytics RPCs require `view_analytics`. `admin_student_profile` requires `view_students`. `log_audit` remains `is_admin()` so permissioned RPCs can still write the log.
+`set_account_status` uses `activate_students` when restoring to `active`, otherwise `restrict_students`. When the target is `role = 'admin'`, `manage_admins` is also required. The last **active** Main Admin cannot be blocked. Question create/version RPCs require `edit_questions` (create also allows `import_questions` so CSV import can insert). Test kill-switch / publish RPCs require `publish_tests`. Enrollment promote/status RPCs require `manage_year_changes`. Analytics RPCs require `view_analytics`. `admin_student_profile` requires `view_students`. `log_audit` is **not** directly callable by clients (`EXECUTE` revoked from `authenticated`/`anon`/`public`); permissioned mutation RPCs write the log internally (still gated by `is_admin()` on the JWT actor).
 
 Admin accounts are created from the `/admin/admins` UI (`manage_admins`): Cloud Auth Admin `createUser` (already confirmed) plus `ensure_profile()` as that user, then `set_admin_role` and permission RPCs on the caller session. Promoting an existing student uses `set_admin_role` only. Removing an admin demotes them to student; Auth user-delete remains pending ([deployment.md](deployment.md)).
 
@@ -177,7 +177,7 @@ Student: Get Subscription → configured payment instructions → enter **amount
 | `rejected` | Terminal for that row. Student may submit a **new** application. |
 | `cancelled` | Abandoned pending row (if used). |
 
-Screenshot: **private Cloudflare R2** object key only (`payment-proofs/{tenant}/{student}/{uuid}`). Never a permanent public URL. Authorized admins fetch via short-lived signed GET after `authorize_payment_screenshot_access`. Lifecycle: discard orphan uploads after a failed create/update attach; delete the previous object on successful screenshot replace; delete the object on reject (bytes are not kept in R2 after reject).
+Screenshot: **private Cloudflare R2** object key only (`payment-proofs/{tenant}/{student}/{uuid}`). Never a permanent public URL. Authorized admins fetch via short-lived signed GET after `authorize_payment_screenshot_access`. Lifecycle: discard orphan uploads after a failed create/update attach (`authorize_payment_screenshot_discard` — students may delete only **unattached** keys under their prefix); delete the previous object on successful screenshot replace (prior key is no longer attached); delete the object on reject via the same authorize RPC with `review_subscription_applications` (row may keep the key for audit metadata; bytes are removed). Students cannot discard a key that is still attached to a pending/approved/rejected/cancelled application.
 
 Payment copy lives in `payment_settings` (Main Admin / `manage_payment_settings`), not hardcoded. Default currency is **PKR**.
 
@@ -345,7 +345,7 @@ Admin **SELECT** on **sensitive student/ops tables** uses `has_permission(code)`
 | material_folders | SELECT catalog for assigned year / grants | SELECT/writes if `has_permission('manage_materials')` |
 | materials | SELECT **without** `drive_url`; open via `open_material` | SELECT metadata if `manage_materials` (`drive_url` via `open_material` requiring `manage_materials` or student entitlement); writes if `has_permission('manage_materials')` |
 | rank_dirty_queue | none | none (SECURITY DEFINER RPCs only) |
-| audit_logs | none | SELECT if `manage_admins` or `manage_system_settings`; insert via `log_audit` from permissioned RPCs (`log_audit` stays non-student) |
+| audit_logs | none | SELECT if `manage_admins` or `manage_system_settings`; insert only via internal `log_audit` from permissioned mutation RPCs (no direct client `EXECUTE`) |
 | import_* | none | SELECT/writes if `import_questions` |
 | question_stats / test_stats | none | `view_analytics` SELECT (live via analytics RPCs; no direct table) |
 

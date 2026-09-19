@@ -23,7 +23,7 @@ async function currentUserId(
   return typeof sub === "string" ? sub : null;
 }
 
-/** Best-effort R2 delete for a key owned by the caller (prefix check). */
+/** Best-effort R2 delete after DB authorize (orphan / admin-reject rules). */
 export async function discardPaymentScreenshot(
   objectKey: string
 ): Promise<{ error?: string }> {
@@ -31,11 +31,23 @@ export async function discardPaymentScreenshot(
   const uid = await currentUserId(supabase);
   if (!uid) return clientActionFailed("discardPaymentScreenshot", "not_authenticated");
   if (!isPrivatePaymentScreenshotKey(objectKey, uid)) {
-    return clientActionFailed(
-      "discardPaymentScreenshot",
-      "invalid_screenshot_object_key"
-    );
+    // Admins may discard another student's key after reject — re-check via RPC.
+    if (!isPrivatePaymentScreenshotKey(objectKey)) {
+      return clientActionFailed(
+        "discardPaymentScreenshot",
+        "invalid_screenshot_object_key"
+      );
+    }
   }
+
+  const { error: authzError } = await supabase.rpc(
+    "authorize_payment_screenshot_discard",
+    { p_object_key: objectKey }
+  );
+  if (authzError) {
+    return clientActionFailed("discardPaymentScreenshot", authzError);
+  }
+
   const config = getR2Config();
   if ("error" in config) {
     return clientActionFailed("discardPaymentScreenshot", config.error);
@@ -50,6 +62,15 @@ export async function discardPaymentScreenshot(
 
 async function deleteOwnedProofBestEffort(objectKey: string | null | undefined) {
   if (!objectKey || !isPrivatePaymentScreenshotKey(objectKey)) return;
+  const supabase = await createClient();
+  const { error: authzError } = await supabase.rpc(
+    "authorize_payment_screenshot_discard",
+    { p_object_key: objectKey }
+  );
+  if (authzError) {
+    toClientActionError(authzError, "deleteOwnedProof.authorize");
+    return;
+  }
   const config = getR2Config();
   if ("error" in config) {
     toClientActionError(config.error, "deleteOwnedProof.config");

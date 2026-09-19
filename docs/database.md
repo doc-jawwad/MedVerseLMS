@@ -74,7 +74,7 @@ Status transitions are now enforced at the database level (`protect_question_sta
 - Partial unique `(student_id) WHERE status = 'pending'` — no simultaneous pending applications.
 - While `pending`, the student may edit/resubmit **that row** (amount, screenshot) via RPC.
 - `approved` is terminal and creates/activates/extends a subscription. `rejected` is terminal; student may insert a **new** application.
-- Screenshot bytes live in **private Cloudflare R2**; the table stores only the object key (`payment-proofs/{tenant_id}/{student_id}/{uuid}`). Never a public URL. Admin review uses a short-lived signed GET after `authorize_payment_screenshot_access` (`review_subscription_applications`). On **replace**, the previous object is deleted after a successful update. On **reject**, the object is deleted after a successful reject (private proofs are not retained in R2). Failed attach after upload discards the new object.
+- Screenshot bytes live in **private Cloudflare R2**; the table stores only the object key (`payment-proofs/{tenant_id}/{student_id}/{uuid}`). Never a public URL. Admin review uses a short-lived signed GET after `authorize_payment_screenshot_access` (`review_subscription_applications`). On **replace**, the previous object is deleted after a successful update. On **reject**, the object is deleted after a successful reject (private proofs are not retained in R2). Failed attach after upload discards the new object only when `authorize_payment_screenshot_discard` allows it (orphan keys; never a key still attached to any application status).
 - Currency default is **PKR** (owner decision). Copied from `payment_settings.currency` when the student omits it.
 - No payment gateway. Admin decides whether `amount` is acceptable.
 
@@ -145,7 +145,7 @@ Practice list RPCs return catalog rows with a lock flag; start/fetch RPCs enforc
 ## Materials
 
 **material_folders** — `name`, `year_id`, `subject_id null`, `sort_order`, plus entitlement columns (existing folders backfilled `free`).
-**materials** — `folder_id`, `title`, `description`, `file_type text`, `drive_url text`.
+**materials** — `folder_id`, `title`, `description`, `file_type text`, `drive_url text` with `CHECK (drive_url ~ '^https://[^[:space:]]+$')` (same https-only rule as the admin UI).
 Student catalog SELECT must **not** expose `drive_url`. Table-level `SELECT` is revoked and re-granted on metadata columns only (Postgres table-level `SELECT` would otherwise still expose `drive_url`). `open_material(id)` returns the URL only after student entitlement or `manage_materials` (Main Admin included via permission short-circuit). Future books/videos: no permanent public object URL; signed access after the same check.
 
 ## Import

@@ -486,7 +486,7 @@ select ok(
 select test_helpers.as_user((select id from t_student));
 select throws_ok(
   $$select public.log_audit('forged', 'subscription_application', gen_random_uuid())$$,
-  'admin only',
+  'permission denied for function log_audit',
   '19e student cannot forge audit rows'
 );
 

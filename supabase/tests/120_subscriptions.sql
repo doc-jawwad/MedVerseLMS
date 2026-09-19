@@ -434,7 +434,7 @@ select is(
 select test_helpers.as_user((select id from t_other));
 select throws_ok(
   'select public.log_audit(''forged_sub'', ''subscription'', gen_random_uuid(), ''{}''::jsonb)',
-  'admin only',
+  'permission denied for function log_audit',
   '19d student cannot forge audit rows'
 );
 

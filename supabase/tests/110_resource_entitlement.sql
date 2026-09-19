@@ -484,7 +484,7 @@ select throws_ok(
     'select public.log_audit(''forged_restriction'', ''access_restriction'', %L, ''{}''::jsonb)',
     (select id from t_restriction)
   ),
-  'admin only',
+  'permission denied for function log_audit',
   '19e student cannot insert audit rows'
 );
 
