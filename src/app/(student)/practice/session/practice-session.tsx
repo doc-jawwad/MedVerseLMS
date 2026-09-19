@@ -106,7 +106,7 @@ export function PracticeSession({
 
   if (error) {
     return (
-      <div className="grid gap-4">
+      <div className="mx-auto grid w-full max-w-2xl gap-4">
         <p className="text-destructive">{error}</p>
         <Button asChild variant="outline" className="w-fit">
           <Link href="/practice">Back to practice</Link>
@@ -116,12 +116,14 @@ export function PracticeSession({
   }
 
   if (loading && queue.length === 0) {
-    return <p className="text-muted-foreground">Loading questions…</p>;
+    return (
+      <p className="text-sm text-muted-foreground">Loading questions…</p>
+    );
   }
 
   if (!current) {
     return (
-      <div className="grid gap-4">
+      <div className="mx-auto grid w-full max-w-2xl gap-4">
         <p className="text-muted-foreground">No questions available here yet.</p>
         <Button asChild variant="outline" className="w-fit">
           <Link href="/practice">Back to practice</Link>
@@ -135,9 +137,14 @@ export function PracticeSession({
 
   return (
     <div className="mx-auto grid w-full max-w-2xl gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold">{title}</h1>
+          <p className="text-[11px] font-semibold tracking-[0.16em] text-primary uppercase">
+            Practice
+          </p>
+          <h1 className="font-heading text-xl font-semibold tracking-tight text-[#072855]">
+            {title}
+          </h1>
           <p className="text-sm text-muted-foreground">
             Question {index + 1} of {queue.length} in this round
           </p>
@@ -152,9 +159,9 @@ export function PracticeSession({
         </div>
       </div>
 
-      <Card>
+      <Card className="shadow-none">
         <CardHeader>
-          <CardTitle className="text-base font-medium leading-relaxed">
+          <CardTitle className="text-base font-medium leading-relaxed text-[#072855]">
             {current.stem}
           </CardTitle>
         </CardHeader>
@@ -169,7 +176,7 @@ export function PracticeSession({
                 key={o.key}
                 disabled={Boolean(feedback)}
                 onClick={() => setSelected(o.key)}
-                className={`rounded-md border p-3 text-left text-sm transition-colors ${
+                className={`rounded-xl border p-3.5 text-left text-sm transition-colors ${
                   isCorrect
                     ? "border-green-600 bg-green-50 dark:bg-green-950"
                     : isWrongPick

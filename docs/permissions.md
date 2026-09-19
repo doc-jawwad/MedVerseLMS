@@ -9,7 +9,7 @@ Four independent concepts. Do not collapse them:
 | **Subscription** | `subscriptions` (+ applications) | Paid/complimentary time-bounded plan. Not the class year. |
 | **Resource entitlement** | resource policy + grants + restrictions | Whether a visible catalog item can be **used** (start test, open file, practice) |
 
-Email verification does **not** require admin approval. After verification, an **active** student enters the LMS immediately. Free resources are usable without a paid subscription. Paid resources stay **visible but locked** until entitled.
+Email verification does **not** require admin approval. After verification, an **active** student enters the LMS immediately. Free students use Dashboard, Free Resources, My Subscription, and My Account; Materials / Practice / Tests / Performance are locked section hubs until a **live** subscription. Free-entitled (and granted) items remain usable via Free Resources and content RPCs. Paid resources stay **visible but locked** inside subscribed catalogs until entitled.
 
 Do **not** infer historical test eligibility or academic history from current subscription. Lifetime analytics, missed vs not-eligible, and leaderboard population: [access-eligibility-analytics.md](access-eligibility-analytics.md).
 
@@ -185,7 +185,7 @@ Admin lists are queries: Applied (`pending` applications), Active (live subscrip
 
 ## Resource access
 
-Do **not** hard-code “paid = menu X”. Menus stay visible. **Catalog visibility** (see the item, lock state) is separate from **content entitlement** (use it).
+Do **not** hard-code “paid = menu X” as entitlement. **Navigation visibility** (which hubs look active vs locked) is Layer 10 UX driven by live subscription. **Catalog visibility** (see the item, lock state) and **content entitlement** (use it) remain separate. Free students get an active Free Resources hub; Materials / Practice / Tests / Performance stay visible but locked until `has_live_subscription()` is true. Content RPCs still enforce free / grant / paid rules.
 
 **Account-level blocking always overrides** resource access: non-`active` accounts get no LMS catalog and no content RPCs (except the explicit in-progress exam disposition in [exam-state-machine.md](exam-state-machine.md)).
 

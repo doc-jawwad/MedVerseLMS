@@ -17,6 +17,13 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { ResourceLockNotice } from "@/components/subscription/resource-lock-notice";
+import { SectionLock } from "@/components/subscription/section-lock";
+import { PageHeader } from "@/components/student/page-header";
+import { StudentPage } from "@/components/student/student-page";
+import { SectionHeading } from "@/components/student/section-heading";
+import { EmptyState } from "@/components/student/empty-state";
+import { getStudentHasLiveSubscription } from "@/lib/subscriptions/student-live-access";
+import { studentHasPaidLmsSections } from "@/lib/subscriptions/student-section-access";
 import {
   bindSsrTiming,
   ssrMarkPageFnEnd,
@@ -40,6 +47,16 @@ type AttemptRow = {
 export default async function StudentTestsPage() {
   await bindSsrTiming("/tests");
   const { supabase, userId } = await requireStudent();
+  const hasLiveAccess = await getStudentHasLiveSubscription();
+  if (!studentHasPaidLmsSections(hasLiveAccess)) {
+    ssrMarkPageFnEnd();
+    return (
+      <SectionLock
+        title="Tests"
+        description="The full tests catalog unlocks with a live subscription. Free and granted tests stay under Free Resources."
+      />
+    );
+  }
 
   const [
     { data: tests },
@@ -126,31 +143,29 @@ export default async function StudentTestsPage() {
   ssrMarkPageFnEnd();
 
   return (
-    <div className="grid gap-6">
-      <div>
-        <h1 className="text-2xl font-semibold">Tests</h1>
-        <p className="text-sm text-muted-foreground">
-          Missed means you could have sat the test and did not. Not eligible
-          means the test was not available to you during its window. Neither is
-          a score of zero.
-        </p>
-      </div>
+    <StudentPage>
+      <PageHeader
+        title="Tests"
+        description="Missed means you could have sat the test and did not. Not eligible means the test was not available to you during its window. Neither is a score of zero."
+      />
 
       {sections.map((sec) => {
         const items = rows.filter((r) => r.section === sec.key);
         if (items.length === 0) return null;
         return (
           <div key={sec.key} className="grid gap-3">
-            <h2 className="font-medium text-muted-foreground">{sec.label}</h2>
+            <SectionHeading title={sec.label} />
             <div className="grid gap-3 sm:grid-cols-2">
               {items.map(({ t, attempt, state }) => {
                 const s = t.subjects as unknown as { name: string } | null;
                 const qc = t.question_count;
                 return (
-                  <Card key={t.id}>
+                  <Card key={t.id} className="shadow-none">
                     <CardHeader>
                       <div className="flex flex-wrap items-start justify-between gap-2">
-                        <CardTitle className="text-base">{t.title}</CardTitle>
+                        <CardTitle className="text-base text-[#072855]">
+                          {t.title}
+                        </CardTitle>
                         <Badge
                           variant={
                             state === "available" || state === "in_progress"
@@ -235,8 +250,11 @@ export default async function StudentTestsPage() {
       })}
 
       {rows.length === 0 && (
-        <p className="text-muted-foreground">No tests assigned to you yet.</p>
+        <EmptyState
+          title="No tests assigned to you yet"
+          description="When your academy publishes a test for your year, it will appear here."
+        />
       )}
-    </div>
+    </StudentPage>
   );
 }

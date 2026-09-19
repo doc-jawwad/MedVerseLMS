@@ -9,6 +9,12 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { PageHeader } from "@/components/student/page-header";
+import { StudentPage } from "@/components/student/student-page";
+import { EmptyState } from "@/components/student/empty-state";
+import { SectionLock } from "@/components/subscription/section-lock";
+import { getStudentHasLiveSubscription } from "@/lib/subscriptions/student-live-access";
+import { studentHasPaidLmsSections } from "@/lib/subscriptions/student-section-access";
 
 export const metadata = { title: "Practice — MedVerse LMS" };
 
@@ -20,6 +26,11 @@ type OverviewRow = {
   approved_questions: number;
 };
 
+type PracticeSubject = {
+  subject_id: string;
+  granted: boolean;
+};
+
 export default async function PracticeSubjectPage({
   params,
 }: {
@@ -27,6 +38,22 @@ export default async function PracticeSubjectPage({
 }) {
   const { supabase } = await requireStudent();
   const { subjectId } = await params;
+  const hasLiveAccess = await getStudentHasLiveSubscription();
+
+  if (!studentHasPaidLmsSections(hasLiveAccess)) {
+    const { data: subjects } = await supabase.rpc("practice_subjects");
+    const allowed = ((subjects ?? []) as PracticeSubject[]).some(
+      (s) => s.subject_id === subjectId && s.granted
+    );
+    if (!allowed) {
+      return (
+        <SectionLock
+          title="Practice MCQs"
+          description="This practice subject requires a live subscription. Free practice stays under Free Resources."
+        />
+      );
+    }
+  }
 
   const [{ data: subject }, { data: overview, error }] = await Promise.all([
     supabase.from("subjects").select("id, name").eq("id", subjectId).maybeSingle(),
@@ -43,29 +70,31 @@ export default async function PracticeSubjectPage({
   const total = rows.reduce((a, r) => a + Number(r.approved_questions), 0);
 
   return (
-    <div className="grid gap-6">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <h1 className="text-2xl font-semibold">{subject.name}</h1>
-          <p className="text-muted-foreground">{total} questions available</p>
-        </div>
-        {total > 0 && (
-          <Button asChild>
-            <Link
-              href={`/practice/session?scope=subject&id=${subject.id}&name=${encodeURIComponent(subject.name)}`}
-            >
-              Practice whole subject
-            </Link>
-          </Button>
-        )}
-      </div>
+    <StudentPage>
+      <PageHeader
+        title={subject.name}
+        description={`${total} questions available`}
+        actions={
+          total > 0 ? (
+            <Button asChild>
+              <Link
+                href={`/practice/session?scope=subject&id=${subject.id}&name=${encodeURIComponent(subject.name)}`}
+              >
+                Practice whole subject
+              </Link>
+            </Button>
+          ) : undefined
+        }
+      />
 
       {[...books.entries()].map(([bookId, book]) => (
         <div key={bookId} className="grid gap-3">
-          <h2 className="font-medium text-muted-foreground">{book.name}</h2>
+          <h2 className="font-heading text-[13px] font-semibold tracking-[0.12em] text-[#072855]/65 uppercase">
+            {book.name}
+          </h2>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {book.chapters.map((c) => (
-              <Card key={c.chapter_id} className="flex flex-col">
+              <Card key={c.chapter_id} className="flex flex-col shadow-none">
                 <CardHeader className="flex-1">
                   <CardTitle className="text-base">{c.chapter_name}</CardTitle>
                   <CardDescription>
@@ -94,8 +123,8 @@ export default async function PracticeSubjectPage({
       ))}
 
       {rows.length === 0 && (
-        <p className="text-muted-foreground">No chapters with questions yet.</p>
+        <EmptyState title="No chapters with questions yet." />
       )}
-    </div>
+    </StudentPage>
   );
 }

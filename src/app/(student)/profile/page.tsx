@@ -15,6 +15,9 @@ import {
   type YearChangeRequestView,
   type YearOption,
 } from "./year-change-panel";
+import { PageHeader } from "@/components/student/page-header";
+import { StudentPage } from "@/components/student/student-page";
+import { FieldRow } from "@/components/student/field-row";
 
 export const metadata = { title: "My Account — MedVerse LMS" };
 
@@ -67,33 +70,33 @@ export default async function ProfilePage() {
     mapped.find((r) => r.status === "rejected") ?? null;
 
   return (
-    <div className="grid max-w-2xl gap-6">
-      <h1 className="text-2xl font-semibold">My Account</h1>
+    <StudentPage width="narrow">
+      <PageHeader title="My Account" />
 
-      <Card>
+      <Card className="shadow-none">
         <CardHeader>
-          <CardTitle className="text-base">Account</CardTitle>
+          <CardTitle className="text-base text-[#072855]">Account</CardTitle>
         </CardHeader>
-        <CardContent className="grid gap-2 text-sm">
-          <Row label="Name">{profile.full_name}</Row>
-          <Row label="Email">{profile.email}</Row>
-          <Row label="Year">{enrollment.year_name}</Row>
-          <Row label="Enrollment status">
+        <CardContent className="grid gap-3 text-sm">
+          <FieldRow label="Name">{profile.full_name}</FieldRow>
+          <FieldRow label="Email">{profile.email}</FieldRow>
+          <FieldRow label="Year">{enrollment.year_name}</FieldRow>
+          <FieldRow label="Enrollment status">
             <Badge variant={enrollment.status === "active" ? "default" : "outline"}>
               {enrollment.status}
             </Badge>
-          </Row>
-          <Row label="Subscription">
+          </FieldRow>
+          <FieldRow label="Subscription">
             <Badge variant={live.data ? "default" : "outline"}>
               {live.data ? "active" : "no active plan"}
             </Badge>
-          </Row>
+          </FieldRow>
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="shadow-none">
         <CardHeader>
-          <CardTitle className="text-base">Academic year</CardTitle>
+          <CardTitle className="text-base text-[#072855]">Academic year</CardTitle>
           <CardDescription>
             Your class year is fixed until an admin approves a change request.
             Account status and subscription stay separate.
@@ -110,9 +113,9 @@ export default async function ProfilePage() {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="shadow-none">
         <CardHeader>
-          <CardTitle className="text-base">Subscription</CardTitle>
+          <CardTitle className="text-base text-[#072855]">Subscription</CardTitle>
           <CardDescription>
             View status, payment instructions, and submit or update an
             application.
@@ -127,9 +130,9 @@ export default async function ProfilePage() {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="shadow-none">
         <CardHeader>
-          <CardTitle className="text-base">Practice access</CardTitle>
+          <CardTitle className="text-base text-[#072855]">Practice access</CardTitle>
           <CardDescription>
             Subjects your admin has granted you for practice MCQs.
           </CardDescription>
@@ -147,23 +150,14 @@ export default async function ProfilePage() {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="shadow-none">
         <CardHeader>
-          <CardTitle className="text-base">Change password</CardTitle>
+          <CardTitle className="text-base text-[#072855]">Change password</CardTitle>
         </CardHeader>
         <CardContent>
           <ChangePasswordForm />
         </CardContent>
       </Card>
-    </div>
-  );
-}
-
-function Row({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="flex items-center justify-between">
-      <span className="text-muted-foreground">{label}</span>
-      <span>{children}</span>
-    </div>
+    </StudentPage>
   );
 }

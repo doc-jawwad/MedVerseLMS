@@ -1,29 +1,17 @@
-import Link from "next/link";
 import { requireStudent } from "@/lib/auth/require-user";
 import { isBlockedAccountStatus } from "@/lib/auth/account-status";
 import { signOutAction } from "@/lib/actions/auth";
 import { Button } from "@/components/ui/button";
 import { SessionWatch } from "@/components/session-watch";
 import { Logo } from "@/components/logo";
-import { MobileNav, type NavItem } from "@/components/mobile-nav";
+import { MobileNav } from "@/components/mobile-nav";
+import { AppShellNav } from "@/components/student/app-shell-nav";
+import { getStudentHasLiveSubscription } from "@/lib/subscriptions/student-live-access";
+import { buildStudentShellNav } from "@/lib/subscriptions/student-section-access";
 import {
   bindSsrTiming,
   scheduleSsrTimingFlush,
 } from "@/lib/observability/ssr-timing-rsc";
-
-const nav: NavItem[] = [
-  { href: "/dashboard", label: "Dashboard", icon: "dashboard" },
-  { href: "/materials", label: "Study Materials", icon: "materials" },
-  { href: "/practice", label: "Practice MCQs", icon: "practice" },
-  { href: "/tests", label: "Tests", icon: "tests" },
-  { href: "/performance", label: "Performance", icon: "performance" },
-  { href: "/subscription", label: "My Subscription", icon: "subscription" },
-  { href: "/profile", label: "My Account", icon: "account" },
-];
-
-// The 4 most-used links pinned to the mobile bottom tab bar; a 5th "More"
-// tab opens the drawer with the full list above (Materials + Subscription + Account).
-const bottomNav = [nav[0], nav[2], nav[3], nav[4]];
 
 export default async function StudentLayout({
   children,
@@ -39,38 +27,31 @@ export default async function StudentLayout({
   // never the student shell nav (dashboard / payments / year-change, etc.).
   if (isBlockedExamContinue) {
     return (
-      <div className="min-h-svh">
+      <div className="min-h-svh bg-[var(--student-canvas)]">
         <SessionWatch userId={userId} />
         <main className="p-4 md:p-8">{children}</main>
       </div>
     );
   }
 
+  const hasLiveAccess = await getStudentHasLiveSubscription();
+  const { items: nav, bottomItems } = buildStudentShellNav(hasLiveAccess);
+
   return (
-    <div className="flex min-h-svh">
+    <div className="flex min-h-svh bg-[var(--student-canvas)]">
       <SessionWatch userId={userId} />
       <aside className="hidden w-60 shrink-0 flex-col bg-sidebar p-4 text-sidebar-foreground md:flex">
         <div className="mb-6">
           <Logo />
-          <div className="mt-3 text-sm text-sidebar-foreground/80">
+          <div className="mt-4 text-sm font-medium text-white">
             {profile.full_name}
           </div>
-          <div className="text-xs text-sidebar-foreground/60">
+          <div className="mt-1 w-fit rounded-full bg-white/10 px-2 py-0.5 text-[11px] tracking-wide text-sidebar-foreground/80">
             {enrollment.year_name}
           </div>
         </div>
-        <nav className="flex flex-1 flex-col gap-1">
-          {nav.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className="rounded-md px-3 py-2 text-sm text-sidebar-foreground/90 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-            >
-              {item.label}
-            </Link>
-          ))}
-        </nav>
-        <form action={signOutAction}>
+        <AppShellNav items={nav} />
+        <form action={signOutAction} className="mt-4">
           <Button
             variant="outline"
             size="sm"
@@ -81,15 +62,15 @@ export default async function StudentLayout({
           </Button>
         </form>
       </aside>
-      <div className="flex-1">
+      <div className="flex min-w-0 flex-1 flex-col">
         <MobileNav
           navItems={nav}
-          bottomItems={bottomNav}
+          bottomItems={bottomItems}
           userLabel={profile.full_name}
           subLabel={enrollment.year_name}
           signOutAction={signOutAction}
         />
-        <main className="p-4 pb-24 md:p-8">{children}</main>
+        <main className="flex-1 p-4 pb-24 md:p-8">{children}</main>
       </div>
     </div>
   );

@@ -56,7 +56,58 @@ describe("student subscription status view", () => {
     });
     assert.equal(view.kind, "pending");
     assert.equal(view.pending?.amount, 5000);
+    assert.equal(view.hasLiveAccess, false);
     assert.equal(studentCanEditApplication(view.pending), true);
+  });
+
+  it("treats pending as not live access for paid LMS sections", async () => {
+    const { studentHasPaidLmsSections } = await import(
+      "../../src/lib/subscriptions/student-section-access.ts"
+    );
+    const view = buildStudentSubscriptionView({
+      hasLiveAccess: false,
+      now,
+      subscriptions: [],
+      applications: [
+        {
+          id: "a1",
+          status: "pending",
+          amount: 5000,
+          currency: "PKR",
+          created_at: "2026-09-14T10:00:00.000Z",
+          review_note: null,
+          reviewed_at: null,
+        },
+      ],
+    });
+    assert.equal(studentHasPaidLmsSections(view.hasLiveAccess), false);
+  });
+
+  it("keeps expired subscription from unlocking paid LMS sections", async () => {
+    const { studentHasPaidLmsSections, buildStudentShellNav } = await import(
+      "../../src/lib/subscriptions/student-section-access.ts"
+    );
+    const view = buildStudentSubscriptionView({
+      hasLiveAccess: false,
+      now,
+      subscriptions: [
+        {
+          id: "s-exp",
+          status: "expired",
+          starts_at: "2026-08-01T00:00:00.000Z",
+          ends_at: "2026-09-01T00:00:00.000Z",
+          plan_name: "MBBS Annual",
+        },
+      ],
+      applications: [],
+    });
+    assert.equal(view.kind, "expired");
+    assert.equal(studentHasPaidLmsSections(view.hasLiveAccess), false);
+    assert.ok(
+      buildStudentShellNav(view.hasLiveAccess).items.some(
+        (i) => i.href === "/practice" && i.locked
+      )
+    );
   });
 
   it("keeps rejected history and allows a new application", () => {

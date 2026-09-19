@@ -8,6 +8,9 @@ import {
 } from "@/lib/tests/attempt-review";
 import { parseOwnTestResult } from "@/lib/tests/own-test-result";
 import { ReviewLockNotice } from "@/components/subscription/review-lock-notice";
+import { PageHeader } from "@/components/student/page-header";
+import { StudentPage } from "@/components/student/student-page";
+import { StatTile } from "@/components/student/stat-tile";
 import {
   bindSsrTiming,
   ssrMarkPageFnEnd,
@@ -18,7 +21,6 @@ import { Badge } from "@/components/ui/badge";
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -74,11 +76,8 @@ export default async function ResultPage({
   ssrMarkPageFnEnd();
 
   return (
-    <div className="mx-auto grid w-full max-w-3xl gap-6">
-      <div>
-        <h1 className="text-2xl font-semibold">{test.title}</h1>
-        <p className="text-muted-foreground">Your result</p>
-      </div>
+    <StudentPage width="article">
+      <PageHeader title={test.title} description="Your result" />
 
       {invalidated.map((a) => (
         <p key={a.id} className="text-sm text-muted-foreground">
@@ -88,18 +87,18 @@ export default async function ResultPage({
       ))}
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4" data-testid="result-summary">
-        <Stat label="Score" value={`${submitted.score} / ${submitted.max_score}`} />
-        <Stat label="Percentage" value={`${submitted.percentage}%`} />
-        <Stat label="Correct" value={String(submitted.raw_correct)} />
-        <Stat
+        <StatTile label="Score" value={`${submitted.score} / ${submitted.max_score}`} />
+        <StatTile label="Percentage" value={`${submitted.percentage}%`} />
+        <StatTile label="Correct" value={String(submitted.raw_correct)} />
+        <StatTile
           label="Wrong / Blank"
           value={`${submitted.raw_wrong} / ${submitted.raw_blank}`}
         />
       </div>
       {submitted.rank != null && (
         <div className="grid grid-cols-2 gap-3 sm:w-1/2">
-          <Stat label="Rank" value={`#${submitted.rank}`} />
-          <Stat
+          <StatTile label="Rank" value={`#${submitted.rank}`} />
+          <StatTile
             label="Percentile"
             value={submitted.percentile != null ? `${submitted.percentile}` : "—"}
           />
@@ -113,9 +112,9 @@ export default async function ResultPage({
       </p>
 
       {leaderboard.length > 0 && (
-        <Card>
+        <Card className="shadow-none">
           <CardHeader>
-            <CardTitle className="text-base">Leaderboard</CardTitle>
+            <CardTitle className="text-base text-[#072855]">Leaderboard</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-1">
             {leaderboard.map((r) => (
@@ -145,7 +144,7 @@ export default async function ResultPage({
       )}
 
       {reviewState.kind === "disabled" && (
-        <Card>
+        <Card className="shadow-none">
           <CardContent className="pt-6 text-sm text-muted-foreground">
             Answer review is not available for this test.
           </CardContent>
@@ -153,7 +152,7 @@ export default async function ResultPage({
       )}
 
       {reviewState.kind === "after_close" && (
-        <Card>
+        <Card className="shadow-none">
           <CardContent className="pt-6 text-sm text-muted-foreground">
             {`Answers and explanations become visible after the test closes (${formatDateTime(test.closes_at)}).`}
           </CardContent>
@@ -172,7 +171,7 @@ export default async function ResultPage({
                   ? "correct"
                   : "wrong";
             return (
-              <Card key={item.idx}>
+              <Card key={item.idx} className="shadow-none">
                 <CardHeader className="pb-2">
                   <CardTitle className="flex items-start justify-between gap-2 text-base font-medium">
                     <span>
@@ -231,17 +230,6 @@ export default async function ResultPage({
           })}
         </div>
       )}
-    </div>
-  );
-}
-
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <Card>
-      <CardHeader className="pb-1">
-        <CardDescription>{label}</CardDescription>
-        <CardTitle className="text-2xl">{value}</CardTitle>
-      </CardHeader>
-    </Card>
+    </StudentPage>
   );
 }

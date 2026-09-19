@@ -87,6 +87,10 @@
   --sidebar-accent-foreground: #ffffff;
   --sidebar-border: #12335e;
   --sidebar-ring: var(--brand-teal);
+
+  /* Student workspace surface — navy/teal product, not a generic gray app. */
+  --student-canvas: #f3f7f8;
+  --student-ink: var(--brand-navy);
 }
 
 .dark {
@@ -124,6 +128,8 @@
   --sidebar-accent-foreground: #eaf2f8;
   --sidebar-border: #12335e;
   --sidebar-ring: var(--brand-teal);
+  --student-canvas: #081226;
+  --student-ink: #eaf2f8;
 }
 
 @layer base {

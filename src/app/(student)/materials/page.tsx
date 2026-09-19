@@ -9,11 +9,26 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { OpenMaterialButton } from "@/components/materials/open-material-button";
 import { ResourceLockNotice } from "@/components/subscription/resource-lock-notice";
+import { SectionLock } from "@/components/subscription/section-lock";
+import { PageHeader } from "@/components/student/page-header";
+import { StudentPage } from "@/components/student/student-page";
+import { EmptyState } from "@/components/student/empty-state";
+import { getStudentHasLiveSubscription } from "@/lib/subscriptions/student-live-access";
+import { studentHasPaidLmsSections } from "@/lib/subscriptions/student-section-access";
 
 export const metadata = { title: "Study Materials — MedVerse LMS" };
 
 export default async function MaterialsPage() {
   const { supabase } = await requireStudent();
+  const hasLiveAccess = await getStudentHasLiveSubscription();
+  if (!studentHasPaidLmsSections(hasLiveAccess)) {
+    return (
+      <SectionLock
+        title="Study Materials"
+        description="The full materials library unlocks with a live subscription. Free folders stay under Free Resources."
+      />
+    );
+  }
 
   const [{ data: folders }, { data: materials }, { data: subjects }, { data: accessible }] =
     await Promise.all([
@@ -38,22 +53,20 @@ export default async function MaterialsPage() {
     subjects?.find((s) => s.id === id)?.name;
 
   return (
-    <div className="grid gap-6">
-      <div>
-        <h1 className="text-2xl font-semibold">Study Materials</h1>
-        <p className="text-muted-foreground">
-          Links open in Google Drive — download from there.
-        </p>
-      </div>
+    <StudentPage>
+      <PageHeader
+        title="Study Materials"
+        description="Links open in Google Drive — download from there."
+      />
 
       {(folders ?? []).map((f) => {
         const items = (materials ?? []).filter((m) => m.folder_id === f.id);
         const locked = !entitled.has(f.id);
         return (
-          <Card key={f.id} className={locked ? "opacity-95" : undefined}>
+          <Card key={f.id} className={`shadow-none ${locked ? "opacity-95" : ""}`}>
             <CardHeader>
-              <CardTitle className="text-base">
-                📁 {f.name}{" "}
+              <CardTitle className="flex flex-wrap items-center gap-2 text-base text-[#072855]">
+                {f.name}{" "}
                 {f.subject_id && (
                   <Badge variant="outline">{subjectName(f.subject_id)}</Badge>
                 )}
@@ -68,7 +81,7 @@ export default async function MaterialsPage() {
                 {items.map((m) => (
                   <div
                     key={m.id}
-                    className={`flex items-center justify-between rounded-md border p-3 text-sm ${
+                    className={`flex items-center justify-between rounded-xl border p-3 text-sm ${
                       locked
                         ? "opacity-70"
                         : "transition-colors hover:bg-accent/50"
@@ -103,10 +116,11 @@ export default async function MaterialsPage() {
       })}
 
       {(folders ?? []).length === 0 && (
-        <p className="text-muted-foreground">
-          No study materials for your year yet.
-        </p>
+        <EmptyState
+          title="No study materials for your year yet"
+          description="Free and subscribed folders will appear here when your academy publishes them."
+        />
       )}
-    </div>
+    </StudentPage>
   );
 }

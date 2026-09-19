@@ -17,6 +17,9 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { SubscriptionApplyForm } from "./apply-form";
+import { PageHeader } from "@/components/student/page-header";
+import { StudentPage } from "@/components/student/student-page";
+import { FieldRow } from "@/components/student/field-row";
 
 export const metadata = { title: "My Subscription — MedVerse LMS" };
 
@@ -102,18 +105,15 @@ export default async function SubscriptionPage() {
   const applyMode = view.pending ? "edit" : "create";
 
   return (
-    <div className="grid max-w-2xl gap-6">
-      <div>
-        <h1 className="text-2xl font-semibold">My Subscription</h1>
-        <p className="text-muted-foreground">
-          Free resources stay available. Subscription-required resources stay
-          visible but locked until you have an active subscription.
-        </p>
-      </div>
+    <StudentPage width="narrow">
+      <PageHeader
+        title="My Subscription"
+        description="Free resources stay available. Subscription-required resources stay visible but locked until you have an active subscription."
+      />
 
-      <Card>
+      <Card className="shadow-none">
         <CardHeader>
-          <CardTitle className="flex flex-wrap items-center gap-2 text-base">
+            <CardTitle className="flex flex-wrap items-center gap-2 text-base text-[#072855]">
             {view.label}
             <Badge
               variant={
@@ -132,15 +132,15 @@ export default async function SubscriptionPage() {
         <CardContent className="grid gap-3 text-sm">
           {view.kind === "active" && view.active && (
             <div className="grid gap-2">
-              <Row label="Plan">{view.active.plan_name ?? "—"}</Row>
-              <Row label="Starts">{formatDate(view.active.starts_at)}</Row>
-              <Row label="Ends">{formatDate(view.active.ends_at)}</Row>
+              <FieldRow label="Plan">{view.active.plan_name ?? "—"}</FieldRow>
+              <FieldRow label="Starts">{formatDate(view.active.starts_at)}</FieldRow>
+              <FieldRow label="Ends">{formatDate(view.active.ends_at)}</FieldRow>
               {view.remainingDays != null && (
-                <Row label="Remaining">
+                <FieldRow label="Remaining">
                   {view.remainingDays === 0
                     ? "Ends today"
                     : `${view.remainingDays} day${view.remainingDays === 1 ? "" : "s"}`}
-                </Row>
+                </FieldRow>
               )}
             </div>
           )}
@@ -148,15 +148,15 @@ export default async function SubscriptionPage() {
           {view.pending && (
             <div className="grid gap-2 rounded-md border bg-muted/30 p-3">
               <p className="font-medium">Pending application</p>
-              <Row
+              <FieldRow
                 label="Amount"
-              >{`${view.pending.amount} ${view.pending.currency}`}</Row>
-              <Row label="Submitted">
+              >{`${view.pending.amount} ${view.pending.currency}`}</FieldRow>
+              <FieldRow label="Submitted">
                 {formatDateTime(view.pending.created_at)}
-              </Row>
-              <Row label="Status">
+              </FieldRow>
+              <FieldRow label="Status">
                 <Badge variant="secondary">pending</Badge>
-              </Row>
+              </FieldRow>
             </div>
           )}
 
@@ -164,18 +164,18 @@ export default async function SubscriptionPage() {
             !view.pending && (
               <div className="grid gap-2 rounded-md border border-destructive/30 bg-destructive/5 p-3">
                 <p className="font-medium">Previous application rejected</p>
-                <Row
+                <FieldRow
                   label="Amount"
-                >{`${view.latestNonPendingApplication.amount} ${view.latestNonPendingApplication.currency}`}</Row>
-                <Row label="Submitted">
+                >{`${view.latestNonPendingApplication.amount} ${view.latestNonPendingApplication.currency}`}</FieldRow>
+                <FieldRow label="Submitted">
                   {formatDateTime(view.latestNonPendingApplication.created_at)}
-                </Row>
+                </FieldRow>
                 {view.latestNonPendingApplication.reviewed_at && (
-                  <Row label="Reviewed">
+                  <FieldRow label="Reviewed">
                     {formatDateTime(
                       view.latestNonPendingApplication.reviewed_at
                     )}
-                  </Row>
+                  </FieldRow>
                 )}
                 {view.latestNonPendingApplication.review_note?.trim() ? (
                   <div className="grid gap-1">
@@ -204,9 +204,9 @@ export default async function SubscriptionPage() {
       </Card>
 
       {showApply && (
-        <Card>
+        <Card className="shadow-none">
           <CardHeader>
-            <CardTitle className="text-base">
+            <CardTitle className="text-base text-[#072855]">
               {applyMode === "edit" ? "Edit pending application" : "Get Subscription"}
             </CardTitle>
             <CardDescription>
@@ -228,9 +228,9 @@ export default async function SubscriptionPage() {
         </Card>
       )}
 
-      <Card id="contact-admin">
+      <Card id="contact-admin" className="shadow-none">
         <CardHeader>
-          <CardTitle className="text-base">Contact Admin</CardTitle>
+          <CardTitle className="text-base text-[#072855]">Contact Admin</CardTitle>
           <CardDescription>
             There is no in-app messaging. Reach your academy admin the same way
             you usually do (WhatsApp / email / office) if you need help with
@@ -243,21 +243,6 @@ export default async function SubscriptionPage() {
           </Button>
         </CardContent>
       </Card>
-    </div>
-  );
-}
-
-function Row({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="flex items-start justify-between gap-4">
-      <span className="text-muted-foreground">{label}</span>
-      <span className="text-right">{children}</span>
-    </div>
+    </StudentPage>
   );
 }

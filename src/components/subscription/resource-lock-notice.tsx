@@ -23,7 +23,7 @@ export function ResourceLockNotice({
   }
 
   return (
-    <div className="grid gap-2">
+    <div className="grid gap-3 rounded-xl border border-dashed bg-muted/40 p-4">
       <Badge variant="outline" className="w-fit">
         locked
       </Badge>

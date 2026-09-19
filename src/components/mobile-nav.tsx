@@ -17,6 +17,8 @@ import {
   History,
   CreditCard,
   Shield,
+  Gift,
+  Lock,
 } from "lucide-react";
 import {
   Sheet,
@@ -32,7 +34,7 @@ import { Logo } from "@/components/logo";
 // Icon components can't cross the Server -> Client Component boundary as
 // props (only plain data can), so layout.tsx files pass an icon *key* and
 // this client-only registry resolves it to the actual component.
-const ICONS = {
+export const ICONS = {
   dashboard: LayoutDashboard,
   materials: BookOpen,
   practice: PencilLine,
@@ -40,6 +42,7 @@ const ICONS = {
   performance: BarChart3,
   account: UserRound,
   subscription: CreditCard,
+  freeResources: Gift,
   students: Users,
   admins: Shield,
   curriculum: BookOpen,
@@ -54,11 +57,13 @@ export type NavItem = {
   href: string;
   label: string;
   icon: IconKey;
+  /** Paid LMS section locked for free / expired / pending students. */
+  locked?: boolean;
 };
 
 // Exact-match roots (e.g. "/admin", "/dashboard") only highlight on an exact
 // path match; every other href also matches its own sub-routes.
-function isActivePath(pathname: string, href: string) {
+export function isActivePath(pathname: string, href: string) {
   if (pathname === href) return true;
   if (href === "/admin" || href === "/dashboard") return false;
   return pathname.startsWith(href + "/");
@@ -85,7 +90,7 @@ export function MobileNav({
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
-      <header className="flex items-center justify-between border-b bg-sidebar p-4 text-sidebar-foreground md:hidden">
+      <header className="flex items-center justify-between border-b border-sidebar-border bg-sidebar px-4 py-3 text-sidebar-foreground md:hidden">
         <Logo size={24} />
         <SheetTrigger asChild>
           <Button
@@ -114,19 +119,27 @@ export function MobileNav({
         <nav className="flex flex-1 flex-col gap-1 overflow-y-auto p-3">
           {navItems.map((item) => {
             const Icon = ICONS[item.icon];
-            const active = isActivePath(pathname, item.href);
+            const active = !item.locked && isActivePath(pathname, item.href);
             return (
               <SheetClose asChild key={item.href}>
                 <Link
                   href={item.href}
-                  className={`flex items-center gap-3 rounded-md px-3 py-2.5 text-sm ${
-                    active
-                      ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                      : "text-sidebar-foreground/90 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                  className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm ${
+                    item.locked
+                      ? "text-sidebar-foreground/55 hover:bg-sidebar-accent/50"
+                      : active
+                        ? "bg-sidebar-accent font-medium text-white shadow-[inset_3px_0_0_0_#05AEA9]"
+                        : "text-sidebar-foreground/90 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                   }`}
                 >
-                  <Icon className="size-4 shrink-0" />
-                  {item.label}
+                  <Icon className="size-4 shrink-0 opacity-90" />
+                  <span className="flex-1">{item.label}</span>
+                  {item.locked ? (
+                    <Lock
+                      className="size-3.5 shrink-0 opacity-70"
+                      aria-label="Locked"
+                    />
+                  ) : null}
                 </Link>
               </SheetClose>
             );
@@ -147,22 +160,34 @@ export function MobileNav({
       </SheetContent>
 
       <nav
-        className="fixed inset-x-0 bottom-0 z-40 flex border-t border-sidebar-border bg-sidebar text-sidebar-foreground md:hidden"
+        className="fixed inset-x-0 bottom-0 z-40 flex border-t border-sidebar-border bg-sidebar/95 text-sidebar-foreground backdrop-blur-md md:hidden"
         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       >
         {bottomItems.map((item) => {
           const Icon = ICONS[item.icon];
-          const active = isActivePath(pathname, item.href);
+          const active = !item.locked && isActivePath(pathname, item.href);
           return (
             <Link
               key={item.href}
               href={item.href}
               className={`flex flex-1 flex-col items-center gap-0.5 py-2 text-[11px] ${
-                active ? "text-sidebar-primary" : "text-sidebar-foreground/70"
+                item.locked
+                  ? "text-sidebar-foreground/45"
+                  : active
+                    ? "font-medium text-sidebar-primary"
+                    : "text-sidebar-foreground/70"
               }`}
             >
-              <Icon className="size-5" />
-              {item.label}
+              <span className="relative">
+                <Icon className="size-5" />
+                {item.locked ? (
+                  <Lock
+                    className="absolute -right-1.5 -top-0.5 size-2.5"
+                    aria-hidden
+                  />
+                ) : null}
+              </span>
+              <span className="max-w-[4.5rem] truncate">{item.label}</span>
             </Link>
           );
         })}

@@ -8,6 +8,12 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { PERFORMANCE_GRAIN_COPY } from "@/lib/tests/student-dashboard-presentation";
+import { PageHeader } from "@/components/student/page-header";
+import { StudentPage } from "@/components/student/student-page";
+import { EmptyState } from "@/components/student/empty-state";
+import { SectionLock } from "@/components/subscription/section-lock";
+import { getStudentHasLiveSubscription } from "@/lib/subscriptions/student-live-access";
+import { studentHasPaidLmsSections } from "@/lib/subscriptions/student-section-access";
 
 export const metadata = { title: "Performance — MedVerse LMS" };
 
@@ -44,9 +50,9 @@ function Bar({ label, value, sub }: { label: string; value: number; sub?: string
           {value}% {sub}
         </span>
       </div>
-      <div className="h-2.5 w-full overflow-hidden rounded-full bg-muted">
+      <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
         <div
-          className="h-full rounded-full bg-primary transition-all"
+          className="h-full rounded-full bg-[#05AEA9] transition-all"
           style={{ width: `${Math.max(0, Math.min(100, value))}%` }}
         />
       </div>
@@ -56,6 +62,15 @@ function Bar({ label, value, sub }: { label: string; value: number; sub?: string
 
 export default async function PerformancePage() {
   const { supabase } = await requireStudent();
+  const hasLiveAccess = await getStudentHasLiveSubscription();
+  if (!studentHasPaidLmsSections(hasLiveAccess)) {
+    return (
+      <SectionLock
+        title="Performance"
+        description="Detailed performance analytics unlock with a live subscription. Lifetime score summaries on your Dashboard stay available."
+      />
+    );
+  }
 
   const [{ data: summary }, { data: subjects }, { data: weak }, { data: trend }] =
     await Promise.all([
@@ -77,19 +92,15 @@ export default async function PerformancePage() {
   const maxTrend = Math.max(100, ...trendRows.map((t) => t.percentage));
 
   return (
-    <div className="grid gap-6">
-      <div>
-        <h1 className="text-2xl font-semibold">Performance</h1>
-        <p className="text-sm text-muted-foreground">
-          Historical academic data stays attached to your account. Subscription
-          status does not erase submitted scores. Changing year does not remove
-          lifetime test history below.
-        </p>
-      </div>
+    <StudentPage>
+      <PageHeader
+        title="Performance"
+        description="Historical academic data stays attached to your account. Subscription status does not erase submitted scores. Changing year does not remove lifetime test history below."
+      />
 
-      <Card>
+      <Card className="shadow-none">
         <CardHeader>
-          <CardTitle className="text-base">Overall</CardTitle>
+          <CardTitle className="text-base text-[#072855]">Overall</CardTitle>
           <CardDescription>
             {PERFORMANCE_GRAIN_COPY.overall}
           </CardDescription>
@@ -104,9 +115,9 @@ export default async function PerformancePage() {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="shadow-none">
         <CardHeader>
-          <CardTitle className="text-base">Subject performance</CardTitle>
+          <CardTitle className="text-base text-[#072855]">Subject performance</CardTitle>
           <CardDescription>
             {PERFORMANCE_GRAIN_COPY.subject}
           </CardDescription>
@@ -128,15 +139,15 @@ export default async function PerformancePage() {
             </div>
           ))}
           {subjectRows.length === 0 && (
-            <p className="text-sm text-muted-foreground">No data yet.</p>
+            <EmptyState title="No data yet." />
           )}
         </CardContent>
       </Card>
 
       {weakRows.length > 0 && (
-        <Card>
+        <Card className="shadow-none">
           <CardHeader>
-            <CardTitle className="text-base">Weak chapters</CardTitle>
+            <CardTitle className="text-base text-[#072855]">Weak chapters</CardTitle>
             <CardDescription>
               {PERFORMANCE_GRAIN_COPY.weakChapters}
             </CardDescription>
@@ -160,16 +171,16 @@ export default async function PerformancePage() {
         </Card>
       )}
 
-      <Card>
+      <Card className="shadow-none">
         <CardHeader>
-          <CardTitle className="text-base">Historical trend</CardTitle>
+          <CardTitle className="text-base text-[#072855]">Historical trend</CardTitle>
           <CardDescription>
             {PERFORMANCE_GRAIN_COPY.trend}
           </CardDescription>
         </CardHeader>
         <CardContent>
           {trendRows.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No tests taken yet.</p>
+            <EmptyState title="No tests taken yet." />
           ) : (
             <div className="flex h-40 items-end gap-2 overflow-x-auto">
               {trendRows.map((t, i) => (
@@ -179,7 +190,7 @@ export default async function PerformancePage() {
                   title={`${t.title}: ${t.percentage}%`}
                 >
                   <div
-                    className="w-full rounded-t bg-primary"
+                    className="w-full rounded-t bg-[#05AEA9]"
                     style={{ height: `${(t.percentage / maxTrend) * 100}%` }}
                   />
                   <span className="text-xs text-muted-foreground">
@@ -192,6 +203,6 @@ export default async function PerformancePage() {
           )}
         </CardContent>
       </Card>
-    </div>
+    </StudentPage>
   );
 }

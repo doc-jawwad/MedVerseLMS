@@ -14,6 +14,11 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/student/page-header";
+import { StudentPage } from "@/components/student/student-page";
+import { StatTile } from "@/components/student/stat-tile";
+import { SectionHeading } from "@/components/student/section-heading";
+import { EmptyState } from "@/components/student/empty-state";
 
 export const metadata = { title: "Dashboard — MedVerse LMS" };
 
@@ -153,20 +158,20 @@ export default async function DashboardPage() {
 
   const subj = nextTest?.subjects as unknown as { name: string } | null;
   const nextEntitled = nextTest ? entitled.has(nextTest.id) : false;
+  const recentRows = (recent ?? []) as RecentTest[];
 
   return (
-    <div className="grid gap-6">
-      <div>
-        <h1 className="text-2xl font-semibold">
-          Welcome, {profile.full_name || "Student"}
-        </h1>
-        <p className="text-muted-foreground">{enrollment.year_name}</p>
-      </div>
+    <StudentPage>
+      <PageHeader
+        eyebrow={enrollment.year_name}
+        title={`Welcome, ${profile.full_name || "Student"}`}
+        description="Your scheduled tests, practice, and lifetime results in one place."
+      />
 
       {presentation.accessBanner && (
-        <Card>
+        <Card className="shadow-none">
           <CardHeader className="pb-2">
-            <CardTitle className="text-base">
+            <CardTitle className="text-base text-[#072855]">
               {presentation.accessBanner.title}
             </CardTitle>
             <CardDescription>
@@ -188,17 +193,19 @@ export default async function DashboardPage() {
         </Card>
       )}
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Available test</CardTitle>
-          <CardDescription>
+      <Card className="overflow-hidden shadow-none">
+        <CardHeader className="border-b bg-[#072855] text-white">
+          <CardTitle className="text-base text-white">Available test</CardTitle>
+          <CardDescription className="text-white/70">
             Current access only — historical eligibility is separate.
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="pt-4">
           {nextTest ? (
-            <div className="grid gap-2">
-              <p className="font-medium">{nextTest.title}</p>
+            <div className="grid gap-3">
+              <p className="font-heading text-lg font-semibold text-[#072855]">
+                {nextTest.title}
+              </p>
               <p className="text-sm text-muted-foreground">
                 {subj?.name && `${subj.name} · `}
                 {nextTest.question_count} MCQs · {nextTest.duration_minutes}{" "}
@@ -217,40 +224,39 @@ export default async function DashboardPage() {
               )}
             </div>
           ) : (
-            <p className="text-sm text-muted-foreground">
-              Nothing available right now.{" "}
-              <Link href="/tests" className="underline">
-                See all tests
-              </Link>
-            </p>
+            <EmptyState
+              title="Nothing available right now"
+              description="When a scheduled test opens, it will appear here."
+              action={
+                <Button asChild variant="outline" size="sm">
+                  <Link href="/tests">See all tests</Link>
+                </Button>
+              }
+            />
           )}
         </CardContent>
       </Card>
 
       {presentation.showHistoricalPerformance && (
-        <div>
-          <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
-            <h2 className="font-medium text-muted-foreground">
-              Lifetime performance
-            </h2>
-            <p className="max-w-xl text-xs text-muted-foreground">
-              {presentation.lifetime.grainNote}
-            </p>
-          </div>
+        <div className="grid gap-3">
+          <SectionHeading
+            title="Lifetime performance"
+            description={presentation.lifetime.grainNote}
+          />
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <Stat
+            <StatTile
               label={presentation.lifetime.attemptedLabel}
               value={String(presentation.lifetime.attempted)}
             />
-            <Stat
+            <StatTile
               label={presentation.lifetime.averageLabel}
               value={`${presentation.lifetime.averagePercentage}%`}
             />
-            <Stat
+            <StatTile
               label={presentation.lifetime.bestLabel}
               value={`${presentation.lifetime.bestPercentage}%`}
             />
-            <Stat
+            <StatTile
               label={presentation.lifetime.rankLabel}
               value={
                 presentation.lifetime.averageRank
@@ -262,29 +268,25 @@ export default async function DashboardPage() {
         </div>
       )}
 
-      <div>
-        <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
-          <h2 className="font-medium text-muted-foreground">
-            Catalog participation
-          </h2>
-          <p className="max-w-xl text-xs text-muted-foreground">
-            {presentation.catalog.scopeNote}
-          </p>
-        </div>
+      <div className="grid gap-3">
+        <SectionHeading
+          title="Catalog participation"
+          description={presentation.catalog.scopeNote}
+        />
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <Stat
+          <StatTile
             label="Eligible (approx.)"
             value={String(presentation.catalog.eligibleApprox)}
           />
-          <Stat
+          <StatTile
             label="Missed"
             value={String(presentation.catalog.missed)}
           />
-          <Stat
+          <StatTile
             label="Not eligible"
             value={String(presentation.catalog.notEligible)}
           />
-          <Stat
+          <StatTile
             label="Locked now"
             value={String(presentation.catalog.counts.locked)}
           />
@@ -292,10 +294,10 @@ export default async function DashboardPage() {
       </div>
 
       {presentation.paidFeatureLock.show && (
-        <Card className="border-dashed">
+        <Card className="border-dashed shadow-none">
           <CardHeader>
             <div className="flex flex-wrap items-center gap-2">
-              <CardTitle className="text-base">
+              <CardTitle className="text-base text-[#072855]">
                 {presentation.paidFeatureLock.title}
               </CardTitle>
               <Badge variant="outline">locked</Badge>
@@ -310,47 +312,39 @@ export default async function DashboardPage() {
         </Card>
       )}
 
-      <Card>
+      <Card className="shadow-none">
         <CardHeader>
-          <CardTitle>Recent tests</CardTitle>
+          <CardTitle className="text-base text-[#072855]">Recent tests</CardTitle>
           <CardDescription>
             Submitted history — kept after subscription expiry.
           </CardDescription>
-          {(recent ?? []).length === 0 && (
-            <CardDescription>No tests taken yet.</CardDescription>
-          )}
         </CardHeader>
-        {(recent ?? []).length > 0 && (
-          <CardContent className="grid gap-2">
-            {((recent ?? []) as RecentTest[]).map((r) => (
-              <Link
-                key={r.test_id}
-                href={`/tests/${r.test_id}/result`}
-                className="flex items-center justify-between rounded-md border p-2 text-sm transition-colors hover:bg-accent/50"
-              >
-                <span>{r.title}</span>
-                <div className="flex items-center gap-2">
-                  <Badge>{r.percentage}%</Badge>
-                  {r.rank != null && (
-                    <span className="text-muted-foreground">Rank #{r.rank}</span>
-                  )}
-                </div>
-              </Link>
-            ))}
-          </CardContent>
-        )}
+        <CardContent>
+          {recentRows.length === 0 ? (
+            <EmptyState title="No tests taken yet." />
+          ) : (
+            <div className="grid gap-2">
+              {recentRows.map((r) => (
+                <Link
+                  key={r.test_id}
+                  href={`/tests/${r.test_id}/result`}
+                  className="flex items-center justify-between rounded-xl border bg-card px-3 py-2.5 text-sm transition-colors hover:bg-accent/50"
+                >
+                  <span className="font-medium text-[#072855]">{r.title}</span>
+                  <div className="flex items-center gap-2">
+                    <Badge>{r.percentage}%</Badge>
+                    {r.rank != null && (
+                      <span className="text-muted-foreground">
+                        Rank #{r.rank}
+                      </span>
+                    )}
+                  </div>
+                </Link>
+              ))}
+            </div>
+          )}
+        </CardContent>
       </Card>
-    </div>
-  );
-}
-
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <Card>
-      <CardHeader className="pb-1">
-        <CardDescription>{label}</CardDescription>
-        <CardTitle className="text-2xl">{value}</CardTitle>
-      </CardHeader>
-    </Card>
+    </StudentPage>
   );
 }

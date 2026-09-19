@@ -50,7 +50,7 @@ Companion analyses (not canonical): subscription-vs-dashboard canvas; eligibilit
 | 7 | **Restriction (deny overlay)** | Unrevoked `access_restrictions` | Exception: named item cannot be used. **Deny wins** over grant, plan, and subscription. Not the same as account `restricted`. |
 | 8 | **Test eligibility (window)** | Could the student have called `start_attempt` during `[opens_at, closes_at)`? | Historical. Not current subscription. See §7. |
 | 9 | **Current resource access** | `can_access_*` / `resource_content_allowed` / exam window | Start test, open file, fetch practice **now**. |
-| 10 | **Navigation visibility** | Which menu items the shell shows | UX. **Not entitlement.** |
+| 10 | **Navigation visibility** | Which menu items the shell shows as active vs locked | UX over live subscription. Free: Dashboard / Free Resources / Subscription / Account active; Materials / Practice / Tests / Performance locked. **Not content entitlement.** |
 | 11 | **Catalog visibility** | `can_view_*` — listed, including locked paid | See the item. Unpublished tests stay hidden. |
 | 12 | **Dashboard visibility** | Which cards, locks, previews, and history links render | UX over 9–11 plus owned history. Must not leak secrets. |
 
@@ -87,36 +87,27 @@ Nothing in 8D/pre-8J is obsolete. What is **missing** is historical window-eligi
 
 ## 2. Free student experience
 
-**CONFIRMED PRODUCT LAW** (already in [architecture.md](architecture.md) / [permissions.md](permissions.md)):
+**CONFIRMED PRODUCT LAW:**
 
 - After email verification, an **active** student enters the LMS **without** a paid subscription. No admin enrollment approval.
-- Absence of a live subscription = free student.
-- Free resources (Admin-defined `entitlement = 'free'`, and not restricted) are usable immediately.
-- Paid sections/resources stay **visible, not hidden**.
-- Paid content cannot be opened/started without entitlement. Authorization is RLS/RPC, not CSS.
-- Subscription CTA may be shown (`ResourceLockNotice` → `/subscription`).
-- Dashboard is available.
-- Free-test history, results, and lifetime analytics remain available.
+- Absence of a live subscription (`has_live_subscription() = false`) = free student. Pending applications are **not** live access. Expired / deactivated subscriptions do not unlock paid LMS sections.
+- **Accessible shell sections (active nav):** Dashboard, **Free Resources**, My Subscription, My Account.
+- **Locked shell sections (visible, intentionally locked chrome + section lock page):** Study Materials, Practice MCQs, Tests, Performance. Clicking a locked item opens a polished subscription CTA (not a broken empty page). Pending ≠ unlocked.
+- **Free Resources** lists items the student can use **now** under the existing entitlement model: global `entitlement = 'free'` and/or an unrevoked personal grant (and not restricted). No parallel entitlement system and no duplicate storage tables.
+- Free educational content is **not** mass-converted to paid. Admin continues to mark free vs paid per resource. Free items stay usable via Free Resources (and content RPCs); paid items stay denied by content RPCs until live subscription / grant rules allow.
+- Subscribed students use the normal Materials / Practice / Tests / Performance catalogs; free and paid items inside those catalogs still follow `resource_content_allowed` / grants / restrictions.
 - Secrets (Drive URL, signed URL, question payload, `correct_key`, other students’ private data) must **never** be sent to the client merely because a card is locked, blurred, or previewed.
+- Dashboard may show lifetime score **summaries** and free-access banners. The dedicated Performance section remains locked without a live subscription (same analytics RPCs power Dashboard summaries — see §19 / implementation note).
 
-**CONFIRMED PRODUCT LAW.** Free Resources are **Admin-controlled**, not hardcoded menus named “lectures / PDFs / OSPEs / free tests / MCQ banks.” Those are possible **types**. Admin decides which items are free by setting global entitlement (and publish state). New types later reuse the same entitlement shape.
-
-**PROPOSED ARCHITECTURE (8J UX):**
-
-- Admin can create folders/categories, reorder them, add resources, publish/unpublish, and mark free vs paid.
-- Free students see a **Free Resources** area (nav and/or dashboard) listing currently free, published, in-year (or granted) items.
-- Paid items elsewhere remain listed with lock / limited preview.
-- Paid dashboard **previews** may be locked, limited, or blurred **only** where they represent currently unavailable **functionality**. Preview must not include other students’ scores, explanations, or any payload the student is not authorized to SELECT.
+**Navigation vs entitlement:** Layer 10 (nav chrome / section hubs) is UX over Layer 3 (live subscription). Layer 9 (content RPCs) remains authoritative for **starting** paid tests, opening paid materials, and fetching paid practice. Free / grant content RPCs remain callable without a live subscription so Free Resources can work.
 
 **CURRENT IMPLEMENTATION:**
 
-- One student nav for everyone: Dashboard, Study Materials, Practice MCQs, Tests, Performance, My Subscription, My Account.
-- No dedicated Free Resources tab. Free vs paid is per test / practice subject / material folder.
-- Existing rows were backfilled `entitlement = 'free'` (compatibility). New items may be paid.
-- Lock UX: `ResourceLockNotice` + reduced opacity. No structured blur-preview of paid analytics.
-- Materials catalog SELECT does not include `drive_url`; `open_material` enforces entitlement.
-
-**ARCHITECTURAL GAP:** no first-class Free Resources library (mixed types, publish/unpublish on folders). Materials have no `published` flag; tests use `status`. Do not invent a parallel entitlement system — group **presentation** of `entitlement = 'free'` items.
+- Student shell builds nav from `has_live_subscription()` via `buildStudentShellNav` (desktop + mobile share the same items / lock flags).
+- Free Resources route: `/free-resources`.
+- Paid section hubs render `SectionLock` when `has_live_subscription()` is false (no protected paid catalog payloads).
+- Deep links to free/granted practice subjects or accessible tests remain usable without unlocking the full section hub.
+- Existing rows may still be `entitlement = 'free'` (compatibility). Admins set paid entitlement on resources that should require subscription.
 
 ---
 
@@ -131,9 +122,9 @@ Nothing in 8D/pre-8J is obsolete. What is **missing** is historical window-eligi
 - Dashboard **Start** on paid tests/practice/materials follows current entitlement.
 - Historical free (and any earlier paid) academic data remains on the same lifetime series. No second analytics island.
 
-**PROPOSED ARCHITECTURE:** subscribed students **may** see a different navigation (for example no “Free Resources” tab) because those items already live under Materials / Practice / Tests. **Not shown in navigation ≠ not entitled.** Deep links and catalog of free items must still work.
+**PROPOSED ARCHITECTURE:** subscribed students may de-emphasize Free Resources because free items also appear inside Materials / Practice / Tests. Free Resources remains available. **Not shown in navigation ≠ not entitled.**
 
-**CURRENT IMPLEMENTATION:** navigation does not change with subscription. `accessible_test_ids` / `accessible_folder_ids` / `practice_subjects().granted` flip Start vs lock on the next Server Component render. Paid access is not stored in the JWT.
+**CURRENT IMPLEMENTATION:** navigation lock flags follow `has_live_subscription()`. Free Resources stays in the shared nav for both free and subscribed students. Inside subscribed catalogs, `accessible_test_ids` / `accessible_folder_ids` / `practice_subjects().granted` flip Start vs lock. Paid access is not stored in the JWT.
 
 ---
 
@@ -595,8 +586,8 @@ Priority: **P0** correctness/fairness before teaching the UI new labels; **P1** 
 | `start_attempt` **new** start window | Closed → `test_window_closed` even with grant | Same unless late-sit action | No backfill sit | P2 | New RPC if approved | **Yes** (§20.4) |
 | `test_summary.registered` | Current audience enrollments | Window-eligible population | Inflates after late subscribe | P1 | Change after B | No (law in §16) |
 | `admin_platform_summary.participation_pct` | Current enrollments × any attempt ever | Per-test: participants / window-eligible; or honest label | Wrong if presented as test participation | P1 | SQL rewrite + label | Metric definition details |
-| Student nav | Identical for free/paid | May differ; not entitlement | No Free Resources tab | P1 | UI only | Nav chrome **yes** (product) |
-| Free Resources library | Folders/tests/practice separate; backfill free | Admin-defined free set, reorder, publish | No mixed-type library / folder publish flag | P1 | 8J UX + maybe publish flag **later** | Types not hardcoded |
+| Student nav | Free: Dashboard / Free Resources / Subscription / Account active; Materials / Practice / Tests / Performance locked chrome. Subscribed: paid sections unlock. Shared `buildStudentShellNav`. | Same | Implemented | — | Keep | Nav chrome **yes** (product) |
+| Free Resources library | `/free-resources` presents free-entitled and/or granted usable items (existing tables/RPCs) | Same; no parallel entitlement | Implemented (presentation) | — | Folder publish flag **later** optional | Types not hardcoded |
 | Group grants | None | Optional exception overlay | No group target | P2 | Schema if approved | **Yes** |
 | Cumulative class board | Does not exist (`average_rank` is personal mean) | Do not ship in this pass | None if we don’t ship | — | Do not add | **Yes** if ever ship |
 | Eligibility on dashboard after subscribe | Ahmad’s A/B/C unlabeled zeros (good) but “Not attempted” (bad) | Not eligible | Label gap only for averages | P1 | UI | No |

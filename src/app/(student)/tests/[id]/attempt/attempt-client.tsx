@@ -369,7 +369,14 @@ export function AttemptClient({ testId }: { testId: string }) {
     return <Blocker title={copy.title} body={copy.body} />;
   }
   if (!payload || !mergedAnswers) {
-    return <p className="text-muted-foreground">Preparing your exam…</p>;
+    return (
+      <div className="mx-auto max-w-md rounded-xl border bg-card px-6 py-10 text-center shadow-none">
+        <p className="font-medium text-[#072855]">Preparing your exam…</p>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Restoring answers and the remaining time for this attempt.
+        </p>
+      </div>
+    );
   }
 
   return (
@@ -391,9 +398,9 @@ export function AttemptClient({ testId }: { testId: string }) {
 function Blocker({ title, body }: { title: string; body: string }) {
   return (
     <div className="mx-auto max-w-md">
-      <Card>
+      <Card className="shadow-none">
         <CardHeader>
-          <CardTitle>{title}</CardTitle>
+          <CardTitle className="text-[#072855]">{title}</CardTitle>
           <CardDescription>{body}</CardDescription>
         </CardHeader>
         <CardContent>
