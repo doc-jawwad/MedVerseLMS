@@ -1,6 +1,6 @@
 import Link from "next/link";
-import Image from "next/image";
 import { Button } from "@/components/ui/button";
+import { Logo } from "@/components/logo";
 
 export default function Home() {
   return (
@@ -13,18 +13,7 @@ export default function Home() {
         }}
       />
       <header className="relative flex items-center justify-between px-6 py-5">
-        <div className="flex items-center gap-2">
-          <Image
-            src="/logo-icon.png"
-            alt="MedVerse"
-            width={32}
-            height={32}
-            priority
-          />
-          <span className="text-lg font-bold tracking-tight">
-            Med<span className="text-[#05AEA9]">Verse</span>
-          </span>
-        </div>
+        <Logo size={32} />
         <div className="flex gap-2">
           <Button asChild variant="ghost" className="text-white hover:bg-white/10 hover:text-white">
             <Link href="/login">Sign in</Link>

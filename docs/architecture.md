@@ -15,11 +15,13 @@ This is a **one-academy, one-time LMS**, not a multi-tenant SaaS product. `tenan
 
 MedVerse Healthcare identity: navy `#072855` + teal `#05AEA9`, sampled directly
 from the logo at `public/logo-icon.png` (source: `public/logo-full.png`).
-Theme tokens live in `src/app/globals.css`; the shared `Logo` component
-(`src/components/logo.tsx`) is the only place the wordmark/icon combination
-should be assembled — reuse it rather than re-implementing. If the logo is
-ever replaced, re-sample these two hex values from the new asset and update
-both this doc and `globals.css`.
+Use `public/logo-icon.png` (navy + teal) on light backgrounds and
+`public/logo-icon-on-dark.png` (white + teal) on navy/blue backgrounds —
+the shared `Logo` component (`src/components/logo.tsx`) picks the variant via
+its `dark` prop and is the only place the wordmark/icon combination should be
+assembled. Theme tokens live in `src/app/globals.css`. If the logo is ever
+replaced, re-sample these two hex values from the new asset and update both
+this doc and `globals.css`.
 
 ## Progressive Web App
 

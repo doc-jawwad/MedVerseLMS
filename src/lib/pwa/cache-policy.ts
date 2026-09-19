@@ -5,13 +5,14 @@
  * Cache only hashed Next static files and public branding. Never intercept
  * HTML/RSC, PostgREST, Auth, signed R2 URLs, exam payloads, or API routes.
  */
-export const PWA_CACHE_NAME = "medverse-static-v1";
+export const PWA_CACHE_NAME = "medverse-static-v2";
 export const PWA_SW_PATH = "/sw.js";
 
 export const PWA_CACHEABLE_PATH_PREFIXES = ["/_next/static/", "/icons/"] as const;
 
 export const PWA_CACHEABLE_PATHS = [
   "/logo-icon.png",
+  "/logo-icon-on-dark.png",
   "/logo-full.png",
 ] as const;
 

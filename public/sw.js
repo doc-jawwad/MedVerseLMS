@@ -6,10 +6,10 @@
  *
  * Keep deny/allow lists aligned with src/lib/pwa/cache-policy.ts.
  */
-const CACHE_NAME = "medverse-static-v1";
+const CACHE_NAME = "medverse-static-v2";
 
 const CACHEABLE_PREFIXES = ["/_next/static/", "/icons/"];
-const CACHEABLE_PATHS = ["/logo-icon.png", "/logo-full.png"];
+const CACHEABLE_PATHS = ["/logo-icon.png", "/logo-icon-on-dark.png", "/logo-full.png"];
 const NEVER_PREFIXES = [
   "/rest/v1",
   "/auth/v1",

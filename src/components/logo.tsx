@@ -9,13 +9,13 @@ export function Logo({
   size?: number;
   withWordmark?: boolean;
   className?: string;
-  /** true when rendered on a light background (uses dark navy wordmark text) */
+  /** true when rendered on a light background (navy mark + dark wordmark) */
   dark?: boolean;
 }) {
   return (
     <div className={`flex items-center gap-2 ${className}`}>
       <Image
-        src="/logo-icon.png"
+        src={dark ? "/logo-icon.png" : "/logo-icon-on-dark.png"}
         alt="MedVerse"
         width={size}
         height={size}

@@ -34,6 +34,13 @@ describe("PWA cache policy", () => {
       }),
       true
     );
+    assert.equal(
+      isCacheableStaticAsset({
+        method: "GET",
+        url: `${origin}/logo-icon-on-dark.png`,
+      }),
+      true
+    );
   });
 
   it("never caches navigations, RSC, PostgREST, Auth, or APIs", () => {
