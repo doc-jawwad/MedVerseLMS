@@ -85,11 +85,12 @@ describe("admin RBAC UI helpers", () => {
 
 describe("admin management wiring", () => {
   it("exposes an Admins nav item and page", () => {
-    const layout = fs.readFileSync(
-      path.join(root, "src/app/(admin)/admin/layout.tsx"),
+    const nav = fs.readFileSync(
+      path.join(root, "src/lib/admin/admin-nav.ts"),
       "utf8"
     );
-    assert.match(layout, /\/admin\/admins/);
+    assert.match(nav, /\/admin\/admins/);
+    assert.match(nav, /manage_admins/);
     assert.ok(
       fs.existsSync(path.join(root, "src/app/(admin)/admin/admins/page.tsx"))
     );

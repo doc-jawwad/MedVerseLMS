@@ -1,6 +1,7 @@
 import { requireAdmin } from "@/lib/auth/require-user";
 import { AdminsManager } from "./admins-manager";
 import type { AdminAccountRow } from "@/lib/admin/admin-rbac-ui";
+import { AdminPermissionDenied } from "@/components/admin/permission-denied";
 
 export const metadata = { title: "Admins — MedVerse Admin" };
 
@@ -11,6 +12,9 @@ export default async function AdminsPage() {
     p_code: "manage_admins",
   });
   const canManage = Boolean(canManageRes);
+  if (!canManage) {
+    return <AdminPermissionDenied title="Admins" />;
+  }
 
   const [{ data: profiles, error: profileError }, { data: permRows }] =
     await Promise.all([

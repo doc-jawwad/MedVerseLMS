@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { requireAdmin } from "@/lib/auth/require-user";
 import { getAdminSubscriptionPermissions } from "@/lib/subscriptions/admin-permissions";
+import { AdminPermissionDenied } from "@/components/admin/permission-denied";
 import { formatDate, formatDateTime } from "@/lib/utils";
 import { subscriptionIsLiveAt } from "@/lib/subscriptions/student-status";
 import { Badge } from "@/components/ui/badge";
@@ -35,6 +36,9 @@ export default async function AdminSubscriptionsPage({
 }) {
   const { supabase } = await requireAdmin();
   const perms = await getAdminSubscriptionPermissions();
+  if (!perms.manageSubscriptions) {
+    return <AdminPermissionDenied title="Subscriptions" />;
+  }
   const { status, q } = await searchParams;
 
   const [{ data: subs, error }, { data: plans }, { data: enrollments }] =

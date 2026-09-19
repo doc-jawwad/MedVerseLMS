@@ -1,6 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireAdmin } from "@/lib/auth/require-user";
+import {
+  adminHasAny,
+  getAdminPermissionSet,
+} from "@/lib/admin/admin-nav";
+import { AdminPermissionDenied } from "@/components/admin/permission-denied";
 import { formatDateTime } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -39,6 +44,17 @@ export default async function StudentProfilePage({
   params: Promise<{ id: string }>;
 }) {
   const { supabase } = await requireAdmin();
+  const perms = await getAdminPermissionSet();
+  if (
+    !adminHasAny(perms, [
+      "view_students",
+      "manage_students",
+      "activate_students",
+      "restrict_students",
+    ])
+  ) {
+    return <AdminPermissionDenied title="Student profile" />;
+  }
   const { id } = await params;
 
   const [

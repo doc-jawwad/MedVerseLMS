@@ -16,6 +16,7 @@ export type SessionProfile = {
   role: "admin" | "student";
   account_status: AccountStatus;
   active_session_id: string | null;
+  is_main_admin: boolean;
 };
 
 export type Enrollment = {
@@ -47,14 +48,26 @@ export const requireUser = cache(async function requireUser() {
   const { data: profile } = await ssrSpan("auth.profiles", () =>
     supabase
       .from("profiles")
-      .select("id, full_name, email, role, account_status, active_session_id")
+      .select(
+        "id, full_name, email, role, account_status, active_session_id, is_main_admin"
+      )
       .eq("id", userId)
-      .single<SessionProfile>()
+      .single()
   );
 
   if (!profile) redirect("/login");
 
-  if (profile.active_session_id && profile.active_session_id !== sessionId) {
+  const sessionProfile: SessionProfile = {
+    id: profile.id,
+    full_name: profile.full_name,
+    email: profile.email,
+    role: profile.role,
+    account_status: profile.account_status,
+    active_session_id: profile.active_session_id,
+    is_main_admin: Boolean(profile.is_main_admin),
+  };
+
+  if (sessionProfile.active_session_id && sessionProfile.active_session_id !== sessionId) {
     const { data: exempt } = await ssrSpan("auth.session_kick_check", () =>
       supabase.rpc("owns_live_attempt_session")
     );
@@ -64,16 +77,16 @@ export const requireUser = cache(async function requireUser() {
     }
   }
 
-  if (isBlockedAccountStatus(profile.account_status)) {
+  if (isBlockedAccountStatus(sessionProfile.account_status)) {
     const { data: exempt } = await ssrSpan("auth.account_status_check", () =>
       supabase.rpc("owns_live_attempt_session")
     );
     if (!exempt) {
-      redirect(`/pending?state=${profile.account_status}`);
+      redirect(`/pending?state=${sessionProfile.account_status}`);
     }
   }
 
-  return { supabase, profile, userId, sessionId };
+  return { supabase, profile: sessionProfile, userId, sessionId };
 });
 
 export const requireStudent = cache(async function requireStudent() {

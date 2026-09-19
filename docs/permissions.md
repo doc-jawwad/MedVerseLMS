@@ -91,9 +91,11 @@ This login-kick exemption is **unchanged**. It is not the same as an admin chang
 
 ## Admin permissions
 
-`is_admin()` remains `profiles.role = 'admin'` (definer; avoids RLS recursion). It gates **entry to the admin surface and admin SELECT**, not every write.
+`is_admin()` remains `profiles.role = 'admin'` (definer; avoids RLS recursion). It gates **entry to the admin surface** (and content-catalog SELECT where noted below), not sensitive student/ops reads and not every write.
 
-Mutations of consequence go through SECURITY DEFINER RPCs that call `has_permission(code)` (Main Admin ⇒ all codes). UI hiding is UX only.
+Sensitive admin **SELECT** (student PII, enrollments, subscriptions/applications/payment settings, attempts/answers/practice rows, year-change requests, notifications, audit logs, admin permission rows) requires `has_permission(code)` for the matching job — not merely `is_admin()`. Main Admin still short-circuits every code. UI hiding is UX only; PostgREST RLS and permissioned DEFINER RPCs are the boundary.
+
+Mutations of consequence go through SECURITY DEFINER RPCs that call `has_permission(code)` (Main Admin ⇒ all codes).
 
 Permission codes (seeded catalog; RPCs check these names):
 
@@ -114,7 +116,7 @@ Permission codes (seeded catalog; RPCs check these names):
 - `manage_materials`
 - `view_analytics`
 
-An Academic/MCQ preset that has only question/test codes **must fail** student, subscription, and year-change RPCs, and must **not** have PostgREST `UPDATE`/`INSERT`/`DELETE` on those tables.
+An Academic/MCQ preset that has only question/test/materials/analytics codes **must fail** student, subscription, and year-change RPCs, must **not** have PostgREST `UPDATE`/`INSERT`/`DELETE` on those tables, and must **not** blanket-`SELECT` student profiles, subscriptions, applications, payment settings, year-change requests, audit logs, or other students’ notifications via PostgREST. Analytics DEFINER RPCs (`admin_platform_summary`, `test_summary`, `question_difficulty_report`, and admin access to `test_leaderboard` / `get_attempt_review`) remain gated by `view_analytics` (and/or `view_students` where names/review are needed).
 
 Creating admins: server-side Auth Admin `createUser` (Cloud) plus a DB RPC that sets `role = 'admin'` and permission rows. Service role stays server-only.
 
@@ -317,34 +319,35 @@ These helpers stay valid on VPS PostgREST because they depend on JWT GUCs + `pub
 
 ## RLS matrix (deny-by-default; only listed access exists)
 
-Admin **SELECT** may use `is_admin()`. Admin **INSERT/UPDATE/DELETE** on sensitive tables is **RPC-only** with `has_permission`. Do not keep blanket `FOR ALL USING (is_admin())` on enrollments, subscriptions, applications, grants, restrictions, profiles status/role, or payment settings.
+Admin **SELECT** on **sensitive student/ops tables** uses `has_permission(code)` (see matrix). Content-bank / curriculum catalog SELECT may still use `is_admin()` until a dedicated curriculum permission is approved. Admin **INSERT/UPDATE/DELETE** on sensitive tables is **RPC-only** with `has_permission`. Do not keep blanket `FOR ALL USING (is_admin())` or blanket `SELECT USING (is_admin())` on enrollments, subscriptions, applications, grants, restrictions, profiles (other users), payment settings, attempts, or audit logs.
 
 | Table | student | admin |
 |---|---|---|
-| profiles | SELECT/UPDATE own row (role, account_status, is_main_admin protected) | SELECT; status/role/main-admin via RPCs |
-| admin_permissions / permissions | none | SELECT own/all if `is_admin()`; writes via `manage_admins` RPCs |
+| profiles | SELECT/UPDATE own row (role, account_status, is_main_admin protected) | SELECT own always; SELECT others if any of `view_students`, `manage_students`, `activate_students`, `restrict_students`, `manage_subscriptions`, `review_subscription_applications`, `manage_year_changes`, `manage_admins`, `grant_resource_access`. Status/role/main-admin via RPCs |
+| admin_permissions / permissions | none | `permissions` SELECT if `manage_admins`; `admin_permissions` SELECT own rows or if `manage_admins`; writes via `manage_admins` RPCs |
 | years/subjects/books/chapters/topics | SELECT current assigned year (account active); subjects/books/chapters/topics also if a live practice grant names that subject | SELECT; writes: `is_admin()` until a dedicated curriculum permission is approved (see pending owner decision). Not a student-data write. |
 | questions | no direct SELECT (RPC only) | SELECT if `is_admin()`; INSERT/UPDATE/DELETE if `has_permission('edit_questions')`; create/version RPCs check the same codes |
 | question_versions | no direct SELECT (RPC only); no UPDATE/DELETE for anyone | SELECT if `is_admin()`; INSERT if `has_permission('edit_questions')` |
-| enrollments | SELECT own | SELECT; writes via year-change / promote RPCs |
-| year_change_requests | SELECT own; insert/update pending via RPC | SELECT; approve/reject RPC |
-| access_grants / access_restrictions | SELECT own | SELECT; grant/revoke RPCs |
-| subscription_plans / payment_settings | SELECT active plans / current payment copy via RPC or read policy | SELECT; writes via payment/plan RPCs |
-| subscriptions | SELECT own | SELECT; activate/extend RPCs |
-| subscription_applications | SELECT own; create/edit pending via RPC | SELECT; review RPCs |
-| student_notifications | SELECT/UPDATE own (read_at) | SELECT |
+| enrollments | SELECT own | SELECT if `view_students` or `manage_year_changes` or `manage_subscriptions` or `grant_resource_access`; writes via year-change / promote RPCs |
+| year_change_requests | SELECT own; insert/update pending via RPC | SELECT if `manage_year_changes`; approve/reject RPC |
+| access_grants / access_restrictions | SELECT own | SELECT if `grant_resource_access` or `view_students`; grant/revoke RPCs |
+| subscription_plans | SELECT active plans | SELECT if `manage_subscriptions` or `review_subscription_applications` (students still see `is_active` plans) |
+| payment_settings | current payment copy via RPC | SELECT if `manage_payment_settings` or `manage_system_settings`; writes via payment RPCs |
+| subscriptions | SELECT own | SELECT if `manage_subscriptions`; activate/extend RPCs |
+| subscription_applications | SELECT own; create/edit pending via RPC | SELECT if `review_subscription_applications`; review RPCs |
+| student_notifications | SELECT/UPDATE own (read_at) | SELECT if `view_students` or `manage_subscriptions` |
 | test_audiences | SELECT via viewable tests | SELECT if `is_admin()`; writes if `has_permission('publish_tests')` |
 | tests | SELECT where `can_view_test(id)` (locked paid still listed). Owned historical **result** must not depend on this policy ([access-eligibility-analytics.md](access-eligibility-analytics.md) §15) | SELECT if `is_admin()`; INSERT/UPDATE/DELETE if `has_permission('publish_tests')`; publish/kill-switch RPCs check the same code |
 | test_questions | none (RPC only) | SELECT if `is_admin()`; writes if `has_permission('publish_tests')` (immutability by trigger) |
-| test_attempts | SELECT own; **no INSERT/UPDATE/DELETE** (RPC only) | SELECT; invalidate RPC |
-| attempt_answers | **none** (RPC only — `save_answer` / scoring / `get_attempt_review`). Direct student SELECT is forbidden so post-expiry review cannot be bypassed | SELECT |
-| practice_seen / practice_answers | via RPC; SELECT own | SELECT |
+| test_attempts | SELECT own; **no INSERT/UPDATE/DELETE** (RPC only) | SELECT if `view_students` or `view_analytics` or `publish_tests`; invalidate RPC |
+| attempt_answers | **none** (RPC only — `save_answer` / scoring / `get_attempt_review`). Direct student SELECT is forbidden so post-expiry review cannot be bypassed | SELECT if `view_students` or `view_analytics` |
+| practice_seen / practice_answers | via RPC; SELECT own | SELECT if `view_students` or `view_analytics` |
 | material_folders | SELECT catalog for assigned year / grants | SELECT if `is_admin()`; writes if `has_permission('manage_materials')` |
 | materials | SELECT **without** `drive_url`; open via `open_material` | SELECT metadata if `is_admin()` (`drive_url` via `open_material`); writes if `has_permission('manage_materials')` |
 | rank_dirty_queue | none | none (SECURITY DEFINER RPCs only) |
-| audit_logs | none | SELECT; insert via `log_audit` from permissioned RPCs (`log_audit` stays non-student) |
+| audit_logs | none | SELECT if `manage_admins` or `manage_system_settings`; insert via `log_audit` from permissioned RPCs (`log_audit` stays non-student) |
 | import_* | none | `import_questions` |
-| question_stats / test_stats | none | `view_analytics` SELECT |
+| question_stats / test_stats | none | `view_analytics` SELECT (live via analytics RPCs; no direct table) |
 
 Hard guarantees a student must NEVER bypass (tested in pgTAP):
 - read another student's profile/attempts/answers/enrollment/subscription/application/results

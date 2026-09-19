@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { requireAdmin } from "@/lib/auth/require-user";
+import { AdminPermissionDenied } from "@/components/admin/permission-denied";
 import { formatDateTime } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -33,6 +34,9 @@ export default async function AdminYearChangesPage({
     p_code: "manage_year_changes",
   });
   const canManage = Boolean(canManageRes);
+  if (!canManage) {
+    return <AdminPermissionDenied title="Year changes" />;
+  }
 
   let query = supabase
     .from("year_change_requests")

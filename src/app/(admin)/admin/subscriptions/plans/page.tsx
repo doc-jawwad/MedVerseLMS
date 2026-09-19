@@ -1,5 +1,6 @@
 import { requireAdmin } from "@/lib/auth/require-user";
 import { getAdminSubscriptionPermissions } from "@/lib/subscriptions/admin-permissions";
+import { AdminPermissionDenied } from "@/components/admin/permission-denied";
 import { SubscriptionAdminNav } from "@/components/admin/subscription-admin-nav";
 import { PlanManager, type PlanRow } from "./plan-manager";
 
@@ -8,6 +9,9 @@ export const metadata = { title: "Subscription plans — MedVerse Admin" };
 export default async function AdminPlansPage() {
   const { supabase } = await requireAdmin();
   const perms = await getAdminSubscriptionPermissions();
+  if (!perms.manageSubscriptions && !perms.reviewApplications) {
+    return <AdminPermissionDenied title="Subscription plans" />;
+  }
   const { data, error } = await supabase
     .from("subscription_plans")
     .select(

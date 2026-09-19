@@ -1,5 +1,6 @@
 import { requireAdmin } from "@/lib/auth/require-user";
 import { getAdminSubscriptionPermissions } from "@/lib/subscriptions/admin-permissions";
+import { AdminPermissionDenied } from "@/components/admin/permission-denied";
 import { SubscriptionAdminNav } from "@/components/admin/subscription-admin-nav";
 import {
   PaymentSettingsForm,
@@ -11,6 +12,9 @@ export const metadata = { title: "Payment settings — MedVerse Admin" };
 export default async function AdminPaymentSettingsPage() {
   const { supabase } = await requireAdmin();
   const perms = await getAdminSubscriptionPermissions();
+  if (!perms.managePaymentSettings) {
+    return <AdminPermissionDenied title="Payment settings" />;
+  }
   const { data, error } = await supabase
     .from("payment_settings")
     .select(

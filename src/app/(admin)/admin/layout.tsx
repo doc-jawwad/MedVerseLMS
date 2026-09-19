@@ -4,24 +4,11 @@ import { signOutAction } from "@/lib/actions/auth";
 import { Button } from "@/components/ui/button";
 import { SessionWatch } from "@/components/session-watch";
 import { Logo } from "@/components/logo";
-import { MobileNav, type NavItem } from "@/components/mobile-nav";
-
-const nav: NavItem[] = [
-  { href: "/admin", label: "Overview", icon: "dashboard" },
-  { href: "/admin/students", label: "Students", icon: "students" },
-  { href: "/admin/admins", label: "Admins", icon: "admins" },
-  { href: "/admin/year-changes", label: "Year changes", icon: "students" },
-  { href: "/admin/subscriptions", label: "Subscriptions", icon: "subscription" },
-  { href: "/admin/curriculum", label: "Curriculum", icon: "curriculum" },
-  { href: "/admin/questions", label: "Question Bank", icon: "questions" },
-  { href: "/admin/tests", label: "Tests", icon: "tests" },
-  { href: "/admin/materials", label: "Materials", icon: "materialsFolder" },
-  { href: "/admin/audit-logs", label: "Audit Log", icon: "auditLog" },
-];
-
-// The 4 most-used links pinned to the mobile bottom tab bar; a 5th "More"
-// tab opens the drawer with the full list above.
-const bottomNav = [nav[0], nav[1], nav[5], nav[4]];
+import { MobileNav } from "@/components/mobile-nav";
+import {
+  filterAdminNav,
+  getAdminPermissionSet,
+} from "@/lib/admin/admin-nav";
 
 export default async function AdminLayout({
   children,
@@ -29,6 +16,23 @@ export default async function AdminLayout({
   children: React.ReactNode;
 }) {
   const { profile, userId } = await requireAdmin();
+  const perms = await getAdminPermissionSet();
+  const nav = filterAdminNav(perms);
+  const bottomNav = [
+    nav.find((i) => i.href === "/admin") ?? nav[0],
+    nav.find((i) => i.href === "/admin/students") ??
+      nav.find((i) => i.href === "/admin/questions") ??
+      nav[1] ??
+      nav[0],
+    nav.find((i) => i.href === "/admin/curriculum") ??
+      nav.find((i) => i.href === "/admin/tests") ??
+      nav[2] ??
+      nav[0],
+    nav.find((i) => i.href === "/admin/subscriptions") ??
+      nav.find((i) => i.href === "/admin/materials") ??
+      nav[3] ??
+      nav[0],
+  ].filter(Boolean);
 
   return (
     <div className="flex min-h-svh">

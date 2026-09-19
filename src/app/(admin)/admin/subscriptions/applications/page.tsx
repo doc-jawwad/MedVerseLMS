@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { requireAdmin } from "@/lib/auth/require-user";
 import { getAdminSubscriptionPermissions } from "@/lib/subscriptions/admin-permissions";
+import { AdminPermissionDenied } from "@/components/admin/permission-denied";
 import { formatDateTime } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -30,6 +31,9 @@ export default async function AdminApplicationsPage({
 }) {
   const { supabase } = await requireAdmin();
   const perms = await getAdminSubscriptionPermissions();
+  if (!perms.reviewApplications) {
+    return <AdminPermissionDenied title="Subscription applications" />;
+  }
   const { status, q } = await searchParams;
   const filter = status ?? "pending";
 

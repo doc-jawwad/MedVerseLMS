@@ -1,4 +1,9 @@
 import { requireAdmin } from "@/lib/auth/require-user";
+import {
+  adminHasAny,
+  getAdminPermissionSet,
+} from "@/lib/admin/admin-nav";
+import { AdminPermissionDenied } from "@/components/admin/permission-denied";
 import { formatDateTime } from "@/lib/utils";
 import {
   Table,
@@ -21,6 +26,10 @@ export default async function AuditLogPage({
   searchParams: Promise<{ action?: string; target_type?: string; page?: string }>;
 }) {
   const { supabase } = await requireAdmin();
+  const perms = await getAdminPermissionSet();
+  if (!adminHasAny(perms, ["manage_admins", "manage_system_settings"])) {
+    return <AdminPermissionDenied title="Audit Log" />;
+  }
   const { action, target_type, page } = await searchParams;
   const pageNum = Math.max(1, Number(page ?? 1));
 

@@ -315,6 +315,8 @@ select lives_ok(
   '10 review permission allows reject'
 );
 
+-- Reviewer lacks manage_subscriptions SELECT; assert as runner.
+select test_helpers.as_runner();
 select is(
   (select count(*)::int from public.subscriptions where student_id = (select id from t_student)),
   1,

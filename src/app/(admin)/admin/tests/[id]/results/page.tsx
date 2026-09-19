@@ -1,6 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireAdmin } from "@/lib/auth/require-user";
+import {
+  adminHasAny,
+  getAdminPermissionSet,
+} from "@/lib/admin/admin-nav";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -38,6 +42,8 @@ export default async function TestResultsPage({
   params: Promise<{ id: string }>;
 }) {
   const { supabase } = await requireAdmin();
+  const perms = await getAdminPermissionSet();
+  const canViewNames = adminHasAny(perms, ["view_students"]);
   const { id } = await params;
 
   const { data: test } = await supabase
@@ -51,13 +57,19 @@ export default async function TestResultsPage({
     await Promise.all([
       supabase.rpc("test_summary", { p_test_id: id }),
       supabase.rpc("test_leaderboard", { p_test_id: id }),
-      supabase
-        .from("test_attempts")
-        .select(
-          "id, student_id, state, invalidated_reason, profiles(full_name, email)"
-        )
-        .eq("test_id", id)
-        .eq("state", "in_progress"),
+      canViewNames
+        ? supabase
+            .from("test_attempts")
+            .select(
+              "id, student_id, state, invalidated_reason, profiles(full_name, email)"
+            )
+            .eq("test_id", id)
+            .eq("state", "in_progress")
+        : supabase
+            .from("test_attempts")
+            .select("id, student_id, state")
+            .eq("test_id", id)
+            .eq("state", "in_progress"),
     ]);
 
   const s = summary as {
@@ -105,8 +117,23 @@ export default async function TestResultsPage({
           <CardContent>
             <ul className="grid gap-1 text-sm">
               {(attempts ?? []).map((a) => {
-                const p = a.profiles as unknown as { full_name: string } | null;
-                return <li key={a.id}>{p?.full_name}</li>;
+                const row = a as {
+                  id: string;
+                  student_id: string;
+                  profiles?: { full_name: string } | null;
+                };
+                if (canViewNames) {
+                  return (
+                    <li key={row.id}>
+                      {row.profiles?.full_name ?? row.student_id}
+                    </li>
+                  );
+                }
+                return (
+                  <li key={row.id}>
+                    In progress ({String(row.student_id).slice(0, 8)}…)
+                  </li>
+                );
               })}
             </ul>
           </CardContent>
@@ -137,12 +164,17 @@ export default async function TestResultsPage({
                     {r.score} / {r.max_score}
                   </TableCell>
                   <TableCell>{r.percentage}%</TableCell>
-                  <TableCell>{r.percentile != null ? r.percentile : "—"}</TableCell>
+                  <TableCell>
+                    {r.percentile != null ? r.percentile : "—"}
+                  </TableCell>
                 </TableRow>
               ))}
               {(leaderboard ?? []).length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center text-muted-foreground">
+                  <TableCell
+                    colSpan={5}
+                    className="text-center text-muted-foreground"
+                  >
                     No submissions yet.
                   </TableCell>
                 </TableRow>

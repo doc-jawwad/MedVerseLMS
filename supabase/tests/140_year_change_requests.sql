@@ -165,6 +165,8 @@ select is(
   'rejected request is terminal'
 );
 
+-- Year manager lacks audit SELECT; assert as runner.
+select test_helpers.as_runner();
 select ok(
   exists (
     select 1 from public.audit_logs
@@ -233,6 +235,7 @@ select ok(
   'request marked approved'
 );
 
+select test_helpers.as_runner();
 select ok(
   exists (
     select 1 from public.audit_logs

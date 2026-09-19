@@ -1,6 +1,10 @@
 import Link from "next/link";
 import { requireAdmin } from "@/lib/auth/require-user";
 import {
+  adminHasAny,
+  getAdminPermissionSet,
+} from "@/lib/admin/admin-nav";
+import {
   Card,
   CardDescription,
   CardHeader,
@@ -31,47 +35,92 @@ type DifficultQuestion = {
 
 export default async function AdminOverviewPage() {
   const { supabase } = await requireAdmin();
+  const perms = await getAdminPermissionSet();
+  const canReadStudents = adminHasAny(perms, [
+    "view_students",
+    "manage_students",
+    "activate_students",
+    "restrict_students",
+  ]);
+  const canViewAnalytics = perms.has("view_analytics");
 
-  const [{ data: blockedCount }, { data: summaryData }, { data: difficultyData }] =
-    await Promise.all([
-      supabase
-        .from("profiles")
-        .select("id", { count: "exact", head: true })
-        .eq("role", "student")
-        .in("account_status", [
-          "restricted",
-          "suspended",
-          "deactivated",
-          "revoked",
-        ])
-        .then((r) => ({ data: r.count })),
-      supabase.rpc("admin_platform_summary"),
-      supabase.rpc("question_difficulty_report", { p_limit: 5 }),
-    ]);
+  const [blockedRes, summaryRes, difficultyRes] = await Promise.all([
+    canReadStudents
+      ? supabase
+          .from("profiles")
+          .select("id", { count: "exact", head: true })
+          .eq("role", "student")
+          .in("account_status", [
+            "restricted",
+            "suspended",
+            "deactivated",
+            "revoked",
+          ])
+          .then((r) => ({ data: r.count }))
+      : Promise.resolve({ data: null as number | null }),
+    canViewAnalytics
+      ? supabase.rpc("admin_platform_summary")
+      : Promise.resolve({ data: null }),
+    canViewAnalytics
+      ? supabase.rpc("question_difficulty_report", { p_limit: 5 })
+      : Promise.resolve({ data: null }),
+  ]);
 
-  const s = summaryData as PlatformSummary | null;
-  const missed = (difficultyData ?? []) as DifficultQuestion[];
+  const blockedCount = blockedRes.data;
+  const s = summaryRes.data as PlatformSummary | null;
+  const missed = (difficultyRes.data ?? []) as DifficultQuestion[];
 
   return (
     <div className="grid gap-6">
       <h1 className="text-2xl font-semibold">Overview</h1>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Link href="/admin/students?account=blocked">
-          <Tile value={blockedCount ?? 0} label="Blocked accounts" />
-        </Link>
-        <Link href="/admin/students">
-          <Tile value={s?.active_students ?? 0} label="Active students" />
-        </Link>
-        <Tile value={s?.tests_this_month ?? 0} label="Tests this month" />
-        <Tile value={s?.total_attempts ?? 0} label="Total attempts" />
+        {canReadStudents ? (
+          <Link href="/admin/students?account=blocked">
+            <Tile value={blockedCount ?? 0} label="Blocked accounts" />
+          </Link>
+        ) : (
+          <Tile value="—" label="Blocked accounts" />
+        )}
+        {canReadStudents && canViewAnalytics ? (
+          <Link href="/admin/students">
+            <Tile value={s?.active_students ?? 0} label="Active students" />
+          </Link>
+        ) : (
+          <Tile
+            value={canViewAnalytics ? (s?.active_students ?? 0) : "—"}
+            label="Active students"
+          />
+        )}
+        <Tile
+          value={canViewAnalytics ? (s?.tests_this_month ?? 0) : "—"}
+          label="Tests this month"
+        />
+        <Tile
+          value={canViewAnalytics ? (s?.total_attempts ?? 0) : "—"}
+          label="Total attempts"
+        />
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Tile value={`${s?.average_score_pct ?? 0}%`} label="Average score" />
-        <Tile value={`${s?.participation_pct ?? 0}%`} label="Participation rate" />
-        <Tile value={s?.best_subject ?? "—"} label="Highest-performing subject" small />
-        <Tile value={s?.hardest_topic ?? "—"} label="Most difficult topic" small />
+        <Tile
+          value={canViewAnalytics ? `${s?.average_score_pct ?? 0}%` : "—"}
+          label="Average score"
+        />
+        <Tile
+          value={canViewAnalytics ? `${s?.participation_pct ?? 0}%` : "—"}
+          label="Participation rate"
+        />
+        <Tile
+          value={canViewAnalytics ? (s?.best_subject ?? "—") : "—"}
+          label="Highest-performing subject"
+          small
+        />
+        <Tile
+          value={canViewAnalytics ? (s?.hardest_topic ?? "—") : "—"}
+          label="Most difficult topic"
+          small
+        />
       </div>
 
       <Card>
@@ -82,19 +131,25 @@ export default async function AdminOverviewPage() {
           </CardDescription>
         </CardHeader>
         <div className="grid gap-1 px-6 pb-6">
-          {missed.map((q) => (
-            <Link
-              key={q.question_id}
-              href={`/admin/questions/${q.question_id}`}
-              className="flex items-center justify-between gap-2 rounded-md border p-2 text-sm transition-colors hover:bg-accent/50"
-            >
-              <span className="truncate">{q.stem}</span>
-              <span className="shrink-0 text-muted-foreground">
-                {q.subject_name} · {q.p_value}% correct ({q.attempts})
-              </span>
-            </Link>
-          ))}
-          {missed.length === 0 && (
+          {!canViewAnalytics && (
+            <p className="text-sm text-muted-foreground">
+              Analytics permission required.
+            </p>
+          )}
+          {canViewAnalytics &&
+            missed.map((q) => (
+              <Link
+                key={q.question_id}
+                href={`/admin/questions/${q.question_id}`}
+                className="flex items-center justify-between gap-2 rounded-md border p-2 text-sm transition-colors hover:bg-accent/50"
+              >
+                <span className="truncate">{q.stem}</span>
+                <span className="shrink-0 text-muted-foreground">
+                  {q.subject_name} · {q.p_value}% correct ({q.attempts})
+                </span>
+              </Link>
+            ))}
+          {canViewAnalytics && missed.length === 0 && (
             <p className="text-sm text-muted-foreground">Not enough data yet.</p>
           )}
         </div>

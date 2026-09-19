@@ -1,4 +1,9 @@
 import { requireAdmin } from "@/lib/auth/require-user";
+import {
+  adminHasAny,
+  getAdminPermissionSet,
+} from "@/lib/admin/admin-nav";
+import { AdminPermissionDenied } from "@/components/admin/permission-denied";
 import { formatDate } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -42,6 +47,17 @@ export default async function StudentsPage({
   searchParams: Promise<{ q?: string; account?: string }>;
 }) {
   const { supabase } = await requireAdmin();
+  const perms = await getAdminPermissionSet();
+  if (
+    !adminHasAny(perms, [
+      "view_students",
+      "manage_students",
+      "activate_students",
+      "restrict_students",
+    ])
+  ) {
+    return <AdminPermissionDenied title="Students" />;
+  }
   const { q, account } = await searchParams;
 
   const [{ data: profiles, error }, { data: liveAttempts }] = await Promise.all([
