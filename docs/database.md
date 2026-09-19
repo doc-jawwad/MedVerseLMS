@@ -113,7 +113,7 @@ Helpers: `can_view_test` (catalog) vs `can_access_test` (content); `resource_con
 
 **tests** — `title`, `year_id`, `subject_id null`, `status text check in ('draft','published','closed','archived','invalidated') default 'draft'`, `opens_at`, `closes_at`, `duration_minutes int`, `marks_per_question numeric(6,2) default 1`, `negative_mark numeric(4,2) default 0`, `shuffle_questions bool default true`, `shuffle_options bool default false`, `show_review text check in ('after_submit','after_close','never') default 'after_close'`, `min_questions int default 1`, `created_by`, plus entitlement columns (`free` / `any_subscription` / `plan`; existing rows backfilled `free`).
 ("live" is derived: `status='published' and now() between opens_at and closes_at` — not a stored state.)
-Student-facing **Free / Paid** audience in the test form maps onto these entitlement columns (not a new enum): Free (including Free+Paid) → `free` (subscription never removes free access); Paid only → `any_subscription`; Neither → remain `draft` (unpublished tests are never in the student catalog). `test_audiences` remains year-cohort catalog membership.
+Student-facing **Free / Both / Paid / Neither** audience in the test form maps onto these entitlement columns (not a new enum): Free and Both → `free` (subscription never removes free access; Both is the same access law as Free); Paid only → `any_subscription`; Neither → remain `draft` (unpublished tests are never in the student catalog). `test_audiences` remains year-cohort catalog membership.
 
 **test_prep_guidelines** — `test_id` PK → `tests` (`ON DELETE CASCADE`), `body_text`. Optional preparation / study notes for a test. No student table SELECT (`get_test_prep_guidelines` / `accessible_test_prep` after `can_access_test`). Writes allowed only while the test is `draft` (frozen after publish, same idea as `protect_published_test`). History keeps the row attached after submit/close; body still requires live content entitlement.
 - `rank_dirty_at timestamptz` — leftover coalesced-ranking drain source for older writers. New scoring must **not** `UPDATE` this column; `rank_dirty_tests()` still clears it when set.
@@ -166,6 +166,26 @@ Student catalog SELECT must **not** expose `drive_url`, `body_text`, or R2 keys.
 
 **import_batches** — `created_by`, `filename`, `total_rows`, `inserted`, `skipped_duplicates`, `errors`.
 **import_rows** — `batch_id`, `row_number`, `outcome check in ('inserted','skipped_duplicate','error')`, `error_message`, `question_id null`.
+
+### Question Bank CSV schema (canonical)
+
+Admin CSV/XLSX import (`/admin/questions/import`) and `import_question_batch` use these **exact** headers (lowercase). Do not invent alternate column names. Subject is chosen in the Admin UI (not a CSV column). Import status (`draft` / `review` / `approved`) is also UI-only.
+
+| Column | Required | Notes |
+|---|---|---|
+| `question` | yes | Stem → `question_versions.stem` |
+| `option_a` … `option_d` | yes | Options A–D |
+| `option_e` | no | Required only when `correct=E` |
+| `correct` | yes | `A`/`B`/`C`/`D`/`E` → `correct_key` |
+| `explanation` | no | |
+| `reference` | no | |
+| `book` | yes | Matched case-insensitively under the chosen subject (optionally created) |
+| `chapter` | yes | Under the resolved book |
+| `topic` | yes | Under the resolved chapter |
+| `difficulty` | no | `easy`/`medium`/`hard` (blank → `medium`) |
+| `tags` | no | Pipe-separated (`\|`), not commas |
+
+Client validation must pass before the RPC runs. The RPC is **atomic**: a hard error rolls back the whole call. Rows matching an existing `content_hash` are `skipped_duplicate` and **never overwrite** existing questions. Template + ChatGPT generation prompt live in Admin Import UI (`src/lib/questions/csv-import.ts`).
 
 ## Stats (Phase 10)
 

@@ -1,14 +1,26 @@
 "use client";
 
-import { useRef, useState } from "react";
+import Link from "next/link";
+import { useMemo, useRef, useState } from "react";
 import Papa from "papaparse";
 import * as XLSX from "xlsx";
 import { toast } from "sonner";
 import {
   createImportBatch,
+  getImportReport,
   importChunk,
-  type ImportRow,
 } from "@/lib/actions/import";
+import {
+  QUESTION_CSV_HEADERS,
+  buildChatGptGenerationPrompt,
+  buildQuestionCsvTemplateMatrix,
+  flattenCsvErrors,
+  formatCsvErrorsForCopy,
+  parseQuestionCsvRecords,
+  toImportPayloadRow,
+  type CsvFieldError,
+  type ParsedCsvRow,
+} from "@/lib/questions/csv-import";
 import { formatDateTime } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -20,6 +32,8 @@ import {
 } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -37,29 +51,6 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 
-const TEMPLATE_HEADERS = [
-  "question",
-  "option_a",
-  "option_b",
-  "option_c",
-  "option_d",
-  "option_e",
-  "correct",
-  "explanation",
-  "reference",
-  "book",
-  "chapter",
-  "topic",
-  "difficulty",
-  "tags",
-];
-
-type ParsedRow = {
-  row_number: number;
-  raw: Record<string, string>;
-  errors: string[];
-};
-
 type Batch = {
   id: string;
   filename: string;
@@ -70,53 +61,7 @@ type Batch = {
   created_at: string;
 };
 
-function validateRow(raw: Record<string, string>): string[] {
-  const errors: string[] = [];
-  if (!raw.question?.trim()) errors.push("question missing");
-  for (const k of ["option_a", "option_b", "option_c", "option_d"]) {
-    if (!raw[k]?.trim()) errors.push(`${k} missing`);
-  }
-  const correct = raw.correct?.trim().toUpperCase();
-  if (!correct || !["A", "B", "C", "D", "E"].includes(correct)) {
-    errors.push("correct must be A–E");
-  } else if (correct === "E" && !raw.option_e?.trim()) {
-    errors.push("correct is E but option_e is empty");
-  }
-  for (const k of ["book", "chapter", "topic"]) {
-    if (!raw[k]?.trim()) errors.push(`${k} missing`);
-  }
-  const diff = raw.difficulty?.trim().toLowerCase();
-  if (diff && !["easy", "medium", "hard"].includes(diff)) {
-    errors.push("difficulty must be easy/medium/hard");
-  }
-  return errors;
-}
-
-function toImportRow(r: ParsedRow, subjectId: string, status: string): ImportRow {
-  const raw = r.raw;
-  const options = (["a", "b", "c", "d", "e"] as const)
-    .map((k) => ({ key: k.toUpperCase(), text: (raw[`option_${k}`] ?? "").trim() }))
-    .filter((o) => o.text !== "");
-  return {
-    row_number: r.row_number,
-    subject_id: subjectId,
-    book: (raw.book ?? "").trim(),
-    chapter: (raw.chapter ?? "").trim(),
-    topic: (raw.topic ?? "").trim(),
-    stem: (raw.question ?? "").trim(),
-    options,
-    correct_key: (raw.correct ?? "").trim().toUpperCase(),
-    explanation: (raw.explanation ?? "").trim(),
-    reference: (raw.reference ?? "").trim(),
-    difficulty: (raw.difficulty ?? "medium").trim().toLowerCase() || "medium",
-    tags: (raw.tags ?? "")
-      .split("|")
-      .map((t) => t.trim())
-      .filter(Boolean),
-    status,
-    ...(r.errors.length > 0 ? { client_errors: r.errors } : {}),
-  };
-}
+type Phase = "upload" | "preview" | "done";
 
 export function ImportClient({
   subjects,
@@ -130,36 +75,41 @@ export function ImportClient({
   const [status, setStatus] = useState("draft");
   const [createMissing, setCreateMissing] = useState(true);
   const [filename, setFilename] = useState("");
-  const [rows, setRows] = useState<ParsedRow[]>([]);
+  const [rows, setRows] = useState<ParsedCsvRow[]>([]);
+  const [headerErrors, setHeaderErrors] = useState<CsvFieldError[]>([]);
+  const [phase, setPhase] = useState<Phase>("upload");
   const [importing, setImporting] = useState(false);
-  const [progress, setProgress] = useState("");
+  const [previewIndex, setPreviewIndex] = useState(0);
+  const [showAnswer, setShowAnswer] = useState(false);
   const [summary, setSummary] = useState<{
     inserted: number;
     skipped: number;
     errors: number;
+    questionIds: string[];
+    duplicateRows: number[];
   } | null>(null);
 
+  const subjectLabel = subjects.find((s) => s.id === subjectId)?.label;
+  const chatgptPrompt = useMemo(
+    () => buildChatGptGenerationPrompt(subjectLabel),
+    [subjectLabel]
+  );
+
+  const allErrors = useMemo(
+    () => flattenCsvErrors(headerErrors, rows),
+    [headerErrors, rows]
+  );
+  const validRows = rows.filter((r) => r.errors.length === 0);
+  const invalidRows = rows.filter((r) => r.errors.length > 0);
+  const canProceed =
+    rows.length > 0 &&
+    headerErrors.length === 0 &&
+    invalidRows.length === 0 &&
+    Boolean(subjectId);
+
   function downloadTemplate() {
-    const csv = Papa.unparse([
-      TEMPLATE_HEADERS,
-      [
-        "Which of the following is a component of Virchow triad?",
-        "Endothelial injury",
-        "Protein C activation",
-        "Increased prostacyclin",
-        "Thrombomodulin expression",
-        "",
-        "A",
-        "Virchow triad: endothelial injury, abnormal flow, hypercoagulability.",
-        "Robbins, Hemodynamic Disorders",
-        "Robbins Basic Pathology",
-        "Hemodynamic Disorders",
-        "Thrombosis",
-        "easy",
-        "virchow|thrombosis",
-      ],
-    ]);
-    const blob = new Blob([csv], { type: "text/csv" });
+    const csv = Papa.unparse(buildQuestionCsvTemplateMatrix());
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
     a.download = "medverse-question-template.csv";
@@ -167,9 +117,27 @@ export function ImportClient({
     URL.revokeObjectURL(a.href);
   }
 
+  async function copyText(label: string, text: string) {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success(`${label} copied`);
+    } catch {
+      toast.error(`Could not copy ${label}`);
+    }
+  }
+
+  function resetParsed() {
+    setRows([]);
+    setHeaderErrors([]);
+    setPhase("upload");
+    setSummary(null);
+    setPreviewIndex(0);
+  }
+
   async function handleFile(file: File) {
     setFilename(file.name);
     setSummary(null);
+    setPhase("upload");
     const lower = file.name.toLowerCase();
 
     let records: Record<string, string>[] = [];
@@ -180,6 +148,10 @@ export function ImportClient({
         skipEmptyLines: true,
         transformHeader: (h) => h.trim().toLowerCase(),
       });
+      if (parsed.errors.length > 0) {
+        const first = parsed.errors[0];
+        toast.error(first?.message ?? "CSV parse failed");
+      }
       records = parsed.data;
     } else if (lower.endsWith(".xlsx") || lower.endsWith(".xls")) {
       const buf = await file.arrayBuffer();
@@ -200,20 +172,30 @@ export function ImportClient({
       return;
     }
 
-    setRows(
-      records.map((raw, i) => ({
-        row_number: i + 2, // header is row 1
-        raw,
-        errors: validateRow(raw),
-      }))
-    );
+    const { rows: parsedRows, headerErrors: hdr } =
+      parseQuestionCsvRecords(records);
+    setHeaderErrors(hdr);
+    setRows(parsedRows);
+    setPreviewIndex(0);
+
+    const errCount = flattenCsvErrors(hdr, parsedRows).length;
+    if (errCount > 0) {
+      toast.message(
+        `Validated ${parsedRows.length} rows — ${errCount} error${errCount === 1 ? "" : "s"} to fix`
+      );
+    } else {
+      toast.success(`Validated ${parsedRows.length} rows — ready to preview`);
+    }
   }
 
-  const validRows = rows.filter((r) => r.errors.length === 0);
-  const invalidRows = rows.filter((r) => r.errors.length > 0);
-
   async function runImport() {
-    if (!subjectId) return void toast.error("Choose the target subject first.");
+    if (!canProceed) {
+      return void toast.error(
+        allErrors.length > 0
+          ? "Fix every CSV error before importing."
+          : "Choose a subject and upload a valid CSV first."
+      );
+    }
     setImporting(true);
     setSummary(null);
     try {
@@ -221,54 +203,90 @@ export function ImportClient({
       if ("error" in batchRes && batchRes.error) throw new Error(batchRes.error);
       const batchId = (batchRes as { id: string }).id;
 
-      // Every parsed row is sent — invalid ones carry `client_errors` so the
-      // server records a permanent 'error' import_rows entry for them too,
-      // instead of only showing up in this transient preview table.
-      const payload = rows.map((r) => toImportRow(r, subjectId, status));
-      const totals = { inserted: 0, skipped: 0, errors: 0 };
-      const CHUNK = 100;
-      for (let i = 0; i < payload.length; i += CHUNK) {
-        setProgress(`Importing ${i + 1}–${Math.min(i + CHUNK, payload.length)} of ${payload.length}…`);
-        const res = await importChunk(batchId, payload.slice(i, i + CHUNK), createMissing);
-        if ("error" in res && res.error) throw new Error(res.error);
-        if (!("result" in res) || !res.result) throw new Error("Import chunk failed");
-        totals.inserted += res.result.inserted;
-        totals.skipped += res.result.skipped;
-        totals.errors += res.result.errors;
-      }
-      setSummary(totals);
+      const payload = rows.map((r) =>
+        toImportPayloadRow(r.raw, r.row_number, subjectId, status)
+      );
+
+      const res = await importChunk(batchId, payload, createMissing);
+      if ("error" in res && res.error) throw new Error(res.error);
+      if (!("result" in res) || !res.result) throw new Error("Import failed");
+
+      const report = await getImportReport(batchId);
+      const duplicateRows = report.rows
+        .filter((r) => r.outcome === "skipped_duplicate")
+        .map((r) => r.row_number as number);
+
+      setSummary({
+        inserted: res.result.inserted,
+        skipped: res.result.skipped,
+        errors: res.result.errors,
+        questionIds: res.result.question_ids,
+        duplicateRows,
+      });
+      setPhase("done");
       toast.success(
-        `Import finished: ${totals.inserted} added, ${totals.skipped} duplicates skipped, ${totals.errors} errors.`
+        `Import finished: ${res.result.inserted} added, ${res.result.skipped} duplicates skipped (not overwritten).`
       );
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Import failed");
     } finally {
       setImporting(false);
-      setProgress("");
     }
   }
+
+  const previewRow = validRows[previewIndex] ?? validRows[0];
+  const previewOptions = previewRow
+    ? (["a", "b", "c", "d", "e"] as const)
+        .map((k) => ({
+          key: k.toUpperCase(),
+          text: (previewRow.raw[`option_${k}`] ?? "").trim(),
+        }))
+        .filter((o) => o.text)
+    : [];
+  const previewCorrect = (previewRow?.raw.correct ?? "").trim().toUpperCase();
 
   return (
     <div className="grid gap-6">
       <Card>
         <CardHeader>
-          <CardTitle>1. Prepare your file</CardTitle>
+          <CardTitle>1. Template &amp; ChatGPT prompt</CardTitle>
           <CardDescription>
-            Columns: {TEMPLATE_HEADERS.join(", ")}. Tags separated by |.
-            Book/chapter/topic are matched by name under the subject you pick
-            (created automatically if allowed below).
+            Canonical columns: {QUESTION_CSV_HEADERS.join(", ")}. Tags use{" "}
+            <code>|</code>. Subject is chosen below (not a CSV column). Book /
+            chapter / topic are matched by name under that subject.
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          <Button variant="outline" onClick={downloadTemplate}>
-            Download CSV template
-          </Button>
+        <CardContent className="grid gap-4">
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" onClick={downloadTemplate}>
+              Download CSV template
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => void copyText("ChatGPT prompt", chatgptPrompt)}
+            >
+              Copy ChatGPT prompt
+            </Button>
+          </div>
+          <div className="grid gap-2">
+            <Label>ChatGPT generation prompt</Label>
+            <Textarea
+              readOnly
+              value={chatgptPrompt}
+              rows={12}
+              className="font-mono text-xs"
+            />
+          </div>
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader>
-          <CardTitle>2. Upload & preview</CardTitle>
+          <CardTitle>2. Upload &amp; validate</CardTitle>
+          <CardDescription>
+            Every row is validated before any database write. Fix errors, re-upload,
+            and validate again. Import stays blocked until the file is clean.
+          </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4">
           <div className="grid gap-4 sm:grid-cols-3">
@@ -290,7 +308,9 @@ export function ImportClient({
             <div className="grid gap-2">
               <Label>Import as</Label>
               <Select value={status} onValueChange={setStatus}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="draft">Draft</SelectItem>
                   <SelectItem value="review">Review</SelectItem>
@@ -315,75 +335,273 @@ export function ImportClient({
             onChange={(e) => {
               const f = e.target.files?.[0];
               if (f) void handleFile(f);
+              e.target.value = "";
             }}
           />
 
           {rows.length > 0 && (
-            <>
-              <div className="flex gap-3 text-sm">
-                <Badge variant="default">{validRows.length} valid</Badge>
-                {invalidRows.length > 0 && (
-                  <Badge variant="destructive">{invalidRows.length} with errors</Badge>
-                )}
+            <div className="flex flex-wrap gap-3 text-sm">
+              <Badge variant="default">{validRows.length} valid</Badge>
+              {invalidRows.length > 0 || headerErrors.length > 0 ? (
+                <Badge variant="destructive">
+                  {allErrors.length} error{allErrors.length === 1 ? "" : "s"}
+                </Badge>
+              ) : (
+                <Badge variant="secondary">No validation errors</Badge>
+              )}
+              <span className="text-muted-foreground">
+                {filename} · {rows.length} data row
+                {rows.length === 1 ? "" : "s"}
+              </span>
+            </div>
+          )}
+
+          {allErrors.length > 0 && (
+            <div className="grid gap-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="text-sm font-medium text-destructive">
+                  Validation errors — import blocked until fixed
+                </p>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() =>
+                    void copyText("All errors", formatCsvErrorsForCopy(allErrors))
+                  }
+                >
+                  Copy all errors
+                </Button>
+                <Button size="sm" variant="ghost" onClick={resetParsed}>
+                  Clear file
+                </Button>
               </div>
-              <div className="max-h-80 overflow-auto rounded-md border">
+              <div className="max-h-96 overflow-auto rounded-md border">
                 <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead>Row</TableHead>
-                      <TableHead className="max-w-sm">Question</TableHead>
-                      <TableHead>Correct</TableHead>
-                      <TableHead>Chapter / Topic</TableHead>
-                      <TableHead>Problems</TableHead>
+                      <TableHead>Field</TableHead>
+                      <TableHead>Error</TableHead>
+                      <TableHead>Invalid value</TableHead>
+                      <TableHead>Expected</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {rows.slice(0, 200).map((r) => (
-                      <TableRow key={r.row_number}>
-                        <TableCell>{r.row_number}</TableCell>
-                        <TableCell className="max-w-sm truncate">
-                          {r.raw.question}
+                    {allErrors.map((e, i) => (
+                      <TableRow key={`${e.row}-${e.field}-${i}`}>
+                        <TableCell>{e.row}</TableCell>
+                        <TableCell className="font-mono text-xs">
+                          {e.field}
                         </TableCell>
-                        <TableCell>{r.raw.correct}</TableCell>
-                        <TableCell className="text-muted-foreground">
-                          {r.raw.chapter} / {r.raw.topic}
+                        <TableCell className="text-destructive">{e.error}</TableCell>
+                        <TableCell className="max-w-[12rem] truncate font-mono text-xs">
+                          {e.invalidValue ?? "—"}
                         </TableCell>
-                        <TableCell className="text-destructive">
-                          {r.errors.join("; ")}
+                        <TableCell className="text-muted-foreground text-xs">
+                          {e.expected}
                         </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
                 </Table>
               </div>
-              <div className="flex items-center gap-3">
-                <Button
-                  onClick={runImport}
-                  disabled={importing || rows.length === 0 || !subjectId}
-                >
-                  {importing
-                    ? progress || "Importing…"
-                    : `Import ${validRows.length} question${validRows.length === 1 ? "" : "s"}`}
-                </Button>
-                {invalidRows.length > 0 && (
-                  <span className="text-sm text-muted-foreground">
-                    {invalidRows.length} row{invalidRows.length === 1 ? "" : "s"} with errors
-                    will be recorded, not created.
-                  </span>
-                )}
-              </div>
-            </>
+              <Textarea
+                readOnly
+                rows={8}
+                className="font-mono text-xs"
+                value={formatCsvErrorsForCopy(allErrors)}
+              />
+            </div>
           )}
 
-          {summary && (
-            <p className="text-sm">
-              Done: <b>{summary.inserted}</b> added,{" "}
-              <b>{summary.skipped}</b> duplicates skipped,{" "}
-              <b>{summary.errors}</b> errors.
-            </p>
+          {rows.length > 0 && allErrors.length === 0 && phase === "upload" && (
+            <div className="flex flex-wrap gap-2">
+              <Button
+                onClick={() => {
+                  if (!subjectId) {
+                    toast.error("Choose the target subject first.");
+                    return;
+                  }
+                  setPhase("preview");
+                  setPreviewIndex(0);
+                }}
+                disabled={!subjectId}
+              >
+                Preview as student ({validRows.length})
+              </Button>
+              <Button variant="ghost" onClick={resetParsed}>
+                Clear file
+              </Button>
+            </div>
           )}
         </CardContent>
       </Card>
+
+      {phase === "preview" && previewRow && (
+        <Card>
+          <CardHeader>
+            <CardTitle>3. Student preview &amp; confirm import</CardTitle>
+            <CardDescription>
+              Review questions as a student sees them (answers hidden by default).
+              Duplicates matching an existing content hash are skipped — never
+              overwritten. The import runs in one database transaction; a hard
+              failure rolls back the whole batch.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-4">
+            <div className="flex flex-wrap items-center gap-3 text-sm">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={previewIndex <= 0}
+                onClick={() => setPreviewIndex((i) => Math.max(0, i - 1))}
+              >
+                Previous
+              </Button>
+              <span>
+                Question {previewIndex + 1} of {validRows.length} (CSV row{" "}
+                {previewRow.row_number})
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={previewIndex >= validRows.length - 1}
+                onClick={() =>
+                  setPreviewIndex((i) =>
+                    Math.min(validRows.length - 1, i + 1)
+                  )
+                }
+              >
+                Next
+              </Button>
+              <label className="ml-auto flex items-center gap-2 text-muted-foreground">
+                Show answer
+                <Switch checked={showAnswer} onCheckedChange={setShowAnswer} />
+              </label>
+            </div>
+
+            <div className="rounded-md border p-4">
+              <p className="mb-1 text-xs text-muted-foreground">
+                {previewRow.raw.book} → {previewRow.raw.chapter} →{" "}
+                {previewRow.raw.topic}
+                {previewRow.raw.difficulty
+                  ? ` · ${previewRow.raw.difficulty}`
+                  : ""}
+              </p>
+              <p className="whitespace-pre-wrap text-sm">
+                {previewRow.raw.question}
+              </p>
+              <div className="mt-3 grid gap-2">
+                {previewOptions.map((o) => (
+                  <div
+                    key={o.key}
+                    className={`rounded-md border p-2 text-sm ${
+                      showAnswer && o.key === previewCorrect
+                        ? "border-green-600 bg-green-50 dark:bg-green-950"
+                        : ""
+                    }`}
+                  >
+                    <span className="mr-2 font-medium">{o.key}.</span>
+                    {o.text}
+                  </div>
+                ))}
+              </div>
+              {showAnswer &&
+                ((previewRow.raw.explanation ?? "").trim() ||
+                  (previewRow.raw.reference ?? "").trim()) && (
+                  <div className="mt-3 rounded-md bg-muted p-3 text-sm">
+                    {(previewRow.raw.explanation ?? "").trim() && (
+                      <p className="whitespace-pre-wrap">
+                        {previewRow.raw.explanation}
+                      </p>
+                    )}
+                    {(previewRow.raw.reference ?? "").trim() && (
+                      <p className="mt-2 text-xs text-muted-foreground">
+                        Reference: {previewRow.raw.reference}
+                      </p>
+                    )}
+                  </div>
+                )}
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              <Button onClick={() => void runImport()} disabled={importing}>
+                {importing
+                  ? "Importing…"
+                  : `Confirm import ${validRows.length} question${
+                      validRows.length === 1 ? "" : "s"
+                    } as ${status}`}
+              </Button>
+              <Button
+                variant="outline"
+                disabled={importing}
+                onClick={() => setPhase("upload")}
+              >
+                Back to validation
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {summary && phase === "done" && (
+        <Card>
+          <CardHeader>
+            <CardTitle>4. Import result</CardTitle>
+            <CardDescription>
+              Edit any imported question before publishing to tests or practice.
+              Status transitions stay on the normal draft → review → approved path
+              unless you imported as approved.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-4">
+            <p className="text-sm">
+              <b>{summary.inserted}</b> added ·{" "}
+              <b>{summary.skipped}</b> duplicates skipped (not overwritten)
+              {summary.duplicateRows.length > 0 && (
+                <> — CSV rows {summary.duplicateRows.join(", ")}</>
+              )}
+              {summary.errors > 0 && (
+                <>
+                  {" "}
+                  · <b>{summary.errors}</b> errors
+                </>
+              )}
+            </p>
+            {summary.questionIds.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {summary.questionIds.slice(0, 20).map((id) => (
+                  <Button key={id} asChild size="sm" variant="outline">
+                    <Link href={`/admin/questions/${id}`}>
+                      Edit {id.slice(0, 8)}…
+                    </Link>
+                  </Button>
+                ))}
+                {summary.questionIds.length > 20 && (
+                  <span className="text-sm text-muted-foreground">
+                    +{summary.questionIds.length - 20} more — open Question Bank
+                    to filter by subject.
+                  </span>
+                )}
+              </div>
+            )}
+            <div className="flex flex-wrap gap-2">
+              <Button asChild>
+                <Link href="/admin/questions">Open Question Bank</Link>
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  resetParsed();
+                  if (fileRef.current) fileRef.current.value = "";
+                }}
+              >
+                Import another file
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {recentBatches.length > 0 && (
         <Card>
@@ -410,9 +628,7 @@ export function ImportClient({
                     <TableCell>{b.inserted}</TableCell>
                     <TableCell>{b.skipped_duplicates}</TableCell>
                     <TableCell>{b.errors}</TableCell>
-                    <TableCell>
-                      {formatDateTime(b.created_at)}
-                    </TableCell>
+                    <TableCell>{formatDateTime(b.created_at)}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>

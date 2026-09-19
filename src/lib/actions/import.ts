@@ -19,12 +19,15 @@ export type ImportRow = {
   difficulty: string;
   tags: string[];
   status: string;
-  /** Client-side validation failures (missing options, bad correct key, …).
-   * When present, the server records an 'error' import_rows entry for this
-   * row and does not attempt to create a question from it — this is what
-   * gives every rejected row a permanent audit trail instead of only a
-   * transient client-side preview. */
+  /** Must not be sent on the atomic import path — CSV validation must pass first. */
   client_errors?: string[];
+};
+
+export type ImportChunkResult = {
+  inserted: number;
+  skipped: number;
+  errors: number;
+  question_ids: string[];
 };
 
 export async function createImportBatch(filename: string, totalRows: number) {
@@ -50,8 +53,21 @@ export async function importChunk(
     p_create_missing: createMissing,
   });
   if (error) return actionRpcResult("action", error);
+  const result = data as {
+    inserted: number;
+    skipped: number;
+    errors: number;
+    question_ids?: string[] | null;
+  };
   return {
-    result: data as { inserted: number; skipped: number; errors: number },
+    result: {
+      inserted: result.inserted,
+      skipped: result.skipped,
+      errors: result.errors,
+      question_ids: Array.isArray(result.question_ids)
+        ? result.question_ids.map(String)
+        : [],
+    } satisfies ImportChunkResult,
   };
 }
 
@@ -59,9 +75,10 @@ export async function getImportReport(batchId: string) {
   const supabase = await createClient();
   const { data: rows } = await supabase
     .from("import_rows")
-    .select("row_number, outcome, error_message")
+    .select("row_number, outcome, error_message, question_id")
     .eq("batch_id", batchId)
     .order("row_number");
   revalidatePath("/admin/questions/import");
+  revalidatePath("/admin/questions");
   return { rows: rows ?? [] };
 }
