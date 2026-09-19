@@ -89,7 +89,7 @@ Ranking must be **coalesced** before a 1,500-submit event — hosting does not r
 
 ## Object storage (R2)
 
-**Payment screenshots (now):** private Cloudflare R2 object keys on `subscription_applications` (`payment-proofs/{tenant_id}/{student_id}/{uuid}`); short-lived signed upload/download; never a public URL. Same R2 platform as backups — not a new infrastructure category. Bucket name is operator-configured (`R2_PAYMENT_BUCKET` or `R2_BUCKET`).
+**Payment screenshots (now):** private Cloudflare R2 object keys on `subscription_applications` (`payment-proofs/{tenant_id}/{student_id}/{uuid}`); short-lived signed upload/download; never a public URL. Same R2 platform as backups — not a new infrastructure category. **Production requires `R2_PAYMENT_BUCKET`** (dedicated payment bucket; never falls back to the backup `R2_BUCKET`). Non-production may use `R2_PAYMENT_BUCKET` or, as a convenience, `R2_BUCKET` for a shared private bucket.
 
 **Study materials today:** Google Drive URLs (`materials.drive_url`). Student catalog access must not leak that URL; open via an entitlement-checked RPC.
 

@@ -363,7 +363,7 @@ Do not guess these in migrations:
 
 1. **Pre-existing `enrollments.status` in `suspended` or `revoked`:** how to map onto `profiles.account_status` vs leave historical enrollment rows only.
 2. **Curriculum tree CRUD permission code:** years/subjects/books/chapters/topics writes stay `is_admin()` until a dedicated code is approved (not in the seeded list above).
-3. **R2 bucket name** for payment screenshots (private R2 is approved; prefix is `payment-proofs/`. Bucket comes from `R2_PAYMENT_BUCKET` or `R2_BUCKET`).
+3. **R2 bucket name** for payment screenshots (private R2 is approved; prefix is `payment-proofs/`). Production requires dedicated `R2_PAYMENT_BUCKET` (no fallback to backup `R2_BUCKET`). Non-production may use `R2_PAYMENT_BUCKET` or `R2_BUCKET`.
 4. **Application `cancelled`:** whether the student UI exposes cancel, or only admin/system uses it. The status exists; no cancel RPC/UI in this step.
 5. **R2 object retention** after reject/replace/orphan upload: no lifecycle rule is configured.
 6. **8L Student Notification Inbox UX** — route path, nav label/placement, exact kind copy, deep-link target, emit-on-inbox/dashboard-load vs lazy-only, mark-all, mark-unread, unread badge, empty-state wording, list retention/pagination. Settled backend/security rules and the OWNER DECISION list: § “8L — Student Notification Inbox” above. Optional pg_cron emit is **not** part of 8L MVP.

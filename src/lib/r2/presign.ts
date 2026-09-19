@@ -14,12 +14,27 @@ export type R2Config = {
   region: string;
 };
 
+function isProductionEnv(): boolean {
+  return (process.env.MEDVERSE_ENV?.trim() ?? "") === "production";
+}
+
+/**
+ * Payment proofs must use a dedicated bucket. In production, never fall back to
+ * R2_BUCKET (that name is for encrypted DB backups on the host backup job).
+ * Non-production may still use R2_BUCKET for a shared private bucket.
+ */
+export function resolvePaymentR2Bucket(): string {
+  const paymentBucket = process.env.R2_PAYMENT_BUCKET?.trim() ?? "";
+  if (paymentBucket) return paymentBucket;
+  if (isProductionEnv()) return "";
+  return process.env.R2_BUCKET?.trim() ?? "";
+}
+
 export function getR2Config(): R2Config | { error: "r2_not_configured" } {
   const accountId = process.env.R2_ACCOUNT_ID?.trim() ?? "";
   const accessKeyId = process.env.R2_ACCESS_KEY_ID?.trim() ?? "";
   const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY?.trim() ?? "";
-  const bucket =
-    process.env.R2_PAYMENT_BUCKET?.trim() || process.env.R2_BUCKET?.trim() || "";
+  const bucket = resolvePaymentR2Bucket();
   if (!accountId || !accessKeyId || !secretAccessKey || !bucket) {
     return { error: "r2_not_configured" };
   }

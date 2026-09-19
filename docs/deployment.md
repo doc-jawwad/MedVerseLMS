@@ -84,11 +84,11 @@ POSTGREST_INTERNAL_URL=          # VPS only: http://127.0.0.1:3001
 # R2_ACCOUNT_ID=
 # R2_ACCESS_KEY_ID=
 # R2_SECRET_ACCESS_KEY=
-# R2_BUCKET=                     # backup bucket; payment proofs may share it
-# R2_PAYMENT_BUCKET=             # optional override for payment objects
+# R2_PAYMENT_BUCKET=             # required when MEDVERSE_ENV=production (payment proofs)
+# R2_BUCKET=                     # non-production only: optional shared private bucket fallback
 # R2_ENDPOINT=                   # optional; default https://<accountid>.r2.cloudflarestorage.com
+# Backup dumps use /etc/medverse/backup.env (separate credentials/bucket); not these Next.js vars.
 ```
-
 PostgREST / Postgres / backup (VPS host files in `/etc/medverse/`, not git): JWT secret, `authenticator` DB password, `PGRST_DB_URI`, dump encryption key, R2 credentials. Not `NEXT_PUBLIC_`. Examples: `deploy/env/*.example`.
 
 Ops scripts refuse Cloud production (`pxoxijlhcvbrostrquft`) and Cloud staging (`vygtwrsshcyfahfzurgq`) URLs unless `MEDVERSE_ALLOW_PRODUCTION=yes` or `MEDVERSE_ALLOW_CLOUD_STAGING=yes` is set explicitly. Backup/restore scripts additionally refuse `*.supabase.co` hosts and any non-loopback `PGHOST`.
