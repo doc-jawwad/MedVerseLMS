@@ -195,7 +195,10 @@ export function AdminsManager({
   const [editCodes, setEditCodes] = useState<AdminPermissionCode[]>([]);
   const [editMain, setEditMain] = useState(false);
 
-  function run(fn: () => Promise<{ error?: string | null }>, ok: string) {
+  function run(
+    fn: () => Promise<{ error?: string | null; id?: string }>,
+    ok: string
+  ) {
     startTransition(async () => {
       const res = await fn();
       if (res.error) toast.error(adminRbacErrorMessage(res.error));

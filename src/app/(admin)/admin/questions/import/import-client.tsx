@@ -230,10 +230,11 @@ export function ImportClient({
       for (let i = 0; i < payload.length; i += CHUNK) {
         setProgress(`Importing ${i + 1}–${Math.min(i + CHUNK, payload.length)} of ${payload.length}…`);
         const res = await importChunk(batchId, payload.slice(i, i + CHUNK), createMissing);
-        if (res.error) throw new Error(res.error);
-        totals.inserted += res.result!.inserted;
-        totals.skipped += res.result!.skipped;
-        totals.errors += res.result!.errors;
+        if ("error" in res && res.error) throw new Error(res.error);
+        if (!("result" in res) || !res.result) throw new Error("Import chunk failed");
+        totals.inserted += res.result.inserted;
+        totals.skipped += res.result.skipped;
+        totals.errors += res.result.errors;
       }
       setSummary(totals);
       toast.success(

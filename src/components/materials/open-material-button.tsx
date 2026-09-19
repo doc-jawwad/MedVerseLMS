@@ -25,11 +25,11 @@ export function OpenMaterialButton({
       onClick={() =>
         startTransition(async () => {
           const result = await openMaterial(materialId);
-          if (result.error) {
+          if ("error" in result && result.error) {
             toast.error(result.error);
             return;
           }
-          if (result.url) {
+          if ("url" in result && result.url) {
             window.open(result.url, "_blank", "noopener,noreferrer");
           }
         })

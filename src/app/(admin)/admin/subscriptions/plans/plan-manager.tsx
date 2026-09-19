@@ -83,7 +83,7 @@ export function PlanManager({
         isComplimentary: form.isComplimentary,
         isActive: form.isActive,
       });
-      if (res.error) toast.error(adminSubscriptionErrorMessage(res.error));
+      if ("error" in res && res.error) toast.error(adminSubscriptionErrorMessage(res.error));
       else toast.success("Plan created");
     });
   }
