@@ -48,7 +48,7 @@ Status transitions are now enforced at the database level (`protect_question_sta
 **enrollments** — `student_id`, `year_id`, `status check in ('active','expired')`, `approved_by`, `approved_at`, `expires_at`.
 - This row is the student’s **assigned MBBS year**. It is not payment and not “admin approved to enter the LMS.”
 - Partial unique index: `(student_id) WHERE status = 'active'` — one live class.
-- After email verification, `ensure_profile()` / `handle_new_user()` insert `status = 'active'` when `user_metadata.year_id` names a real year and no live active row exists. Students have no direct INSERT/UPDATE/DELETE.
+- After email verification, `ensure_profile()` / `handle_new_user()` insert `status = 'active'` when `user_metadata.year_id` names a real year and the student has **never** had any enrollment row (first provision only). Students have no direct INSERT/UPDATE/DELETE.
 - `promote_student(student_id)`: sets active row `expired`, inserts active row for year+1. Audit-logged. Requires `manage_year_changes`.
 - **Migration:** existing `status = 'pending'` rows are **auto-activated**. Enrollment `pending` is not used going forward. Pre-existing `suspended`/`revoked` enrollment rows: mapping onto `profiles.account_status` is a **pending owner decision**.
 
@@ -146,7 +146,7 @@ Practice list RPCs return catalog rows with a lock flag; start/fetch RPCs enforc
 
 **material_folders** — `name`, `year_id`, `subject_id null`, `sort_order`, plus entitlement columns (existing folders backfilled `free`).
 **materials** — `folder_id`, `title`, `description`, `file_type text`, `drive_url text`.
-Student catalog SELECT must **not** expose `drive_url`. Table-level `SELECT` is revoked and re-granted on metadata columns only (Postgres table-level `SELECT` would otherwise still expose `drive_url`). `open_material(id)` returns the URL only after entitlement (admins may open any material). Future books/videos: no permanent public object URL; signed access after the same check.
+Student catalog SELECT must **not** expose `drive_url`. Table-level `SELECT` is revoked and re-granted on metadata columns only (Postgres table-level `SELECT` would otherwise still expose `drive_url`). `open_material(id)` returns the URL only after student entitlement or `manage_materials` (Main Admin included via permission short-circuit). Future books/videos: no permanent public object URL; signed access after the same check.
 
 ## Import
 

@@ -7,12 +7,20 @@ import {
   ssrTimingEnabled,
 } from "@/lib/observability/ssr-timing";
 
+function nextWithPathname(request: NextRequest, pathname: string) {
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set("x-medverse-pathname", pathname);
+  return NextResponse.next({
+    request: { headers: requestHeaders },
+  });
+}
+
 // Next 16 proxy (formerly middleware): refresh the Supabase session cookie and do
 // OPTIMISTIC redirects only. Real authorization lives in RLS + layout guards
 // (docs/permissions.md); the single-session check runs in requireUser().
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  let response = NextResponse.next({ request });
+  let response = nextWithPathname(request, pathname);
 
   // Captured before getClaims() runs: a failed refresh makes the Supabase
   // client's own setAll() callback clear this same cookie from `request`
@@ -34,7 +42,7 @@ export async function proxy(request: NextRequest) {
           cookiesToSet.forEach(({ name, value }) =>
             request.cookies.set(name, value)
           );
-          response = NextResponse.next({ request });
+          response = nextWithPathname(request, pathname);
           cookiesToSet.forEach(({ name, value, options }) =>
             response.cookies.set(name, value, options)
           );

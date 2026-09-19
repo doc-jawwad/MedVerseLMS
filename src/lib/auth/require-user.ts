@@ -1,12 +1,14 @@
 import "server-only";
 
 import { cache } from "react";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import {
   type AccountStatus,
   isBlockedAccountStatus,
 } from "@/lib/auth/account-status";
+import { isLiveExamAttemptPath } from "@/lib/auth/live-exam-path";
 import { ssrSpan } from "@/lib/observability/ssr-timing-rsc";
 
 export type SessionProfile = {
@@ -27,12 +29,20 @@ export type Enrollment = {
   year_name: string;
 };
 
+export { isLiveExamAttemptPath } from "@/lib/auth/live-exam-path";
+
+async function currentPathname(): Promise<string> {
+  const h = await headers();
+  return h.get("x-medverse-pathname") ?? "";
+}
+
 // Central auth gate for protected layouts. Enforces the two-layer session
 // policy from docs/permissions.md:
 //  - Layer 1: JWT session_id must equal profiles.active_session_id
 //  - Account status: non-active accounts cannot enter LMS shells
-//  - Exemption: a session owning an in_progress attempt is NOT evicted
-//    (leave_in_progress disposition / login-kick exam exemption)
+//  - Exam exemption: blocked accounts may ONLY continue the live exam player
+//    path (same device/session). Layer 2 RPCs remain authoritative for
+//    save/submit/resume — this gate is UX routing only.
 export const requireUser = cache(async function requireUser() {
   const supabase = await ssrSpan("auth.createClient", () => createClient());
 
@@ -78,12 +88,16 @@ export const requireUser = cache(async function requireUser() {
   }
 
   if (isBlockedAccountStatus(sessionProfile.account_status)) {
-    const { data: exempt } = await ssrSpan("auth.account_status_check", () =>
-      supabase.rpc("owns_live_attempt_session")
-    );
-    if (!exempt) {
-      redirect(`/pending?state=${sessionProfile.account_status}`);
+    const path = await currentPathname();
+    if (isLiveExamAttemptPath(path)) {
+      const { data: exempt } = await ssrSpan("auth.account_status_check", () =>
+        supabase.rpc("owns_live_attempt_session")
+      );
+      if (exempt) {
+        return { supabase, profile: sessionProfile, userId, sessionId };
+      }
     }
+    redirect(`/pending?state=${sessionProfile.account_status}`);
   }
 
   return { supabase, profile: sessionProfile, userId, sessionId };

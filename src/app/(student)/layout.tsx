@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { requireStudent } from "@/lib/auth/require-user";
+import { isBlockedAccountStatus } from "@/lib/auth/account-status";
 import { signOutAction } from "@/lib/actions/auth";
 import { Button } from "@/components/ui/button";
 import { SessionWatch } from "@/components/session-watch";
@@ -32,6 +33,18 @@ export default async function StudentLayout({
   await bindSsrTiming();
   scheduleSsrTimingFlush();
   const { profile, enrollment, userId } = await requireStudent();
+  const isBlockedExamContinue = isBlockedAccountStatus(profile.account_status);
+
+  // Blocked accounts with leave_in_progress may only see the exam player —
+  // never the student shell nav (dashboard / payments / year-change, etc.).
+  if (isBlockedExamContinue) {
+    return (
+      <div className="min-h-svh">
+        <SessionWatch userId={userId} />
+        <main className="p-4 md:p-8">{children}</main>
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-svh">

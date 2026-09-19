@@ -57,7 +57,7 @@ Production Auth is **Supabase Cloud**; application rows are **VPS PostgreSQL** (
 
 - `profiles.id` is the Auth user UUID (`JWT sub`). On the VPS it is **not** a foreign key to `auth.users` (that table is not on the VPS).
 - RLS and SECURITY DEFINER helpers keep using `(select auth.uid())` and `auth.jwt() ->> 'session_id'`. Those read PostgREST JWT GUCs after PostgREST verifies the Cloud-issued access token. They do not query Cloud `auth.users`.
-- Idempotent `ensure_profile()` creates `profiles` (`account_status` default `active`) and an **active** class enrollment from JWT `user_metadata.year_id` when that year exists and the student has no live `active` enrollment. Call it after signup (when a session exists) / verify / signIn, before `register_session()`. It never writes `role`, `account_status` (on update), or `is_main_admin`. `handle_new_user()` on `auth.users` remains in migrations for managed-Supabase portability; it will not fire across the Auth/DB split.
+- Idempotent `ensure_profile()` creates `profiles` (`account_status` default `active`) and an **active** class enrollment from JWT `user_metadata.year_id` when that year exists and the student has **never** had any `enrollments` row (true first provision/signup only). Losing or ending an enrollment must not let the student pick another year via editable `user_metadata`. Later year changes are admin-mediated (`manage_year_changes` / year-change requests). Call it after signup (when a session exists) / verify / signIn, before `register_session()`. It never writes `role`, `account_status` (on update), or `is_main_admin`. `handle_new_user()` on `auth.users` remains in migrations for managed-Supabase portability; it will not fire across the Auth/DB split.
 - Deleting a user in Cloud Auth does **not** cascade to VPS `profiles` / attempts. Exact user-delete semantics are **pending approval** ([deployment.md](deployment.md)).
 
 ## Session policy — two explicit layers
@@ -69,7 +69,7 @@ One account = **one active authenticated session**. On login:
 
 `src/proxy.ts` refreshes the Auth cookie and does optimistic redirects only. **Authoritative** Layer-1 check is `requireUser()` (and exam RPCs via `is_active_session()`): JWT `session_id` vs `profiles.active_session_id`. Mismatch without the exam exemption → local signOut → `/login?reason=kicked`. This is per request (`cache()` within one Server Component render), not a timed cache.
 
-A non-`active` account status must not enter student or admin shells. UX may use `/pending` as the blocked-account destination (compatibility). That is not enrollment approval.
+A non-`active` account status must not enter student or admin shells (dashboard, catalog, payments, year-change, etc.). UX may use `/pending` as the blocked-account destination (compatibility). That is not enrollment approval. The only LMS UI exception is the live exam player path (`/tests/[id]/attempt`) when `owns_live_attempt_session()` is true for the same device/session — Layer 2 RPCs remain authoritative for resume/save/submit. `requireUser()` must not reuse the live-attempt exemption for other student shell routes.
 
 ### Layer 1 companion — session watch (polling)
 
@@ -83,15 +83,15 @@ An `in_progress` attempt is bound to the `device_id` (and `session_id`) that sta
 ### Interaction rule (protects the innocent student)
 While a student has an `in_progress` attempt, **a new portal login does NOT evict the exam session**:
 - `is_active_session()` returns true for a session that owns a live attempt, even if `active_session_id` has moved on.
-- `requireUser()` / `proxy.ts` apply the same exemption (live-attempt RPC).
+- `requireUser()` applies the same Layer-1 kick exemption via `owns_live_attempt_session()` (session mismatch only).
 - The *new* login may browse the portal but is refused entry to the attempt ("exam in progress on another device").
 - When the attempt reaches a terminal state, the exemption ends and normal Layer-1 eviction applies.
 
-This login-kick exemption is **unchanged**. It is not the same as an admin changing `account_status` mid-exam; that path requires an **explicit attempt disposition** ([exam-state-machine.md](exam-state-machine.md)).
+This login-kick exemption is **unchanged**. It is not the same as an admin changing `account_status` mid-exam; that path requires an **explicit attempt disposition** ([exam-state-machine.md](exam-state-machine.md)). A blocked account must not enter the LMS shell via the live-attempt RPC; only the exam player path may continue.
 
 ## Admin permissions
 
-`is_admin()` remains `profiles.role = 'admin'` (definer; avoids RLS recursion). It gates **entry to the admin surface** (and content-catalog SELECT where noted below), not sensitive student/ops reads and not every write.
+`is_admin()` remains `profiles.role = 'admin'` (definer; avoids RLS recursion). It gates **entry to the admin surface**, not sensitive student/ops reads, not content-bank answer-key SELECT, not material Drive URLs, and not every write.
 
 Sensitive admin **SELECT** (student PII, enrollments, subscriptions/applications/payment settings, attempts/answers/practice rows, year-change requests, notifications, audit logs, admin permission rows) requires `has_permission(code)` for the matching job — not merely `is_admin()`. Main Admin still short-circuits every code. UI hiding is UX only; PostgREST RLS and permissioned DEFINER RPCs are the boundary.
 
@@ -312,7 +312,7 @@ When these are decided, record the choices in this section (replace OWNER DECISI
 - `get_own_test_result(p_test_id)` — SECURITY DEFINER historical **score / % / summary** for the caller’s own `submitted` attempt (`student_id = auth.uid()`, `test_id = p_test_id`). Independent of current `can_view_test`, entitlement, catalog year, and `can_access_test`. Returns `null` when the caller has no submitted attempt (including in-progress-only). Does **not** accept a client student id or attempt id; does **not** return review items. Admin viewing others uses admin SELECT / `get_attempt_review`, not this RPC.
 - `can_view_practice_subject` / `has_practice_access` — catalog vs content for practice subjects (`practice_subjects().granted` is the content flag).
 - `can_view_material_folder` / `can_access_material_folder` / `open_material(id)` — catalog vs content for materials. `open_material` is the only student path to `drive_url`.
-- `ensure_profile()` — idempotent; profile UUID = `auth.uid()`. Inserts/updates email and full_name from JWT claims; never writes `role` / `is_main_admin`. Creates an **active** enrollment from `user_metadata.year_id` when that year exists and the student has no live `active` enrollment.
+- `ensure_profile()` — idempotent; profile UUID = `auth.uid()`. Inserts/updates email and full_name from JWT claims; never writes `role` / `is_main_admin`. Creates an **active** enrollment from `user_metadata.year_id` when that year exists and the student has **never** had any enrollment row (first provision only).
 - `bootstrap_first_main_admin()` — caller becomes Main Admin **only if** no Main Admin exists. One-time bootstrap; additional admins use `set_admin_role`.
 
 These helpers stay valid on VPS PostgREST because they depend on JWT GUCs + `public` tables, not on a local `auth` schema of users.
@@ -326,8 +326,8 @@ Admin **SELECT** on **sensitive student/ops tables** uses `has_permission(code)`
 | profiles | SELECT/UPDATE own row (role, account_status, is_main_admin protected) | SELECT own always; SELECT others if any of `view_students`, `manage_students`, `activate_students`, `restrict_students`, `manage_subscriptions`, `review_subscription_applications`, `manage_year_changes`, `manage_admins`, `grant_resource_access`. Status/role/main-admin via RPCs |
 | admin_permissions / permissions | none | `permissions` SELECT if `manage_admins`; `admin_permissions` SELECT own rows or if `manage_admins`; writes via `manage_admins` RPCs |
 | years/subjects/books/chapters/topics | SELECT current assigned year (account active); subjects/books/chapters/topics also if a live practice grant names that subject | SELECT; writes: `is_admin()` until a dedicated curriculum permission is approved (see pending owner decision). Not a student-data write. |
-| questions | no direct SELECT (RPC only) | SELECT if `is_admin()`; INSERT/UPDATE/DELETE if `has_permission('edit_questions')`; create/version RPCs check the same codes |
-| question_versions | no direct SELECT (RPC only); no UPDATE/DELETE for anyone | SELECT if `is_admin()`; INSERT if `has_permission('edit_questions')` |
+| questions | no direct SELECT (RPC only) | SELECT if `edit_questions` or `import_questions`; INSERT/UPDATE/DELETE if `has_permission('edit_questions')`; create/version RPCs check the same codes |
+| question_versions | no direct SELECT (RPC only); no UPDATE/DELETE for anyone | SELECT if `edit_questions` or `import_questions` (answer keys); INSERT if `has_permission('edit_questions')` |
 | enrollments | SELECT own | SELECT if `view_students` or `manage_year_changes` or `manage_subscriptions` or `grant_resource_access`; writes via year-change / promote RPCs |
 | year_change_requests | SELECT own; insert/update pending via RPC | SELECT if `manage_year_changes`; approve/reject RPC |
 | access_grants / access_restrictions | SELECT own | SELECT if `grant_resource_access` or `view_students`; grant/revoke RPCs |
@@ -336,17 +336,17 @@ Admin **SELECT** on **sensitive student/ops tables** uses `has_permission(code)`
 | subscriptions | SELECT own | SELECT if `manage_subscriptions`; activate/extend RPCs |
 | subscription_applications | SELECT own; create/edit pending via RPC | SELECT if `review_subscription_applications`; review RPCs |
 | student_notifications | SELECT/UPDATE own (read_at) | SELECT if `view_students` or `manage_subscriptions` |
-| test_audiences | SELECT via viewable tests | SELECT if `is_admin()`; writes if `has_permission('publish_tests')` |
-| tests | SELECT where `can_view_test(id)` (locked paid still listed). Owned historical **result** must not depend on this policy ([access-eligibility-analytics.md](access-eligibility-analytics.md) §15) | SELECT if `is_admin()`; INSERT/UPDATE/DELETE if `has_permission('publish_tests')`; publish/kill-switch RPCs check the same code |
-| test_questions | none (RPC only) | SELECT if `is_admin()`; writes if `has_permission('publish_tests')` (immutability by trigger) |
+| test_audiences | SELECT via viewable tests | SELECT if `publish_tests` or `edit_questions`; writes if `has_permission('publish_tests')` |
+| tests | SELECT where `can_view_test(id)` (locked paid still listed). Owned historical **result** must not depend on this policy ([access-eligibility-analytics.md](access-eligibility-analytics.md) §15) | SELECT if `publish_tests` or `edit_questions`; INSERT/UPDATE/DELETE if `has_permission('publish_tests')`; publish/kill-switch RPCs check the same code |
+| test_questions | none (RPC only) | SELECT if `publish_tests` or `edit_questions`; writes if `has_permission('publish_tests')` (immutability by trigger) |
 | test_attempts | SELECT own; **no INSERT/UPDATE/DELETE** (RPC only) | SELECT if `view_students` or `view_analytics` or `publish_tests`; invalidate RPC |
 | attempt_answers | **none** (RPC only — `save_answer` / scoring / `get_attempt_review`). Direct student SELECT is forbidden so post-expiry review cannot be bypassed | SELECT if `view_students` or `view_analytics` |
 | practice_seen / practice_answers | via RPC; SELECT own | SELECT if `view_students` or `view_analytics` |
-| material_folders | SELECT catalog for assigned year / grants | SELECT if `is_admin()`; writes if `has_permission('manage_materials')` |
-| materials | SELECT **without** `drive_url`; open via `open_material` | SELECT metadata if `is_admin()` (`drive_url` via `open_material`); writes if `has_permission('manage_materials')` |
+| material_folders | SELECT catalog for assigned year / grants | SELECT/writes if `has_permission('manage_materials')` |
+| materials | SELECT **without** `drive_url`; open via `open_material` | SELECT metadata if `manage_materials` (`drive_url` via `open_material` requiring `manage_materials` or student entitlement); writes if `has_permission('manage_materials')` |
 | rank_dirty_queue | none | none (SECURITY DEFINER RPCs only) |
 | audit_logs | none | SELECT if `manage_admins` or `manage_system_settings`; insert via `log_audit` from permissioned RPCs (`log_audit` stays non-student) |
-| import_* | none | `import_questions` |
+| import_* | none | SELECT/writes if `import_questions` |
 | question_stats / test_stats | none | `view_analytics` SELECT (live via analytics RPCs; no direct table) |
 
 Hard guarantees a student must NEVER bypass (tested in pgTAP):
