@@ -59,7 +59,7 @@ test.describe("Admin class source of truth", () => {
       .toBe(y3Cookie);
 
     await expect(page.getByTestId("admin-year-chip-3")).toHaveClass(
-      /bg-\[var\(--brand-navy\)\]/
+      /bg-primary/
     );
   });
 
