@@ -35,7 +35,7 @@ test.describe("Free student navigation", () => {
 
     await page.getByRole("link", { name: "MCQ Bank" }).click();
     await page.waitForURL(/\/mcq-bank$/, { timeout: 15000 });
-    await expect(page.getByText(/subscription required/i)).toBeVisible({
+    await expect(page.getByText(/subscription(?:\s+is)?\s+required/i)).toBeVisible({
       timeout: 15000,
     });
     await expect(
@@ -46,7 +46,7 @@ test.describe("Free student navigation", () => {
     ).toBeVisible();
 
     await page.goto("/pearl-points");
-    await expect(page.getByText(/subscription required/i)).toBeVisible({
+    await expect(page.getByText(/subscription(?:\s+is)?\s+required/i)).toBeVisible({
       timeout: 15000,
     });
 
@@ -71,10 +71,10 @@ test.describe("Free student navigation", () => {
     await expect(page.getByRole("heading", { name: "Tests" })).toBeVisible({
       timeout: 15000,
     });
-    await expect(page.getByText(/subscription required/i)).toHaveCount(0);
+    await expect(page.getByText(/subscription(?:\s+is)?\s+required/i)).toHaveCount(0);
 
     await page.goto("/performance");
-    await expect(page.getByText(/subscription required/i)).toBeVisible({
+    await expect(page.getByText(/subscription(?:\s+is)?\s+required/i)).toBeVisible({
       timeout: 15000,
     });
   });
