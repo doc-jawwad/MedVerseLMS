@@ -1,12 +1,18 @@
 import type { IconKey, NavItem } from "@/components/mobile-nav";
-import { LIBRARY_LIST } from "../library/types.ts";
+import {
+  PROF_SESSION_LABEL,
+  PROF_SESSION_SLUG,
+  blocksForYearNumber,
+  classDisplayName,
+} from "../academic-tree/index.ts";
 
 /**
  * Full-library hubs locked for free / expired / pending students.
- * Tests (history) and Free Resources stay unlocked. Content RPCs remain
+ * Tests (history) and Resources stay unlocked. Content RPCs remain
  * the authorization boundary for free/granted items.
  */
 export const PAID_LMS_SECTION_HREFS = [
+  "/library",
   "/mcq-bank",
   "/pearl-points",
   "/guidelines",
@@ -27,7 +33,9 @@ export function studentHasPaidLmsSections(hasLiveAccess: boolean): boolean {
 }
 
 export function isPaidLmsSectionPath(pathname: string): boolean {
-  // OSPE Practice stations use per-item entitlement (free stations for free students).
+  if (pathname === "/resources" || pathname.startsWith("/resources/")) {
+    return false;
+  }
   if (
     pathname === "/practice/ospe" ||
     pathname.startsWith("/practice/ospe/")
@@ -39,68 +47,109 @@ export function isPaidLmsSectionPath(pathname: string): boolean {
   );
 }
 
-type NavDef = {
-  href: string;
-  label: string;
-  icon: IconKey;
-  /** When true, item is locked unless the student has paid LMS sections. */
-  requiresPaidSections?: boolean;
+export type StudentEnrollmentNav = {
+  year_number: number;
+  year_name: string;
 };
 
-const STUDENT_NAV_DEFS: NavDef[] = [
-  { href: "/dashboard", label: "Dashboard", icon: "dashboard" },
-  { href: "/tests", label: "Tests", icon: "tests" },
-  { href: "/free-resources", label: "Free Resources", icon: "freeResources" },
-  ...LIBRARY_LIST.map((lib) => ({
-    href: lib.href,
-    label: lib.label,
-    icon: lib.icon,
-    requiresPaidSections: true as const,
-  })),
-  {
-    href: "/practice/ospe",
-    label: "OSPE Practice",
-    icon: "ospeMaterial",
-    // Per-station entitlement; free stations remain usable without a section lock.
-    requiresPaidSections: false,
-  },
-  {
-    href: "/performance",
-    label: "Performance",
-    icon: "performance",
-    requiresPaidSections: true,
-  },
-  { href: "/contact", label: "Contact Us", icon: "contact" },
-  { href: "/career-counselling", label: "Career Counselling Series", icon: "career" },
-  {
-    href: "/imd-stepwise",
-    label: "Get iMD & StepWise MD Subscription",
-    icon: "imd",
-  },
-  { href: "/subscription", label: "My Subscription", icon: "subscription" },
-  { href: "/profile", label: "My Account", icon: "account" },
-];
-
-export function buildStudentShellNav(hasLiveAccess: boolean): {
+/**
+ * Class-first student shell nav.
+ * Free: Resources surface. Paid: Library surface + Prof. Session.
+ * Legacy flat hubs stay routable but are not listed in global nav.
+ */
+export function buildStudentShellNav(
+  hasLiveAccess: boolean,
+  enrollment?: StudentEnrollmentNav
+): {
   items: NavItem[];
   bottomItems: NavItem[];
 } {
   const paid = studentHasPaidLmsSections(hasLiveAccess);
-  const items: NavItem[] = STUDENT_NAV_DEFS.map((def) => ({
-    href: def.href,
-    label: def.label,
-    icon: def.icon,
-    locked: Boolean(def.requiresPaidSections) && !paid,
-  }));
+  const yearNumber = enrollment?.year_number ?? 1;
+  const yearName = classDisplayName(yearNumber, enrollment?.year_name);
+  const classSurface = paid ? "library" : "resources";
+  const classHref = `/${classSurface}`;
+  const profHref = `/${classSurface}/${PROF_SESSION_SLUG}`;
+
+  const blockChildren: NavItem[] = blocksForYearNumber(yearNumber).map(
+    (block) => ({
+      href: `${classHref}/${block.key}`,
+      label: block.name,
+      icon: "classLibrary" as IconKey,
+    })
+  );
+
+  const items: NavItem[] = [
+    { href: "/dashboard", label: "Dashboard", icon: "dashboard", locked: false },
+    {
+      href: classHref,
+      label: yearName,
+      icon: "classLibrary",
+      locked: false,
+      children: blockChildren,
+    },
+    {
+      href: profHref,
+      label: PROF_SESSION_LABEL,
+      icon: "tests",
+      locked: false,
+    },
+    { href: "/tests", label: "Tests", icon: "tests", locked: false },
+    {
+      href: "/practice/ospe",
+      label: "OSPE Practice",
+      icon: "ospeMaterial",
+      locked: false,
+    },
+    {
+      href: "/performance",
+      label: "Performance",
+      icon: "performance",
+      locked: !paid,
+    },
+    { href: "/contact", label: "Contact Us", icon: "contact", locked: false },
+    {
+      href: "/career-counselling",
+      label: "Career Counselling Series",
+      icon: "career",
+      locked: false,
+    },
+    {
+      href: "/imd-stepwise",
+      label: "Get iMD & StepWise MD Subscription",
+      icon: "imd",
+      locked: false,
+    },
+    {
+      href: "/subscription",
+      label: "My Subscription",
+      icon: "subscription",
+      locked: false,
+    },
+    { href: "/profile", label: "My Account", icon: "account", locked: false },
+  ];
 
   const bottomHrefs = paid
-    ? ["/dashboard", "/tests", "/mcq-bank", "/pearl-points"]
-    : ["/dashboard", "/tests", "/free-resources", "/contact"];
+    ? ["/dashboard", "/tests", classHref, profHref]
+    : ["/dashboard", "/tests", classHref, "/contact"];
 
   const byHref = new Map(items.map((i) => [i.href, i]));
   const bottomItems = bottomHrefs
-    .map((href) => byHref.get(href))
-    .filter((i): i is NavItem => Boolean(i));
+    .map((href) => {
+      const item = byHref.get(href);
+      if (item) return item;
+      return undefined;
+    })
+    .filter((i): i is NavItem => Boolean(i))
+    .map((item) =>
+      item.href === classHref
+        ? {
+            ...item,
+            label: paid ? "Library" : "Resources",
+            children: undefined,
+          }
+        : { ...item, children: undefined }
+    );
 
   return { items, bottomItems };
 }

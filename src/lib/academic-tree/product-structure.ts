@@ -49,9 +49,7 @@ export function blocksForYearNumber(yearNumber: number): BlockProductDef[] {
   return BLOCK_PRODUCT_DEFS.filter((b) => b.year_number === yearNumber);
 }
 
-export function findBlockProduct(
-  key: string
-): BlockProductDef | null {
+export function findBlockProduct(key: string): BlockProductDef | null {
   return BLOCK_PRODUCT_DEFS.find((b) => b.key === key) ?? null;
 }
 
@@ -67,42 +65,19 @@ export type BlockCategoryDef = {
   placeholder?: boolean;
 };
 
+/** Eight academic categories under each Block / Final-Year subject. */
 export const BLOCK_CATEGORIES: readonly BlockCategoryDef[] = [
   {
-    id: "test",
-    name: "Test",
-    slug: "test",
-    description: "Day-based syllabus, guidelines, practice, and formal Test MCQ.",
+    id: "mcq_bank",
+    name: "MCQ Bank",
+    slug: "mcq-bank",
+    description: "Practice questions with instant feedback.",
   },
   {
-    id: "ospe",
-    name: "OSPE",
-    slug: "ospe",
-    description: "OSPE stations, packs, and related material.",
-  },
-  {
-    id: "lectures",
-    name: "Lectures",
-    slug: "lectures",
-    description: "Lecture videos and recordings.",
-  },
-  {
-    id: "books",
-    name: "Books",
-    slug: "books",
-    description: "Reference books and complete texts.",
-  },
-  {
-    id: "past_papers",
-    name: "Past Papers",
-    slug: "past-papers",
-    description: "Past paper sets and archives.",
-  },
-  {
-    id: "notes",
-    name: "Notes",
-    slug: "notes",
-    description: "Class notes and concise write-ups.",
+    id: "pearl_points",
+    name: "Pearl Points",
+    slug: "pearl-points",
+    description: "High-yield recall points. Not scored exams.",
   },
   {
     id: "guidelines",
@@ -111,23 +86,42 @@ export const BLOCK_CATEGORIES: readonly BlockCategoryDef[] = [
     description: "Study guidelines and protocols.",
   },
   {
-    id: "flashcards",
-    name: "Flashcards",
-    slug: "flashcards",
-    description: "Coming soon — placeholder only.",
-    placeholder: true,
+    id: "ospe_material",
+    name: "OSPE Material",
+    slug: "ospe-material",
+    description: "OSPE PDFs and station packs.",
+  },
+  {
+    id: "ospe_lectures",
+    name: "OSPE Lectures",
+    slug: "ospe-lectures",
+    description: "OSPE lecture videos and recordings.",
+  },
+  {
+    id: "books",
+    name: "Books",
+    slug: "books",
+    description: "Reference books and complete texts.",
+  },
+  {
+    id: "notes",
+    name: "Notes",
+    slug: "notes",
+    description: "Class notes and concise write-ups.",
+  },
+  {
+    id: "lectures",
+    name: "Lectures",
+    slug: "lectures",
+    description: "Lecture videos and recordings.",
   },
 ] as const;
 
-export function findCategoryById(
-  id: string
-): BlockCategoryDef | null {
+export function findCategoryById(id: string): BlockCategoryDef | null {
   return BLOCK_CATEGORIES.find((c) => c.id === id) ?? null;
 }
 
-export function findCategoryBySlug(
-  slug: string
-): BlockCategoryDef | null {
+export function findCategoryBySlug(slug: string): BlockCategoryDef | null {
   return BLOCK_CATEGORIES.find((c) => c.slug === slug) ?? null;
 }
 
@@ -138,6 +132,7 @@ export type TestDaySlotDef = {
   description: string;
 };
 
+/** Fixed containers under each Prof. Session day (product law). */
 export const TEST_DAY_SLOTS: readonly TestDaySlotDef[] = [
   {
     id: "syllabus",
@@ -153,9 +148,9 @@ export const TEST_DAY_SLOTS: readonly TestDaySlotDef[] = [
   },
   {
     id: "one_liners",
-    name: "One-liners",
+    name: "One-liners / Pearl Points",
     slug: "one-liners",
-    description: "High-yield one-liners.",
+    description: "High-yield one-liners and pearl points.",
   },
   {
     id: "practice_mcqs",
@@ -174,3 +169,7 @@ export const TEST_DAY_SLOTS: readonly TestDaySlotDef[] = [
 export function findDaySlotBySlug(slug: string): TestDaySlotDef | null {
   return TEST_DAY_SLOTS.find((s) => s.slug === slug) ?? null;
 }
+
+/** Prof. Session sits beside class Blocks — never nested under a Block. */
+export const PROF_SESSION_LABEL = "Prof. Session";
+export const PROF_SESSION_SLUG = "prof-session";

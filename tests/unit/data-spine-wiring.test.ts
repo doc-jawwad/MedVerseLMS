@@ -10,6 +10,7 @@ import {
 } from "../../src/lib/practice/spine-progress-store.ts";
 import { adaptTestLeaderboardRows } from "../../src/lib/leaderboard/from-test-leaderboard.ts";
 import { LEADERBOARD_PROJECTION_LIMITS } from "../../src/lib/leaderboard/projection-contract.ts";
+import { BLOCK_CATEGORIES } from "../../src/lib/academic-tree/index.ts";
 
 describe("Data Spine practice kind mapping", () => {
   it("maps mcq ↔ question, pearl ↔ pearl, and ospe ↔ ospe", () => {
@@ -24,7 +25,7 @@ describe("Data Spine practice kind mapping", () => {
 });
 
 describe("Data Spine academic tree mapping", () => {
-  it("maps RPC subjects/categories/folders without inventing content payloads", () => {
+  it("maps RPC subjects into eight categories and empty prof_session", () => {
     const tree = mapRpcTree(
       {
         surface: "library",
@@ -53,10 +54,22 @@ describe("Data Spine academic tree mapping", () => {
                 ],
               },
               {
+                library_type: "ospe",
+                name: "OSPE",
+                locked: false,
+                folders: [],
+              },
+              {
                 library_type: "flashcards",
                 name: "Flashcards",
                 locked: false,
                 placeholder: true,
+                folders: [],
+              },
+              {
+                library_type: "test",
+                name: "Test",
+                locked: false,
                 folders: [],
               },
             ],
@@ -74,16 +87,23 @@ describe("Data Spine academic tree mapping", () => {
 
     assert.ok(tree);
     assert.equal(tree!.from_adapter, false);
-    assert.equal(tree!.subjects.length, 1);
-    assert.equal(tree!.subjects[0]?.product_key, "medicine");
-    assert.equal(tree!.subjects[0]?.locked, true);
-    const notes = tree!.subjects[0]?.categories.find((c) => c.id === "notes");
+    assert.equal(tree!.subjects.length, 4);
+    const medicine = tree!.subjects.find((s) => s.product_key === "medicine");
+    assert.ok(medicine);
+    assert.equal(medicine!.locked, true);
+    assert.equal(medicine!.categories.length, BLOCK_CATEGORIES.length);
+    const notes = medicine!.categories.find((c) => c.id === "notes");
     assert.ok(notes);
     assert.equal(notes!.folders[0]?.is_day, true);
     assert.deepEqual(notes!.folders[0]?.items, []);
     assert.ok(
-      tree!.subjects[0]?.categories.some((c) => c.id === "flashcards")
+      medicine!.categories.some((c) => c.id === "ospe_material"),
+      "legacy ospe remaps to ospe_material"
     );
+    assert.ok(!medicine!.categories.some((c) => (c.id as string) === "flashcards"));
+    assert.ok(!medicine!.categories.some((c) => (c.id as string) === "test"));
+    assert.ok(tree!.prof_session);
+    assert.deepEqual(tree!.prof_session.days, []);
   });
 
   it("resolves product keys from subject names", () => {

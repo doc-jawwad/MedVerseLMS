@@ -160,6 +160,8 @@ export const STUDY_REVALIDATE_PATHS = [
   "/admin/ospe-stations",
   "/materials",
   "/free-resources",
+  "/resources",
+  "/library",
   "/mcq-bank",
   "/pearl-points",
   "/practice/ospe",

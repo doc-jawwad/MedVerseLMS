@@ -14,6 +14,8 @@ import { SectionLock } from "@/components/subscription/section-lock";
 import { PageHeader } from "@/components/student/page-header";
 import { StudentPage } from "@/components/student/student-page";
 import { EmptyState } from "@/components/student/empty-state";
+import { AcademicBreadcrumbs } from "@/components/academic/academic-breadcrumbs";
+import type { BreadcrumbCrumb } from "@/lib/academic-tree";
 import { belongsOnFreeResources } from "@/lib/library/free-surface";
 import { getStudentHasLiveSubscription } from "@/lib/subscriptions/student-live-access";
 import { studentHasPaidLmsSections } from "@/lib/subscriptions/student-section-access";
@@ -39,9 +41,19 @@ type Material = {
 export async function MaterialLibraryPage({
   libraryType,
   mode,
+  subjectId,
+  breadcrumbs,
+  title,
+  description,
+  backHref,
 }: {
   libraryType: FolderLibraryType;
-  mode: "full" | "free";
+  mode: "full" | "free" | "resources";
+  subjectId?: string;
+  breadcrumbs?: BreadcrumbCrumb[];
+  title?: string;
+  description?: string;
+  backHref?: string;
 }) {
   const { supabase, userId } = await requireStudent();
   const meta = LIBRARY_META[libraryType];
@@ -51,7 +63,7 @@ export async function MaterialLibraryPage({
     return (
       <SectionLock
         title={meta.label}
-        description={`The full ${meta.label} library unlocks with a live subscription. Free items your academy published stay under Free Resources.`}
+        description={`The full ${meta.label} library unlocks with a live subscription. Free items your academy published stay under Resources.`}
       />
     );
   }
@@ -96,6 +108,9 @@ export async function MaterialLibraryPage({
     subjects?.find((s) => s.id === id)?.name ?? "General";
 
   let visibleFolders = (folders ?? []) as Folder[];
+  if (subjectId) {
+    visibleFolders = visibleFolders.filter((f) => f.subject_id === subjectId);
+  }
   if (mode === "free") {
     visibleFolders = visibleFolders.filter((f) =>
       belongsOnFreeResources({
@@ -108,7 +123,7 @@ export async function MaterialLibraryPage({
 
   const mats = (materials ?? []) as Material[];
   const foldersWithItems = visibleFolders.filter((f) => {
-    if (mode === "full") return true;
+    if (mode === "full" || mode === "resources") return true;
     return mats.some((m) => m.folder_id === f.id);
   });
 
@@ -120,25 +135,41 @@ export async function MaterialLibraryPage({
     grouped.set(key, list);
   }
 
+  const showLocks = mode === "full" || mode === "resources";
+  const pageTitle =
+    title ?? (mode === "free" ? `Free ${meta.label}` : meta.label);
+  const pageDescription =
+    description ??
+    (mode === "free"
+      ? `Admin-selected free ${meta.label.toLowerCase()} for your class. The full library is a separate section.`
+      : meta.description);
+
   return (
     <StudentPage>
+      {breadcrumbs ? <AcademicBreadcrumbs crumbs={breadcrumbs} /> : null}
       <PageHeader
-        title={mode === "free" ? `Free ${meta.label}` : meta.label}
-        description={
-          mode === "free"
-            ? `Admin-selected free ${meta.label.toLowerCase()} for your class. The full library is a separate section.`
-            : meta.description
+        title={pageTitle}
+        description={pageDescription}
+        actions={
+          backHref ? (
+            <Link
+              href={backHref}
+              className="text-sm text-muted-foreground underline-offset-4 hover:underline"
+            >
+              Back
+            </Link>
+          ) : undefined
         }
       />
 
-      {[...grouped.entries()].map(([subjectId, subjectFolders]) => (
-        <div key={subjectId} className="grid gap-3">
+      {[...grouped.entries()].map(([sid, subjectFolders]) => (
+        <div key={sid} className="grid gap-3">
           <h2 className="font-heading text-lg font-semibold text-[var(--student-ink)]">
-            {subjectName(subjectId === "general" ? null : subjectId)}
+            {subjectName(sid === "general" ? null : sid)}
           </h2>
           {subjectFolders.map((f) => {
             const items = mats.filter((m) => m.folder_id === f.id);
-            const locked = mode === "full" && !entitled.has(f.id);
+            const locked = showLocks && !entitled.has(f.id);
             return (
               <Card
                 key={f.id}

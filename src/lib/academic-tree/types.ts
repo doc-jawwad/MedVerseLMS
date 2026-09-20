@@ -25,17 +25,18 @@ export type BlockProductKey =
   | "gynecology"
   | "pediatrics";
 
+/** Eight academic categories under each Block / Final-Year subject. */
 export type BlockCategoryId =
-  | "test"
-  | "ospe"
-  | "lectures"
+  | "mcq_bank"
+  | "pearl_points"
+  | "guidelines"
+  | "ospe_material"
+  | "ospe_lectures"
   | "books"
-  | "past_papers"
-  | "flashcards"
   | "notes"
-  | "guidelines";
+  | "lectures";
 
-/** Fixed containers under each Test day (product law). */
+/** Fixed containers under each Prof. Session day (product law). */
 export type TestDaySlotId =
   | "syllabus"
   | "guidelines"
@@ -50,7 +51,8 @@ export type AcademicNodeKind =
   | "folder"
   | "day"
   | "day_slot"
-  | "item";
+  | "item"
+  | "prof_session";
 
 export type AcademicTreeItemKind =
   | "material"
@@ -77,7 +79,7 @@ export type AcademicTreeFolder = {
   /** Nested folders (subfolders) or days under a category. */
   children: AcademicTreeFolder[];
   items: AcademicTreeItem[];
-  /** True when this folder is a Test "Day N" container. */
+  /** True when this folder is a Prof. Session "Day N" container. */
   is_day?: boolean;
   /** When set, this node is one of the fixed day slots. */
   day_slot?: TestDaySlotId;
@@ -87,7 +89,7 @@ export type AcademicTreeCategory = {
   id: BlockCategoryId;
   name: string;
   locked: boolean;
-  /** Flashcards is placeholder-only (no engine). */
+  /** Reserved for future placeholders; block categories are live today. */
   placeholder?: boolean;
   folders: AcademicTreeFolder[];
 };
@@ -101,12 +103,20 @@ export type AcademicTreeSubject = {
   categories: AcademicTreeCategory[];
 };
 
+/** Prof. Session sits beside class Blocks — never nested under a Block. */
+export type AcademicProfSession = {
+  locked: boolean;
+  /** Only days that exist (Admin-created when Data Spine provides them). */
+  days: AcademicTreeFolder[];
+};
+
 export type AcademicTree = {
   surface: AcademicTreeSurface;
   year_id: string;
   year_number: number;
   year_name: string;
   subjects: AcademicTreeSubject[];
+  prof_session: AcademicProfSession;
   /** true when payload came from stub adapter, not live RPC. */
   from_adapter: boolean;
 };
@@ -118,7 +128,7 @@ export type AcademicTree = {
 export type AcademicSearchHit = {
   kind: Extract<
     AcademicNodeKind,
-    "class" | "block" | "category" | "folder" | "day"
+    "class" | "block" | "category" | "folder" | "day" | "prof_session"
   >;
   id: string;
   name: string;

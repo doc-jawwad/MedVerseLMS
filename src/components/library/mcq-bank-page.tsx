@@ -12,6 +12,8 @@ import { SectionLock } from "@/components/subscription/section-lock";
 import { PageHeader } from "@/components/student/page-header";
 import { StudentPage } from "@/components/student/student-page";
 import { EmptyState } from "@/components/student/empty-state";
+import { AcademicBreadcrumbs } from "@/components/academic/academic-breadcrumbs";
+import type { BreadcrumbCrumb } from "@/lib/academic-tree";
 import { belongsOnFreeResources } from "@/lib/library/free-surface";
 import { getStudentHasLiveSubscription } from "@/lib/subscriptions/student-live-access";
 import { studentHasPaidLmsSections } from "@/lib/subscriptions/student-section-access";
@@ -25,7 +27,21 @@ type PracticeSubject = {
   correct: number;
 };
 
-export async function McqBankPage({ mode }: { mode: "full" | "free" }) {
+export async function McqBankPage({
+  mode,
+  subjectId,
+  breadcrumbs,
+  title,
+  description,
+  backHref,
+}: {
+  mode: "full" | "free" | "resources";
+  subjectId?: string;
+  breadcrumbs?: BreadcrumbCrumb[];
+  title?: string;
+  description?: string;
+  backHref?: string;
+}) {
   const { supabase, userId } = await requireStudent();
   const hasLiveAccess = await getStudentHasLiveSubscription();
 
@@ -33,7 +49,7 @@ export async function McqBankPage({ mode }: { mode: "full" | "free" }) {
     return (
       <SectionLock
         title="MCQ Bank"
-        description="The full MCQ Bank unlocks with a live subscription. Admin-selected free practice stays under Free Resources."
+        description="The full MCQ Bank unlocks with a live subscription. Admin-selected free practice stays under Resources."
       />
     );
   }
@@ -64,6 +80,7 @@ export async function McqBankPage({ mode }: { mode: "full" | "free" }) {
   );
 
   const subjects = ((data ?? []) as PracticeSubject[]).filter((s) => {
+    if (subjectId && s.subject_id !== subjectId) return false;
     if (mode !== "free") return true;
     return (
       belongsOnFreeResources({
@@ -74,14 +91,29 @@ export async function McqBankPage({ mode }: { mode: "full" | "free" }) {
     );
   });
 
+  const pageTitle =
+    title ?? (mode === "free" ? "Free MCQ Bank" : "MCQ Bank");
+  const pageDescription =
+    description ??
+    (mode === "free"
+      ? "Practice subjects your academy marked free (or granted to you). The full bank is a separate section."
+      : "Learn with instant feedback — answers and explanations after every question.");
+
   return (
     <StudentPage>
+      {breadcrumbs ? <AcademicBreadcrumbs crumbs={breadcrumbs} /> : null}
       <PageHeader
-        title={mode === "free" ? "Free MCQ Bank" : "MCQ Bank"}
-        description={
-          mode === "free"
-            ? "Practice subjects your academy marked free (or granted to you). The full bank is a separate section."
-            : "Learn with instant feedback — answers and explanations after every question."
+        title={pageTitle}
+        description={pageDescription}
+        actions={
+          backHref ? (
+            <Link
+              href={backHref}
+              className="text-sm text-muted-foreground underline-offset-4 hover:underline"
+            >
+              Back
+            </Link>
+          ) : undefined
         }
       />
 

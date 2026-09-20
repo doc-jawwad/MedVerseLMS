@@ -35,7 +35,7 @@ describe("academic tree search scope", () => {
     assert.ok(hit.href.startsWith("/"));
   });
 
-  it("searches class, category, and day names", () => {
+  it("searches class, category, prof session, and day names", () => {
     const classHits = searchAcademicTreeNames({ query: "1st Year", tree });
     assert.ok(classHits.some((h) => h.kind === "class"));
 
@@ -44,6 +44,9 @@ describe("academic tree search scope", () => {
 
     const dayHits = searchAcademicTreeNames({ query: "Day 1", tree });
     assert.ok(dayHits.some((h) => h.kind === "day"));
+
+    const profHits = searchAcademicTreeNames({ query: "Prof. Session", tree });
+    assert.ok(profHits.some((h) => h.kind === "prof_session"));
   });
 
   it("does not return day slots or invent stem/PDF hits", () => {
@@ -98,8 +101,8 @@ describe("theme persistence", () => {
   });
 });
 
-describe("search hit hrefs (current hubs)", () => {
-  it("maps category and folder hits onto live student routes", () => {
+describe("search hit hrefs (nested IA)", () => {
+  it("maps category, folder, and class hits onto resources/library routes", () => {
     assert.equal(
       hrefForAcademicSearchHit(
         {
@@ -109,7 +112,7 @@ describe("search hit hrefs (current hubs)", () => {
         },
         "library"
       ),
-      "/notes"
+      "/library/block-1/notes"
     );
     assert.equal(
       hrefForAcademicSearchHit(
@@ -120,14 +123,36 @@ describe("search hit hrefs (current hubs)", () => {
         },
         "library"
       ),
-      "/materials"
+      "/library/block-1/books"
     );
     assert.equal(
       hrefForAcademicSearchHit(
         { kind: "class", name: "1st Year MBBS", path_labels: ["1st Year MBBS"] },
         "resources"
       ),
-      "/free-resources"
+      "/resources"
+    );
+    assert.equal(
+      hrefForAcademicSearchHit(
+        {
+          kind: "day",
+          name: "Day 1",
+          path_labels: ["1st Year MBBS", "Prof. Session", "Day 1"],
+        },
+        "resources"
+      ),
+      "/resources/prof-session/day-1"
+    );
+    assert.equal(
+      hrefForAcademicSearchHit(
+        {
+          kind: "prof_session",
+          name: "Prof. Session",
+          path_labels: ["1st Year MBBS", "Prof. Session"],
+        },
+        "library"
+      ),
+      "/library/prof-session"
     );
   });
 });

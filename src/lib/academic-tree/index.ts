@@ -1,5 +1,6 @@
 export type {
   AcademicNodeKind,
+  AcademicProfSession,
   AcademicSearchHit,
   AcademicTree,
   AcademicTreeAdapter,
@@ -20,6 +21,8 @@ export {
   BLOCK_CATEGORIES,
   BLOCK_PRODUCT_DEFS,
   CLASS_DISPLAY_BY_YEAR_NUMBER,
+  PROF_SESSION_LABEL,
+  PROF_SESSION_SLUG,
   TEST_DAY_SLOTS,
   blocksForYearNumber,
   classDisplayName,
@@ -31,6 +34,7 @@ export {
 } from "./product-structure.ts";
 
 export {
+  buildDefaultProfSessionDays,
   buildStructuralAcademicTree,
   findCategoryInSubject,
   findDayFolder,
@@ -45,8 +49,8 @@ export { hrefForAcademicSearchHit } from "./hit-href.ts";
 
 export { mapRpcTree, productKeyForSubjectName } from "./map-rpc-tree.ts";
 
-// loadAcademicTree stays in ./load-tree.ts (server-only) — do not re-export
-// from this barrel so client/unit imports stay free of `server-only`.
+// loadAcademicTree / browse helpers stay in server-only modules — do not
+// re-export from this barrel so client/unit imports stay free of `server-only`.
 
 export {
   blockHref,
@@ -58,6 +62,7 @@ export {
   folderHref,
   isKnownDaySlotSlug,
   parseCategorySlug,
+  profSessionHref,
   searchHref,
   surfaceBasePath,
   surfaceLabel,

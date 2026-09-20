@@ -1,4 +1,5 @@
 import type {
+  AcademicProfSession,
   AcademicTree,
   AcademicTreeCategory,
   AcademicTreeFolder,
@@ -16,8 +17,12 @@ import {
 } from "./product-structure.ts";
 
 /**
- * Map Data Spine `get_academic_tree` jsonb into the existing AcademicTree UI model.
+ * Map Data Spine `get_academic_tree` jsonb into the AcademicTree UI model.
  * Never attaches Drive URLs, stems, or correct_key.
+ *
+ * Compatibility: live RPC may still return older category ids (test, ospe,
+ * past_papers, flashcards). Those are remapped or ignored as block categories.
+ * Prof. Session days come from RPC only when present — otherwise empty.
  */
 export function mapRpcTree(
   raw: unknown,
@@ -40,11 +45,35 @@ export function mapRpcTree(
     typeof row.year_name === "string" ? row.year_name : input.year_name
   );
 
-  const subjects: AcademicTreeSubject[] = [];
+  const libraryLocked =
+    input.surface === "library" && !input.has_live_subscription;
+
+  const mappedByKey = new Map<BlockProductKey, AcademicTreeSubject>();
   for (const subjectRaw of row.subjects) {
     const mapped = mapRpcSubject(subjectRaw, yearNumber);
-    if (mapped) subjects.push(mapped);
+    if (mapped) mappedByKey.set(mapped.product_key, mapped);
   }
+
+  const subjects: AcademicTreeSubject[] = blocksForYearNumber(yearNumber).map(
+    (def) => {
+      const existing = mappedByKey.get(def.key);
+      if (existing) {
+        return {
+          ...existing,
+          categories: ensureEightCategories(existing.categories),
+        };
+      }
+      return {
+        subject_id: `product:${def.key}`,
+        product_key: def.key,
+        name: def.name,
+        locked: libraryLocked,
+        categories: emptyEightCategories(libraryLocked),
+      };
+    }
+  );
+
+  const prof_session = mapRpcProfSession(row.prof_session, libraryLocked);
 
   return {
     surface: input.surface,
@@ -52,8 +81,60 @@ export function mapRpcTree(
     year_number: yearNumber,
     year_name: yearName,
     subjects,
+    prof_session,
     from_adapter: false,
   };
+}
+
+function mapRpcProfSession(
+  raw: unknown,
+  libraryLocked: boolean
+): AcademicProfSession {
+  if (!raw || typeof raw !== "object") {
+    return { locked: libraryLocked, days: [] };
+  }
+  const row = raw as Record<string, unknown>;
+  const daysRaw = Array.isArray(row.days) ? row.days : [];
+  const days = daysRaw
+    .map((d) => mapRpcFolder(d))
+    .filter((f): f is AcademicTreeFolder => Boolean(f));
+  return {
+    locked: row.locked != null ? Boolean(row.locked) : libraryLocked,
+    days,
+  };
+}
+
+function emptyEightCategories(locked: boolean): AcademicTreeCategory[] {
+  return BLOCK_CATEGORIES.map((cat) => ({
+    id: cat.id,
+    name: cat.name,
+    locked,
+    placeholder: cat.placeholder,
+    folders: [],
+  }));
+}
+
+function ensureEightCategories(
+  categories: AcademicTreeCategory[]
+): AcademicTreeCategory[] {
+  const byId = new Map(categories.map((c) => [c.id, c]));
+  return BLOCK_CATEGORIES.map((def) => {
+    const existing = byId.get(def.id);
+    if (existing) {
+      return {
+        ...existing,
+        name: existing.name || def.name,
+        placeholder: existing.placeholder ?? def.placeholder,
+      };
+    }
+    return {
+      id: def.id,
+      name: def.name,
+      locked: false,
+      placeholder: def.placeholder,
+      folders: [],
+    };
+  });
 }
 
 function mapRpcSubject(
@@ -72,16 +153,6 @@ function mapRpcSubject(
   for (const catRaw of categoriesRaw) {
     const cat = mapRpcCategory(catRaw);
     if (cat) categories.push(cat);
-  }
-
-  if (!categories.some((c) => c.id === "flashcards")) {
-    categories.push({
-      id: "flashcards",
-      name: "Flashcards",
-      locked: false,
-      placeholder: true,
-      folders: [],
-    });
   }
 
   return {
@@ -114,7 +185,7 @@ function mapRpcCategory(raw: unknown): AcademicTreeCategory | null {
         ? row.name.trim()
         : known?.name ?? libraryType,
     locked: Boolean(row.locked),
-    placeholder: Boolean(row.placeholder) || id === "flashcards",
+    placeholder: Boolean(row.placeholder),
     folders,
   };
 }
@@ -150,24 +221,28 @@ function categoryIdFromLibraryType(
   libraryType: string
 ): BlockCategoryId | null {
   switch (libraryType) {
-    case "test":
-      return "test";
-    case "ospe":
-    case "ospe_material":
-    case "ospe_lectures":
-      return "ospe";
-    case "lectures":
-      return "lectures";
-    case "books":
-      return "books";
-    case "past_papers":
-      return "past_papers";
-    case "notes":
-      return "notes";
+    case "mcq_bank":
+      return "mcq_bank";
+    case "pearl_points":
+      return "pearl_points";
     case "guidelines":
       return "guidelines";
+    case "ospe_material":
+      return "ospe_material";
+    case "ospe":
+      return "ospe_material";
+    case "ospe_lectures":
+      return "ospe_lectures";
+    case "books":
+      return "books";
+    case "notes":
+      return "notes";
+    case "lectures":
+      return "lectures";
+    case "test":
+    case "past_papers":
     case "flashcards":
-      return "flashcards";
+      return null;
     default:
       return null;
   }

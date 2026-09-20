@@ -1,10 +1,12 @@
 import type { AcademicTreeSurface } from "./types.ts";
+import { PROF_SESSION_LABEL } from "./product-structure.ts";
 import {
   blockHref,
   categoryHref,
   dayHref,
   daySlotHref,
   folderHref,
+  profSessionHref,
   searchHref,
   surfaceBasePath,
   surfaceLabel,
@@ -24,6 +26,8 @@ export function buildAcademicBreadcrumbs(args: {
   categorySlug?: string;
   folderName?: string;
   folderSlug?: string;
+  /** When true, day crumbs hang under Prof. Session (not under a Block). */
+  profSession?: boolean;
   dayName?: string;
   daySlug?: string;
   slotName?: string;
@@ -45,6 +49,27 @@ export function buildAcademicBreadcrumbs(args: {
     return crumbs;
   }
 
+  if (args.profSession || (args.dayName && args.daySlug && !args.blockSlug)) {
+    crumbs.push({
+      label: PROF_SESSION_LABEL,
+      href: profSessionHref(args.surface),
+    });
+
+    if (args.dayName && args.daySlug) {
+      crumbs.push({
+        label: args.dayName,
+        href: dayHref(args.surface, args.daySlug),
+      });
+      if (args.slotName && args.slotSlug) {
+        crumbs.push({
+          label: args.slotName,
+          href: daySlotHref(args.surface, args.daySlug, args.slotSlug),
+        });
+      }
+    }
+    return finalize(crumbs);
+  }
+
   if (args.blockName && args.blockSlug) {
     crumbs.push({
       label: args.blockName,
@@ -57,25 +82,6 @@ export function buildAcademicBreadcrumbs(args: {
       label: args.categoryName,
       href: categoryHref(args.surface, args.blockSlug, args.categorySlug),
     });
-  }
-
-  if (args.dayName && args.daySlug && args.blockSlug) {
-    crumbs.push({
-      label: args.dayName,
-      href: dayHref(args.surface, args.blockSlug, args.daySlug),
-    });
-    if (args.slotName && args.slotSlug) {
-      crumbs.push({
-        label: args.slotName,
-        href: daySlotHref(
-          args.surface,
-          args.blockSlug,
-          args.daySlug,
-          args.slotSlug
-        ),
-      });
-    }
-    return finalize(crumbs);
   }
 
   if (
@@ -110,6 +116,7 @@ export {
   dayHref,
   daySlotHref,
   folderHref,
+  profSessionHref,
   searchHref,
   surfaceBasePath,
   surfaceLabel,

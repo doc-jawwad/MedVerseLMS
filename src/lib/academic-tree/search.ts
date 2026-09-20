@@ -3,24 +3,23 @@ import type {
   AcademicTree,
   AcademicTreeFolder,
 } from "./types.ts";
+import { PROF_SESSION_LABEL } from "./product-structure.ts";
 import { hrefForAcademicSearchHit } from "./hit-href.ts";
 
 const DEFAULT_LIMIT = 20;
 
-/** Kinds allowed by SPEC FREEZE search scope (tree names only). */
 const SEARCHABLE_KINDS = new Set<AcademicSearchHit["kind"]>([
   "class",
   "block",
   "category",
   "folder",
   "day",
+  "prof_session",
 ]);
 
 /**
  * Client-side name search over a loaded academic tree.
  * Does not search stems, PDF bytes, transcripts, day slots, or item payloads.
- * Prefer live `search_academic_tree` in the shell UI; this helper remains for
- * structural fallback (admin / offline) and unit tests.
  */
 export function searchAcademicTreeNames(input: {
   query: string;
@@ -91,6 +90,28 @@ export function searchAcademicTreeNames(input: {
     }
   }
 
+  const prof = input.tree.prof_session;
+  if (prof && hits.length < limit) {
+    tryPush({
+      kind: "prof_session",
+      id: `${input.tree.year_id}:prof-session`,
+      name: PROF_SESSION_LABEL,
+      path_labels: [className, PROF_SESSION_LABEL],
+      locked: prof.locked,
+      class_name: className,
+    });
+
+    walkFolders({
+      folders: prof.days,
+      path: [className, PROF_SESSION_LABEL],
+      className,
+      surface,
+      query: q,
+      hits,
+      limit,
+    });
+  }
+
   return hits.slice(0, limit);
 }
 
@@ -105,8 +126,6 @@ function walkFolders(args: {
 }): void {
   for (const folder of args.folders) {
     if (args.hits.length >= args.limit) return;
-
-    // Day slots are fixed chrome — not in the searchable name set.
     if (folder.day_slot) continue;
 
     const path = [...args.path, folder.name];
@@ -144,7 +163,6 @@ function normalizeQuery(query: string): string {
 function matchesQuery(name: string, query: string): boolean {
   const n = name.toLowerCase();
   if (n.includes(query)) return true;
-  // Allow "block 1" ↔ "block-1" style matches without stemming content.
   const compact = (s: string) => s.replace(/[\s_-]+/g, "");
   return compact(n).includes(compact(query));
 }

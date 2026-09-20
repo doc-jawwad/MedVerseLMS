@@ -1,60 +1,116 @@
 import type { AcademicSearchHit, AcademicTreeSurface } from "./types.ts";
+import {
+  BLOCK_CATEGORIES,
+  BLOCK_PRODUCT_DEFS,
+  PROF_SESSION_LABEL,
+} from "./product-structure.ts";
+import {
+  blockHref,
+  categoryHref,
+  classHref,
+  dayHref,
+  profSessionHref,
+  surfaceBasePath,
+} from "./paths.ts";
 
 /**
- * Map search hits onto the current student hub routes until the class-first
- * `/library` + `/resources` IA is integrated. Never invent content URLs.
+ * Map search hits onto class-first `/resources` + `/library` nested routes.
  */
 export function hrefForAcademicSearchHit(
   hit: Pick<AcademicSearchHit, "kind" | "name" | "path_labels">,
   surface: AcademicTreeSurface
 ): string {
-  const home = surface === "resources" ? "/free-resources" : "/books";
+  const home = classHref(surface);
+  const labels = hit.path_labels ?? [];
+
+  if (hit.kind === "class") return home;
+  if (hit.kind === "prof_session") return profSessionHref(surface);
+
+  const blockSlug = blockSlugFromLabels(labels);
+  const categorySlug = categorySlugFromLabels(labels);
+  const underProf = labels.some(
+    (l) => normalizeKey(l) === normalizeKey(PROF_SESSION_LABEL)
+  );
+
+  if (hit.kind === "day") {
+    const daySlug = daySlugFromName(hit.name);
+    if (underProf || !blockSlug) {
+      return daySlug ? dayHref(surface, daySlug) : profSessionHref(surface);
+    }
+    return blockSlug ? blockHref(surface, blockSlug) : home;
+  }
+
+  if (hit.kind === "block") {
+    const slug =
+      blockSlugFromName(hit.name) ?? blockSlug ?? productKeyFromName(hit.name);
+    return slug ? blockHref(surface, slug) : home;
+  }
 
   if (hit.kind === "category") {
-    return categoryHubHref(hit.name, surface) ?? home;
+    const cat =
+      categorySlugFromName(hit.name) ??
+      categorySlug ??
+      categorySlugFromLabels(labels);
+    const block = blockSlug ?? blockSlugFromLabels(labels);
+    if (block && cat) return categoryHref(surface, block, cat);
+    return home;
   }
 
-  if (hit.kind === "folder" || hit.kind === "day") {
-    return surface === "resources" ? "/free-resources" : "/materials";
+  if (hit.kind === "folder") {
+    if (underProf) return profSessionHref(surface);
+    if (blockSlug && categorySlug) {
+      return categoryHref(surface, blockSlug, categorySlug);
+    }
+    if (blockSlug) return blockHref(surface, blockSlug);
+    return home;
   }
 
-  // class / block → surface home
-  return home;
+  return surfaceBasePath(surface);
 }
 
-function categoryHubHref(
-  name: string,
-  surface: AcademicTreeSurface
-): string | null {
-  const key = name.trim().toLowerCase().replace(/[\s_-]+/g, "");
-  const free = surface === "resources";
-  const map: Record<string, { paid: string; free: string }> = {
-    notes: { paid: "/notes", free: "/free-resources/notes" },
-    books: { paid: "/books", free: "/free-resources/books" },
-    guidelines: { paid: "/guidelines", free: "/free-resources/guidelines" },
-    lectures: { paid: "/lectures", free: "/free-resources/lectures" },
-    ospematerial: {
-      paid: "/ospe-material",
-      free: "/free-resources/ospe-material",
-    },
-    ospelectures: {
-      paid: "/ospe-lectures",
-      free: "/free-resources/ospe-lectures",
-    },
-    pastpapers: { paid: "/books", free: "/free-resources" },
-    flashcards: { paid: "/books", free: "/free-resources" },
-    test: { paid: "/tests", free: "/tests" },
-    mcqbank: { paid: "/mcq-bank", free: "/free-resources/mcq-bank" },
-    pearlpoints: {
-      paid: "/pearl-points",
-      free: "/free-resources/pearl-points",
-    },
-    ospepractice: {
-      paid: "/practice/ospe",
-      free: "/practice/ospe",
-    },
-  };
-  const entry = map[key];
-  if (!entry) return null;
-  return free ? entry.free : entry.paid;
+function normalizeKey(value: string): string {
+  return value.trim().toLowerCase().replace(/[\s_-]+/g, "");
+}
+
+function productKeyFromName(name: string): string | null {
+  const key = normalizeKey(name);
+  const byName = BLOCK_PRODUCT_DEFS.find(
+    (b) => normalizeKey(b.name) === key || normalizeKey(b.key) === key
+  );
+  return byName?.key ?? null;
+}
+
+function blockSlugFromName(name: string): string | null {
+  return productKeyFromName(name);
+}
+
+function blockSlugFromLabels(labels: string[]): string | null {
+  for (const label of labels) {
+    const slug = blockSlugFromName(label);
+    if (slug) return slug;
+  }
+  return null;
+}
+
+function categorySlugFromName(name: string): string | null {
+  const key = normalizeKey(name);
+  const found = BLOCK_CATEGORIES.find(
+    (c) => normalizeKey(c.name) === key || normalizeKey(c.slug) === key
+  );
+  return found?.slug ?? null;
+}
+
+function categorySlugFromLabels(labels: string[]): string | null {
+  for (const label of labels) {
+    const slug = categorySlugFromName(label);
+    if (slug) return slug;
+  }
+  return null;
+}
+
+function daySlugFromName(name: string): string | null {
+  const match = /^day\s*[-_]?\s*(\d+)$/i.exec(name.trim());
+  if (match) return `day-${match[1]}`;
+  if (/^day-\d+$/i.test(name.trim())) return name.trim().toLowerCase();
+  return null;
 }

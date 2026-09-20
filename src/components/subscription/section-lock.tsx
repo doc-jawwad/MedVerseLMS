@@ -40,7 +40,7 @@ export function SectionLock({
           </CardTitle>
           <CardDescription>
             {description ??
-              "This full library is part of a MedVerse subscription. Free items selected by your academy stay under Free Resources. Pending applications do not unlock paid sections."}
+              "This full library is part of a MedVerse subscription. Free items selected by your academy stay under Resources. Pending applications do not unlock paid sections."}
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-wrap gap-2">
@@ -51,7 +51,7 @@ export function SectionLock({
             <Link href="/contact">Contact MedVerse</Link>
           </Button>
           <Button asChild variant="ghost">
-            <Link href="/free-resources">Browse Free Resources</Link>
+            <Link href="/resources">Browse Resources</Link>
           </Button>
         </CardContent>
       </Card>

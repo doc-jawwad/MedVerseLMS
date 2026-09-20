@@ -82,6 +82,8 @@ export type NavItem = {
   icon: IconKey;
   /** Paid LMS section locked for free / expired / pending students. */
   locked?: boolean;
+  /** Nested sidebar children (e.g. Blocks under enrolled class). */
+  children?: NavItem[];
 };
 
 // Exact-match roots (e.g. "/admin", "/dashboard") only highlight on an exact
@@ -152,33 +154,9 @@ export function MobileNav({
         </SheetHeader>
 
         <nav className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto overscroll-contain p-3">
-          {navItems.map((item) => {
-            const Icon = ICONS[item.icon];
-            const active = !item.locked && isActivePath(pathname, item.href);
-            return (
-              <SheetClose asChild key={item.href}>
-                <Link
-                  href={item.href}
-                  className={`flex min-h-11 items-center gap-3 rounded-lg px-3 py-2.5 text-sm ${
-                    item.locked
-                      ? "text-[var(--sidebar-muted)] hover:bg-sidebar-accent/50"
-                      : active
-                        ? "bg-sidebar-accent font-medium text-white shadow-[inset_3px_0_0_0_var(--brand-teal)]"
-                        : "text-sidebar-foreground/90 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                  }`}
-                >
-                  <Icon className="size-4 shrink-0 opacity-90" />
-                  <span className="flex-1 truncate">{item.label}</span>
-                  {item.locked ? (
-                    <Lock
-                      className="size-3.5 shrink-0 opacity-70"
-                      aria-label="Locked"
-                    />
-                  ) : null}
-                </Link>
-              </SheetClose>
-            );
-          })}
+          {navItems.map((item) => (
+            <MobileNavEntry key={item.href} item={item} pathname={pathname} />
+          ))}
         </nav>
 
         <div className="shrink-0 space-y-3 border-t border-sidebar-border p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
@@ -235,5 +213,53 @@ export function MobileNav({
         </nav>
       ) : null}
     </Sheet>
+  );
+}
+
+function MobileNavEntry({
+  item,
+  pathname,
+  depth = 0,
+}: {
+  item: NavItem;
+  pathname: string;
+  depth?: number;
+}) {
+  const Icon = ICONS[item.icon];
+  const active = !item.locked && isActivePath(pathname, item.href);
+  const pad = depth > 0 ? "pl-8" : "";
+
+  return (
+    <div className="flex flex-col gap-0.5">
+      <SheetClose asChild>
+        <Link
+          href={item.href}
+          className={`flex min-h-11 items-center gap-3 rounded-lg px-3 py-2.5 text-sm ${pad} ${
+            item.locked
+              ? "text-[var(--sidebar-muted)] hover:bg-sidebar-accent/50"
+              : active
+                ? "bg-sidebar-accent font-medium text-white shadow-[inset_3px_0_0_0_var(--brand-teal)]"
+                : "text-sidebar-foreground/90 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+          }`}
+        >
+          <Icon className="size-4 shrink-0 opacity-90" />
+          <span className="flex-1 truncate">{item.label}</span>
+          {item.locked ? (
+            <Lock
+              className="size-3.5 shrink-0 opacity-70"
+              aria-label="Locked"
+            />
+          ) : null}
+        </Link>
+      </SheetClose>
+      {item.children?.map((child) => (
+        <MobileNavEntry
+          key={child.href}
+          item={child}
+          pathname={pathname}
+          depth={depth + 1}
+        />
+      ))}
+    </div>
   );
 }

@@ -1,4 +1,5 @@
 import type {
+  AcademicProfSession,
   AcademicTree,
   AcademicTreeAdapter,
   AcademicTreeCategory,
@@ -16,12 +17,7 @@ import { searchAcademicTreeNames } from "./search.ts";
 
 /**
  * Structural scaffolding until `get_academic_tree` ships.
- * Shows the frozen Class → Block → Category → Day tree with lock flags.
- * Does not invent a second content store or paid payloads.
- *
- * Resources: same tree as Library; navigation is visible. Content leaves stay
- * empty until Data Spine returns Admin-unlocked / free / granted nodes.
- * Library without live subscription: nodes marked locked (shell also gates).
+ * Shows Class → Block → 8 categories, plus a separate Prof. Session tree.
  */
 export function buildStructuralAcademicTree(
   input: GetAcademicTreeInput
@@ -29,29 +25,17 @@ export function buildStructuralAcademicTree(
   const yearName = classDisplayName(input.year_number, input.year_name);
   const libraryLocked =
     input.surface === "library" && !input.has_live_subscription;
-  const libraryOpen =
-    input.surface === "library" && input.has_live_subscription;
 
   const subjects: AcademicTreeSubject[] = blocksForYearNumber(
     input.year_number
   ).map((block) => {
-    const categories: AcademicTreeCategory[] = BLOCK_CATEGORIES.map((cat) => {
-      const folders: AcademicTreeFolder[] =
-        cat.id === "test"
-          ? buildDefaultTestDays({
-              subjectKey: block.key,
-              locked: libraryLocked,
-            })
-          : [];
-
-      return {
-        id: cat.id,
-        name: cat.name,
-        locked: libraryLocked,
-        placeholder: cat.placeholder,
-        folders,
-      };
-    });
+    const categories: AcademicTreeCategory[] = BLOCK_CATEGORIES.map((cat) => ({
+      id: cat.id,
+      name: cat.name,
+      locked: libraryLocked,
+      placeholder: cat.placeholder,
+      folders: [],
+    }));
 
     return {
       subject_id: `product:${block.key}`,
@@ -62,7 +46,10 @@ export function buildStructuralAcademicTree(
     };
   });
 
-  void libraryOpen;
+  const prof_session: AcademicProfSession = {
+    locked: libraryLocked,
+    days: buildDefaultProfSessionDays({ locked: libraryLocked }),
+  };
 
   return {
     surface: input.surface,
@@ -70,19 +57,18 @@ export function buildStructuralAcademicTree(
     year_number: input.year_number,
     year_name: yearName,
     subjects,
+    prof_session,
     from_adapter: true,
   };
 }
 
-function buildDefaultTestDays(args: {
-  subjectKey: string;
+/** Scaffold Day 1–3 under Prof. Session so the IA is navigable before Admin days exist. */
+export function buildDefaultProfSessionDays(args: {
   locked: boolean;
 }): AcademicTreeFolder[] {
-  // Structural Day 1–3 scaffolding so Test IA is navigable before Data Spine
-  // returns real day folders. Empty item lists — no invented content.
   return [1, 2, 3].map((n) => {
     const slug = `day-${n}`;
-    const dayId = `product:${args.subjectKey}:test:${slug}`;
+    const dayId = `product:prof-session:${slug}`;
     const slotChildren: AcademicTreeFolder[] = TEST_DAY_SLOTS.map((slot) => ({
       id: `${dayId}:${slot.id}`,
       slug: slot.slug,
@@ -131,12 +117,10 @@ export function findCategoryInSubject(
 }
 
 export function findDayFolder(
-  category: AcademicTreeCategory,
+  days: AcademicTreeFolder[],
   daySlug: string
 ): AcademicTreeFolder | null {
-  return (
-    category.folders.find((f) => f.is_day && f.slug === daySlug) ?? null
-  );
+  return days.find((f) => f.is_day && f.slug === daySlug) ?? null;
 }
 
 export function findFolderBySlug(

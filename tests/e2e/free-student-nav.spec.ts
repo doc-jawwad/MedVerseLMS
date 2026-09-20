@@ -3,17 +3,17 @@ import { loadE2EEnv, STAGING_APP_ORIGIN } from "./load-e2e-env";
 
 /**
  * Free-student shell policy — requires a deployed app that includes
- * Free Resources + section locks. Staging credentials must be a free
+ * Resources + section locks. Staging credentials must be a free
  * (non–live-subscription) student.
  */
 test.describe("Free student navigation", () => {
-  test("active Free Resources and Tests; locked full-library hubs", async ({
+  test("active Resources and Tests; locked Library / Performance hubs", async ({
     page,
   }) => {
     const e2e = loadE2EEnv();
     test.skip(
       e2e.target !== "staging",
-      "Set E2E_TARGET=staging (deployed build with Free Resources)"
+      "Set E2E_TARGET=staging (deployed build with Resources IA)"
     );
     test.skip(
       !e2e.stagingStudentEmail || !e2e.stagingStudentPassword,
@@ -28,13 +28,17 @@ test.describe("Free student navigation", () => {
     await page.getByRole("button", { name: "Sign in" }).click();
     await page.waitForURL(/\/dashboard/, { timeout: 30000 });
 
-    await expect(page.getByRole("link", { name: "Free Resources" })).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: "Resources" }).or(
+        page.getByRole("link", { name: /Year MBBS/ })
+      )
+    ).toBeVisible();
     await expect(page.getByRole("link", { name: "Tests" }).first()).toBeVisible();
     await expect(page.getByRole("link", { name: "Contact Us" })).toBeVisible();
     await expect(page.getByRole("link", { name: "My Account" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Prof. Session" })).toBeVisible();
 
-    await page.getByRole("link", { name: "MCQ Bank" }).click();
-    await page.waitForURL(/\/mcq-bank$/, { timeout: 15000 });
+    await page.goto("/library");
     await expect(page.getByText(/subscription(?:\s+is)?\s+required/i)).toBeVisible({
       timeout: 15000,
     });
@@ -42,17 +46,17 @@ test.describe("Free student navigation", () => {
       page.getByRole("link", { name: "Get Subscription" })
     ).toBeVisible();
     await expect(
-      page.getByRole("link", { name: "Contact MedVerse" })
+      page.getByRole("link", { name: "Browse Resources" })
     ).toBeVisible();
 
-    await page.goto("/pearl-points");
+    await page.goto("/mcq-bank");
     await expect(page.getByText(/subscription(?:\s+is)?\s+required/i)).toBeVisible({
       timeout: 15000,
     });
 
-    await page.goto("/free-resources");
+    await page.goto("/resources");
     await expect(
-      page.getByRole("heading", { name: "Free Resources" })
+      page.getByRole("heading", { name: /Year MBBS|Resources/i })
     ).toBeVisible({ timeout: 15000 });
 
     await page.goto("/contact");

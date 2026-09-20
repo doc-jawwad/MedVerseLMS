@@ -4,14 +4,27 @@ import { PageHeader } from "@/components/student/page-header";
 import { StudentPage } from "@/components/student/student-page";
 import { EmptyState } from "@/components/student/empty-state";
 import { SectionLock } from "@/components/subscription/section-lock";
+import { AcademicBreadcrumbs } from "@/components/academic/academic-breadcrumbs";
+import type { BreadcrumbCrumb } from "@/lib/academic-tree";
 import { belongsOnFreeResources } from "@/lib/library/free-surface";
 import { getStudentHasLiveSubscription } from "@/lib/subscriptions/student-live-access";
 import { studentHasPaidLmsSections } from "@/lib/subscriptions/student-section-access";
+import Link from "next/link";
 
 export async function PearlPointsLibraryPage({
   mode,
+  subjectId,
+  breadcrumbs,
+  title,
+  description,
+  backHref,
 }: {
-  mode: "full" | "free";
+  mode: "full" | "free" | "resources";
+  subjectId?: string;
+  breadcrumbs?: BreadcrumbCrumb[];
+  title?: string;
+  description?: string;
+  backHref?: string;
 }) {
   const { supabase, userId } = await requireStudent();
   const hasLiveAccess = await getStudentHasLiveSubscription();
@@ -20,7 +33,7 @@ export async function PearlPointsLibraryPage({
     return (
       <SectionLock
         title="Pearl Points"
-        description="The full Pearl Points library unlocks with a live subscription. Free recall points stay under Free Resources."
+        description="The full Pearl Points library unlocks with a live subscription. Free recall points stay under Resources."
       />
     );
   }
@@ -55,30 +68,51 @@ export async function PearlPointsLibraryPage({
       subject_name:
         (p.subjects as unknown as { name: string } | null)?.name ?? null,
     }))
-    .filter((p) =>
-      mode === "free"
-        ? belongsOnFreeResources({
-            entitlement: p.entitlement,
-            accessible: p.accessible,
-          })
-        : true
-    );
+    .filter((p) => {
+      if (subjectId && p.subject_id !== subjectId) return false;
+      if (mode === "free") {
+        return belongsOnFreeResources({
+          entitlement: p.entitlement,
+          accessible: p.accessible,
+        });
+      }
+      return true;
+    });
 
   const filterSubjects =
     mode === "free"
       ? (subjects ?? []).filter((s) =>
           items.some((p) => p.subject_id === s.id)
         )
-      : (subjects ?? []);
+      : subjectId
+        ? (subjects ?? []).filter((s) => s.id === subjectId)
+        : (subjects ?? []);
+
+  const pageTitle =
+    title ?? (mode === "free" ? "Free Pearl Points" : "Pearl Points");
+  const pageDescription =
+    description ??
+    (mode === "free"
+      ? "Admin-selected free recall points for your class. The full set is a separate section."
+      : "High-yield one-liners for rapid recall. Reveal the answer when you are ready — this is not an exam.");
+  const defaultBack =
+    mode === "free" ? "/free-resources/pearl-points" : "/pearl-points";
 
   return (
     <StudentPage width="narrow">
+      {breadcrumbs ? <AcademicBreadcrumbs crumbs={breadcrumbs} /> : null}
       <PageHeader
-        title={mode === "free" ? "Free Pearl Points" : "Pearl Points"}
-        description={
-          mode === "free"
-            ? "Admin-selected free recall points for your class. The full set is a separate section."
-            : "High-yield one-liners for rapid recall. Reveal the answer when you are ready — this is not an exam."
+        title={pageTitle}
+        description={pageDescription}
+        actions={
+          backHref ? (
+            <Link
+              href={backHref}
+              className="text-sm text-muted-foreground underline-offset-4 hover:underline"
+            >
+              Back
+            </Link>
+          ) : undefined
         }
       />
       {items.length === 0 ? (
@@ -95,7 +129,7 @@ export async function PearlPointsLibraryPage({
           items={items}
           subjects={filterSubjects}
           studentId={userId}
-          backHref={mode === "free" ? "/free-resources/pearl-points" : "/pearl-points"}
+          backHref={backHref ?? defaultBack}
         />
       )}
     </StudentPage>

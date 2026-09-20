@@ -104,9 +104,10 @@ describe("student subscription status view", () => {
     assert.equal(view.kind, "expired");
     assert.equal(studentHasPaidLmsSections(view.hasLiveAccess), false);
     assert.ok(
-      buildStudentShellNav(view.hasLiveAccess).items.some(
-        (i) => i.href === "/mcq-bank" && i.locked
-      )
+      buildStudentShellNav(view.hasLiveAccess, {
+        year_number: 1,
+        year_name: "1st Year MBBS",
+      }).items.some((i) => i.href === "/performance" && i.locked)
     );
   });
 

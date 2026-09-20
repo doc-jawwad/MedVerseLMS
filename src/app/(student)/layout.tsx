@@ -32,7 +32,10 @@ export default async function StudentLayout({
   }
 
   const hasLiveAccess = await getStudentHasLiveSubscription();
-  const { items: nav, bottomItems } = buildStudentShellNav(hasLiveAccess);
+  const { items: nav, bottomItems } = buildStudentShellNav(hasLiveAccess, {
+    year_number: enrollment.year_number,
+    year_name: enrollment.year_name,
+  });
   const surface = hasLiveAccess ? "library" : "resources";
 
   return (

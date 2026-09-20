@@ -1,5 +1,9 @@
 import type { AcademicTreeSurface, BlockCategoryId } from "./types.ts";
-import { findCategoryById, findCategoryBySlug } from "./product-structure.ts";
+import {
+  PROF_SESSION_SLUG,
+  findCategoryById,
+  findCategoryBySlug,
+} from "./product-structure.ts";
 
 export function surfaceBasePath(surface: AcademicTreeSurface): string {
   return surface === "resources" ? "/resources" : "/library";
@@ -51,21 +55,20 @@ export function folderHref(
   return `${categoryHref(surface, blockSlug, categorySlug)}/f/${encodeURIComponent(folderSlug)}`;
 }
 
-export function dayHref(
-  surface: AcademicTreeSurface,
-  blockSlug: string,
-  daySlug: string
-): string {
-  return `${blockHref(surface, blockSlug)}/test/${encodeURIComponent(daySlug)}`;
+export function profSessionHref(surface: AcademicTreeSurface): string {
+  return `${surfaceBasePath(surface)}/${PROF_SESSION_SLUG}`;
+}
+
+export function dayHref(surface: AcademicTreeSurface, daySlug: string): string {
+  return `${profSessionHref(surface)}/${encodeURIComponent(daySlug)}`;
 }
 
 export function daySlotHref(
   surface: AcademicTreeSurface,
-  blockSlug: string,
   daySlug: string,
   slotSlug: string
 ): string {
-  return `${dayHref(surface, blockSlug, daySlug)}/${encodeURIComponent(slotSlug)}`;
+  return `${dayHref(surface, daySlug)}/${encodeURIComponent(slotSlug)}`;
 }
 
 export function searchHref(

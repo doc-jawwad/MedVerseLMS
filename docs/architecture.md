@@ -124,6 +124,31 @@ Student-facing second level under each class. Product names map onto existing `s
 | 4th Year MBBS | Block 10, Block 11, Block 12 |
 | Final Year MBBS | Medicine, Surgery, Gynecology, Pediatrics |
 
+### 2b. Eight categories under every Block / Final Year subject
+
+Each Block (and each Final Year clinical subject) contains exactly these eight student-facing categories:
+
+| Category | Notes |
+|---|---|
+| MCQ Bank | Practice with instant feedback |
+| Pearl Points | High-yield recall (not formal exams) |
+| Guidelines | Study guidelines / protocols |
+| OSPE Material | OSPE PDFs and station packs |
+| OSPE Lectures | OSPE lecture media |
+| Books | Reference texts |
+| Notes | Class notes (own category — not folded into Books) |
+| Lectures | Lecture videos / recordings |
+
+**Flashcards** is **not** a student block category in this IA (placeholder-only product note remains in §10). Legacy hubs such as Past Papers / combined OSPE may still exist in storage or older RPC payloads; the student tree remaps or omits them from Block category chrome.
+
+### 2c. Prof. Session (separate from Blocks)
+
+**Prof. Session** is a first-class student nav node beside the enrolled class Blocks — **never** nested under a Block or under a block category.
+
+Hierarchy: **Prof. Session → Day N →** Syllabus | Guidelines | One-liners / Pearl Points | Practice MCQs | Test MCQ.
+
+Routes live under `/resources/prof-session/...` (free surface) and `/library/prof-session/...` (subscribed surface). Formal **Test MCQ** remains the existing exam engine (`/tests`); Prof. Session only links into it.
+
 ### 3. Notes
 
 **Notes** remains its **own** library category (not folded into Books or Past Papers). Preserve `material_folders.library_type` / category identity for Notes.
@@ -173,7 +198,7 @@ Filters / states: **All / Remaining / Done / Marked**; mark/unmark; Done → Rem
 
 ### 10. Flashcards
 
-**Placeholder only.** No flashcard engine and no flashcard content table in this freeze.
+**Placeholder only.** No flashcard engine and no flashcard content table in this freeze. Flashcards is **not** one of the eight student Block categories (§2b).
 
 ### 11. Search
 
