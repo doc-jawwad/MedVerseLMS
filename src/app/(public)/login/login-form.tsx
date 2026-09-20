@@ -28,7 +28,7 @@ export function LoginForm({ next, reason }: { next?: string; reason?: string }) 
   return (
     <Card className="w-full border-border/80 shadow-none">
       <CardHeader className="space-y-1.5 pb-4">
-        <CardTitle className="text-xl text-[var(--brand-navy)]">Sign in</CardTitle>
+        <CardTitle className="text-xl text-foreground">Sign in</CardTitle>
         <CardDescription>Access your MedVerse LMS account</CardDescription>
       </CardHeader>
       <CardContent>
@@ -101,7 +101,7 @@ export function LoginForm({ next, reason }: { next?: string; reason?: string }) 
           </Button>
           <p className="text-center text-sm text-muted-foreground">
             New student?{" "}
-            <Link href="/register" className="font-medium text-[var(--brand-navy)] underline underline-offset-2">
+            <Link href="/register" className="font-medium text-foreground underline underline-offset-2">
               Create an account
             </Link>
           </p>

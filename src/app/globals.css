@@ -49,14 +49,16 @@
 }
 
 /* MedVerse Healthcare brand: navy #072855 + teal #05AEA9 (docs/architecture.md).
-   --brand-teal stays the logo sample; --brand-teal-ink is contrast-safe for text. */
+   --brand-teal stays the logo sample; --brand-teal-ink is contrast-safe for text.
+   Light mode: neutral/off-white canvas — navy is for sidebar/header/strong brand only.
+   Dark mode: near-black navy foundation — never use brand navy as body text. */
 :root {
   --brand-navy: #072855;
   --brand-teal: #05aea9;
   /* Readable teal on light surfaces (~AA for UI text / accents). */
   --brand-teal-ink: #037a76;
 
-  --background: #f7fafb;
+  --background: #f8fafc;
   --foreground: #072855;
   --card: #ffffff;
   --card-foreground: #072855;
@@ -65,16 +67,16 @@
   /* Slightly deeper teal fill so white label text stays crisp on buttons. */
   --primary: #04948f;
   --primary-foreground: #ffffff;
-  --secondary: #e6f4f3;
+  --secondary: #eef2f6;
   --secondary-foreground: #072855;
-  --muted: #e8eef2;
-  /* Darker muted copy — was too soft on canvas (#5b6b78). */
-  --muted-foreground: #3d5263;
-  --accent: #d9f0ee;
+  --muted: #eef2f6;
+  /* Slate muted copy on light canvas. */
+  --muted-foreground: #475569;
+  --accent: #e6f4f3;
   --accent-foreground: #072855;
   --destructive: #c0352b;
-  --border: #c5d5dc;
-  --input: #c5d5dc;
+  --border: #d7e0e8;
+  --input: #d7e0e8;
   --ring: var(--brand-teal);
   --chart-1: var(--brand-navy);
   --chart-2: var(--brand-teal);
@@ -93,36 +95,38 @@
   --sidebar-ring: var(--brand-teal);
   --sidebar-muted: #b8cce0;
 
-  --student-canvas: #eef4f7;
+  /* Neutral light canvas — not a blue wash. */
+  --student-canvas: #f4f6f8;
   --student-ink: #072855;
   --student-surface: #ffffff;
-  --student-elevated-shadow: 0 1px 2px rgb(7 40 85 / 0.06),
-    0 8px 24px rgb(7 40 85 / 0.06);
+  --student-elevated-shadow: 0 1px 2px rgb(15 23 42 / 0.04),
+    0 8px 24px rgb(15 23 42 / 0.05);
 }
 
 .dark {
   --brand-navy: #072855;
   --brand-teal: #05aea9;
   /* Brighter teal for readable accents on dark navy surfaces. */
-  --brand-teal-ink: #4ad4ce;
+  --brand-teal-ink: #5ee0da;
 
-  --background: #06101f;
-  --foreground: #f0f5fa;
-  --card: #0c1a33;
-  --card-foreground: #f0f5fa;
-  --popover: #0c1a33;
-  --popover-foreground: #f0f5fa;
+  --background: #050b16;
+  --foreground: #f1f5f9;
+  --card: #0b1528;
+  --card-foreground: #f1f5f9;
+  --popover: #0b1528;
+  --popover-foreground: #f1f5f9;
   --primary: #05aea9;
   --primary-foreground: #04201e;
-  --secondary: #143054;
-  --secondary-foreground: #f0f5fa;
-  --muted: #122847;
-  --muted-foreground: #b7c7d8;
-  --accent: #15406f;
-  --accent-foreground: #f0f5fa;
+  --secondary: #13243c;
+  --secondary-foreground: #f1f5f9;
+  --muted: #122033;
+  /* Light slate — readable muted copy on dark cards. */
+  --muted-foreground: #cbd5e1;
+  --accent: #163456;
+  --accent-foreground: #f1f5f9;
   --destructive: #f07167;
-  --border: #2a4a73;
-  --input: #2a4a73;
+  --border: #2a4060;
+  --input: #2a4060;
   --ring: var(--brand-teal);
   --chart-1: var(--brand-teal);
   --chart-2: #3fc9c2;
@@ -130,21 +134,21 @@
   --chart-4: #3a6ea5;
   --chart-5: #9bb0c4;
 
-  --sidebar: #040e1f;
-  --sidebar-foreground: #f0f5fa;
+  --sidebar: #030912;
+  --sidebar-foreground: #f1f5f9;
   --sidebar-primary: var(--brand-teal);
   --sidebar-primary-foreground: #04201e;
   --sidebar-accent: #123a66;
   --sidebar-accent-foreground: #ffffff;
   --sidebar-border: #1c3d66;
   --sidebar-ring: var(--brand-teal);
-  --sidebar-muted: #9eb6ce;
+  --sidebar-muted: #a8bdd4;
 
-  --student-canvas: #06101f;
-  --student-ink: #f0f5fa;
-  --student-surface: #0c1a33;
-  --student-elevated-shadow: 0 1px 2px rgb(0 0 0 / 0.35),
-    0 12px 32px rgb(0 0 0 / 0.35);
+  --student-canvas: #050b16;
+  --student-ink: #f1f5f9;
+  --student-surface: #0b1528;
+  --student-elevated-shadow: 0 1px 2px rgb(0 0 0 / 0.4),
+    0 12px 32px rgb(0 0 0 / 0.4);
 }
 
 @layer base {

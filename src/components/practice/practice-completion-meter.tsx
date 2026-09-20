@@ -13,10 +13,10 @@ export function PracticeCompletionMeter({
   return (
     <div className="grid gap-1.5">
       <div className="flex items-center justify-between gap-2 text-xs">
-        <span className="font-medium text-[#072855]/70">{label}</span>
-        <span className="tabular-nums font-semibold text-[#072855]">{safe}%</span>
+        <span className="font-medium text-[var(--student-ink)]/70">{label}</span>
+        <span className="tabular-nums font-semibold text-[var(--student-ink)]">{safe}%</span>
       </div>
-      <Progress value={safe} className="h-1.5 bg-[#072855]/10" />
+      <Progress value={safe} className="h-1.5 bg-muted" />
     </div>
   );
 }

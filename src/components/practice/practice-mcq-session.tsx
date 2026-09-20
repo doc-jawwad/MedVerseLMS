@@ -273,7 +273,7 @@ export function PracticeMcqSession({
           Nothing matches this filter. Try All or Remaining, or reset Done items.
         </div>
       ) : (
-        <article className="grid gap-4 rounded-3xl border border-[var(--student-ink)]/10 bg-gradient-to-b from-white to-[var(--brand-teal)]/[0.04] p-4 sm:p-6">
+        <article className="grid gap-4 rounded-3xl border border-[var(--student-ink)]/10 bg-card p-4 sm:p-6">
           <div className="flex flex-wrap items-center gap-2 text-xs">
             <span className="rounded-full bg-[var(--student-ink)]/8 px-2.5 py-1 font-semibold tracking-wide text-[var(--student-ink)]/70 uppercase">
               {currentContent.difficulty}
@@ -305,7 +305,7 @@ export function PracticeMcqSession({
                       : isWrongPick
                         ? "border-red-500 bg-red-50"
                         : isSelected
-                          ? "border-[#05AEA9] bg-[var(--brand-teal)]/10"
+                          ? "border-[var(--brand-teal)] bg-[var(--brand-teal)]/10"
                           : "border-[var(--student-ink)]/12 hover:bg-[var(--student-ink)]/[0.03]"
                   }`}
                 >

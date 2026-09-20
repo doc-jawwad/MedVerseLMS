@@ -72,7 +72,7 @@ export function ProfileEditForm({
   return (
     <div className="grid gap-6">
       <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center">
-        <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-full border bg-[#072855]/10 text-lg font-semibold text-[#072855]">
+        <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-full border bg-muted text-lg font-semibold text-[var(--student-ink)]">
           {avatarUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
@@ -85,7 +85,7 @@ export function ProfileEditForm({
           )}
         </div>
         <div className="grid gap-2">
-          <p className="text-sm font-medium text-[#072855]">Profile photo</p>
+          <p className="text-sm font-medium text-[var(--student-ink)]">Profile photo</p>
           <p className="text-xs text-muted-foreground">
             JPEG, PNG, or WebP up to 2 MB. Shown on leaderboards with your name
             and college only.

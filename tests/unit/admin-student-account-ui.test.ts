@@ -133,4 +133,16 @@ describe("admin student surfaces do not use enrollment as LMS gate", () => {
       assert.doesNotMatch(src, /Approve this student's enrollment/i);
     }
   });
+
+  it("disambiguates profiles→enrollments embed via student_id FK (PGRST201)", () => {
+    const src = fs.readFileSync(
+      path.join(path.resolve("."), "src/app/(admin)/admin/students/page.tsx"),
+      "utf8"
+    );
+    assert.match(src, /enrollments!enrollments_student_id_fkey\(/);
+    assert.doesNotMatch(
+      src,
+      /enrollments\(id, status, year_id, years\(name\)\)/
+    );
+  });
 });

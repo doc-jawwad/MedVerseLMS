@@ -15,7 +15,7 @@ function AvatarPlaceholder({ name }: { name: string }) {
   const initial = name.trim().charAt(0).toUpperCase() || "?";
   return (
     <span
-      className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[#072855]/10 text-sm font-semibold text-[#072855]"
+      className="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted text-sm font-semibold text-[var(--student-ink)]"
       aria-hidden
     >
       {initial || <User className="size-4" />}
@@ -40,7 +40,7 @@ export function LeaderboardBoardCard({
     return (
       <Card className="shadow-none" data-testid="leaderboard-board">
         <CardHeader>
-          <CardTitle className="text-base text-[#072855]">{title}</CardTitle>
+          <CardTitle className="text-base text-[var(--student-ink)]">{title}</CardTitle>
           {description && <CardDescription>{description}</CardDescription>}
           {board.testTitle && (
             <CardDescription>{board.testTitle}</CardDescription>
@@ -57,14 +57,14 @@ export function LeaderboardBoardCard({
     <Card className="shadow-none" data-testid="leaderboard-board">
       <CardHeader>
         <div className="flex flex-wrap items-center gap-2">
-          <CardTitle className="text-base text-[#072855]">{title}</CardTitle>
+          <CardTitle className="text-base text-[var(--student-ink)]">{title}</CardTitle>
           <Badge variant="secondary">Top {board.limit}</Badge>
         </div>
         <CardDescription>
           {description ??
             "Ranked by formal test score (rank_test). Visible to free and paid students."}
         </CardDescription>
-        <p className="text-sm font-medium text-[#072855]">{board.testTitle}</p>
+        <p className="text-sm font-medium text-[var(--student-ink)]">{board.testTitle}</p>
       </CardHeader>
       <CardContent className="grid gap-2">
         {board.rows.map((row) => {
@@ -77,15 +77,15 @@ export function LeaderboardBoardCard({
               data-testid="leaderboard-row"
               data-rank={row.rank}
             >
-              <span className="w-7 shrink-0 text-center font-heading text-lg font-semibold text-[#072855]">
+              <span className="w-7 shrink-0 text-center font-heading text-lg font-semibold text-[var(--student-ink)]">
                 {row.rank}
               </span>
               <AvatarPlaceholder name={row.full_name} />
               <div className="min-w-0 flex-1">
-                <p className="truncate font-medium text-[#072855]">
+                <p className="truncate font-medium text-[var(--student-ink)]">
                   {row.full_name}
                   {isMe ? (
-                    <span className="ml-1.5 text-xs font-normal text-[#05AEA9]">
+                    <span className="ml-1.5 text-xs font-normal text-[var(--brand-teal-ink)]">
                       you
                     </span>
                   ) : null}
@@ -94,7 +94,7 @@ export function LeaderboardBoardCard({
                   {row.college_name?.trim() || "College not set"}
                 </p>
               </div>
-              <span className="shrink-0 font-semibold tabular-nums text-[#072855]">
+              <span className="shrink-0 font-semibold tabular-nums text-[var(--student-ink)]">
                 {row.score}
               </span>
             </div>

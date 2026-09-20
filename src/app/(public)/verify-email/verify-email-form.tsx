@@ -46,7 +46,7 @@ export function VerifyEmailForm({ email: initialEmail }: { email: string }) {
   return (
     <Card className="w-full border-border/80 shadow-none">
       <CardHeader className="space-y-1.5 pb-4">
-        <CardTitle className="text-xl text-[var(--brand-navy)]">
+        <CardTitle className="text-xl text-foreground">
           Verify your email
         </CardTitle>
         <CardDescription>

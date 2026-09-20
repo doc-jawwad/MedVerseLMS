@@ -73,9 +73,9 @@ function formatClock(msLeft: number) {
 function paletteClass(status: ExamQuestionStatus, isCurrent: boolean) {
   return cn(
     "flex h-8 items-center justify-center rounded-md text-xs font-semibold transition-colors",
-    isCurrent && "ring-2 ring-[#072855] ring-offset-1",
+    isCurrent && "ring-2 ring-[var(--brand-navy)] ring-offset-1",
     status === "answered" &&
-      "bg-[#05AEA9]/20 text-[var(--student-ink)] dark:bg-teal-900 dark:text-teal-50",
+      "bg-[var(--brand-teal)]/20 text-[var(--student-ink)] dark:bg-teal-900 dark:text-teal-50",
     status === "skipped" &&
       "bg-amber-100 text-amber-950 dark:bg-amber-900 dark:text-amber-50",
     status === "remaining" && "bg-muted text-muted-foreground"
@@ -316,7 +316,7 @@ export function ExamPlayer({
                 onClick={() => setIndex(i)}
                 className={cn(
                   "flex h-8 min-w-8 items-center justify-center rounded-md bg-amber-200 px-2 text-xs font-semibold text-amber-950 dark:bg-amber-800 dark:text-amber-50",
-                  i === index && "ring-2 ring-[#072855]"
+                  i === index && "ring-2 ring-[var(--brand-navy)]"
                 )}
               >
                 {i + 1}
@@ -328,7 +328,7 @@ export function ExamPlayer({
 
       <div className="grid gap-1 text-xs text-muted-foreground">
         <span>
-          <span className="mr-1 inline-block h-2 w-2 rounded bg-[#05AEA9]/50" />{" "}
+          <span className="mr-1 inline-block h-2 w-2 rounded bg-[var(--brand-teal)]/50" />{" "}
           answered
         </span>
         <span>
@@ -378,7 +378,7 @@ export function ExamPlayer({
                 "rounded-lg px-2.5 py-1 font-mono text-lg font-semibold tabular-nums",
                 low
                   ? "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300"
-                  : "bg-[#072855] text-white"
+                  : "bg-primary text-primary-foreground"
               )}
               aria-label="time remaining"
             >
@@ -413,7 +413,7 @@ export function ExamPlayer({
           aria-hidden
         >
           <div
-            className="h-full rounded-full bg-[#05AEA9] transition-[width]"
+            className="h-full rounded-full bg-[var(--brand-teal)] transition-[width]"
             style={{ width: `${progressPct}%` }}
           />
         </div>
@@ -449,7 +449,7 @@ export function ExamPlayer({
                       className={cn(
                         "rounded-xl border p-3.5 text-left text-sm transition-colors",
                         selected
-                          ? "border-[#05AEA9] bg-[#05AEA9]/10 font-medium text-[var(--student-ink)]"
+                          ? "border-[var(--brand-teal)] bg-[var(--brand-teal)]/10 font-medium text-[var(--student-ink)]"
                           : "border-border bg-card hover:bg-accent/60"
                       )}
                     >
@@ -525,7 +525,7 @@ function CountChip({
       className={cn(
         "flex items-baseline gap-1.5 rounded-full px-2.5 py-1 text-xs",
         tone === "skipped" && "bg-amber-100 text-amber-950 dark:bg-amber-900 dark:text-amber-50",
-        tone === "answered" && "bg-[#05AEA9]/15 text-[var(--student-ink)]",
+        tone === "answered" && "bg-[var(--brand-teal)]/15 text-[var(--student-ink)]",
         tone === "muted" && "bg-muted text-[var(--student-ink)]"
       )}
     >

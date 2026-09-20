@@ -40,7 +40,7 @@ export function IosInstallGuide() {
             className="flex gap-3 rounded-xl border border-border/80 bg-[var(--student-canvas)] p-3"
           >
             <span
-              className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[#072855] text-sm font-semibold text-white"
+              className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[var(--brand-navy)] text-sm font-semibold text-white"
               aria-hidden
             >
               {step.n}

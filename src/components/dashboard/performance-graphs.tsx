@@ -24,14 +24,14 @@ function SummaryBar({
   return (
     <div className="grid gap-1">
       <div className="flex items-baseline justify-between gap-2 text-sm">
-        <span className="font-medium text-[#072855]">{label}</span>
+        <span className="font-medium text-[var(--student-ink)]">{label}</span>
         <span className="shrink-0 text-muted-foreground tabular-nums">
           {value}%{sub ? ` ${sub}` : ""}
         </span>
       </div>
       <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
         <div
-          className="h-full rounded-full bg-[#05AEA9]"
+          className="h-full rounded-full bg-[var(--brand-teal)]"
           style={{ width: `${Math.max(0, Math.min(100, value))}%` }}
         />
       </div>
@@ -50,7 +50,7 @@ export function DashboardPerformanceGraphs({
     <div className="grid gap-3" data-testid="dashboard-graphs">
       <Card className="shadow-none">
         <CardHeader>
-          <CardTitle className="text-base text-[#072855]">
+          <CardTitle className="text-base text-[var(--student-ink)]">
             Score overview
           </CardTitle>
           <CardDescription>{PERFORMANCE_GRAIN_COPY.overall}</CardDescription>
@@ -76,7 +76,7 @@ export function DashboardPerformanceGraphs({
 
       <Card className="shadow-none">
         <CardHeader>
-          <CardTitle className="text-base text-[#072855]">
+          <CardTitle className="text-base text-[var(--student-ink)]">
             Historical trend
           </CardTitle>
           <CardDescription>{PERFORMANCE_GRAIN_COPY.trend}</CardDescription>
@@ -101,11 +101,11 @@ export function DashboardPerformanceGraphs({
                     className="flex min-w-11 flex-1 flex-col items-center gap-1"
                     title={`${point.title}: ${point.percentage}%`}
                   >
-                    <span className="text-[10px] font-medium tabular-nums text-[#072855] sm:text-xs">
+                    <span className="text-[10px] font-medium tabular-nums text-[var(--student-ink)] sm:text-xs">
                       {point.percentage}%
                     </span>
                     <div
-                      className="w-full max-w-12 rounded-t bg-[#05AEA9]"
+                      className="w-full max-w-12 rounded-t bg-[var(--brand-teal)]"
                       style={{
                         height: `${Math.max(
                           4,

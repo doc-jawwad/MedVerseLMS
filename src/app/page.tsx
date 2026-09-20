@@ -4,7 +4,7 @@ import { Logo } from "@/components/logo";
 
 export default function Home() {
   return (
-    <div className="relative flex min-h-svh flex-col overflow-hidden bg-[#072855] text-white">
+    <div className="relative flex min-h-svh flex-col overflow-hidden bg-[var(--brand-navy)] text-white">
       <div
         className="pointer-events-none absolute inset-0"
         style={{

@@ -24,8 +24,8 @@ export function AdminLibraryTypeTabs({
             className={cn(
               "rounded-full border px-3 py-1 text-sm",
               on
-                ? "border-[#072855] bg-[#072855] text-white"
-                : "bg-card text-muted-foreground hover:bg-accent"
+                ? "border-primary bg-primary text-primary-foreground"
+                : "border-border bg-card text-muted-foreground hover:bg-accent"
             )}
           >
             {t.label}

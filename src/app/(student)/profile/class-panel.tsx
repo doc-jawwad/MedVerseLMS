@@ -50,13 +50,13 @@ export function ClassPanel({
 
   return (
     <div className="grid gap-4 text-sm">
-      <div className="rounded-md border border-[#072855]/15 bg-[#072855]/[0.03] p-4">
+      <div className="rounded-md border border-border bg-muted/40 p-4">
         <div className="flex flex-wrap items-center gap-2">
           <Badge variant={lock.can_self_change ? "outline" : "default"}>
             {classLockBadgeLabel(lock.lock)}
           </Badge>
         </div>
-        <p className="mt-2 text-base font-semibold text-[#072855]">
+        <p className="mt-2 text-base font-semibold text-[var(--student-ink)]">
           {classLockHeadline(lock)}
         </p>
         <p className="mt-1 text-muted-foreground">

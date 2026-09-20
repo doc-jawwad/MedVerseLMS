@@ -233,7 +233,7 @@ export function PearlPracticeSession({
           </div>
         ) : (
           <article
-            className="grid gap-4 rounded-3xl border border-[var(--student-ink)]/10 bg-gradient-to-b from-white to-[#072855]/[0.03] p-4 sm:p-6"
+            className="grid gap-4 rounded-3xl border border-[var(--student-ink)]/10 bg-card p-4 sm:p-6"
             data-testid="pearl-card"
           >
             {currentMeta.subject_name ? (

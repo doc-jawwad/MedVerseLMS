@@ -135,7 +135,7 @@ export default async function QuestionsPage({
         <div className="grid gap-5">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <h1 className="text-2xl font-semibold tracking-tight text-[var(--brand-navy)]">
+              <h1 className="text-2xl font-semibold tracking-tight text-foreground">
                 Question Bank
               </h1>
               <p className="mt-1 text-sm text-muted-foreground">
@@ -181,7 +181,7 @@ export default async function QuestionsPage({
                       href={filterLink({ status: s || undefined })}
                       className={`rounded-full border px-2.5 py-1 text-xs capitalize transition-colors ${
                         (params.status ?? "") === s
-                          ? "border-[var(--brand-navy)] bg-[var(--brand-navy)] text-white"
+                          ? "border-primary bg-primary text-primary-foreground"
                           : "hover:bg-accent/60"
                       }`}
                     >
@@ -200,7 +200,7 @@ export default async function QuestionsPage({
                       data-testid={`admin-year-chip-${y.year_number}`}
                       className={`rounded-full border px-2.5 py-1 text-xs transition-colors ${
                         yearFilter === y.id
-                          ? "border-[var(--brand-navy)] bg-[var(--brand-navy)] text-white"
+                          ? "border-primary bg-primary text-primary-foreground"
                           : "hover:bg-accent/60"
                       }`}
                     >
@@ -218,7 +218,7 @@ export default async function QuestionsPage({
                       chapter: undefined,
                       topic: undefined,
                     })}
-                    className={`rounded-full border px-2.5 py-1 text-xs transition-colors ${!params.subject ? "border-[var(--brand-navy)] bg-[var(--brand-navy)] text-white" : "hover:bg-accent/60"}`}
+                    className={`rounded-full border px-2.5 py-1 text-xs transition-colors ${!params.subject ? "border-primary bg-primary text-primary-foreground" : "hover:bg-accent/60"}`}
                   >
                     all subjects
                   </Link>
@@ -233,7 +233,7 @@ export default async function QuestionsPage({
                       })}
                       className={`rounded-full border px-2.5 py-1 text-xs transition-colors ${
                         params.subject === s.id
-                          ? "border-[var(--brand-navy)] bg-[var(--brand-navy)] text-white"
+                          ? "border-primary bg-primary text-primary-foreground"
                           : "hover:bg-accent/60"
                       }`}
                     >
@@ -250,7 +250,7 @@ export default async function QuestionsPage({
                       chapter: undefined,
                       topic: undefined,
                     })}
-                    className={`rounded-full border px-2.5 py-1 text-xs transition-colors ${!params.book ? "border-[var(--brand-navy)] bg-[var(--brand-navy)] text-white" : "hover:bg-accent/60"}`}
+                    className={`rounded-full border px-2.5 py-1 text-xs transition-colors ${!params.book ? "border-primary bg-primary text-primary-foreground" : "hover:bg-accent/60"}`}
                   >
                     all books
                   </Link>
@@ -264,7 +264,7 @@ export default async function QuestionsPage({
                       })}
                       className={`rounded-full border px-2.5 py-1 text-xs transition-colors ${
                         params.book === b.id
-                          ? "border-[var(--brand-navy)] bg-[var(--brand-navy)] text-white"
+                          ? "border-primary bg-primary text-primary-foreground"
                           : "hover:bg-accent/60"
                       }`}
                     >
@@ -277,7 +277,7 @@ export default async function QuestionsPage({
                 <div className="flex flex-wrap gap-1">
                   <Link
                     href={filterLink({ chapter: undefined, topic: undefined })}
-                    className={`rounded-full border px-2.5 py-1 text-xs transition-colors ${!params.chapter ? "border-[var(--brand-navy)] bg-[var(--brand-navy)] text-white" : "hover:bg-accent/60"}`}
+                    className={`rounded-full border px-2.5 py-1 text-xs transition-colors ${!params.chapter ? "border-primary bg-primary text-primary-foreground" : "hover:bg-accent/60"}`}
                   >
                     all chapters
                   </Link>
@@ -287,7 +287,7 @@ export default async function QuestionsPage({
                       href={filterLink({ chapter: c.id, topic: undefined })}
                       className={`rounded-full border px-2.5 py-1 text-xs transition-colors ${
                         params.chapter === c.id
-                          ? "border-[var(--brand-navy)] bg-[var(--brand-navy)] text-white"
+                          ? "border-primary bg-primary text-primary-foreground"
                           : "hover:bg-accent/60"
                       }`}
                     >
@@ -300,7 +300,7 @@ export default async function QuestionsPage({
                 <div className="flex flex-wrap gap-1">
                   <Link
                     href={filterLink({ topic: undefined })}
-                    className={`rounded-full border px-2.5 py-1 text-xs transition-colors ${!params.topic ? "border-[var(--brand-navy)] bg-[var(--brand-navy)] text-white" : "hover:bg-accent/60"}`}
+                    className={`rounded-full border px-2.5 py-1 text-xs transition-colors ${!params.topic ? "border-primary bg-primary text-primary-foreground" : "hover:bg-accent/60"}`}
                   >
                     all topics
                   </Link>
@@ -310,7 +310,7 @@ export default async function QuestionsPage({
                       href={filterLink({ topic: t.id })}
                       className={`rounded-full border px-2.5 py-1 text-xs transition-colors ${
                         params.topic === t.id
-                          ? "border-[var(--brand-navy)] bg-[var(--brand-navy)] text-white"
+                          ? "border-primary bg-primary text-primary-foreground"
                           : "hover:bg-accent/60"
                       }`}
                     >
@@ -326,7 +326,7 @@ export default async function QuestionsPage({
                     href={filterLink({ difficulty: d || undefined })}
                     className={`rounded-full border px-2.5 py-1 text-xs transition-colors ${
                       (params.difficulty ?? "") === d
-                        ? "border-[var(--brand-navy)] bg-[var(--brand-navy)] text-white"
+                        ? "border-primary bg-primary text-primary-foreground"
                         : "hover:bg-accent/60"
                     }`}
                   >
@@ -343,7 +343,7 @@ export default async function QuestionsPage({
                     })}
                     className={`rounded-full border px-2.5 py-1 text-xs transition-colors ${
                       sort.value === s.value
-                        ? "border-[var(--brand-navy)] bg-[var(--brand-navy)] text-white"
+                        ? "border-primary bg-primary text-primary-foreground"
                         : "hover:bg-accent/60"
                     }`}
                   >

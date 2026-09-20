@@ -57,7 +57,7 @@ function Bar({ label, value, sub }: { label: string; value: number; sub?: string
       </div>
       <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
         <div
-          className="h-full rounded-full bg-[#05AEA9] transition-all"
+          className="h-full rounded-full bg-[var(--brand-teal)] transition-all"
           style={{ width: `${Math.max(0, Math.min(100, value))}%` }}
         />
       </div>

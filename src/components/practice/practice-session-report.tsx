@@ -20,14 +20,14 @@ export function PracticeSessionReportCard({
 }) {
   return (
     <div
-      className="mx-auto grid w-full max-w-lg gap-6 rounded-3xl border border-[#072855]/10 bg-gradient-to-b from-white to-[#072855]/[0.03] p-6 shadow-none sm:p-8"
+      className="mx-auto grid w-full max-w-lg gap-6 rounded-3xl border border-border bg-card p-6 shadow-none sm:p-8"
       data-testid="practice-session-report"
     >
       <div>
-        <p className="text-[11px] font-semibold tracking-[0.16em] text-[#05AEA9] uppercase">
+        <p className="text-[11px] font-semibold tracking-[0.16em] text-[var(--brand-teal-ink)] uppercase">
           Session report
         </p>
-        <h1 className="mt-1 font-heading text-2xl font-semibold tracking-tight text-[#072855]">
+        <h1 className="mt-1 font-heading text-2xl font-semibold tracking-tight text-[var(--student-ink)]">
           {title}
         </h1>
         <p className="mt-1.5 text-sm text-muted-foreground">
@@ -73,12 +73,12 @@ function Stat({
 }) {
   return (
     <div
-      className={`rounded-2xl bg-[#072855]/[0.04] px-4 py-3 ${className ?? ""}`}
+      className={`rounded-2xl bg-muted/50 px-4 py-3 ${className ?? ""}`}
     >
-      <dt className="text-[11px] font-semibold tracking-wide text-[#072855]/55 uppercase">
+      <dt className="text-[11px] font-semibold tracking-wide text-[var(--student-ink)]/55 uppercase">
         {label}
       </dt>
-      <dd className="mt-1 font-heading text-xl font-semibold tabular-nums text-[#072855]">
+      <dd className="mt-1 font-heading text-xl font-semibold tabular-nums text-[var(--student-ink)]">
         {value}
       </dd>
     </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { cn } from "cn";
+import { cn } from "@/lib/utils";
 import type { PracticeFilter, PracticeFilterCounts } from "@/lib/practice/types";
 
 const FILTERS: { id: PracticeFilter; label: string }[] = [
@@ -37,15 +37,15 @@ export function PracticeFilterBar({
             className={cn(
               "shrink-0 rounded-full px-3.5 py-1.5 text-xs font-semibold tracking-wide transition-colors",
               active
-                ? "bg-[#072855] text-white"
-                : "bg-[#072855]/6 text-[#072855]/80 hover:bg-[#072855]/10"
+                ? "bg-primary text-primary-foreground"
+                : "bg-muted text-foreground hover:bg-muted/80"
             )}
           >
             {f.label}
             <span
               className={cn(
                 "ml-1.5 tabular-nums",
-                active ? "text-white/70" : "text-[#072855]/45"
+                active ? "text-primary-foreground/80" : "text-muted-foreground"
               )}
             >
               {counts[f.id]}

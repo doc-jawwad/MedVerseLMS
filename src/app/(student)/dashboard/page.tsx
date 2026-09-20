@@ -244,9 +244,9 @@ export default async function DashboardPage() {
       <DashboardAlerts alerts={alerts} />
 
       <Card className="overflow-hidden shadow-none">
-        <CardHeader className="border-b bg-[#072855] text-white">
-          <CardTitle className="text-base text-white">Incoming tests</CardTitle>
-          <CardDescription className="text-white/85">
+        <CardHeader className="border-b border-border bg-card">
+          <CardTitle className="text-base text-foreground">Incoming tests</CardTitle>
+          <CardDescription>
             Scheduled and currently open tests for your class. History lives under Tests.
           </CardDescription>
         </CardHeader>

@@ -30,7 +30,7 @@ export function ForgotPasswordForm() {
   return (
     <Card className="w-full border-border/80 shadow-none">
       <CardHeader className="space-y-1.5 pb-4">
-        <CardTitle className="text-xl text-[var(--brand-navy)]">
+        <CardTitle className="text-xl text-foreground">
           Forgot password
         </CardTitle>
         <CardDescription>
@@ -74,7 +74,7 @@ export function ForgotPasswordForm() {
         <p className="mt-4 text-center text-sm text-muted-foreground">
           <Link
             href="/login"
-            className="font-medium text-[var(--brand-navy)] underline underline-offset-2"
+            className="font-medium text-foreground underline underline-offset-2"
           >
             Back to sign in
           </Link>

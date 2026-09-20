@@ -64,7 +64,8 @@ export default async function StudentsPage({
     supabase
       .from("profiles")
       .select(
-        "id, full_name, email, account_status, last_login_at, created_at, enrollments(id, status, year_id, years(name))"
+        // Disambiguate: enrollments also has approved_by → profiles (PGRST201).
+        "id, full_name, email, account_status, last_login_at, created_at, enrollments!enrollments_student_id_fkey(id, status, year_id, years(name))"
       )
       .eq("role", "student")
       .order("full_name", { ascending: true })

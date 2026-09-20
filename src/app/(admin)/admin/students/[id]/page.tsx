@@ -70,7 +70,7 @@ export default async function StudentProfilePage({
     <div className="grid gap-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex items-start gap-4">
-          <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full border bg-[#072855]/10 text-lg font-semibold text-[#072855]">
+          <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full border bg-muted text-lg font-semibold text-[var(--student-ink)]">
             {d.biodata.avatar_url ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
@@ -90,7 +90,7 @@ export default async function StudentProfilePage({
             <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
               Student 360
             </p>
-            <h1 className="text-2xl font-semibold text-[#072855]">
+            <h1 className="text-2xl font-semibold text-[var(--student-ink)]">
               {d.biodata.full_name}
             </h1>
             <p className="text-sm text-muted-foreground">
@@ -169,11 +169,11 @@ export default async function StudentProfilePage({
             <CardTitle className="text-base">Class</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-3 text-sm">
-            <div className="rounded-md border border-[#072855]/15 bg-[#072855]/[0.03] p-3">
+            <div className="rounded-md border border-border bg-muted/40 p-3">
               <Badge variant="outline">
                 {classLockBadgeLabel(d.class.lock.lock)}
               </Badge>
-              <p className="mt-2 font-medium text-[#072855]">
+              <p className="mt-2 font-medium text-[var(--student-ink)]">
                 {classLockHeadline(d.class.lock)}
               </p>
             </div>
@@ -412,7 +412,7 @@ function Row({
 function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-md border p-3 text-center">
-      <p className="text-2xl font-semibold text-[#072855]">{value}</p>
+      <p className="text-2xl font-semibold text-[var(--student-ink)]">{value}</p>
       <p className="text-muted-foreground">{label}</p>
     </div>
   );

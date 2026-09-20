@@ -26,7 +26,7 @@ export function ResetPasswordForm() {
   return (
     <Card className="w-full border-border/80 shadow-none">
       <CardHeader className="space-y-1.5 pb-4">
-        <CardTitle className="text-xl text-[var(--brand-navy)]">
+        <CardTitle className="text-xl text-foreground">
           Choose a new password
         </CardTitle>
         <CardDescription>

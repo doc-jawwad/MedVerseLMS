@@ -250,8 +250,8 @@ export function SubscriptionApplyForm({
 
   return (
     <div className="grid gap-6">
-      <section className="grid gap-3 rounded-lg border border-[#072855]/20 bg-[#072855]/[0.03] p-4">
-        <h2 className="font-medium text-[#072855]">Purchase class</h2>
+      <section className="grid gap-3 rounded-lg border border-border bg-muted/40 p-4">
+        <h2 className="font-medium text-[var(--student-ink)]">Purchase class</h2>
         <p className="text-sm text-muted-foreground">
           {purchaseClassPrompt(purchaseYearName)}
         </p>

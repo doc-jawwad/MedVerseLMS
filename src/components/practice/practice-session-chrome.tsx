@@ -53,10 +53,10 @@ export function PracticeSessionChrome({
       <header className="grid gap-3">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="text-[11px] font-semibold tracking-[0.16em] text-[#05AEA9] uppercase">
+            <p className="text-[11px] font-semibold tracking-[0.16em] text-[var(--brand-teal-ink)] uppercase">
               {eyebrow}
             </p>
-            <h1 className="font-heading text-xl font-semibold tracking-tight text-[#072855] sm:text-2xl">
+            <h1 className="font-heading text-xl font-semibold tracking-tight text-[var(--student-ink)] sm:text-2xl">
               {title}
             </h1>
             <p className="mt-0.5 text-sm text-muted-foreground">{positionLabel}</p>
@@ -105,7 +105,7 @@ export function PracticeSessionChrome({
 
       <div className="min-h-[280px]">{children}</div>
 
-      <nav className="sticky bottom-3 z-10 flex gap-2 rounded-2xl border border-[#072855]/10 bg-background/95 p-2 shadow-sm backdrop-blur supports-backdrop-filter:bg-background/80">
+      <nav className="sticky bottom-3 z-10 flex gap-2 rounded-2xl border border-border bg-background/95 p-2 shadow-sm backdrop-blur supports-backdrop-filter:bg-background/80">
         <Button
           type="button"
           variant="outline"

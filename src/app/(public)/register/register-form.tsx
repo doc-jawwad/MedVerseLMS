@@ -39,7 +39,7 @@ export function RegisterForm({ years }: { years: Year[] }) {
   return (
     <Card className="w-full border-border/80 shadow-none">
       <CardHeader className="space-y-1.5 pb-4">
-        <CardTitle className="text-xl text-[var(--brand-navy)]">
+        <CardTitle className="text-xl text-foreground">
           Create your account
         </CardTitle>
         <CardDescription>
@@ -146,7 +146,7 @@ export function RegisterForm({ years }: { years: Year[] }) {
             Already registered?{" "}
             <Link
               href="/login"
-              className="font-medium text-[var(--brand-navy)] underline underline-offset-2"
+              className="font-medium text-foreground underline underline-offset-2"
             >
               Sign in
             </Link>

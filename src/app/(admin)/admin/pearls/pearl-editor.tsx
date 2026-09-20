@@ -227,7 +227,7 @@ export function PearlEditor({
         <div className="rounded-xl border bg-card p-4">
           <p className="text-xs font-semibold tracking-wide text-[var(--brand-teal-ink)] uppercase">Student preview</p>
           <p className="mt-3 text-lg font-medium text-[var(--student-ink)]">{prompt || "Prompt"}</p>
-          <div className="mt-4 rounded-lg bg-[#072855]/5 p-3">
+          <div className="mt-4 rounded-lg bg-muted/60 p-3">
             <p className="text-sm font-semibold">Answer</p>
             <p>{answer || "—"}</p>
             {explanation ? (
