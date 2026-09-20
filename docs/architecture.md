@@ -207,6 +207,8 @@ Ranking must be **coalesced** before a 1,500-submit event — hosting does not r
 
 **Pearl points:** lightweight recall items in `pearl_points` (not `question_versions`). Same entitlement columns as tests/folders. Answers are RPC-only.
 
+**OSPE Practice stations:** image + hidden-answer items in `ospe_stations` (not library OSPE folders, not MCQs, not exam attempts). Same entitlement columns; private R2 under `study-content/`; answer and object key are RPC-only (`open_ospe_station` / `authorize_ospe_station_object`).
+
 **Test preparation guidelines:** optional `test_prep_guidelines` row keyed by `test_id`. Frozen after the test leaves `draft`. Student body is returned only after `can_access_test`. Catalog visibility of a test does not leak the guideline.
 
 **Books/notes/video (FUTURE):** add a `materials.kind` (or a similarly narrow table) and the same signed-R2 + entitlement pattern. Do not invent a generic CMS. Must not be stored as permanent VPS-local public files and must not expose ordinary permanent download URLs or public MP4s.

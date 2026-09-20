@@ -104,7 +104,7 @@ Each student-facing resource kind carries the same entitlement shape (columns on
 - `entitlement text check in ('free','any_subscription','plan')` default `'free'`
 - `required_plan_id uuid null references subscription_plans` — required iff `entitlement = 'plan'`.
 
-Applies to **tests**, **material_folders**, **practice subjects** (`subjects`), and **pearl_points**. Main Admin configures each practice subject independently. Do not hard-code practice or pearls as always free or always paid. PDF files and text guidelines inherit **folder** entitlement — they are not a second policy.
+Applies to **tests**, **material_folders**, **practice subjects** (`subjects`), **pearl_points**, and **ospe_stations**. Main Admin configures each practice subject independently. Do not hard-code practice, pearls, or OSPE stations as always free or always paid. PDF files and text guidelines inherit **folder** entitlement — they are not a second policy. OSPE Practice stations carry their own entitlement columns (independent of `material_folders` and of `has_practice_access`).
 
 **Compatibility backfill:** existing tests, material folders, and practice subjects default to `entitlement = 'free'` so current year-based access is preserved. New resources may be free, subscription-required, or plan-specific.
 
@@ -191,6 +191,10 @@ Student catalog SELECT must **not** expose `drive_url`, `body_text`, or R2 keys.
 ## Pearl points
 
 **pearl_points** — high-yield one-line recall items. **Not** Question Bank MCQs (`questions` / `question_versions` stay 4–5 option scored items). Columns: `prompt`, `answer`, `explanation` (optional), `year_id`, `subject_id`, optional `chapter_id` / `topic_id`, `status` `draft|published`, entitlement columns, `sort_order`, `created_by`. Student catalog SELECT excludes `answer` / `explanation`. `open_pearl(id)` returns the reveal payload after `can_access_pearl`. `can_view_pearl` is published + active year enrollment + `account_allows_lms`. Content uses `resource_content_allowed` with kind `pearl_point` (grant overlay for this kind is not stored on `access_grants` yet).
+
+## OSPE Practice stations
+
+**ospe_stations** — image + hidden-answer Practice stations. **Not** library OSPE packs (`material_folders.library_type` `ospe_material` / `ospe_lectures`), **not** MCQs, **not** `test_attempts`. Columns: `title`, `answer`, `year_id`, `subject_id`, `status` `draft|published`, entitlement columns (`free` / `any_subscription` / `plan`), private R2 `r2_object_key` under `study-content/` with `r2_content_type` `image/jpeg|image/png|image/webp` and `r2_byte_size > 0`, `sort_order`, `created_by`. No `chapter_id` / `topic_id` / `explanation` / `description` / `folder_id` / Drive or guideline payload. Student catalog SELECT is metadata only (no `answer`, no R2 columns, no `created_by`). `can_view_ospe_station` = published + active year enrollment + `account_allows_lms`. `can_access_ospe_station` adds `resource_content_allowed('ospe_station', …)` — **do not** use `has_practice_access`. Image bytes: `authorize_ospe_station_object(id)` returns the key only (admin `manage_materials` + assigned class may authorize draft; student needs published + content entitlement). Reveal: `open_ospe_station(id)` returns `{id,title,answer}` only. Admin edit: `get_ospe_station_for_admin` (`manage_materials` + `admin_can_access_year`). Entitlement writes via `set_resource_entitlement(..., 'ospe_station', ...)`. Practice progress `item_kind` includes `ospe`, authorized through `can_access_ospe_station`. Reuse `allocate_study_object_key` / `authorize_study_object_discard`. Per-student OSPE grant overlay deferred (same as pearls).
 
 ## Import
 

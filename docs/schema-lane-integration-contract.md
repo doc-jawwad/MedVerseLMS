@@ -29,7 +29,7 @@ Second level = `subjects.id` (product Blocks after future mapping).
 
 ### Tables
 - `admin_year_assignments` `(admin_id, year_id)` unique
-- `practice_progress` `(student_id, item_kind, item_id)` unique; `state` remaining|done; `marked`
+- `practice_progress` `(student_id, item_kind, item_id)` unique; `item_kind` question|pearl|ospe; `state` remaining|done; `marked`
 - `practice_sessions` (optional report summary)
 
 ### Additive columns
