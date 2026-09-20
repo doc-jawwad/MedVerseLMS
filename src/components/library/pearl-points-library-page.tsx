@@ -1,5 +1,5 @@
 import { requireStudent } from "@/lib/auth/require-user";
-import { PearlPlayer } from "@/components/study/pearl-player";
+import { PearlPracticeSession } from "@/components/practice/pearl-practice-session";
 import { PageHeader } from "@/components/student/page-header";
 import { StudentPage } from "@/components/student/student-page";
 import { EmptyState } from "@/components/student/empty-state";
@@ -13,7 +13,7 @@ export async function PearlPointsLibraryPage({
 }: {
   mode: "full" | "free";
 }) {
-  const { supabase } = await requireStudent();
+  const { supabase, userId } = await requireStudent();
   const hasLiveAccess = await getStudentHasLiveSubscription();
 
   if (mode === "full" && !studentHasPaidLmsSections(hasLiveAccess)) {
@@ -91,7 +91,12 @@ export async function PearlPointsLibraryPage({
           description="When your academy publishes recall points you can use, they appear here."
         />
       ) : (
-        <PearlPlayer items={items} subjects={filterSubjects} />
+        <PearlPracticeSession
+          items={items}
+          subjects={filterSubjects}
+          studentId={userId}
+          backHref={mode === "free" ? "/free-resources/pearl-points" : "/pearl-points"}
+        />
       )}
     </StudentPage>
   );
