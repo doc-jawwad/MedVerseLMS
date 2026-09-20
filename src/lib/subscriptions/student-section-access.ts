@@ -27,6 +27,13 @@ export function studentHasPaidLmsSections(hasLiveAccess: boolean): boolean {
 }
 
 export function isPaidLmsSectionPath(pathname: string): boolean {
+  // OSPE Practice stations use per-item entitlement (free stations for free students).
+  if (
+    pathname === "/practice/ospe" ||
+    pathname.startsWith("/practice/ospe/")
+  ) {
+    return false;
+  }
   return PAID_LMS_SECTION_HREFS.some(
     (href) => pathname === href || pathname.startsWith(`${href}/`)
   );
@@ -50,6 +57,13 @@ const STUDENT_NAV_DEFS: NavDef[] = [
     icon: lib.icon,
     requiresPaidSections: true as const,
   })),
+  {
+    href: "/practice/ospe",
+    label: "OSPE Practice",
+    icon: "ospeMaterial",
+    // Per-station entitlement; free stations remain usable without a section lock.
+    requiresPaidSections: false,
+  },
   {
     href: "/performance",
     label: "Performance",

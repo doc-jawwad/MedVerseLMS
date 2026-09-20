@@ -19,9 +19,13 @@ function rpcMissing(error: { message?: string | null } | null): boolean {
   );
 }
 
-/** App kind `mcq` maps to Data Spine `question`. */
-export function toSpineItemKind(kind: PracticeItemKind): "question" | "pearl" {
-  return kind === "mcq" ? "question" : "pearl";
+/** App kind `mcq` maps to Data Spine `question`; `ospe` stays `ospe`. */
+export function toSpineItemKind(
+  kind: PracticeItemKind
+): "question" | "pearl" | "ospe" {
+  if (kind === "mcq") return "question";
+  if (kind === "ospe") return "ospe";
+  return "pearl";
 }
 
 export function fromSpineItemKind(
@@ -29,6 +33,7 @@ export function fromSpineItemKind(
 ): PracticeItemKind | null {
   if (kind === "question") return "mcq";
   if (kind === "pearl") return "pearl";
+  if (kind === "ospe") return "ospe";
   return null;
 }
 

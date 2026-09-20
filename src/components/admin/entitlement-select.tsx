@@ -18,7 +18,12 @@ export function EntitlementSelect({
   value,
   disabled,
 }: {
-  kind: "practice_subject" | "test" | "materials_folder" | "pearl_point";
+  kind:
+    | "practice_subject"
+    | "test"
+    | "materials_folder"
+    | "pearl_point"
+    | "ospe_station";
   id: string;
   value: string;
   disabled?: boolean;

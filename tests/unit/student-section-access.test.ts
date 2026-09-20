@@ -36,6 +36,7 @@ describe("buildStudentShellNav", () => {
     assert.equal(byHref["/notes"]?.locked, true);
     assert.equal(byHref["/lectures"]?.locked, true);
     assert.equal(byHref["/performance"]?.locked, true);
+    assert.equal(byHref["/practice/ospe"]?.locked, false);
 
     assert.deepEqual(
       bottomItems.map((i) => i.href),
@@ -69,6 +70,8 @@ describe("isPaidLmsSectionPath", () => {
     assert.equal(isPaidLmsSectionPath("/mcq-bank"), true);
     assert.equal(isPaidLmsSectionPath("/practice"), true);
     assert.equal(isPaidLmsSectionPath("/practice/abc"), true);
+    assert.equal(isPaidLmsSectionPath("/practice/ospe"), false);
+    assert.equal(isPaidLmsSectionPath("/practice/ospe/x"), false);
     assert.equal(isPaidLmsSectionPath("/pearl-points"), true);
     assert.equal(isPaidLmsSectionPath("/guidelines"), true);
     assert.equal(isPaidLmsSectionPath("/performance"), true);

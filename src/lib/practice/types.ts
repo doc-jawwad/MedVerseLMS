@@ -1,6 +1,6 @@
 /** Practice product progress — separate from formal exam attempts. */
 
-export type PracticeItemKind = "mcq" | "pearl";
+export type PracticeItemKind = "mcq" | "pearl" | "ospe";
 
 /** Per-item product state. Default when no row exists is remaining. */
 export type PracticeItemState = "remaining" | "done";

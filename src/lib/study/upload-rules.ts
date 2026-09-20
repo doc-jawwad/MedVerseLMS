@@ -1,5 +1,7 @@
 export const STUDY_PDF_MAX_BYTES = 25 * 1024 * 1024;
 export const STUDY_COVER_MAX_BYTES = 2 * 1024 * 1024;
+/** OSPE station photos — larger than cover thumbs, still private study-content. */
+export const OSPE_STATION_IMAGE_MAX_BYTES = 10 * 1024 * 1024;
 
 export const STUDY_PDF_CONTENT_TYPE = "application/pdf";
 
@@ -8,6 +10,8 @@ export const STUDY_COVER_CONTENT_TYPES = [
   "image/png",
   "image/webp",
 ] as const;
+
+export const OSPE_STATION_IMAGE_CONTENT_TYPES = STUDY_COVER_CONTENT_TYPES;
 
 export function isStudyPdfFile(file: { type: string; size: number }): string | null {
   if (file.type !== STUDY_PDF_CONTENT_TYPE) return "pdf_type_invalid";
@@ -24,5 +28,22 @@ export function isStudyCoverFile(file: { type: string; size: number }): string |
     return "cover_type_invalid";
   }
   if (file.size <= 0 || file.size > STUDY_COVER_MAX_BYTES) return "cover_too_large";
+  return null;
+}
+
+export function isOspeStationImageFile(file: {
+  type: string;
+  size: number;
+}): string | null {
+  if (
+    !OSPE_STATION_IMAGE_CONTENT_TYPES.includes(
+      file.type as (typeof OSPE_STATION_IMAGE_CONTENT_TYPES)[number]
+    )
+  ) {
+    return "ospe_image_type_invalid";
+  }
+  if (file.size <= 0 || file.size > OSPE_STATION_IMAGE_MAX_BYTES) {
+    return "ospe_image_too_large";
+  }
   return null;
 }

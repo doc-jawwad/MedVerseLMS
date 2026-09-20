@@ -113,6 +113,12 @@ export const ADMIN_NAV: AdminNavDef[] = [
     anyOf: ["manage_materials"],
   },
   {
+    href: "/admin/ospe-stations",
+    label: "OSPE Practice",
+    icon: "ospeMaterial",
+    anyOf: ["manage_materials"],
+  },
+  {
     href: "/admin/free-resources",
     label: "Free Resources",
     icon: "freeResources",

@@ -49,6 +49,10 @@ function categoryHubHref(
       paid: "/pearl-points",
       free: "/free-resources/pearl-points",
     },
+    ospepractice: {
+      paid: "/practice/ospe",
+      free: "/practice/ospe",
+    },
   };
   const entry = map[key];
   if (!entry) return null;

@@ -12,11 +12,13 @@ import { adaptTestLeaderboardRows } from "../../src/lib/leaderboard/from-test-le
 import { LEADERBOARD_PROJECTION_LIMITS } from "../../src/lib/leaderboard/projection-contract.ts";
 
 describe("Data Spine practice kind mapping", () => {
-  it("maps mcq ↔ question and pearl ↔ pearl", () => {
+  it("maps mcq ↔ question, pearl ↔ pearl, and ospe ↔ ospe", () => {
     assert.equal(toSpineItemKind("mcq"), "question");
     assert.equal(toSpineItemKind("pearl"), "pearl");
+    assert.equal(toSpineItemKind("ospe"), "ospe");
     assert.equal(fromSpineItemKind("question"), "mcq");
     assert.equal(fromSpineItemKind("pearl"), "pearl");
+    assert.equal(fromSpineItemKind("ospe"), "ospe");
     assert.equal(fromSpineItemKind("other"), null);
   });
 });
