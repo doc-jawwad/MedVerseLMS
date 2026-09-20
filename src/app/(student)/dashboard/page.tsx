@@ -30,6 +30,18 @@ import { EmptyState } from "@/components/student/empty-state";
 import { OpensCountdown } from "@/components/study/opens-countdown";
 import { StudyMarkdown } from "@/components/study/study-markdown";
 import { sortByOpensAtAsc } from "@/lib/study/upcoming";
+import { DashboardAlerts } from "@/components/dashboard/dashboard-alerts";
+import { LeaderboardBoardCard } from "@/components/dashboard/leaderboard-board-card";
+import { DashboardPerformanceGraphs } from "@/components/dashboard/performance-graphs";
+import { buildDashboardAlerts } from "@/lib/dashboard/build-alerts";
+import {
+  adaptLifetimeSummaryBars,
+  adaptStudentTrendForChart,
+} from "@/lib/dashboard/trend-chart-adapter";
+import {
+  dashboardTop3Limit,
+  loadLastCompletedLeaderboardBoard,
+} from "@/lib/leaderboard/load-last-completed-board";
 
 export const metadata = { title: "Dashboard — MedVerse LMS" };
 
@@ -49,10 +61,12 @@ export default async function DashboardPage() {
 
   const now = new Date();
   const nowIso = now.toISOString();
+  const nowMs = now.getTime();
 
   const [
     { data: summary },
     { data: recent },
+    { data: trend },
     { data: upcoming },
     { data: catalogTests },
     { data: myAttempts },
@@ -65,6 +79,7 @@ export default async function DashboardPage() {
   ] = await Promise.all([
     supabase.rpc("student_test_summary"),
     supabase.rpc("student_recent_tests", { p_limit: 5 }),
+    supabase.rpc("student_trend"),
     supabase
       .from("tests")
       .select(
@@ -76,7 +91,7 @@ export default async function DashboardPage() {
       .limit(20),
     supabase
       .from("tests")
-      .select("id, status, opens_at, closes_at, entitlement"),
+      .select("id, title, status, opens_at, closes_at, entitlement"),
     supabase
       .from("test_attempts")
       .select("test_id, state, expires_at")
@@ -145,7 +160,7 @@ export default async function DashboardPage() {
   });
 
   const catalogStates = classifyCatalogTestStates({
-    nowMs: now.getTime(),
+    nowMs,
     tests: catalogTests ?? [],
     attempts: myAttempts ?? [],
     accessibleIds: (accessible ?? []).map((row: { id: string }) => row.id),
@@ -170,7 +185,7 @@ export default async function DashboardPage() {
   });
 
   const incomingStates = classifyCatalogTestStates({
-    nowMs: now.getTime(),
+    nowMs,
     tests: upcoming ?? [],
     attempts: myAttempts ?? [],
     accessibleIds: (accessible ?? []).map((row: { id: string }) => row.id),
@@ -180,11 +195,40 @@ export default async function DashboardPage() {
     })),
     grants: grants ?? [],
   });
-  const incomingTests = sortByOpensAtAsc(upcoming ?? []).map((t) => {
-    const idx = (upcoming ?? []).findIndex((row) => row.id === t.id);
-    return { t, state: incomingStates[idx]! };
-  }).filter(({ state }) => isIncomingDashboardTest(state));
+  const incomingTests = sortByOpensAtAsc(upcoming ?? [])
+    .map((t) => {
+      const idx = (upcoming ?? []).findIndex((row) => row.id === t.id);
+      return { t, state: incomingStates[idx]! };
+    })
+    .filter(({ state }) => isIncomingDashboardTest(state));
 
+  const alerts = buildDashboardAlerts({
+    accessKind: presentation.accessKind,
+    accessBanner: presentation.accessBanner,
+    incoming: incomingTests.map(({ t, state }) => ({
+      id: t.id,
+      title: t.title,
+      opens_at: t.opens_at,
+      state,
+    })),
+    nowMs,
+  });
+
+  const top3Board = await loadLastCompletedLeaderboardBoard(supabase, {
+    candidates: (catalogTests ?? []).map((t) => ({
+      id: t.id as string,
+      title: (t.title as string) ?? "",
+      status: t.status as string,
+      closes_at: (t.closes_at as string | null) ?? null,
+      opens_at: (t.opens_at as string | null) ?? null,
+      entitlement: (t.entitlement as string | null) ?? null,
+    })),
+    nowMs,
+    limit: dashboardTop3Limit(),
+  });
+
+  const trendSeries = adaptStudentTrendForChart(trend);
+  const summaryBars = adaptLifetimeSummaryBars(s);
   const recentRows = (recent ?? []) as RecentTest[];
 
   return (
@@ -192,35 +236,12 @@ export default async function DashboardPage() {
       <PageHeader
         eyebrow={enrollment.year_name}
         title={`Welcome, ${profile.full_name || "Student"}`}
-        description="Incoming scheduled tests for your class, plus lifetime results."
+        description="Incoming scheduled tests for your class, plus lifetime results and the last-test Top 3."
       />
 
       <InstallMedverseApp variant="card" />
 
-      {presentation.accessBanner && (
-        <Card className="shadow-none">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base text-[#072855]">
-              {presentation.accessBanner.title}
-            </CardTitle>
-            <CardDescription>
-              {presentation.accessBanner.description}
-            </CardDescription>
-          </CardHeader>
-          {presentation.lockPaidCurrentAccess && (
-            <CardContent>
-              <Button asChild size="sm" variant="secondary">
-                <Link href="/subscription">
-                  {presentation.accessKind === "expired" ||
-                  presentation.accessKind === "deactivated"
-                    ? "Renew subscription"
-                    : "My subscription"}
-                </Link>
-              </Button>
-            </CardContent>
-          )}
-        </Card>
-      )}
+      <DashboardAlerts alerts={alerts} />
 
       <Card className="overflow-hidden shadow-none">
         <CardHeader className="border-b bg-[#072855] text-white">
@@ -303,6 +324,13 @@ export default async function DashboardPage() {
         </CardContent>
       </Card>
 
+      <LeaderboardBoardCard
+        title="Last test leaderboard"
+        description="Top 3 from the most recently completed formal test. Free and paid students can view this board."
+        board={top3Board}
+        viewerStudentId={userId}
+      />
+
       {presentation.showHistoricalPerformance && (
         <div className="grid gap-3">
           <SectionHeading
@@ -333,6 +361,8 @@ export default async function DashboardPage() {
           </div>
         </div>
       )}
+
+      <DashboardPerformanceGraphs trend={trendSeries} summary={summaryBars} />
 
       <div className="grid gap-3">
         <SectionHeading
@@ -387,7 +417,10 @@ export default async function DashboardPage() {
         </CardHeader>
         <CardContent>
           {recentRows.length === 0 ? (
-            <EmptyState title="No tests taken yet." />
+            <EmptyState
+              title="No history yet"
+              description="Submitted tests will list here with your score and rank."
+            />
           ) : (
             <div className="grid gap-2">
               {recentRows.map((r) => (
