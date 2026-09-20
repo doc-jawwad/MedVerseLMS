@@ -38,29 +38,46 @@ alter table public.subscriptions
 alter table public.subscription_applications
   add column if not exists year_id uuid references public.years (id);
 
--- Backfill from active enrollment (best available purchase/class proxy).
-update public.subscriptions s
-set year_id = e.year_id
-from public.enrollments e
-where s.year_id is null
-  and e.student_id = s.student_id
-  and e.status = 'active';
+-- Backfill year_id. subscription_applications is RPC-only via
+-- protect_subscription_application() / medverse.subscription_application_rpc.
+-- Wrap in one DO block so set_config(..., is_local := true) covers all UPDATEs
+-- in a single transaction (plain sequential statements would each autocommit and
+-- drop a local GUC). Safe to re-run after a partial apply that added nullable
+-- year_id columns but failed before backfill (production 2026-09-20).
+do $$
+begin
+  perform set_config('medverse.subscription_application_rpc', '1', true);
 
-update public.subscription_applications a
-set year_id = e.year_id
-from public.enrollments e
-where a.year_id is null
-  and e.student_id = a.student_id
-  and e.status = 'active';
+  -- From active enrollment (best available purchase/class proxy).
+  update public.subscriptions s
+  set year_id = e.year_id
+  from public.enrollments e
+  where s.year_id is null
+    and e.student_id = s.student_id
+    and e.status = 'active';
 
--- Remaining orphans: attach year 1 so NOT NULL can apply (should be rare).
-update public.subscriptions
-set year_id = (select id from public.years where year_number = 1 limit 1)
-where year_id is null;
+  update public.subscription_applications a
+  set year_id = e.year_id
+  from public.enrollments e
+  where a.year_id is null
+    and e.student_id = a.student_id
+    and e.status = 'active';
 
-update public.subscription_applications
-set year_id = (select id from public.years where year_number = 1 limit 1)
-where year_id is null;
+  -- Remaining orphans: attach year 1 so NOT NULL can apply (should be rare).
+  update public.subscriptions
+  set year_id = (select id from public.years where year_number = 1 limit 1)
+  where year_id is null;
+
+  update public.subscription_applications
+  set year_id = (select id from public.years where year_number = 1 limit 1)
+  where year_id is null;
+
+  perform set_config('medverse.subscription_application_rpc', '', true);
+exception
+  when others then
+    perform set_config('medverse.subscription_application_rpc', '', true);
+    raise;
+end $$;
 
 alter table public.subscriptions
   alter column year_id set not null;
