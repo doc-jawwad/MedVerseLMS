@@ -24,10 +24,19 @@ export function Logo({
       {withWordmark && (
         <span
           className={`text-lg font-bold tracking-tight ${
-            dark ? "text-[#072855]" : "text-white"
+            dark ? "text-[var(--student-ink)]" : "text-white"
           }`}
         >
-          Med<span className="text-[#05AEA9]">Verse</span>
+          Med
+          <span
+            className={
+              dark
+                ? "text-[var(--brand-teal-ink)]"
+                : "text-[var(--brand-teal)]"
+            }
+          >
+            Verse
+          </span>
         </span>
       )}
     </div>

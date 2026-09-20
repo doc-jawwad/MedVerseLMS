@@ -32,12 +32,12 @@ export default function ContactUsPage() {
               className="group block min-w-0 outline-none"
               data-testid={`contact-link-${item.id}`}
             >
-              <Card className="h-full min-w-0 border-border/80 shadow-none transition-colors group-hover:border-[#05AEA9]/40 group-hover:bg-accent/40 group-focus-visible:ring-2 group-focus-visible:ring-[#05AEA9]/50">
+              <Card className="h-full min-w-0 border-border/80 shadow-none transition-colors group-hover:border-[var(--brand-teal)]/50 group-hover:bg-accent/40 group-focus-visible:ring-2 group-focus-visible:ring-[var(--brand-teal)]/45">
                 <CardHeader className="gap-1.5">
-                  <CardTitle className="flex items-start justify-between gap-2 text-base text-[#072855]">
+                  <CardTitle className="flex items-start justify-between gap-2 text-base text-[var(--student-ink)]">
                     <span className="min-w-0 text-balance">{item.label}</span>
                     <ExternalLink
-                      className="mt-0.5 size-4 shrink-0 text-muted-foreground opacity-70 transition-opacity group-hover:opacity-100"
+                      className="mt-0.5 size-4 shrink-0 text-muted-foreground opacity-80 transition-opacity group-hover:opacity-100"
                       aria-hidden
                     />
                   </CardTitle>
@@ -56,11 +56,11 @@ export default function ContactUsPage() {
           href="/career-counselling"
           className="group block min-w-0 outline-none"
         >
-          <Card className="h-full border-border/80 shadow-none transition-colors group-hover:border-[#05AEA9]/40 group-hover:bg-accent/40 group-focus-visible:ring-2 group-focus-visible:ring-[#05AEA9]/50">
+          <Card className="h-full border-border/80 shadow-none transition-colors group-hover:border-[var(--brand-teal)]/50 group-hover:bg-accent/40 group-focus-visible:ring-2 group-focus-visible:ring-[var(--brand-teal)]/45">
             <CardHeader className="gap-1.5">
-              <CardTitle className="flex items-center gap-2 text-base text-[#072855]">
+              <CardTitle className="flex items-center gap-2 text-base text-[var(--student-ink)]">
                 <GraduationCap
-                  className="size-4 shrink-0 text-[#05AEA9]"
+                  className="size-4 shrink-0 text-[var(--brand-teal-ink)]"
                   aria-hidden
                 />
                 Career Counselling Series
@@ -72,10 +72,10 @@ export default function ContactUsPage() {
           </Card>
         </Link>
         <Link href="/imd-stepwise" className="group block min-w-0 outline-none">
-          <Card className="h-full border-border/80 shadow-none transition-colors group-hover:border-[#05AEA9]/40 group-hover:bg-accent/40 group-focus-visible:ring-2 group-focus-visible:ring-[#05AEA9]/50">
+          <Card className="h-full border-border/80 shadow-none transition-colors group-hover:border-[var(--brand-teal)]/50 group-hover:bg-accent/40 group-focus-visible:ring-2 group-focus-visible:ring-[var(--brand-teal)]/45">
             <CardHeader className="gap-1.5">
-              <CardTitle className="flex items-center gap-2 text-base text-[#072855]">
-                <Award className="size-4 shrink-0 text-[#05AEA9]" aria-hidden />
+              <CardTitle className="flex items-center gap-2 text-base text-[var(--student-ink)]">
+                <Award className="size-4 shrink-0 text-[var(--brand-teal-ink)]" aria-hidden />
                 Get iMD & StepWise MD Subscription
               </CardTitle>
               <CardDescription className="text-xs leading-relaxed sm:text-sm">

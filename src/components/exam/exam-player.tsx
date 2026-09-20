@@ -75,7 +75,7 @@ function paletteClass(status: ExamQuestionStatus, isCurrent: boolean) {
     "flex h-8 items-center justify-center rounded-md text-xs font-semibold transition-colors",
     isCurrent && "ring-2 ring-[#072855] ring-offset-1",
     status === "answered" &&
-      "bg-[#05AEA9]/20 text-[#072855] dark:bg-teal-900 dark:text-teal-50",
+      "bg-[#05AEA9]/20 text-[var(--student-ink)] dark:bg-teal-900 dark:text-teal-50",
     status === "skipped" &&
       "bg-amber-100 text-amber-950 dark:bg-amber-900 dark:text-amber-50",
     status === "remaining" && "bg-muted text-muted-foreground"
@@ -269,7 +269,7 @@ export function ExamPlayer({
   const navPanel = (
     <div className="grid gap-3">
       <div>
-        <p className="mb-2 text-xs font-semibold tracking-wide text-[#072855]/70 uppercase">
+        <p className="mb-2 text-xs font-semibold tracking-wide text-[var(--student-ink)]/70 uppercase">
           Questions
         </p>
         <div className="grid grid-cols-8 gap-1 sm:grid-cols-10 lg:grid-cols-5">
@@ -356,7 +356,7 @@ export function ExamPlayer({
       <header className="shrink-0 border-b bg-card/90 px-4 py-3 pt-[max(0.75rem,env(safe-area-inset-top))] backdrop-blur-md">
         <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-3">
           <div className="min-w-0">
-            <p className="truncate font-heading text-sm font-semibold text-[#072855] sm:text-base">
+            <p className="truncate font-heading text-sm font-semibold text-[var(--student-ink)] sm:text-base">
               {title}
             </p>
             <p className="text-xs text-muted-foreground">
@@ -426,7 +426,7 @@ export function ExamPlayer({
         >
           <Card className="shadow-none">
             <CardContent className="grid gap-4 pt-6">
-              <p className="whitespace-pre-wrap text-[15px] leading-relaxed text-[#072855] sm:text-base">
+              <p className="whitespace-pre-wrap text-[15px] leading-relaxed text-[var(--student-ink)] sm:text-base">
                 <span className="mr-2 font-semibold">{index + 1}.</span>
                 {current.stem}
               </p>
@@ -449,7 +449,7 @@ export function ExamPlayer({
                       className={cn(
                         "rounded-xl border p-3.5 text-left text-sm transition-colors",
                         selected
-                          ? "border-[#05AEA9] bg-[#05AEA9]/10 font-medium text-[#072855]"
+                          ? "border-[#05AEA9] bg-[#05AEA9]/10 font-medium text-[var(--student-ink)]"
                           : "border-border bg-card hover:bg-accent/60"
                       )}
                     >
@@ -525,8 +525,8 @@ function CountChip({
       className={cn(
         "flex items-baseline gap-1.5 rounded-full px-2.5 py-1 text-xs",
         tone === "skipped" && "bg-amber-100 text-amber-950 dark:bg-amber-900 dark:text-amber-50",
-        tone === "answered" && "bg-[#05AEA9]/15 text-[#072855]",
-        tone === "muted" && "bg-muted text-[#072855]"
+        tone === "answered" && "bg-[#05AEA9]/15 text-[var(--student-ink)]",
+        tone === "muted" && "bg-muted text-[var(--student-ink)]"
       )}
     >
       <span className="font-medium">{label}</span>

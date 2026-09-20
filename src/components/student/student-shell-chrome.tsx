@@ -77,7 +77,7 @@ export function StudentShellChrome({
           <div className="mt-4 truncate text-sm font-medium text-white">
             {userLabel}
           </div>
-          <div className="mt-1.5 w-fit rounded-full bg-white/10 px-2.5 py-0.5 text-[11px] tracking-wide text-sidebar-foreground/80">
+          <div className="mt-1.5 w-fit rounded-full bg-white/12 px-2.5 py-0.5 text-[11px] tracking-wide text-[var(--sidebar-muted)]">
             {subLabel}
           </div>
         </div>

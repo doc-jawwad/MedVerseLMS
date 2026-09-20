@@ -89,7 +89,7 @@ export default async function PracticeSubjectPage({
 
       {[...books.entries()].map(([bookId, book]) => (
         <div key={bookId} className="grid gap-3">
-          <h2 className="font-heading text-[13px] font-semibold tracking-[0.12em] text-[#072855]/65 uppercase">
+          <h2 className="font-heading text-[13px] font-semibold tracking-[0.12em] text-[var(--student-ink)]/70 uppercase">
             {book.name}
           </h2>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">

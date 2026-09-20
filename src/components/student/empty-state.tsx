@@ -9,7 +9,7 @@ export function EmptyState({
 }) {
   return (
     <div className="rounded-xl border border-dashed bg-card/80 px-6 py-12 text-center">
-      <p className="font-medium text-[#072855]">{title}</p>
+      <p className="font-medium text-[var(--student-ink)]">{title}</p>
       {description && (
         <p className="mx-auto mt-1.5 max-w-md text-sm text-muted-foreground">
           {description}

@@ -24,7 +24,7 @@ export default function Home() {
         </div>
       </header>
       <main className="relative flex flex-1 flex-col items-center justify-center px-6 py-16 text-center">
-        <p className="text-[11px] font-semibold tracking-[0.2em] text-[#05AEA9] uppercase">
+        <p className="text-[11px] font-semibold tracking-[0.2em] text-[var(--brand-teal-ink)] uppercase">
           Medical education
         </p>
         <h1 className="mt-3 max-w-2xl font-heading text-4xl font-semibold tracking-tight sm:text-5xl">

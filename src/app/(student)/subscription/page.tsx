@@ -117,7 +117,7 @@ export default async function SubscriptionPage() {
 
       <Card className="shadow-none">
         <CardHeader>
-          <CardTitle className="flex flex-wrap items-center gap-2 text-base text-[#072855]">
+          <CardTitle className="flex flex-wrap items-center gap-2 text-base text-[var(--student-ink)]">
             {view.label}
             <Badge
               variant={
@@ -210,7 +210,7 @@ export default async function SubscriptionPage() {
       {showApply && (
         <Card className="shadow-none">
           <CardHeader>
-            <CardTitle className="text-base text-[#072855]">
+            <CardTitle className="text-base text-[var(--student-ink)]">
               {applyMode === "edit"
                 ? "Edit pending application"
                 : "Get Subscription"}
@@ -238,7 +238,7 @@ export default async function SubscriptionPage() {
 
       <Card id="contact-admin" className="shadow-none">
         <CardHeader>
-          <CardTitle className="text-base text-[#072855]">Contact Admin</CardTitle>
+          <CardTitle className="text-base text-[var(--student-ink)]">Contact Admin</CardTitle>
           <CardDescription>
             There is no in-app messaging. Reach your academy admin the same way
             you usually do (WhatsApp / email / office) if you need help with

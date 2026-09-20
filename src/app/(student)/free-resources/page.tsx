@@ -131,7 +131,7 @@ export default async function FreeResourcesPage() {
                 <Card className="h-full shadow-none transition-colors hover:bg-accent/40">
                   <CardHeader>
                     <div className="flex flex-wrap items-center gap-2">
-                      <CardTitle className="text-lg text-[#072855]">
+                      <CardTitle className="text-lg text-[var(--student-ink)]">
                         {cat.label}
                       </CardTitle>
                       <Badge variant="secondary">{cat.itemCount} items</Badge>

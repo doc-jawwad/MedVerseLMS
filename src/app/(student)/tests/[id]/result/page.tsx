@@ -114,7 +114,7 @@ export default async function ResultPage({
       {leaderboard.length > 0 && (
         <Card className="shadow-none">
           <CardHeader>
-            <CardTitle className="text-base text-[#072855]">Leaderboard</CardTitle>
+            <CardTitle className="text-base text-[var(--student-ink)]">Leaderboard</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-1">
             {leaderboard.map((r) => (

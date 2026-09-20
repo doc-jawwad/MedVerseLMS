@@ -24,7 +24,7 @@ export function ShellTools({
     <div className="space-y-2">
       {showSearch ? (
         <div className="flex items-center justify-between gap-2">
-          <span className="text-[11px] tracking-wide text-sidebar-foreground/55 uppercase">
+          <span className="text-[11px] tracking-wide text-[var(--sidebar-muted)] uppercase">
             Search
           </span>
           <GlobalSearch

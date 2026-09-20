@@ -85,7 +85,7 @@ export function InstallMedverseApp({
     <>
       {variant === "card" ? (
         <div className="rounded-xl border border-border/80 bg-card p-4 shadow-none">
-          <p className="text-sm font-semibold text-[#072855]">
+          <p className="text-sm font-semibold text-[var(--student-ink)]">
             Use MedVerse as an app
           </p>
           <p className="mt-1 text-xs leading-relaxed text-muted-foreground">

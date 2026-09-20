@@ -36,7 +36,7 @@ export default async function AdminLibraryPage({
           <p className="text-[11px] font-semibold tracking-[0.16em] text-primary uppercase">
             {yearDisplayName(year)}
           </p>
-          <h1 className="font-heading text-2xl font-semibold text-[#072855]">
+          <h1 className="font-heading text-2xl font-semibold text-[var(--student-ink)]">
             Class library
           </h1>
           <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
@@ -50,7 +50,7 @@ export default async function AdminLibraryPage({
             <Link href="/admin/free-resources">
               <Card className="h-full shadow-none transition-colors hover:bg-accent/40">
                 <CardHeader>
-                  <CardTitle className="text-lg text-[#072855]">
+                  <CardTitle className="text-lg text-[var(--student-ink)]">
                     Free Resources
                   </CardTitle>
                   <CardDescription>
@@ -64,7 +64,7 @@ export default async function AdminLibraryPage({
             <Link href="/admin/materials">
               <Card className="h-full shadow-none transition-colors hover:bg-accent/40">
                 <CardHeader>
-                  <CardTitle className="text-lg text-[#072855]">
+                  <CardTitle className="text-lg text-[var(--student-ink)]">
                     Full library / paid resources
                   </CardTitle>
                   <CardDescription>
@@ -78,7 +78,7 @@ export default async function AdminLibraryPage({
             <Link href={`/admin/questions?year=${year.id}`}>
               <Card className="h-full shadow-none transition-colors hover:bg-accent/40">
                 <CardHeader>
-                  <CardTitle className="text-lg text-[#072855]">
+                  <CardTitle className="text-lg text-[var(--student-ink)]">
                     Question Bank
                   </CardTitle>
                   <CardDescription>
@@ -92,7 +92,7 @@ export default async function AdminLibraryPage({
             <Link href={`/admin/pearls?year=${year.id}`}>
               <Card className="h-full shadow-none transition-colors hover:bg-accent/40">
                 <CardHeader>
-                  <CardTitle className="text-lg text-[#072855]">
+                  <CardTitle className="text-lg text-[var(--student-ink)]">
                     Pearl Points
                   </CardTitle>
                   <CardDescription>
@@ -106,7 +106,7 @@ export default async function AdminLibraryPage({
             <Link href="/admin/tests">
               <Card className="h-full shadow-none transition-colors hover:bg-accent/40">
                 <CardHeader>
-                  <CardTitle className="text-lg text-[#072855]">Tests</CardTitle>
+                  <CardTitle className="text-lg text-[var(--student-ink)]">Tests</CardTitle>
                   <CardDescription>
                     Scheduled assessments for {yearDisplayName(year)}.
                   </CardDescription>
@@ -118,7 +118,7 @@ export default async function AdminLibraryPage({
 
         {canMaterials && (
           <div>
-            <h2 className="mb-3 font-heading text-base font-semibold text-[#072855]">
+            <h2 className="mb-3 font-heading text-base font-semibold text-[var(--student-ink)]">
               Full library types
             </h2>
             <div className="flex flex-wrap gap-2">

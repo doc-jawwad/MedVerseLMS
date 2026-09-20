@@ -134,7 +134,7 @@ export default async function PerformancePage() {
         <>
           <Card className="shadow-none">
             <CardHeader>
-              <CardTitle className="text-base text-[#072855]">Overall</CardTitle>
+              <CardTitle className="text-base text-[var(--student-ink)]">Overall</CardTitle>
               <CardDescription>
                 {PERFORMANCE_GRAIN_COPY.overall}
               </CardDescription>
@@ -151,7 +151,7 @@ export default async function PerformancePage() {
 
           <Card className="shadow-none">
             <CardHeader>
-              <CardTitle className="text-base text-[#072855]">
+              <CardTitle className="text-base text-[var(--student-ink)]">
                 Subject performance
               </CardTitle>
               <CardDescription>
@@ -183,7 +183,7 @@ export default async function PerformancePage() {
           {weakRows.length > 0 && (
             <Card className="shadow-none">
               <CardHeader>
-                <CardTitle className="text-base text-[#072855]">
+                <CardTitle className="text-base text-[var(--student-ink)]">
                   Weak chapters
                 </CardTitle>
                 <CardDescription>
@@ -214,7 +214,7 @@ export default async function PerformancePage() {
       ) : (
         <Card className="border-dashed shadow-none">
           <CardHeader>
-            <CardTitle className="text-base text-[#072855]">
+            <CardTitle className="text-base text-[var(--student-ink)]">
               Subject & practice analytics
             </CardTitle>
             <CardDescription>

@@ -269,22 +269,22 @@ export function PracticeMcqSession({
       onNext={() => deck.go("next")}
     >
       {!deck.current || !currentContent ? (
-        <div className="rounded-3xl border border-dashed border-[#072855]/15 p-8 text-center text-sm text-muted-foreground">
+        <div className="rounded-3xl border border-dashed border-[var(--student-ink)]/15 p-8 text-center text-sm text-muted-foreground">
           Nothing matches this filter. Try All or Remaining, or reset Done items.
         </div>
       ) : (
-        <article className="grid gap-4 rounded-3xl border border-[#072855]/10 bg-gradient-to-b from-white to-[#05AEA9]/[0.04] p-4 sm:p-6">
+        <article className="grid gap-4 rounded-3xl border border-[var(--student-ink)]/10 bg-gradient-to-b from-white to-[var(--brand-teal)]/[0.04] p-4 sm:p-6">
           <div className="flex flex-wrap items-center gap-2 text-xs">
-            <span className="rounded-full bg-[#072855]/8 px-2.5 py-1 font-semibold tracking-wide text-[#072855]/70 uppercase">
+            <span className="rounded-full bg-[var(--student-ink)]/8 px-2.5 py-1 font-semibold tracking-wide text-[var(--student-ink)]/70 uppercase">
               {currentContent.difficulty}
             </span>
             {deck.current.state === "done" && (
-              <span className="rounded-full bg-[#05AEA9]/15 px-2.5 py-1 font-semibold text-[#05AEA9]">
+              <span className="rounded-full bg-[var(--brand-teal)]/15 px-2.5 py-1 font-semibold text-[var(--brand-teal-ink)]">
                 Done
               </span>
             )}
           </div>
-          <h2 className="font-heading text-base leading-relaxed font-medium text-[#072855] sm:text-lg">
+          <h2 className="font-heading text-base leading-relaxed font-medium text-[var(--student-ink)] sm:text-lg">
             {currentContent.stem}
           </h2>
           <div className="grid gap-2">
@@ -305,11 +305,11 @@ export function PracticeMcqSession({
                       : isWrongPick
                         ? "border-red-500 bg-red-50"
                         : isSelected
-                          ? "border-[#05AEA9] bg-[#05AEA9]/10"
-                          : "border-[#072855]/12 hover:bg-[#072855]/[0.03]"
+                          ? "border-[#05AEA9] bg-[var(--brand-teal)]/10"
+                          : "border-[var(--student-ink)]/12 hover:bg-[var(--student-ink)]/[0.03]"
                   }`}
                 >
-                  <span className="mr-2 font-semibold text-[#072855]">
+                  <span className="mr-2 font-semibold text-[var(--student-ink)]">
                     {o.key}.
                   </span>
                   {o.text}

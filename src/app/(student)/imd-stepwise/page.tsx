@@ -23,7 +23,7 @@ export default function ImdStepwisePage() {
       />
       <Card className="shadow-none">
         <CardHeader>
-          <CardTitle className="text-base text-[#072855]">
+          <CardTitle className="text-base text-[var(--student-ink)]">
             Subscribe through MedVerse
           </CardTitle>
           <CardDescription>

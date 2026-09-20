@@ -99,7 +99,7 @@ function PendingNotice({
     <AuthShell>
       <Card className="w-full shadow-none">
         <CardHeader>
-          <CardTitle className="text-[#072855]">{title}</CardTitle>
+          <CardTitle className="text-[var(--student-ink)]">{title}</CardTitle>
           <CardDescription>{description}</CardDescription>
         </CardHeader>
         <CardContent className="flex gap-2">

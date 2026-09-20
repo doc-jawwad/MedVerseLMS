@@ -12,7 +12,7 @@ export function OpensCountdown({ opensAt }: { opensAt: string }) {
   const { label } = countdownParts(opensAt, now);
   if (!label) return null;
   return (
-    <p className="text-sm font-medium text-[#05AEA9]" data-testid="opens-countdown">
+    <p className="text-sm font-medium text-[var(--brand-teal-ink)]" data-testid="opens-countdown">
       {label}
     </p>
   );

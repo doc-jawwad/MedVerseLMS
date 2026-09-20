@@ -246,7 +246,7 @@ export default async function DashboardPage() {
       <Card className="overflow-hidden shadow-none">
         <CardHeader className="border-b bg-[#072855] text-white">
           <CardTitle className="text-base text-white">Incoming tests</CardTitle>
-          <CardDescription className="text-white/70">
+          <CardDescription className="text-white/85">
             Scheduled and currently open tests for your class. History lives under Tests.
           </CardDescription>
         </CardHeader>
@@ -271,7 +271,7 @@ export default async function DashboardPage() {
                   className="grid gap-2 rounded-xl border p-3"
                 >
                   <div className="flex flex-wrap items-start justify-between gap-2">
-                    <p className="font-heading text-lg font-semibold text-[#072855]">
+                    <p className="font-heading text-lg font-semibold text-[var(--student-ink)]">
                       {displayTestTitle(t.title, pricing)}
                     </p>
                     <Badge variant={pricing === "FREE" ? "secondary" : "outline"}>
@@ -292,7 +292,7 @@ export default async function DashboardPage() {
                   )}
                   {isEntitled && prepByTest.get(t.id) && (
                     <div className="rounded-lg border bg-muted/40 p-3">
-                      <p className="mb-1 text-xs font-semibold tracking-wide text-[#05AEA9] uppercase">
+                      <p className="mb-1 text-xs font-semibold tracking-wide text-[var(--brand-teal-ink)] uppercase">
                         Preparation
                       </p>
                       <StudyMarkdown source={prepByTest.get(t.id)!} />
@@ -393,7 +393,7 @@ export default async function DashboardPage() {
         <Card className="border-dashed shadow-none">
           <CardHeader>
             <div className="flex flex-wrap items-center gap-2">
-              <CardTitle className="text-base text-[#072855]">
+              <CardTitle className="text-base text-[var(--student-ink)]">
                 {presentation.paidFeatureLock.title}
               </CardTitle>
               <Badge variant="outline">locked</Badge>
@@ -410,7 +410,7 @@ export default async function DashboardPage() {
 
       <Card className="shadow-none">
         <CardHeader>
-          <CardTitle className="text-base text-[#072855]">Recent tests</CardTitle>
+          <CardTitle className="text-base text-[var(--student-ink)]">Recent tests</CardTitle>
           <CardDescription>
             Submitted history — kept after subscription expiry.
           </CardDescription>
@@ -429,7 +429,7 @@ export default async function DashboardPage() {
                   href={`/tests/${r.test_id}/result`}
                   className="flex items-center justify-between rounded-xl border bg-card px-3 py-2.5 text-sm transition-colors hover:bg-accent/50"
                 >
-                  <span className="font-medium text-[#072855]">{r.title}</span>
+                  <span className="font-medium text-[var(--student-ink)]">{r.title}</span>
                   <div className="flex items-center gap-2">
                     <Badge>{r.percentage}%</Badge>
                     {r.rank != null && (

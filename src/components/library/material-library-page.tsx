@@ -133,7 +133,7 @@ export async function MaterialLibraryPage({
 
       {[...grouped.entries()].map(([subjectId, subjectFolders]) => (
         <div key={subjectId} className="grid gap-3">
-          <h2 className="font-heading text-lg font-semibold text-[#072855]">
+          <h2 className="font-heading text-lg font-semibold text-[var(--student-ink)]">
             {subjectName(subjectId === "general" ? null : subjectId)}
           </h2>
           {subjectFolders.map((f) => {
@@ -145,7 +145,7 @@ export async function MaterialLibraryPage({
                 className={`shadow-none ${locked ? "opacity-95" : ""}`}
               >
                 <CardHeader>
-                  <CardTitle className="text-base text-[#072855]">
+                  <CardTitle className="text-base text-[var(--student-ink)]">
                     {f.name}
                   </CardTitle>
                   {!locked && items.length === 0 && (

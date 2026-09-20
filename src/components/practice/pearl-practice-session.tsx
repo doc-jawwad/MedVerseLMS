@@ -168,7 +168,7 @@ export function PearlPracticeSession({
         <label className="grid gap-1 text-sm">
           <span className="text-muted-foreground">Subject</span>
           <select
-            className="h-9 rounded-xl border border-[#072855]/15 bg-background px-2"
+            className="h-9 rounded-xl border border-[var(--student-ink)]/15 bg-background px-2"
             value={subjectId}
             onChange={(e) => {
               setSubjectId(e.target.value);
@@ -228,32 +228,32 @@ export function PearlPracticeSession({
         }
       >
         {!deck.current || !currentMeta ? (
-          <div className="rounded-3xl border border-dashed border-[#072855]/15 p-8 text-center text-sm text-muted-foreground">
+          <div className="rounded-3xl border border-dashed border-[var(--student-ink)]/15 p-8 text-center text-sm text-muted-foreground">
             Nothing matches this filter. Try All or Remaining, or reset Done items.
           </div>
         ) : (
           <article
-            className="grid gap-4 rounded-3xl border border-[#072855]/10 bg-gradient-to-b from-white to-[#072855]/[0.03] p-4 sm:p-6"
+            className="grid gap-4 rounded-3xl border border-[var(--student-ink)]/10 bg-gradient-to-b from-white to-[#072855]/[0.03] p-4 sm:p-6"
             data-testid="pearl-card"
           >
             {currentMeta.subject_name ? (
-              <p className="text-xs font-medium tracking-wide text-[#072855]/55 uppercase">
+              <p className="text-xs font-medium tracking-wide text-[var(--student-ink)]/55 uppercase">
                 {currentMeta.subject_name}
               </p>
             ) : null}
-            <p className="font-heading text-lg leading-relaxed font-medium text-[#072855]">
+            <p className="font-heading text-lg leading-relaxed font-medium text-[var(--student-ink)]">
               {currentMeta.prompt}
             </p>
             {!currentMeta.accessible && <ResourceLockNotice />}
             {currentMeta.accessible && revealed && payload && (
               <div
-                className="rounded-2xl bg-[#072855]/5 p-4"
+                className="rounded-2xl bg-[var(--student-ink)]/5 p-4"
                 data-testid="pearl-answer"
               >
-                <p className="text-sm font-semibold tracking-wide text-[#05AEA9] uppercase">
+                <p className="text-sm font-semibold tracking-wide text-[var(--brand-teal-ink)] uppercase">
                   Answer
                 </p>
-                <p className="mt-1 text-base font-medium text-[#072855]">
+                <p className="mt-1 text-base font-medium text-[var(--student-ink)]">
                   {payload.answer}
                 </p>
                 {payload.explanation ? (

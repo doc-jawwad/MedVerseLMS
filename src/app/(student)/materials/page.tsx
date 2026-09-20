@@ -39,7 +39,7 @@ export default async function MaterialsCompatPage() {
           <Link key={m.id} href={m.href}>
             <Card className="h-full shadow-none transition-colors hover:bg-accent/40">
               <CardHeader>
-                <CardTitle className="text-lg text-[#072855]">{m.label}</CardTitle>
+                <CardTitle className="text-lg text-[var(--student-ink)]">{m.label}</CardTitle>
                 <CardDescription>{m.description}</CardDescription>
               </CardHeader>
             </Card>

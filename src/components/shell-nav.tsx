@@ -18,7 +18,7 @@ export function ShellNav({ items }: { items: NavItem[] }) {
             href={item.href}
             className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors ${
               item.locked
-                ? "text-sidebar-foreground/55 hover:bg-sidebar-accent/50"
+                ? "text-[var(--sidebar-muted)] hover:bg-sidebar-accent/50"
                 : active
                   ? "bg-sidebar-accent font-medium text-white shadow-[inset_3px_0_0_0_var(--brand-teal)]"
                   : "text-sidebar-foreground/80 hover:bg-sidebar-accent/80 hover:text-sidebar-accent-foreground"

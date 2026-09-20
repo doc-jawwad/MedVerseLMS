@@ -48,88 +48,103 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
-/* MedVerse Healthcare brand: navy #072855 + teal #05AEA9, sampled directly
-   from the logo (see docs/architecture.md). Keep these two in sync with the
-   logo if it's ever updated. */
+/* MedVerse Healthcare brand: navy #072855 + teal #05AEA9 (docs/architecture.md).
+   --brand-teal stays the logo sample; --brand-teal-ink is contrast-safe for text. */
 :root {
   --brand-navy: #072855;
   --brand-teal: #05aea9;
+  /* Readable teal on light surfaces (~AA for UI text / accents). */
+  --brand-teal-ink: #037a76;
 
-  --background: #ffffff;
-  --foreground: #0b1f3a;
+  --background: #f7fafb;
+  --foreground: #072855;
   --card: #ffffff;
-  --card-foreground: #0b1f3a;
+  --card-foreground: #072855;
   --popover: #ffffff;
-  --popover-foreground: #0b1f3a;
-  --primary: var(--brand-teal);
+  --popover-foreground: #072855;
+  /* Slightly deeper teal fill so white label text stays crisp on buttons. */
+  --primary: #04948f;
   --primary-foreground: #ffffff;
-  --secondary: #eef6f6;
-  --secondary-foreground: var(--brand-navy);
-  --muted: #f2f6f7;
-  --muted-foreground: #5b6b78;
-  --accent: #e3f3f2;
-  --accent-foreground: var(--brand-navy);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: #dbe6e7;
-  --input: #dbe6e7;
+  --secondary: #e6f4f3;
+  --secondary-foreground: #072855;
+  --muted: #e8eef2;
+  /* Darker muted copy — was too soft on canvas (#5b6b78). */
+  --muted-foreground: #3d5263;
+  --accent: #d9f0ee;
+  --accent-foreground: #072855;
+  --destructive: #c0352b;
+  --border: #c5d5dc;
+  --input: #c5d5dc;
   --ring: var(--brand-teal);
   --chart-1: var(--brand-navy);
   --chart-2: var(--brand-teal);
-  --chart-3: #3a6ea5;
+  --chart-3: #2f6a9e;
   --chart-4: #3fc9c2;
-  --chart-5: #8fa6b8;
+  --chart-5: #6b8499;
   --radius: 0.625rem;
-  --sidebar: var(--brand-navy);
-  --sidebar-foreground: #eaf2f8;
+
+  --sidebar: #072855;
+  --sidebar-foreground: #f4f8fc;
   --sidebar-primary: var(--brand-teal);
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #0f3868;
+  --sidebar-accent: #0c3d72;
   --sidebar-accent-foreground: #ffffff;
-  --sidebar-border: #12335e;
+  --sidebar-border: #1a4570;
   --sidebar-ring: var(--brand-teal);
+  --sidebar-muted: #b8cce0;
 
-  /* Student workspace surface — navy/teal product, not a generic gray app. */
-  --student-canvas: #f3f7f8;
-  --student-ink: var(--brand-navy);
+  --student-canvas: #eef4f7;
+  --student-ink: #072855;
+  --student-surface: #ffffff;
+  --student-elevated-shadow: 0 1px 2px rgb(7 40 85 / 0.06),
+    0 8px 24px rgb(7 40 85 / 0.06);
 }
 
 .dark {
   --brand-navy: #072855;
   --brand-teal: #05aea9;
+  /* Brighter teal for readable accents on dark navy surfaces. */
+  --brand-teal-ink: #4ad4ce;
 
-  --background: #081226;
-  --foreground: #eaf2f8;
-  --card: #0d1c38;
-  --card-foreground: #eaf2f8;
-  --popover: #0d1c38;
-  --popover-foreground: #eaf2f8;
-  --primary: var(--brand-teal);
-  --primary-foreground: #06231f;
-  --secondary: #12294d;
-  --secondary-foreground: #eaf2f8;
-  --muted: #10213e;
-  --muted-foreground: #8fa6b8;
-  --accent: #0f3868;
-  --accent-foreground: #eaf2f8;
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: #17325a;
-  --input: #17325a;
+  --background: #06101f;
+  --foreground: #f0f5fa;
+  --card: #0c1a33;
+  --card-foreground: #f0f5fa;
+  --popover: #0c1a33;
+  --popover-foreground: #f0f5fa;
+  --primary: #05aea9;
+  --primary-foreground: #04201e;
+  --secondary: #143054;
+  --secondary-foreground: #f0f5fa;
+  --muted: #122847;
+  --muted-foreground: #b7c7d8;
+  --accent: #15406f;
+  --accent-foreground: #f0f5fa;
+  --destructive: #f07167;
+  --border: #2a4a73;
+  --input: #2a4a73;
   --ring: var(--brand-teal);
   --chart-1: var(--brand-teal);
   --chart-2: #3fc9c2;
-  --chart-3: #6fb4e0;
+  --chart-3: #7ec0ea;
   --chart-4: #3a6ea5;
-  --chart-5: #8fa6b8;
-  --sidebar: #05132a;
-  --sidebar-foreground: #eaf2f8;
+  --chart-5: #9bb0c4;
+
+  --sidebar: #040e1f;
+  --sidebar-foreground: #f0f5fa;
   --sidebar-primary: var(--brand-teal);
-  --sidebar-primary-foreground: #06231f;
-  --sidebar-accent: #0f3868;
-  --sidebar-accent-foreground: #eaf2f8;
-  --sidebar-border: #12335e;
+  --sidebar-primary-foreground: #04201e;
+  --sidebar-accent: #123a66;
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: #1c3d66;
   --sidebar-ring: var(--brand-teal);
-  --student-canvas: #081226;
-  --student-ink: #eaf2f8;
+  --sidebar-muted: #9eb6ce;
+
+  --student-canvas: #06101f;
+  --student-ink: #f0f5fa;
+  --student-surface: #0c1a33;
+  --student-elevated-shadow: 0 1px 2px rgb(0 0 0 / 0.35),
+    0 12px 32px rgb(0 0 0 / 0.35);
 }
 
 @layer base {
@@ -148,10 +163,23 @@
     padding-left: env(safe-area-inset-left);
     padding-right: env(safe-area-inset-right);
   }
+
+  /* Prefer semantic ink over raw navy hex so dark mode stays readable. */
+  .ink {
+    color: var(--student-ink);
+  }
+  .teal-ink {
+    color: var(--brand-teal-ink);
+  }
 }
 
 @layer utilities {
   .page-stack {
     @apply grid gap-5;
+  }
+
+  .surface-card {
+    background: var(--student-surface);
+    box-shadow: var(--student-elevated-shadow);
   }
 }

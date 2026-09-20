@@ -46,8 +46,8 @@ export function IosInstallGuide() {
               {step.n}
             </span>
             <div className="min-w-0 flex-1">
-              <p className="flex items-center gap-2 text-sm font-semibold text-[#072855]">
-                <Icon className="size-4 shrink-0 text-[#05AEA9]" aria-hidden />
+              <p className="flex items-center gap-2 text-sm font-semibold text-[var(--student-ink)]">
+                <Icon className="size-4 shrink-0 text-[var(--brand-teal-ink)]" aria-hidden />
                 {step.title}
               </p>
               <p className="mt-1 text-xs leading-relaxed text-muted-foreground">

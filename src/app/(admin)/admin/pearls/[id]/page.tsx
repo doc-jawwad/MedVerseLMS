@@ -41,7 +41,7 @@ export default async function EditPearlPage({
   return (
     <div className="grid gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="font-heading text-2xl font-semibold text-[#072855]">Edit Pearl Point</h1>
+        <h1 className="font-heading text-2xl font-semibold text-[var(--student-ink)]">Edit Pearl Point</h1>
         <EntitlementSelect kind="pearl_point" id={pearl.id} value={pearl.entitlement} />
       </div>
       <PearlEditor

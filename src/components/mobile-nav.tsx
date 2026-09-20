@@ -146,7 +146,7 @@ export function MobileNav({
           <div className="mt-2 truncate text-sm font-medium text-sidebar-foreground/90">
             {userLabel}
           </div>
-          <div className="truncate text-xs text-sidebar-foreground/55">
+          <div className="truncate text-xs text-[var(--sidebar-muted)]">
             {subLabel}
           </div>
         </SheetHeader>
@@ -161,7 +161,7 @@ export function MobileNav({
                   href={item.href}
                   className={`flex min-h-11 items-center gap-3 rounded-lg px-3 py-2.5 text-sm ${
                     item.locked
-                      ? "text-sidebar-foreground/55 hover:bg-sidebar-accent/50"
+                      ? "text-[var(--sidebar-muted)] hover:bg-sidebar-accent/50"
                       : active
                         ? "bg-sidebar-accent font-medium text-white shadow-[inset_3px_0_0_0_var(--brand-teal)]"
                         : "text-sidebar-foreground/90 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
@@ -213,10 +213,10 @@ export function MobileNav({
                 href={item.href}
                 className={`flex min-h-14 flex-1 flex-col items-center justify-center gap-0.5 px-1 py-2 text-[10px] sm:text-[11px] ${
                   item.locked
-                    ? "text-sidebar-foreground/45"
+                    ? "text-[var(--sidebar-muted)]"
                     : active
                       ? "font-medium text-sidebar-primary"
-                      : "text-sidebar-foreground/70"
+                      : "text-sidebar-foreground/85"
                 }`}
               >
                 <span className="relative">

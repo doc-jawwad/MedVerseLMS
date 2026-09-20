@@ -172,7 +172,7 @@ export default async function StudentTestsPage() {
                   <Card key={t.id} className="shadow-none">
                     <CardHeader>
                       <div className="flex flex-wrap items-start justify-between gap-2">
-                        <CardTitle className="text-base text-[#072855]">
+                        <CardTitle className="text-base text-[var(--student-ink)]">
                           {displayTestTitle(t.title, pricing)}
                         </CardTitle>
                         <div className="flex shrink-0 flex-wrap gap-1">
@@ -256,7 +256,7 @@ export default async function StudentTestsPage() {
                           state === "in_progress" ||
                           state === "result") && (
                           <div className="rounded-lg border bg-muted/40 p-3">
-                            <p className="mb-1 text-xs font-semibold tracking-wide text-[#05AEA9] uppercase">
+                            <p className="mb-1 text-xs font-semibold tracking-wide text-[var(--brand-teal-ink)] uppercase">
                               Preparation
                             </p>
                             <StudyMarkdown source={prepByTest.get(t.id)!} />

@@ -7,7 +7,7 @@ export function SectionHeading({
 }) {
   return (
     <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
-      <h2 className="font-heading text-[13px] font-semibold tracking-[0.12em] text-[#072855]/65 uppercase">
+      <h2 className="font-heading text-[13px] font-semibold tracking-[0.14em] text-muted-foreground uppercase">
         {title}
       </h2>
       {description && (

@@ -45,7 +45,7 @@ export default async function AdminPearlsPage({
               <p className="text-[11px] font-semibold tracking-[0.16em] text-primary uppercase">
                 Content
               </p>
-              <h1 className="font-heading text-2xl font-semibold text-[#072855]">
+              <h1 className="font-heading text-2xl font-semibold text-[var(--student-ink)]">
                 Pearl Points
               </h1>
               <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
@@ -96,7 +96,7 @@ export default async function AdminPearlsPage({
                   <Card key={p.id} className="shadow-none">
                     <CardHeader className="flex flex-col gap-3 space-y-0 sm:flex-row sm:items-center sm:justify-between">
                       <div className="min-w-0">
-                        <CardTitle className="text-base text-[#072855]">
+                        <CardTitle className="text-base text-[var(--student-ink)]">
                           <Link
                             href={`/admin/pearls/${p.id}`}
                             className="hover:underline"

@@ -59,7 +59,7 @@ export default async function AdminLayout({
           <div className="mt-4 truncate text-sm font-medium text-white">
             {profile.full_name}
           </div>
-          <div className="mt-1 text-[11px] tracking-[0.14em] text-sidebar-foreground/55 uppercase">
+          <div className="mt-1 text-[11px] tracking-[0.14em] text-[var(--sidebar-muted)] uppercase">
             Admin
           </div>
         </div>

@@ -41,7 +41,7 @@ export default async function AdminFreeResourcesPage({
           <FreeShell yearName={yearDisplayName(year)} type={type}>
             <Card className="shadow-none">
               <CardHeader>
-                <CardTitle className="text-base text-[#072855]">
+                <CardTitle className="text-base text-[var(--student-ink)]">
                   Practice subjects
                 </CardTitle>
                 <p className="text-sm text-muted-foreground">
@@ -89,7 +89,7 @@ export default async function AdminFreeResourcesPage({
             </div>
             <Card className="shadow-none">
               <CardHeader>
-                <CardTitle className="text-base text-[#072855]">
+                <CardTitle className="text-base text-[var(--student-ink)]">
                   Pearl Points
                 </CardTitle>
                 <p className="text-sm text-muted-foreground">
@@ -185,7 +185,7 @@ function FreeShell({
         <p className="text-[11px] font-semibold tracking-[0.16em] text-primary uppercase">
           {yearName} · Free Resources
         </p>
-        <h1 className="font-heading text-2xl font-semibold text-[#072855]">
+        <h1 className="font-heading text-2xl font-semibold text-[var(--student-ink)]">
           Free Resources
         </h1>
         <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
@@ -213,7 +213,7 @@ function Row({
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3">
       <div className="min-w-0">
-        <p className="font-medium text-[#072855]">{title}</p>
+        <p className="font-medium text-[var(--student-ink)]">{title}</p>
         {meta && <p className="text-xs text-muted-foreground">{meta}</p>}
       </div>
       <div className="flex flex-wrap items-center gap-2">

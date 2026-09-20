@@ -18,7 +18,7 @@ export function StatTile({
         <CardDescription className="text-[11px] font-medium tracking-wide uppercase">
           {label}
         </CardDescription>
-        <CardTitle className="font-heading text-2xl font-semibold tracking-tight text-[#072855]">
+        <CardTitle className="font-heading text-2xl font-semibold tracking-tight text-[var(--student-ink)]">
           {value}
         </CardTitle>
         {hint && <p className="text-xs text-muted-foreground">{hint}</p>}

@@ -98,7 +98,7 @@ export async function McqBankPage({ mode }: { mode: "full" | "free" }) {
               }
             >
               <CardHeader>
-                <CardTitle className="text-lg text-[#072855]">
+                <CardTitle className="text-lg text-[var(--student-ink)]">
                   {s.subject_name}
                 </CardTitle>
                 <CardDescription>

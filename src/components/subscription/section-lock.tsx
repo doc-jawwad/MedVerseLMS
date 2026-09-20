@@ -35,7 +35,7 @@ export function SectionLock({
               subscription required
             </Badge>
           </div>
-          <CardTitle className="text-base text-[#072855]">
+          <CardTitle className="text-base text-[var(--student-ink)]">
             Unlock {title}
           </CardTitle>
           <CardDescription>

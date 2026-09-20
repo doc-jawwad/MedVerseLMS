@@ -124,7 +124,7 @@ export function PdfViewer({
         data-testid="pdf-mobile-fallback"
       >
         <div className="grid gap-1">
-          <p className="font-heading text-base font-semibold text-[#072855]">
+          <p className="font-heading text-base font-semibold text-[var(--student-ink)]">
             {title}
           </p>
           <p className="text-sm text-muted-foreground">

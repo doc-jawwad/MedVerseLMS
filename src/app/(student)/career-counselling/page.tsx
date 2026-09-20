@@ -22,7 +22,7 @@ export default function CareerCounsellingPage() {
       />
       <Card className="shadow-none">
         <CardHeader>
-          <CardTitle className="text-base text-[#072855]">Watch and join</CardTitle>
+          <CardTitle className="text-base text-[var(--student-ink)]">Watch and join</CardTitle>
           <CardDescription>
             The series lives on MedVerse channels. Use YouTube for recorded sessions and
             WhatsApp for updates.

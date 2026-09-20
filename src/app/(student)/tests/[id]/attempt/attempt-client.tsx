@@ -382,7 +382,7 @@ export function AttemptClient({ testId }: { testId: string }) {
   if (!payload || !mergedAnswers) {
     return (
       <div className="mx-auto max-w-md rounded-xl border bg-card px-6 py-10 text-center shadow-none">
-        <p className="font-medium text-[#072855]">Preparing your exam…</p>
+        <p className="font-medium text-[var(--student-ink)]">Preparing your exam…</p>
         <p className="mt-1 text-sm text-muted-foreground">
           Restoring answers and the remaining time for this attempt.
         </p>
@@ -411,7 +411,7 @@ function Blocker({ title, body }: { title: string; body: string }) {
     <div className="mx-auto max-w-md">
       <Card className="shadow-none">
         <CardHeader>
-          <CardTitle className="text-[#072855]">{title}</CardTitle>
+          <CardTitle className="text-[var(--student-ink)]">{title}</CardTitle>
           <CardDescription>{body}</CardDescription>
         </CardHeader>
         <CardContent>
