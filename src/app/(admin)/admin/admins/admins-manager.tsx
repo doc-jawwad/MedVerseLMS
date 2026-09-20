@@ -8,6 +8,7 @@ import {
   promoteStudentToAdmin,
   setAdminAccountStatus,
   setAdminPermissions,
+  setAdminYearAssignmentsAction,
 } from "@/lib/actions/admins";
 import {
   ADMIN_PERMISSION_CATALOG,
@@ -182,9 +183,13 @@ function CreateForm({
 export function AdminsManager({
   admins,
   canManage,
+  years,
+  yearIdsByAdmin,
 }: {
   admins: AdminAccountRow[];
   canManage: boolean;
+  years: { id: string; year_number: number; name: string }[];
+  yearIdsByAdmin: Record<string, string[]>;
 }) {
   const [pending, startTransition] = useTransition();
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -194,6 +199,7 @@ export function AdminsManager({
   );
   const [editCodes, setEditCodes] = useState<AdminPermissionCode[]>([]);
   const [editMain, setEditMain] = useState(false);
+  const [editYearIds, setEditYearIds] = useState<string[]>([]);
 
   function run(
     fn: () => Promise<{ error?: string | null; id?: string }>,
@@ -298,6 +304,7 @@ export function AdminsManager({
                         ADMIN_PERMISSION_CATALOG.some((p) => p.code === c)
                       ) as AdminPermissionCode[]
                     );
+                    setEditYearIds(yearIdsByAdmin[admin.id] ?? []);
                   }}
                 >
                   Jobs
@@ -353,10 +360,18 @@ export function AdminsManager({
           onSubmit={(e) => {
             e.preventDefault();
             const id = editing.id;
-            run(
-              () => setAdminPermissions(id, editCodes, editMain),
-              "Admin jobs updated."
-            );
+            run(async () => {
+              const jobs = await setAdminPermissions(id, editCodes, editMain);
+              if (jobs.error) return jobs;
+              if (!editMain) {
+                const yearsRes = await setAdminYearAssignmentsAction(
+                  id,
+                  editYearIds
+                );
+                if (yearsRes.error) return yearsRes;
+              }
+              return {};
+            }, "Admin jobs and class scope updated.");
           }}
         >
           <h2 className="text-base font-semibold">
@@ -367,10 +382,38 @@ export function AdminsManager({
               checked={editMain}
               onCheckedChange={(v) => setEditMain(v === true)}
             />
-            Main Admin (all jobs)
+            Main Admin (all jobs, all classes)
           </label>
           {!editMain && (
-            <PermissionPicker codes={editCodes} onChange={setEditCodes} />
+            <>
+              <PermissionPicker codes={editCodes} onChange={setEditCodes} />
+              <div className="grid gap-2">
+                <p className="text-sm font-medium">Assigned classes</p>
+                <p className="text-xs text-muted-foreground">
+                  Limited admins need both class assignment and the matching
+                  job permission. Backend RPCs enforce this.
+                </p>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {years.map((y) => (
+                    <label key={y.id} className="flex items-center gap-2 text-sm">
+                      <Checkbox
+                        checked={editYearIds.includes(y.id)}
+                        onCheckedChange={(v) => {
+                          if (v === true) {
+                            setEditYearIds([...editYearIds, y.id]);
+                          } else {
+                            setEditYearIds(
+                              editYearIds.filter((id) => id !== y.id)
+                            );
+                          }
+                        }}
+                      />
+                      {y.name}
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </>
           )}
           <div className="flex gap-2">
             <Button type="submit" disabled={pending}>

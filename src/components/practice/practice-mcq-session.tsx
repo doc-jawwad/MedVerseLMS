@@ -6,7 +6,11 @@ import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { PracticeSessionChrome } from "@/components/practice/practice-session-chrome";
 import { PracticeSessionReportCard } from "@/components/practice/practice-session-report";
-import { createLocalProgressStore } from "@/lib/practice/local-progress-store";
+import {
+  createSpineProgressStore,
+  endPracticeSessionRpc,
+  startPracticeSessionRpc,
+} from "@/lib/practice/spine-progress-store";
 import { usePracticeDeckController } from "@/lib/practice/use-practice-deck";
 import type {
   PracticeAnswerFeedback,
@@ -22,6 +26,7 @@ type RpcQuestion = {
   stem: string;
   options: { key: string; text: string }[] | string;
   difficulty: string;
+  subject_id?: string;
 };
 
 function parseOptions(
@@ -48,7 +53,7 @@ function toContent(row: RpcQuestion): PracticeMcqContent {
 }
 
 /**
- * Practice MCQ session — progress via PracticeProgressStore (local until Data Spine).
+ * Practice MCQ session — progress via Data Spine PracticeProgressStore.
  * Answers still go through submit_practice_answer (historical accuracy).
  * Does not use test_attempts.
  */
@@ -62,7 +67,19 @@ export function PracticeMcqSession({
   backHref?: string;
 }) {
   const supabase = useRef(createClient()).current;
-  const store = useMemo(() => createLocalProgressStore(), []);
+  const [subjectIds, setSubjectIds] = useState<string[]>(
+    scope.type === "subject" ? [scope.id] : []
+  );
+  const store = useMemo(
+    () =>
+      createSpineProgressStore({
+        supabase,
+        subjectIds,
+        studentId,
+      }),
+    [supabase, subjectIds, studentId]
+  );
+  const sessionIdRef = useRef<string | null>(null);
   const [contents, setContents] = useState<PracticeMcqContent[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -91,7 +108,6 @@ export function PracticeMcqSession({
         return;
       }
       const rows = ((data ?? []) as RpcQuestion[]).map(toContent);
-      // Dedupe by itemId while preserving order
       const seen = new Set<string>();
       const unique: PracticeMcqContent[] = [];
       for (const row of rows) {
@@ -100,6 +116,23 @@ export function PracticeMcqSession({
         unique.push(row);
       }
       setContents(unique);
+
+      if (scope.type === "subject") {
+        setSubjectIds([scope.id]);
+      } else if (unique[0]) {
+        const { data: q } = await supabase
+          .from("questions")
+          .select("subject_id")
+          .eq("id", unique[0].itemId)
+          .maybeSingle();
+        if (q?.subject_id) setSubjectIds([q.subject_id as string]);
+      }
+
+      const sid =
+        scope.type === "subject"
+          ? scope.id
+          : null;
+      sessionIdRef.current = await startPracticeSessionRpc(supabase, sid);
     })();
   }, [supabase, scope.type, scope.id]);
 
@@ -125,6 +158,20 @@ export function PracticeMcqSession({
     setSelected(null);
     setFeedback(null);
   }, [deck.current?.itemId]);
+
+  const endAndReport = useCallback(() => {
+    const taken = deck.timeTakenMs;
+    const stats = deck.stats;
+    deck.endSession();
+    const sid = sessionIdRef.current;
+    if (sid) {
+      void endPracticeSessionRpc(supabase, {
+        sessionId: sid,
+        durationMs: taken,
+        counts: { practiced: stats.practiced, correct: stats.correct },
+      });
+    }
+  }, [deck, supabase]);
 
   const checkAnswer = useCallback(async () => {
     if (!currentContent || !selected || !deck.current) return;
@@ -215,7 +262,7 @@ export function PracticeMcqSession({
       marked={deck.current?.marked ?? false}
       onToggleMark={() => void deck.toggleMark()}
       onResetDone={() => void deck.resetDone()}
-      onEnd={deck.endSession}
+      onEnd={endAndReport}
       canGoPrev={deck.index > 0}
       canGoNext={deck.index < deck.filtered.length - 1}
       onPrev={() => deck.go("previous")}

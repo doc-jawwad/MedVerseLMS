@@ -102,16 +102,43 @@ export function GlobalSearch({
             p_limit: 20,
           });
           if (cancelled) return;
-          if (error || !Array.isArray(data)) {
+          if (error) {
+            const msg = (error.message ?? "").toLowerCase();
+            const compat =
+              msg.includes("could not find the function") ||
+              msg.includes("does not exist") ||
+              msg.includes("pgrst202") ||
+              msg.includes("42883") ||
+              msg.includes("no_active_enrollment");
+            // Compat only when RPC missing / admin without enrollment.
+            setRpcHits(compat ? null : []);
+            return;
+          }
+          const rows = Array.isArray(data)
+            ? data
+            : data &&
+                typeof data === "object" &&
+                Array.isArray((data as { hits?: unknown }).hits)
+              ? ((data as { hits: unknown[] }).hits as RpcHit[])
+              : null;
+          if (!rows) {
             setRpcHits(null);
             return;
           }
-          const mapped: AcademicSearchHit[] = (data as RpcHit[]).map((row) => {
+          const mapped: AcademicSearchHit[] = (rows as RpcHit[]).map((row) => {
             const path_labels = Array.isArray(row.path_labels)
               ? row.path_labels.map(String)
               : [yearName, row.name];
+            const kind =
+              row.kind === "class" ||
+              row.kind === "block" ||
+              row.kind === "category" ||
+              row.kind === "folder" ||
+              row.kind === "day"
+                ? row.kind
+                : "folder";
             const partial = {
-              kind: row.kind,
+              kind,
               id: String(row.id),
               name: String(row.name),
               path_labels,

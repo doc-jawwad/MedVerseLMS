@@ -270,6 +270,22 @@ export async function setAdminPermissions(
   return { error: undefined };
 }
 
+export async function setAdminYearAssignmentsAction(
+  adminId: string,
+  yearIds: string[]
+): Promise<{ error?: string }> {
+  const gate = await requireManageAdmins();
+  if (gate.error) return { error: gate.error };
+
+  const { error } = await gate.supabase.rpc("set_admin_year_assignments", {
+    p_admin_id: adminId,
+    p_year_ids: yearIds,
+  });
+  if (error) return clientActionFailed("setAdminYearAssignments", error);
+  revalidateAdmins();
+  return {};
+}
+
 export async function demoteAdmin(adminId: string) {
   const gate = await requireManageAdmins();
   if (gate.error) return { error: gate.error };

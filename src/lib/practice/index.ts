@@ -15,6 +15,13 @@ export type { PracticeProgressStore } from "./progress-store.ts";
 export { progressKey } from "./progress-store.ts";
 export { createMemoryProgressStore } from "./memory-progress-store.ts";
 export { createLocalProgressStore } from "./local-progress-store.ts";
+export {
+  createSpineProgressStore,
+  toSpineItemKind,
+  fromSpineItemKind,
+  startPracticeSessionRpc,
+  endPracticeSessionRpc,
+} from "./spine-progress-store.ts";
 
 export {
   accuracyPercent,

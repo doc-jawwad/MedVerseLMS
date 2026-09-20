@@ -124,6 +124,8 @@ export async function createSubscriptionApplication(input: {
   screenshotObjectKey: string;
   planId?: string | null;
   currency?: string | null;
+  /** Purchased class — Data Spine subscription_applications.year_id. */
+  yearId?: string | null;
 }): Promise<{ error: string } | { id: string }> {
   const amountError = validatePaymentAmount(input.amount);
   if (amountError) return { error: amountError };
@@ -140,6 +142,7 @@ export async function createSubscriptionApplication(input: {
     p_screenshot_object_key: input.screenshotObjectKey,
     p_plan_id: input.planId ?? null,
     p_currency: input.currency ?? null,
+    p_year_id: input.yearId ?? null,
   });
   revalidateAdminSubscriptionPaths();
   if (error) {
@@ -155,6 +158,7 @@ export async function updatePendingSubscriptionApplication(input: {
   screenshotObjectKey?: string | null;
   planId?: string | null;
   currency?: string | null;
+  yearId?: string | null;
 }): Promise<{ error?: string }> {
   if (input.amount != null) {
     const amountError = validatePaymentAmount(input.amount);
@@ -191,6 +195,7 @@ export async function updatePendingSubscriptionApplication(input: {
     p_screenshot_object_key: input.screenshotObjectKey ?? null,
     p_plan_id: input.planId ?? null,
     p_currency: input.currency ?? null,
+    p_year_id: input.yearId ?? null,
   });
   revalidateAdminSubscriptionPaths();
   if (error) {

@@ -43,6 +43,11 @@ export { searchAcademicTreeNames } from "./search.ts";
 
 export { hrefForAcademicSearchHit } from "./hit-href.ts";
 
+export { mapRpcTree, productKeyForSubjectName } from "./map-rpc-tree.ts";
+
+// loadAcademicTree stays in ./load-tree.ts (server-only) — do not re-export
+// from this barrel so client/unit imports stay free of `server-only`.
+
 export {
   blockHref,
   categoryHref,

@@ -16,7 +16,7 @@ export default async function AdminsPage() {
     return <AdminPermissionDenied title="Admins" />;
   }
 
-  const [{ data: profiles, error: profileError }, { data: permRows }] =
+  const [{ data: profiles, error: profileError }, { data: permRows }, { data: yearRows }, { data: assignRows }] =
     await Promise.all([
       supabase
         .from("profiles")
@@ -26,6 +26,11 @@ export default async function AdminsPage() {
         .eq("role", "admin")
         .order("full_name", { ascending: true }),
       supabase.from("admin_permissions").select("admin_id, permission_code"),
+      supabase
+        .from("years")
+        .select("id, year_number, name")
+        .order("year_number"),
+      supabase.from("admin_year_assignments").select("admin_id, year_id"),
     ]);
 
   const codesByAdmin = new Map<string, string[]>();
@@ -33,6 +38,13 @@ export default async function AdminsPage() {
     const list = codesByAdmin.get(row.admin_id) ?? [];
     list.push(row.permission_code);
     codesByAdmin.set(row.admin_id, list);
+  }
+
+  const yearIdsByAdmin: Record<string, string[]> = {};
+  for (const row of assignRows ?? []) {
+    const list = yearIdsByAdmin[row.admin_id] ?? [];
+    list.push(row.year_id);
+    yearIdsByAdmin[row.admin_id] = list;
   }
 
   const admins: AdminAccountRow[] = (profiles ?? []).map((p) => ({
@@ -59,7 +71,16 @@ export default async function AdminsPage() {
           Could not load admins. Please try again.
         </p>
       )}
-      <AdminsManager admins={admins} canManage={canManage} />
+      <AdminsManager
+        admins={admins}
+        canManage={canManage}
+        years={(yearRows ?? []).map((y) => ({
+          id: y.id,
+          year_number: y.year_number,
+          name: y.year_number === 5 ? "Final Year MBBS" : y.name,
+        }))}
+        yearIdsByAdmin={yearIdsByAdmin}
+      />
     </div>
   );
 }

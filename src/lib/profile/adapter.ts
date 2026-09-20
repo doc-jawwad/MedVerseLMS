@@ -9,6 +9,7 @@ import type {
 } from "@/lib/profile/ports";
 import type {
   ClassLockState,
+  ClassLockKind,
   ProfileUpdateInput,
   PurchaseClassConfirmation,
   StudentProfile,
@@ -26,9 +27,13 @@ import { getR2Config, presignR2Object, studyContentPrefix } from "@/lib/r2/presi
 
 type Supabase = Awaited<ReturnType<typeof createClient>>;
 
+/** Contact has no profiles column yet — Auth metadata bootstrap only. */
 const META_CONTACT = "contact_number";
+/** Compat bridge when college was stored before Data Spine profiles.college_name. */
 const META_COLLEGE = "college_name";
+/** Compat bridge for avatar before profiles.avatar_object_key reads. */
 const META_AVATAR = "avatar_object_key";
+/** Compat intent before create_subscription_application(p_year_id). */
 const META_PURCHASE_YEAR = "subscription_purchase_year_id";
 
 function metaString(
@@ -39,6 +44,16 @@ function metaString(
   if (typeof v !== "string") return null;
   const t = v.trim();
   return t.length ? t : null;
+}
+
+function rpcMissing(error: { message?: string | null } | null): boolean {
+  const msg = (error?.message ?? "").toLowerCase();
+  return (
+    msg.includes("could not find the function") ||
+    msg.includes("does not exist") ||
+    msg.includes("pgrst202") ||
+    msg.includes("42883")
+  );
 }
 
 async function currentUser(supabase: Supabase) {
@@ -73,6 +88,59 @@ async function loadEnrollment(supabase: Supabase) {
   };
 }
 
+async function yearNameById(
+  supabase: Supabase,
+  yearId: string | null | undefined
+): Promise<string | null> {
+  if (!yearId) return null;
+  const { data } = await supabase
+    .from("years")
+    .select("name, year_number")
+    .eq("id", yearId)
+    .maybeSingle();
+  if (!data) return null;
+  if (data.year_number === 5) return "Final Year MBBS";
+  return data.name;
+}
+
+function normalizeClassLockRpc(
+  raw: Record<string, unknown>,
+  names: {
+    subscriptionYearName: string | null;
+    pendingYearId: string | null;
+    pendingYearName: string | null;
+  }
+): ClassLockState {
+  const lockRaw = String(raw.lock ?? "free");
+  const lock: ClassLockKind =
+    lockRaw === "pending_application" || lockRaw === "active_subscription"
+      ? lockRaw
+      : "free";
+  const canSelf =
+    typeof raw.can_self_change === "boolean"
+      ? raw.can_self_change
+      : lock === "free";
+  return {
+    year_id: typeof raw.year_id === "string" ? raw.year_id : null,
+    year_number:
+      typeof raw.year_number === "number" ? raw.year_number : null,
+    year_name: typeof raw.year_name === "string" ? raw.year_name : null,
+    lock,
+    can_self_change: canSelf,
+    subscription_year_id:
+      typeof raw.subscription_year_id === "string"
+        ? raw.subscription_year_id
+        : null,
+    subscription_year_name: names.subscriptionYearName,
+    pending_application_id:
+      typeof raw.pending_application_id === "string"
+        ? raw.pending_application_id
+        : null,
+    pending_application_year_id: names.pendingYearId,
+    pending_application_year_name: names.pendingYearName,
+  };
+}
+
 async function buildProfile(
   supabase: Supabase,
   userId: string
@@ -80,7 +148,7 @@ async function buildProfile(
   const [{ data: row }, user, enrollment] = await Promise.all([
     supabase
       .from("profiles")
-      .select("id, full_name, email")
+      .select("id, full_name, email, college_name, avatar_object_key")
       .eq("id", userId)
       .maybeSingle(),
     currentUser(supabase),
@@ -88,18 +156,29 @@ async function buildProfile(
   ]);
   if (!row) return null;
   const meta = (user?.user_metadata ?? {}) as Record<string, unknown>;
-  const avatarKey = metaString(meta, META_AVATAR);
+
+  const college =
+    (typeof row.college_name === "string" && row.college_name.trim()
+      ? row.college_name.trim()
+      : null) ?? metaString(meta, META_COLLEGE);
+
+  const avatarKey =
+    (typeof row.avatar_object_key === "string" && row.avatar_object_key.trim()
+      ? row.avatar_object_key.trim()
+      : null) ?? metaString(meta, META_AVATAR);
+
   let avatarUrl: string | null = null;
   if (avatarKey) {
     const signed = presignR2Object({ method: "GET", key: avatarKey });
     if ("url" in signed) avatarUrl = signed.url;
   }
+
   return {
     id: row.id,
     full_name: row.full_name,
     email: row.email,
     contact_number: metaString(meta, META_CONTACT),
-    college_name: metaString(meta, META_COLLEGE),
+    college_name: college,
     avatar_object_key: avatarKey,
     avatar_url: avatarUrl,
     current_year_id: enrollment.year_id,
@@ -125,16 +204,6 @@ async function mergeUserMetadata(
   return null;
 }
 
-function rpcMissing(error: { message?: string | null } | null): boolean {
-  const msg = (error?.message ?? "").toLowerCase();
-  return (
-    msg.includes("could not find the function") ||
-    msg.includes("does not exist") ||
-    msg.includes("pgrst202") ||
-    msg.includes("42883")
-  );
-}
-
 export function createStudentProfileAdapter(
   supabase?: Supabase
 ): StudentProfilePort {
@@ -157,34 +226,36 @@ export function createStudentProfileAdapter(
       const user = await currentUser(sb);
       if (!user) return { ok: false, error: "not_authenticated" };
 
+      const current = await buildProfile(sb, user.id);
+      if (!current) return { ok: false, error: "profile_not_found" };
+
       const fullName =
         input.full_name !== undefined
           ? String(input.full_name).trim()
-          : undefined;
-      if (fullName !== undefined) {
-        const err = validateFullName(fullName);
-        if (err) return { ok: false, error: err };
-      }
+          : current.full_name;
+      const errName = validateFullName(fullName);
+      if (errName) return { ok: false, error: errName };
+
       if (input.contact_number !== undefined && input.contact_number != null) {
         const err = validateContactNumber(input.contact_number);
         if (err) return { ok: false, error: err };
       }
-      if (input.college_name !== undefined && input.college_name != null) {
-        const err = validateCollegeName(input.college_name);
+
+      const collegeNext =
+        input.college_name !== undefined
+          ? input.college_name
+            ? String(input.college_name).trim()
+            : null
+          : current.college_name;
+      if (collegeNext) {
+        const err = validateCollegeName(collegeNext);
         if (err) return { ok: false, error: err };
       }
 
-      // Preferred path when schema lane ships update_own_profile.
+      // Data Spine: name + college on profiles (no contact column).
       const { error: rpcError } = await sb.rpc("update_own_profile", {
-        p_full_name: fullName ?? null,
-        p_college_name:
-          input.college_name === undefined ? null : input.college_name,
-        p_contact_number:
-          input.contact_number === undefined
-            ? null
-            : input.contact_number
-              ? normalizeContactNumber(input.contact_number)
-              : null,
+        p_full_name: fullName,
+        p_college_name: collegeNext,
       });
 
       if (rpcError && !rpcMissing(rpcError)) {
@@ -192,28 +263,25 @@ export function createStudentProfileAdapter(
       }
 
       if (rpcError && rpcMissing(rpcError)) {
-        if (fullName !== undefined) {
-          const { error } = await sb
-            .from("profiles")
-            .update({ full_name: fullName })
-            .eq("id", user.id);
-          if (error) return { ok: false, error: error.message };
-        }
+        const { error } = await sb
+          .from("profiles")
+          .update({ full_name: fullName })
+          .eq("id", user.id);
+        if (error) return { ok: false, error: error.message };
         const metaErr = await mergeUserMetadata(sb, {
-          ...(input.contact_number !== undefined
-            ? {
-                [META_CONTACT]: input.contact_number
-                  ? normalizeContactNumber(input.contact_number)
-                  : null,
-              }
-            : {}),
           ...(input.college_name !== undefined
-            ? {
-                [META_COLLEGE]: input.college_name
-                  ? String(input.college_name).trim()
-                  : null,
-              }
+            ? { [META_COLLEGE]: collegeNext }
             : {}),
+        });
+        if (metaErr) return { ok: false, error: metaErr };
+      }
+
+      // Contact remains Auth metadata (no Data Spine column).
+      if (input.contact_number !== undefined) {
+        const metaErr = await mergeUserMetadata(sb, {
+          [META_CONTACT]: input.contact_number
+            ? normalizeContactNumber(input.contact_number)
+            : null,
         });
         if (metaErr) return { ok: false, error: metaErr };
       }
@@ -233,8 +301,6 @@ export function createStudentProfileAdapter(
         return { ok: false, error: error.message };
       }
       if (error && rpcMissing(error)) {
-        // Bridge: provisional key under study-content until avatar RPC ships.
-        // Never use payment-proof bucket.
         const config = getR2Config();
         if ("error" in config) {
           return { ok: false, error: "avatar_storage_unavailable" };
@@ -271,14 +337,25 @@ export function createStudentProfileAdapter(
       ) {
         return { ok: false, error: "invalid_avatar_object_key" };
       }
-      const { error } = await sb.rpc("authorize_avatar_object", {
-        p_object_key: objectKey,
-      });
+
+      // authorize_avatar_object returns the stored key for signing (own profile).
+      // allocate_avatar_object_key already persisted profiles.avatar_object_key.
+      const { data: authorizedKey, error } = await sb.rpc(
+        "authorize_avatar_object"
+      );
       if (error && !rpcMissing(error)) {
         return { ok: false, error: error.message };
       }
+      if (!error && typeof authorizedKey === "string") {
+        if (authorizedKey !== objectKey) {
+          return { ok: false, error: "avatar_object_mismatch" };
+        }
+      }
+
+      // Compat: keep metadata in sync for older readers.
       const metaErr = await mergeUserMetadata(sb, { [META_AVATAR]: objectKey });
       if (metaErr) return { ok: false, error: metaErr };
+
       const profile = await buildProfile(sb, user.id);
       if (!profile) return { ok: false, error: "profile_not_found" };
       return { ok: true, data: profile };
@@ -288,6 +365,18 @@ export function createStudentProfileAdapter(
       const sb = await client();
       const user = await currentUser(sb);
       if (!user) return { ok: false, error: "not_authenticated" };
+
+      // No clear_avatar RPC — best-effort profiles column clear via RLS.
+      const { error } = await sb
+        .from("profiles")
+        .update({ avatar_object_key: null })
+        .eq("id", user.id);
+      if (error && !rpcMissing(error)) {
+        // Still clear metadata so UI drops the preview.
+        await mergeUserMetadata(sb, { [META_AVATAR]: null });
+        return { ok: false, error: error.message };
+      }
+
       const metaErr = await mergeUserMetadata(sb, { [META_AVATAR]: null });
       if (metaErr) return { ok: false, error: metaErr };
       const profile = await buildProfile(sb, user.id);
@@ -314,26 +403,59 @@ export function createSubscriptionClassAdapter(
         "get_class_lock_state"
       );
       if (!rpcError && rpcData && typeof rpcData === "object") {
-        const row = rpcData as ClassLockState;
-        return { ok: true, data: row };
+        const row = rpcData as Record<string, unknown>;
+        const subYearId =
+          typeof row.subscription_year_id === "string"
+            ? row.subscription_year_id
+            : null;
+        const pendingId =
+          typeof row.pending_application_id === "string"
+            ? row.pending_application_id
+            : null;
+
+        let pendingYearId: string | null = null;
+        if (pendingId) {
+          const { data: app } = await sb
+            .from("subscription_applications")
+            .select("year_id")
+            .eq("id", pendingId)
+            .maybeSingle();
+          pendingYearId =
+            typeof app?.year_id === "string" ? app.year_id : null;
+        }
+
+        const [subscriptionYearName, pendingYearName] = await Promise.all([
+          yearNameById(sb, subYearId),
+          yearNameById(sb, pendingYearId),
+        ]);
+
+        return {
+          ok: true,
+          data: normalizeClassLockRpc(row, {
+            subscriptionYearName,
+            pendingYearId,
+            pendingYearName,
+          }),
+        };
       }
       if (rpcError && !rpcMissing(rpcError)) {
         return { ok: false, error: rpcError.message };
       }
 
+      // Compat fallback when get_class_lock_state is unavailable.
       const enrollment = await loadEnrollment(sb);
       const [{ data: live }, { data: apps }, { data: subs }] = await Promise.all([
         sb.rpc("has_live_subscription"),
         sb
           .from("subscription_applications")
-          .select("id, status")
+          .select("id, status, year_id")
           .eq("student_id", user.id)
           .eq("status", "pending")
           .order("created_at", { ascending: false })
           .limit(1),
         sb
           .from("subscriptions")
-          .select("id, status, ends_at, grace_days")
+          .select("id, status, ends_at, grace_days, year_id")
           .eq("student_id", user.id)
           .eq("status", "active")
           .order("ends_at", { ascending: false })
@@ -341,22 +463,22 @@ export function createSubscriptionClassAdapter(
       ]);
 
       const pending = (apps ?? [])[0] ?? null;
+      const sub = (subs ?? [])[0] ?? null;
       const meta = (user.user_metadata ?? {}) as Record<string, unknown>;
-      const purchaseYearId = metaString(meta, META_PURCHASE_YEAR);
+      const metaPurchaseYear = metaString(meta, META_PURCHASE_YEAR);
 
-      let pendingYearName: string | null = null;
-      let subscriptionYearName: string | null = null;
-      if (purchaseYearId) {
-        const { data: yearRow } = await sb
-          .from("years")
-          .select("id, name, year_number")
-          .eq("id", purchaseYearId)
-          .maybeSingle();
-        if (yearRow) {
-          pendingYearName = yearRow.name;
-          subscriptionYearName = yearRow.name;
-        }
-      }
+      const pendingYearId =
+        (typeof pending?.year_id === "string" ? pending.year_id : null) ??
+        metaPurchaseYear;
+      const subscriptionYearId =
+        (typeof sub?.year_id === "string" ? sub.year_id : null) ??
+        metaPurchaseYear ??
+        enrollment.year_id;
+
+      const [pendingYearName, subscriptionYearName] = await Promise.all([
+        yearNameById(sb, pendingYearId),
+        yearNameById(sb, subscriptionYearId),
+      ]);
 
       const state = deriveClassLockState({
         currentYearId: enrollment.year_id,
@@ -365,16 +487,12 @@ export function createSubscriptionClassAdapter(
         hasLiveSubscription: Boolean(live),
         hasPendingApplication: Boolean(pending),
         pendingApplicationId: pending?.id ?? null,
-        pendingApplicationYearId: purchaseYearId,
+        pendingApplicationYearId: pendingYearId,
         pendingApplicationYearName: pendingYearName,
-        // subscriptions.year_id not in schema yet — use purchase intent / current.
-        subscriptionYearId: purchaseYearId ?? enrollment.year_id,
+        subscriptionYearId,
         subscriptionYearName:
           subscriptionYearName ?? enrollment.year_name,
       });
-
-      // Silence unused until schema adds year_id on subscriptions.
-      void subs;
 
       return { ok: true, data: state };
     },
@@ -389,12 +507,7 @@ export function createSubscriptionClassAdapter(
 
     async selfChangeClass(yearId: string) {
       const sb = await client();
-      const lock = await this.getClassLockState();
-      if (!lock.ok) return lock;
-      if (!lock.data.can_self_change) {
-        return { ok: false, error: "class_locked" };
-      }
-
+      // Authoritative lock is enforced inside self_change_class RPC.
       const { data, error } = await sb.rpc("self_change_class", {
         p_year_id: yearId,
       });
@@ -416,6 +529,7 @@ export function createSubscriptionClassAdapter(
       });
       if (err) return { ok: false, error: err };
       const sb = await client();
+      // Compat metadata; create_subscription_application(p_year_id) is authoritative.
       const metaErr = await mergeUserMetadata(sb, {
         [META_PURCHASE_YEAR]: confirmation.year_id,
       });

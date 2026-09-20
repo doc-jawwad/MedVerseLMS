@@ -105,6 +105,12 @@ export const BLOCK_CATEGORIES: readonly BlockCategoryDef[] = [
     description: "Class notes and concise write-ups.",
   },
   {
+    id: "guidelines",
+    name: "Guidelines",
+    slug: "guidelines",
+    description: "Study guidelines and protocols.",
+  },
+  {
     id: "flashcards",
     name: "Flashcards",
     slug: "flashcards",

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { openPearl } from "@/lib/actions/pearls";
 import { studyErrorMessage } from "@/lib/study/errors";
@@ -8,8 +8,13 @@ import { Button } from "@/components/ui/button";
 import { ResourceLockNotice } from "@/components/subscription/resource-lock-notice";
 import { PracticeSessionChrome } from "@/components/practice/practice-session-chrome";
 import { PracticeSessionReportCard } from "@/components/practice/practice-session-report";
-import { createLocalProgressStore } from "@/lib/practice/local-progress-store";
+import {
+  createSpineProgressStore,
+  endPracticeSessionRpc,
+  startPracticeSessionRpc,
+} from "@/lib/practice/spine-progress-store";
 import { usePracticeDeckController } from "@/lib/practice/use-practice-deck";
+import { createClient } from "@/lib/supabase/client";
 
 export type PearlCatalogItem = {
   id: string;
@@ -24,7 +29,7 @@ export type PearlCatalogItem = {
 
 /**
  * Pearl Points / one-liners — same progress interaction as Practice MCQ.
- * Content from pearl_points + open_pearl; progress via PracticeProgressStore.
+ * Content from pearl_points + open_pearl; progress via Data Spine store.
  */
 export function PearlPracticeSession({
   items,
@@ -37,7 +42,7 @@ export function PearlPracticeSession({
   studentId: string;
   backHref?: string;
 }) {
-  const store = useMemo(() => createLocalProgressStore(), []);
+  const supabase = useRef(createClient()).current;
   const [subjectId, setSubjectId] = useState("");
   const [shuffle, setShuffle] = useState(false);
   const [revealed, setRevealed] = useState(false);
@@ -46,6 +51,7 @@ export function PearlPracticeSession({
     explanation: string;
   } | null>(null);
   const [pending, startTransition] = useTransition();
+  const sessionIdRef = useRef<string | null>(null);
 
   const scoped = useMemo(
     () => (subjectId ? items.filter((p) => p.subject_id === subjectId) : items),
@@ -53,6 +59,32 @@ export function PearlPracticeSession({
   );
   const itemIds = useMemo(() => scoped.map((p) => p.id), [scoped]);
   const byId = useMemo(() => new Map(scoped.map((p) => [p.id, p])), [scoped]);
+  const subjectIds = useMemo(() => {
+    if (subjectId) return [subjectId];
+    return [...new Set(scoped.map((p) => p.subject_id).filter(Boolean))];
+  }, [subjectId, scoped]);
+
+  const store = useMemo(
+    () =>
+      createSpineProgressStore({
+        supabase,
+        subjectIds,
+        studentId,
+      }),
+    [supabase, subjectIds, studentId]
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const sid = subjectId || subjectIds[0] || null;
+      const sessionId = await startPracticeSessionRpc(supabase, sid);
+      if (!cancelled) sessionIdRef.current = sessionId;
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [supabase, subjectId, subjectIds]);
 
   const deck = usePracticeDeckController({
     studentId,
@@ -86,6 +118,23 @@ export function PearlPracticeSession({
       setRevealed(true);
       await deck.markDoneAndRecord(null);
     });
+  }
+
+  function endAndReport() {
+    const durationMs = deck.timeTakenMs;
+    const counts = {
+      practiced: deck.stats.practiced,
+      correct: deck.stats.correct,
+    };
+    deck.endSession();
+    const sid = sessionIdRef.current;
+    if (sid) {
+      void endPracticeSessionRpc(supabase, {
+        sessionId: sid,
+        durationMs,
+        counts,
+      });
+    }
   }
 
   if (items.length === 0) return null;
@@ -157,7 +206,7 @@ export function PearlPracticeSession({
           setPayload(null);
           void deck.resetDone();
         }}
-        onEnd={deck.endSession}
+        onEnd={endAndReport}
         canGoPrev={deck.index > 0}
         canGoNext={deck.index < deck.filtered.length - 1}
         onPrev={() => onNavigate("previous")}

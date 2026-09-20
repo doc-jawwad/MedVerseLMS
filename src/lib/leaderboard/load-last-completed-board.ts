@@ -10,10 +10,20 @@ import {
   type CompletedTestCandidate,
 } from "./resolve-last-completed-test.ts";
 
+function rpcMissing(error: { message?: string | null } | null): boolean {
+  const msg = (error?.message ?? "").toLowerCase();
+  return (
+    msg.includes("could not find the function") ||
+    msg.includes("does not exist") ||
+    msg.includes("pgrst202") ||
+    msg.includes("42883")
+  );
+}
+
 /**
  * Load Top-N board for the most recently completed catalog test via
- * existing `test_leaderboard` (rank_test-backed). Adapts to the future
- * projection contract. No second ranking query.
+ * `test_leaderboard_projection` (rank_test ranks only). Falls back to
+ * legacy `test_leaderboard` only when the projection RPC is missing.
  */
 export async function loadLastCompletedLeaderboardBoard(
   supabase: SupabaseClient,
@@ -32,6 +42,30 @@ export async function loadLastCompletedLeaderboardBoard(
     });
   }
 
+  const projected = await supabase.rpc("test_leaderboard_projection", {
+    p_test_id: resolved.id,
+    p_limit: input.limit,
+  });
+
+  if (!projected.error) {
+    return buildLeaderboardBoardState({
+      resolved,
+      rawRows: projected.data,
+      limit: input.limit,
+      fetchFailed: false,
+    });
+  }
+
+  if (!rpcMissing(projected.error)) {
+    return buildLeaderboardBoardState({
+      resolved,
+      rawRows: [],
+      limit: input.limit,
+      fetchFailed: true,
+    });
+  }
+
+  // Compat: projection RPC not deployed yet.
   const { data, error } = await supabase.rpc("test_leaderboard", {
     p_test_id: resolved.id,
   });

@@ -56,8 +56,8 @@ function nowIso(): string {
 }
 
 /**
- * Browser localStorage stand-in for progress until Data Spine RPCs exist.
- * Same contract as PracticeProgressStore — swap the adapter later.
+ * Browser localStorage stand-in for progress when Data Spine RPCs are missing.
+ * Production sessions prefer createSpineProgressStore.
  */
 export function createLocalProgressStore(
   storage: Storage = globalThis.localStorage

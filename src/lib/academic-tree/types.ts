@@ -32,7 +32,8 @@ export type BlockCategoryId =
   | "books"
   | "past_papers"
   | "flashcards"
-  | "notes";
+  | "notes"
+  | "guidelines";
 
 /** Fixed containers under each Test day (product law). */
 export type TestDaySlotId =

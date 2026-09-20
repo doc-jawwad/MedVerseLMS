@@ -186,6 +186,7 @@ export function SubscriptionApplyForm({
             amount: parsedAmount,
             screenshotObjectKey: objectKey ?? null,
             currency: displayCurrency,
+            yearId: purchaseYearId,
           });
           if (result.error) {
             if (objectKey) {
@@ -210,6 +211,7 @@ export function SubscriptionApplyForm({
             amount: parsedAmount,
             screenshotObjectKey: objectKey,
             currency: displayCurrency,
+            yearId: purchaseYearId,
           });
           if ("error" in result) {
             try {

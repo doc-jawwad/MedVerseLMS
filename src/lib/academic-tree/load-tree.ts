@@ -6,17 +6,28 @@ import type {
   AcademicTreeSurface,
   GetAcademicTreeInput,
 } from "./types.ts";
-import {
-  buildStructuralAcademicTree,
-  structuralAcademicTreeAdapter,
-} from "./adapter.ts";
+import { structuralAcademicTreeAdapter } from "./adapter.ts";
+import { mapRpcTree } from "./map-rpc-tree.ts";
 import { searchAcademicTreeNames } from "./search.ts";
 import type { AcademicSearchHit } from "./types.ts";
 
+export { mapRpcTree, productKeyForSubjectName } from "./map-rpc-tree.ts";
+
+function rpcMissing(error: { message?: string | null } | null): boolean {
+  const msg = (error?.message ?? "").toLowerCase();
+  return (
+    msg.includes("could not find the function") ||
+    msg.includes("does not exist") ||
+    msg.includes("pgrst202") ||
+    msg.includes("42883") ||
+    msg.includes("no_active_enrollment")
+  );
+}
+
 /**
  * Loads the academic tree for a student surface.
- * Tries planned RPC `get_academic_tree` when present; otherwise uses the
- * structural adapter (no schema invention).
+ * Prefers Data Spine `get_academic_tree`; structural scaffolding is
+ * compatibility-only when the RPC is missing or the caller has no enrollment.
  */
 export async function loadAcademicTree(args: {
   supabase: SupabaseClient;
@@ -43,8 +54,15 @@ export async function loadAcademicTree(args: {
       const mapped = mapRpcTree(data, input);
       if (mapped) return { tree: mapped, error: null };
     }
+
+    if (error && !rpcMissing(error)) {
+      return {
+        tree: await structuralAcademicTreeAdapter.getAcademicTree(input),
+        error: error.message,
+      };
+    }
   } catch {
-    // RPC not deployed yet — fall through to structural adapter.
+    // Fall through to structural adapter.
   }
 
   const tree = await structuralAcademicTreeAdapter.getAcademicTree(input);
@@ -57,26 +75,4 @@ export function searchLoadedTree(args: {
   limit?: number;
 }): AcademicSearchHit[] {
   return searchAcademicTreeNames(args);
-}
-
-function mapRpcTree(
-  raw: unknown,
-  input: GetAcademicTreeInput
-): AcademicTree | null {
-  if (!raw || typeof raw !== "object") return null;
-  const row = raw as Record<string, unknown>;
-  if (!Array.isArray(row.subjects)) {
-    // Partial / unexpected shape — prefer structural scaffolding.
-    return buildStructuralAcademicTree(input);
-  }
-
-  // When schema lane ships a full shape, map here. Until then, merge
-  // year identity from RPC with structural categories so UI stays stable.
-  const structural = buildStructuralAcademicTree({
-    ...input,
-    year_id: typeof row.year_id === "string" ? row.year_id : input.year_id,
-    year_name:
-      typeof row.year_name === "string" ? row.year_name : input.year_name,
-  });
-  return { ...structural, from_adapter: false };
 }
