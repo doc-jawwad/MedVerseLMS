@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { requireStudent } from "@/lib/auth/require-user";
 import { getPaymentInstructions } from "@/lib/actions/subscription-applications";
+import { createSubscriptionClassAdapter } from "@/lib/profile/adapter";
 import { formatDate, formatDateTime } from "@/lib/utils";
 import {
   buildStudentSubscriptionView,
@@ -24,29 +25,31 @@ import { FieldRow } from "@/components/student/field-row";
 export const metadata = { title: "My Subscription — MedVerse LMS" };
 
 export default async function SubscriptionPage() {
-  const { supabase, userId } = await requireStudent();
+  const { supabase, userId, enrollment } = await requireStudent();
+  const classAdapter = createSubscriptionClassAdapter(supabase);
 
-  // Lazy expiry + warning inserts (no staging cron required).
   await supabase.rpc("expire_due_subscriptions");
 
-  const [liveRes, subsRes, appsRes, instructionsRes] = await Promise.all([
-    supabase.rpc("has_live_subscription"),
-    supabase
-      .from("subscriptions")
-      .select(
-        "id, status, starts_at, ends_at, grace_days, paid_access_mode, subscription_plans(name)"
-      )
-      .eq("student_id", userId)
-      .order("ends_at", { ascending: false }),
-    supabase
-      .from("subscription_applications")
-      .select(
-        "id, status, amount, currency, created_at, review_note, reviewed_at"
-      )
-      .eq("student_id", userId)
-      .order("created_at", { ascending: false }),
-    getPaymentInstructions(),
-  ]);
+  const [liveRes, subsRes, appsRes, instructionsRes, yearsRes] =
+    await Promise.all([
+      supabase.rpc("has_live_subscription"),
+      supabase
+        .from("subscriptions")
+        .select(
+          "id, status, starts_at, ends_at, grace_days, paid_access_mode, subscription_plans(name)"
+        )
+        .eq("student_id", userId)
+        .order("ends_at", { ascending: false }),
+      supabase
+        .from("subscription_applications")
+        .select(
+          "id, status, amount, currency, created_at, review_note, reviewed_at"
+        )
+        .eq("student_id", userId)
+        .order("created_at", { ascending: false }),
+      getPaymentInstructions(),
+      classAdapter.listYears(),
+    ]);
 
   const subscriptions: StudentSubscriptionRow[] = (subsRes.data ?? []).map(
     (row) => {
@@ -103,6 +106,7 @@ export default async function SubscriptionPage() {
     (view.kind === "pending" && view.pending);
 
   const applyMode = view.pending ? "edit" : "create";
+  const years = yearsRes.ok ? yearsRes.data : [];
 
   return (
     <StudentPage width="narrow">
@@ -113,7 +117,7 @@ export default async function SubscriptionPage() {
 
       <Card className="shadow-none">
         <CardHeader>
-            <CardTitle className="flex flex-wrap items-center gap-2 text-base text-[#072855]">
+          <CardTitle className="flex flex-wrap items-center gap-2 text-base text-[#072855]">
             {view.label}
             <Badge
               variant={
@@ -148,9 +152,9 @@ export default async function SubscriptionPage() {
           {view.pending && (
             <div className="grid gap-2 rounded-md border bg-muted/30 p-3">
               <p className="font-medium">Pending application</p>
-              <FieldRow
-                label="Amount"
-              >{`${view.pending.amount} ${view.pending.currency}`}</FieldRow>
+              <FieldRow label="Amount">
+                {`${view.pending.amount} ${view.pending.currency}`}
+              </FieldRow>
               <FieldRow label="Submitted">
                 {formatDateTime(view.pending.created_at)}
               </FieldRow>
@@ -164,9 +168,9 @@ export default async function SubscriptionPage() {
             !view.pending && (
               <div className="grid gap-2 rounded-md border border-destructive/30 bg-destructive/5 p-3">
                 <p className="font-medium">Previous application rejected</p>
-                <FieldRow
-                  label="Amount"
-                >{`${view.latestNonPendingApplication.amount} ${view.latestNonPendingApplication.currency}`}</FieldRow>
+                <FieldRow label="Amount">
+                  {`${view.latestNonPendingApplication.amount} ${view.latestNonPendingApplication.currency}`}
+                </FieldRow>
                 <FieldRow label="Submitted">
                   {formatDateTime(view.latestNonPendingApplication.created_at)}
                 </FieldRow>
@@ -207,12 +211,14 @@ export default async function SubscriptionPage() {
         <Card className="shadow-none">
           <CardHeader>
             <CardTitle className="text-base text-[#072855]">
-              {applyMode === "edit" ? "Edit pending application" : "Get Subscription"}
+              {applyMode === "edit"
+                ? "Edit pending application"
+                : "Get Subscription"}
             </CardTitle>
             <CardDescription>
               {applyMode === "edit"
-                ? "Update the amount or replace the payment screenshot while review is pending."
-                : "Transfer the fee using the instructions below, then upload your payment screenshot for admin review."}
+                ? "Update the amount or replace the payment screenshot while review is pending. Purchase class stays locked for the pending period."
+                : "Confirm the class you are purchasing, transfer the fee, then upload your payment screenshot for admin review."}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -223,6 +229,8 @@ export default async function SubscriptionPage() {
               pendingApplicationId={view.pending?.id}
               initialAmount={view.pending?.amount}
               currency={view.pending?.currency ?? "PKR"}
+              years={years}
+              defaultYearId={enrollment.year_id}
             />
           </CardContent>
         </Card>

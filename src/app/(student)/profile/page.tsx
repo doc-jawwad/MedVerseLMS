@@ -1,6 +1,10 @@
 import Link from "next/link";
 import { requireStudent } from "@/lib/auth/require-user";
 import {
+  createStudentProfileAdapter,
+  createSubscriptionClassAdapter,
+} from "@/lib/profile/adapter";
+import {
   Card,
   CardContent,
   CardDescription,
@@ -10,63 +14,51 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ChangePasswordForm } from "./change-password-form";
-import {
-  YearChangePanel,
-  type YearChangeRequestView,
-  type YearOption,
-} from "./year-change-panel";
+import { ProfileEditForm } from "./profile-edit-form";
+import { ClassPanel } from "./class-panel";
+import type { YearChangeRequestView } from "./year-change-panel";
 import { PageHeader } from "@/components/student/page-header";
 import { StudentPage } from "@/components/student/student-page";
 import { FieldRow } from "@/components/student/field-row";
 import { InstallMedverseApp } from "@/components/pwa/install-medverse-app";
-import { ThemeToggle } from "@/components/theme/theme-toggle";
 
 export const metadata = { title: "My Account — MedVerse LMS" };
 
 export default async function ProfilePage() {
-  const { supabase, profile, enrollment, userId } = await requireStudent();
+  const { supabase, userId } = await requireStudent();
+  const profileAdapter = createStudentProfileAdapter(supabase);
+  const classAdapter = createSubscriptionClassAdapter(supabase);
 
-  const [
-    { data: grants },
-    { data: live },
-    { data: yearRows },
-    { data: ycRows },
-  ] = await Promise.all([
-    supabase
-      .from("access_grants")
-      .select("grant_type, subjects(name), material_folders(name)")
-      .eq("student_id", userId)
-      .eq("grant_type", "practice_subject")
-      .is("revoked_at", null),
-    supabase.rpc("has_live_subscription"),
-    supabase.rpc("list_years"),
-    supabase
-      .from("year_change_requests")
-      .select(
-        "id, status, reason, review_note, created_at, reviewed_at, from_year_id, to_year_id"
-      )
-      .eq("student_id", userId)
-      .order("created_at", { ascending: false })
-      .limit(20),
-  ]);
+  const [profileRes, lockRes, yearsRes, ycRes, liveRes, grantsRes] =
+    await Promise.all([
+      profileAdapter.getOwnProfile(),
+      classAdapter.getClassLockState(),
+      classAdapter.listYears(),
+      classAdapter.listOwnYearChangeRequests(),
+      supabase.rpc("has_live_subscription"),
+      supabase
+        .from("access_grants")
+        .select("grant_type, subjects(name), material_folders(name)")
+        .eq("student_id", userId)
+        .eq("grant_type", "practice_subject")
+        .is("revoked_at", null),
+    ]);
 
-  const years = (yearRows ?? []) as YearOption[];
-  const yearName = (id: string) =>
-    years.find((y) => y.id === id)?.name ?? null;
+  if (!profileRes.ok || !lockRes.ok) {
+    return (
+      <StudentPage width="narrow">
+        <PageHeader title="My Account" />
+        <p className="text-sm text-muted-foreground">
+          Could not load your profile. Please refresh and try again.
+        </p>
+      </StudentPage>
+    );
+  }
 
-  const mapped: YearChangeRequestView[] = (ycRows ?? []).map((r) => ({
-    id: r.id,
-    status: r.status,
-    reason: r.reason,
-    review_note: r.review_note,
-    created_at: r.created_at,
-    reviewed_at: r.reviewed_at,
-    from_year_id: r.from_year_id,
-    to_year_id: r.to_year_id,
-    from_name: yearName(r.from_year_id),
-    to_name: yearName(r.to_year_id),
-  }));
-
+  const profile = profileRes.data;
+  const lock = lockRes.data;
+  const years = yearsRes.ok ? yearsRes.data : [];
+  const mapped: YearChangeRequestView[] = ycRes.ok ? ycRes.data : [];
   const pending = mapped.find((r) => r.status === "pending") ?? null;
   const latestRejected =
     mapped.find((r) => r.status === "rejected") ?? null;
@@ -79,53 +71,34 @@ export default async function ProfilePage() {
 
       <Card className="shadow-none">
         <CardHeader>
-          <CardTitle className="text-base text-[var(--student-ink)]">
-            Appearance
-          </CardTitle>
+          <CardTitle className="text-base text-[#072855]">Profile</CardTitle>
           <CardDescription>
-            Light, Dark, or System. Saved on this device only.
+            Biodata, contact, college, and photo. Contact details stay private —
+            leaderboards only show name, college, and photo.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div data-testid="profile-appearance-theme">
-            <ThemeToggle tone="content" />
-          </div>
+          <ProfileEditForm
+            fullName={profile.full_name}
+            email={profile.email}
+            contactNumber={profile.contact_number}
+            collegeName={profile.college_name}
+            avatarUrl={profile.avatar_url}
+          />
         </CardContent>
       </Card>
 
       <Card className="shadow-none">
         <CardHeader>
-          <CardTitle className="text-base text-[var(--student-ink)]">Account</CardTitle>
-        </CardHeader>
-        <CardContent className="grid gap-3 text-sm">
-          <FieldRow label="Name">{profile.full_name}</FieldRow>
-          <FieldRow label="Email">{profile.email}</FieldRow>
-          <FieldRow label="Year">{enrollment.year_name}</FieldRow>
-          <FieldRow label="Enrollment status">
-            <Badge variant={enrollment.status === "active" ? "default" : "outline"}>
-              {enrollment.status}
-            </Badge>
-          </FieldRow>
-          <FieldRow label="Subscription">
-            <Badge variant={live.data ? "default" : "outline"}>
-              {live.data ? "active" : "no active plan"}
-            </Badge>
-          </FieldRow>
-        </CardContent>
-      </Card>
-
-      <Card className="shadow-none">
-        <CardHeader>
-          <CardTitle className="text-base text-[#072855]">Academic year</CardTitle>
+          <CardTitle className="text-base text-[#072855]">Class</CardTitle>
           <CardDescription>
-            Your class year is fixed until an admin approves a change request.
-            Account status and subscription stay separate.
+            Free students can change class freely. Pending or active
+            subscriptions lock class to the purchased year.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <YearChangePanel
-            currentYearId={enrollment.year_id}
-            currentYearName={enrollment.year_name}
+          <ClassPanel
+            lock={lock}
             years={years}
             pending={pending}
             latestRejected={pending ? null : latestRejected}
@@ -138,13 +111,18 @@ export default async function ProfilePage() {
           <CardTitle className="text-base text-[#072855]">Subscription</CardTitle>
           <CardDescription>
             View status, payment instructions, and submit or update an
-            application.
+            application. Confirm your purchase class before paying.
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          <Button asChild>
+        <CardContent className="grid gap-3">
+          <FieldRow label="Status">
+            <Badge variant={liveRes.data ? "default" : "outline"}>
+              {liveRes.data ? "active" : "no active plan"}
+            </Badge>
+          </FieldRow>
+          <Button asChild className="w-fit">
             <Link href="/subscription">
-              {live.data ? "My Subscription" : "Get Subscription"}
+              {liveRes.data ? "My Subscription" : "Get Subscription"}
             </Link>
           </Button>
         </CardContent>
@@ -158,12 +136,12 @@ export default async function ProfilePage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-1 text-sm">
-          {(grants ?? []).length === 0 && (
+          {(grantsRes.data ?? []).length === 0 && (
             <p className="text-muted-foreground">
               No practice subjects granted yet — ask your admin.
             </p>
           )}
-          {(grants ?? []).map((g, i) => {
+          {(grantsRes.data ?? []).map((g, i) => {
             const s = g.subjects as unknown as { name: string } | null;
             return <div key={i}>{s?.name}</div>;
           })}

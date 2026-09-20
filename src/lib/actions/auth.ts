@@ -38,21 +38,36 @@ export async function signUp(
   const email = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
   const yearId = String(formData.get("year_id") ?? "");
+  const contactNumber = String(formData.get("contact_number") ?? "").trim();
+  const collegeName = String(formData.get("college_name") ?? "").trim();
 
-  if (!fullName || !email || !password || !yearId) {
+  if (!fullName || !email || !password || !yearId || !contactNumber || !collegeName) {
     return { error: "All fields are required." };
   }
   if (password.length < 8) {
     return { error: "Password must be at least 8 characters." };
+  }
+  if (contactNumber.replace(/[\s()-]/g, "").length < 7) {
+    return { error: "Enter a valid contact number." };
+  }
+  if (collegeName.length < 2) {
+    return { error: "Enter your college name." };
   }
 
   const supabase = await createClient();
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
-    // user_metadata: handle_new_user() (managed Supabase) and ensure_profile()
-    // (VPS / Cloud Auth split) both read full_name + year_id from here.
-    options: { data: { full_name: fullName, year_id: yearId } },
+    // user_metadata: ensure_profile reads full_name + year_id.
+    // contact_number + college_name bridge until profiles columns ship.
+    options: {
+      data: {
+        full_name: fullName,
+        year_id: yearId,
+        contact_number: contactNumber,
+        college_name: collegeName,
+      },
+    },
   });
 
   const classified = classifySignUpResult({

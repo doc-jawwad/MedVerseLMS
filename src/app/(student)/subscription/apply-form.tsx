@@ -9,6 +9,7 @@ import {
   uploadPaymentScreenshot,
   discardPaymentScreenshot,
 } from "@/lib/actions/subscription-applications";
+import { recordPurchaseClassIntentAction } from "@/lib/actions/profile";
 import {
   PAYMENT_SCREENSHOT_CONTENT_TYPES,
   PAYMENT_SCREENSHOT_MAX_BYTES,
@@ -16,9 +17,15 @@ import {
   validatePaymentScreenshotFile,
 } from "@/lib/payments/application";
 import { studentSubscriptionErrorMessage } from "@/lib/subscriptions/student-errors";
+import {
+  purchaseClassConfirmLabel,
+  purchaseClassPrompt,
+} from "@/lib/profile/presentation";
+import type { YearOption } from "@/lib/profile/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 
 export type PaymentInstructions = {
   bank_name?: string | null;
@@ -59,6 +66,8 @@ export function SubscriptionApplyForm({
   pendingApplicationId,
   initialAmount,
   currency = "PKR",
+  years,
+  defaultYearId,
 }: {
   instructions: PaymentInstructions;
   instructionsError?: string | null;
@@ -66,6 +75,8 @@ export function SubscriptionApplyForm({
   pendingApplicationId?: string | null;
   initialAmount?: number | null;
   currency?: string;
+  years: YearOption[];
+  defaultYearId: string | null;
 }) {
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
@@ -79,11 +90,18 @@ export function SubscriptionApplyForm({
   const [phase, setPhase] = useState<"idle" | "uploading" | "submitting">(
     "idle"
   );
+  const [purchaseYearId, setPurchaseYearId] = useState(
+    defaultYearId ?? years[0]?.id ?? ""
+  );
+  const [purchaseConfirmed, setPurchaseConfirmed] = useState(false);
 
   const displayCurrency =
     (instructions?.currency && instructions.currency.trim()) ||
     currency ||
     "PKR";
+
+  const purchaseYearName =
+    years.find((y) => y.id === purchaseYearId)?.name ?? "your class";
 
   function onFileChange(next: File | null) {
     setFile(next);
@@ -107,6 +125,14 @@ export function SubscriptionApplyForm({
       setFormError(studentSubscriptionErrorMessage(amountErr));
       return;
     }
+    if (!purchaseYearId) {
+      setFormError("Select the class this subscription is for.");
+      return;
+    }
+    if (!purchaseConfirmed) {
+      setFormError("Confirm the purchase class before submitting.");
+      return;
+    }
     const parsedAmount = Number(amount);
     if (mode === "create" && !file) {
       setFormError("Upload a payment screenshot before submitting.");
@@ -126,6 +152,16 @@ export function SubscriptionApplyForm({
     startTransition(async () => {
       let objectKey: string | undefined;
       try {
+        const intent = await recordPurchaseClassIntentAction({
+          yearId: purchaseYearId,
+          yearName: purchaseYearName,
+          confirmed: purchaseConfirmed,
+        });
+        if (!intent.ok) {
+          setFormError(intent.error);
+          return;
+        }
+
         if (file) {
           setPhase("uploading");
           const fd = new FormData();
@@ -212,6 +248,41 @@ export function SubscriptionApplyForm({
 
   return (
     <div className="grid gap-6">
+      <section className="grid gap-3 rounded-lg border border-[#072855]/20 bg-[#072855]/[0.03] p-4">
+        <h2 className="font-medium text-[#072855]">Purchase class</h2>
+        <p className="text-sm text-muted-foreground">
+          {purchaseClassPrompt(purchaseYearName)}
+        </p>
+        <div className="grid gap-2">
+          <Label htmlFor="purchase-year">Class for this subscription</Label>
+          <select
+            id="purchase-year"
+            className="h-9 w-full rounded-md border bg-transparent px-3 text-sm"
+            value={purchaseYearId}
+            disabled={busy || years.length === 0}
+            onChange={(e) => {
+              setPurchaseYearId(e.target.value);
+              setPurchaseConfirmed(false);
+            }}
+          >
+            {years.map((y) => (
+              <option key={y.id} value={y.id}>
+                {y.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <label className="flex items-start gap-3 text-sm">
+          <Checkbox
+            checked={purchaseConfirmed}
+            disabled={busy}
+            onCheckedChange={(v) => setPurchaseConfirmed(v === true)}
+            className="mt-0.5"
+          />
+          <span>{purchaseClassConfirmLabel(purchaseYearName)}</span>
+        </label>
+      </section>
+
       <section className="grid gap-3 rounded-lg border p-4">
         <h2 className="font-medium">Payment instructions</h2>
         {instructionsError ? (

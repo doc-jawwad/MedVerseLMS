@@ -33,6 +33,8 @@ export function RegisterForm({ years }: { years: Year[] }) {
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [contactNumber, setContactNumber] = useState("");
+  const [collegeName, setCollegeName] = useState("");
 
   return (
     <Card className="w-full border-border/80 shadow-none">
@@ -41,8 +43,8 @@ export function RegisterForm({ years }: { years: Year[] }) {
           Create your account
         </CardTitle>
         <CardDescription>
-          Verify your email to start using the LMS right away. Your year is for
-          class placement; changing it later needs admin approval.
+          Verify your email to start using the LMS right away. Free students can
+          change class later; a subscription locks class to the purchased year.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -70,6 +72,32 @@ export function RegisterForm({ years }: { years: Year[] }) {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="h-10"
+            />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="contact_number">Contact number</Label>
+            <Input
+              id="contact_number"
+              name="contact_number"
+              type="tel"
+              required
+              autoComplete="tel"
+              value={contactNumber}
+              onChange={(e) => setContactNumber(e.target.value)}
+              className="h-10"
+              placeholder="+92…"
+            />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="college_name">College name</Label>
+            <Input
+              id="college_name"
+              name="college_name"
+              required
+              value={collegeName}
+              onChange={(e) => setCollegeName(e.target.value)}
+              className="h-10"
+              placeholder="Your medical college"
             />
           </div>
           <div className="grid gap-2">
