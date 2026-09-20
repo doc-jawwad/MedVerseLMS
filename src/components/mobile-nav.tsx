@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import {
   Menu,
   LayoutDashboard,
@@ -99,6 +99,7 @@ export function MobileNav({
   subLabel,
   signOutAction,
   showBottomNav = false,
+  tools,
 }: {
   /** Full list shown in the slide-out drawer. */
   navItems: NavItem[];
@@ -109,6 +110,8 @@ export function MobileNav({
   signOutAction: () => Promise<void>;
   /** Student may keep a compact bottom bar; Admin must not. */
   showBottomNav?: boolean;
+  /** Search + theme (and similar) rendered in the drawer footer. */
+  tools?: ReactNode;
 }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
@@ -179,6 +182,7 @@ export function MobileNav({
         </nav>
 
         <div className="shrink-0 space-y-3 border-t border-sidebar-border p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+          {tools}
           <InstallMedverseApp variant="nav" />
           <form action={signOutAction}>
             <Button

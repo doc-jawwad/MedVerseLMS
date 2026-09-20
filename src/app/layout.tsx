@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import { PwaRuntimeProvider } from "@/components/pwa/pwa-runtime-provider";
 import { PwaUpdateBanner } from "@/components/pwa/pwa-update-banner";
+import { ThemeProvider } from "@/components/theme/theme-provider";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -46,14 +47,17 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
+      suppressHydrationWarning
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="flex min-h-full flex-col">
-        <PwaRuntimeProvider>
-          {children}
-          <PwaUpdateBanner />
-          <Toaster richColors />
-        </PwaRuntimeProvider>
+        <ThemeProvider>
+          <PwaRuntimeProvider>
+            {children}
+            <PwaUpdateBanner />
+            <Toaster richColors />
+          </PwaRuntimeProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

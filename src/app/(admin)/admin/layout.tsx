@@ -7,6 +7,7 @@ import { MobileNav } from "@/components/mobile-nav";
 import { ShellNav } from "@/components/shell-nav";
 import { BrandCredit } from "@/components/brand-credit";
 import { InstallMedverseApp } from "@/components/pwa/install-medverse-app";
+import { ShellTools } from "@/components/shell-tools";
 import {
   filterAdminNav,
   getAdminPermissionSet,
@@ -27,6 +28,28 @@ export default async function AdminLayout({
     readAdminSelectedYearId(),
   ]);
 
+  const yearList = years ?? [];
+  const selected =
+    yearList.find((y) => y.id === selectedYearId) ?? yearList[0] ?? null;
+  const tools = selected ? (
+    <ShellTools
+      surface="library"
+      yearId={selected.id}
+      yearNumber={selected.year_number}
+      yearName={selected.name}
+      hasLiveSubscription
+    />
+  ) : (
+    <ShellTools
+      surface="library"
+      yearId=""
+      yearNumber={1}
+      yearName="Class"
+      hasLiveSubscription
+      showSearch={false}
+    />
+  );
+
   return (
     <div className="flex min-h-svh bg-[var(--student-canvas)]">
       <SessionWatch userId={userId} />
@@ -42,6 +65,7 @@ export default async function AdminLayout({
         </div>
         <ShellNav items={nav} />
         <div className="mt-4 space-y-3">
+          {tools}
           <InstallMedverseApp variant="nav" />
           <form action={signOutAction}>
             <Button
@@ -63,11 +87,12 @@ export default async function AdminLayout({
           subLabel="Admin"
           signOutAction={signOutAction}
           showBottomNav={false}
+          tools={tools}
         />
         <main className="mx-auto w-full max-w-7xl flex-1 px-4 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] md:px-8 md:py-8">
           <div className="mb-4">
             <AdminClassSelector
-              years={years ?? []}
+              years={yearList}
               selectedId={selectedYearId}
             />
           </div>

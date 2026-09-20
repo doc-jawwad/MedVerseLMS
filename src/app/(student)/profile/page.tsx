@@ -19,6 +19,7 @@ import { PageHeader } from "@/components/student/page-header";
 import { StudentPage } from "@/components/student/student-page";
 import { FieldRow } from "@/components/student/field-row";
 import { InstallMedverseApp } from "@/components/pwa/install-medverse-app";
+import { ThemeToggle } from "@/components/theme/theme-toggle";
 
 export const metadata = { title: "My Account — MedVerse LMS" };
 
@@ -78,7 +79,23 @@ export default async function ProfilePage() {
 
       <Card className="shadow-none">
         <CardHeader>
-          <CardTitle className="text-base text-[#072855]">Account</CardTitle>
+          <CardTitle className="text-base text-[var(--student-ink)]">
+            Appearance
+          </CardTitle>
+          <CardDescription>
+            Light, Dark, or System. Saved on this device only.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div data-testid="profile-appearance-theme">
+            <ThemeToggle tone="content" />
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="shadow-none">
+        <CardHeader>
+          <CardTitle className="text-base text-[var(--student-ink)]">Account</CardTitle>
         </CardHeader>
         <CardContent className="grid gap-3 text-sm">
           <FieldRow label="Name">{profile.full_name}</FieldRow>
