@@ -23,19 +23,48 @@ export async function addFolder(
 ) {
   if (!name.trim()) return { error: "Folder name required." };
   const supabase = await createClient();
-  const { error } = await supabase.from("material_folders").insert({
-    year_id: yearId,
-    subject_id: subjectId,
-    name: name.trim(),
-    library_type: libraryType,
-    entitlement,
-  });
+  // protect_resource_entitlement allows INSERT only as free; paid/plan must
+  // go through set_resource_entitlement after the row exists.
+  const { data: folder, error } = await supabase
+    .from("material_folders")
+    .insert({
+      year_id: yearId,
+      subject_id: subjectId,
+      name: name.trim(),
+      library_type: libraryType,
+      entitlement: "free",
+    })
+    .select("id")
+    .single();
+  if (error || !folder?.id) {
+    revalidateStudyPaths();
+    return actionRpcResult("addFolder.insert", error ?? { message: "folder_create_failed" });
+  }
+
+  if (entitlement !== "free") {
+    const { error: entError } = await supabase.rpc("set_resource_entitlement", {
+      p_kind: "materials_folder",
+      p_id: folder.id,
+      p_entitlement: entitlement,
+      p_required_plan_id: null,
+    });
+    if (entError) {
+      await supabase.from("material_folders").delete().eq("id", folder.id);
+      revalidateStudyPaths();
+      return actionRpcResult("addFolder.entitlement", entError);
+    }
+  }
+
+  revalidateStudyPaths();
+  return {};
+}
+
+function revalidateStudyPaths() {
   revalidatePath("/admin/materials");
   revalidatePath("/admin/free-resources");
   revalidatePath("/admin/library");
   revalidatePath("/materials");
   revalidatePath("/free-resources");
-  return actionRpcResult("action", error);
 }
 
 export async function deleteFolder(folderId: string) {

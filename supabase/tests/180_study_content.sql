@@ -1,6 +1,6 @@
 -- Study content: materials kinds, signed-object authorize, test prep, pearls.
 begin;
-select plan(36);
+select plan(39);
 
 select test_helpers.as_runner();
 select * into temp curriculum from test_helpers.make_curriculum();
@@ -505,6 +505,52 @@ select lives_ok(
     'free'
   )$$,
   'manage_materials can set pearl entitlement'
+);
+
+------------------------------------------------------------------
+-- App create-folder workflow: INSERT free, then set paid via RPC
+------------------------------------------------------------------
+select test_helpers.as_user((select id from t_mats));
+select throws_ok(
+  $$insert into public.material_folders (year_id, name, library_type, entitlement)
+    values (
+      (select year_id from curriculum),
+      'Paid Direct Insert Must Fail',
+      'notes',
+      'any_subscription'
+    )$$,
+  'entitlement changes require set_resource_entitlement()',
+  'direct INSERT of any_subscription folder is blocked'
+);
+
+select lives_ok(
+  $$
+  with created as (
+    insert into public.material_folders (year_id, name, library_type, entitlement)
+    values (
+      (select year_id from curriculum),
+      'Paid Via RPC Workflow',
+      'notes',
+      'free'
+    )
+    returning id
+  )
+  select public.set_resource_entitlement(
+    'materials_folder',
+    (select id from created),
+    'any_subscription'
+  )
+  $$,
+  'create folder as free then set_resource_entitlement to any_subscription'
+);
+
+select is(
+  (
+    select entitlement from public.material_folders
+    where name = 'Paid Via RPC Workflow'
+  ),
+  'any_subscription',
+  'paid folder entitlement is any_subscription after RPC workflow'
 );
 
 select finish();
