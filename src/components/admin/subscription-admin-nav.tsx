@@ -17,6 +17,11 @@ const links = [
     label: "Payment settings",
     match: "prefix" as const,
   },
+  {
+    href: "/admin/subscriptions/block-access",
+    label: "Block access",
+    match: "prefix" as const,
+  },
 ];
 
 export function SubscriptionAdminNav({ currentPath }: { currentPath: string }) {

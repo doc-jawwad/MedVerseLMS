@@ -18,45 +18,72 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
+export type YearOption = { id: string; year_name: string; year_number: number };
 
 export type PlanRow = {
   id: string;
   name: string;
   description: string | null;
   duration_days: number;
+  price: number;
   is_complimentary: boolean;
   is_active: boolean;
   sort_order: number;
+  year_id: string;
+  year_name?: string | null;
+};
+
+type FormState = {
+  name: string;
+  yearId: string;
+  price: string;
+  description: string;
+  durationDays: string;
+  sortOrder: string;
+  isComplimentary: boolean;
+  isActive: boolean;
 };
 
 export function PlanManager({
   plans,
+  years,
   canManage,
+  filterYearId,
 }: {
   plans: PlanRow[];
+  years: YearOption[];
   canManage: boolean;
+  filterYearId?: string | null;
 }) {
   const [pending, startTransition] = useTransition();
   const [createOpen, setCreateOpen] = useState(false);
   const [edit, setEdit] = useState<PlanRow | null>(null);
-  const [form, setForm] = useState({
-    name: "",
-    description: "",
-    durationDays: "365",
-    sortOrder: "0",
-    isComplimentary: false,
-    isActive: true,
-  });
 
-  function openCreate() {
-    setForm({
+  function blankForm(yearId?: string): FormState {
+    return {
       name: "",
+      yearId: yearId ?? years[0]?.id ?? "",
+      price: "0",
       description: "",
       durationDays: "365",
       sortOrder: String((plans.at(-1)?.sort_order ?? 0) + 10),
       isComplimentary: false,
       isActive: true,
-    });
+    };
+  }
+
+  const [form, setForm] = useState<FormState>(() => blankForm(filterYearId ?? undefined));
+
+  function openCreate() {
+    setForm(blankForm(filterYearId ?? undefined));
     setCreateOpen(true);
   }
 
@@ -64,6 +91,8 @@ export function PlanManager({
     setEdit(p);
     setForm({
       name: p.name,
+      yearId: p.year_id,
+      price: String(p.price),
       description: p.description ?? "",
       durationDays: String(p.duration_days),
       sortOrder: String(p.sort_order),
@@ -77,6 +106,8 @@ export function PlanManager({
     startTransition(async () => {
       const res = await createSubscriptionPlan({
         name: form.name.trim(),
+        yearId: form.yearId,
+        price: Number(form.price),
         description: form.description,
         durationDays: Number(form.durationDays),
         sortOrder: Number(form.sortOrder),
@@ -101,6 +132,7 @@ export function PlanManager({
         sortOrder: Number(form.sortOrder),
         isComplimentary: form.isComplimentary,
         isActive: form.isActive,
+        price: Number(form.price),
       });
       if (res.error) toast.error(adminSubscriptionErrorMessage(res.error));
       else toast.success("Plan updated");
@@ -118,6 +150,10 @@ export function PlanManager({
     });
   }
 
+  const visiblePlans = filterYearId
+    ? plans.filter((p) => p.year_id === filterYearId)
+    : plans;
+
   return (
     <div className="grid gap-4">
       {canManage && (
@@ -133,15 +169,16 @@ export function PlanManager({
           <thead>
             <tr className="border-b text-left">
               <th className="p-3">Name</th>
+              <th className="p-3">Class</th>
+              <th className="p-3">Price</th>
               <th className="p-3">Days</th>
               <th className="p-3">Complimentary</th>
-              <th className="p-3">Order</th>
               <th className="p-3">Active</th>
               <th className="p-3 text-right">Actions</th>
             </tr>
           </thead>
           <tbody>
-            {plans.map((p) => (
+            {visiblePlans.map((p) => (
               <tr key={p.id} className="border-b">
                 <td className="p-3">
                   <div className="font-medium">{p.name}</div>
@@ -151,9 +188,18 @@ export function PlanManager({
                     </div>
                   )}
                 </td>
+                <td className="p-3 text-xs text-muted-foreground">
+                  {p.year_name ?? years.find((y) => y.id === p.year_id)?.year_name ?? "—"}
+                </td>
+                <td className="p-3">
+                  {p.is_complimentary ? (
+                    <span className="text-muted-foreground">—</span>
+                  ) : (
+                    <span>{Number(p.price).toLocaleString()} PKR</span>
+                  )}
+                </td>
                 <td className="p-3">{p.duration_days}</td>
                 <td className="p-3">{p.is_complimentary ? "yes" : "no"}</td>
-                <td className="p-3">{p.sort_order}</td>
                 <td className="p-3">{p.is_active ? "yes" : "no"}</td>
                 <td className="p-3 text-right">
                   {canManage && (
@@ -179,9 +225,9 @@ export function PlanManager({
                 </td>
               </tr>
             ))}
-            {plans.length === 0 && (
+            {visiblePlans.length === 0 && (
               <tr>
-                <td colSpan={6} className="p-3 text-muted-foreground">
+                <td colSpan={7} className="p-3 text-muted-foreground">
                   No plans yet.
                 </td>
               </tr>
@@ -195,12 +241,14 @@ export function PlanManager({
           <DialogHeader>
             <DialogTitle>Create plan</DialogTitle>
           </DialogHeader>
-          <PlanFields form={form} setForm={setForm} />
+          <PlanFields form={form} setForm={setForm} years={years} showYearSelector />
           <DialogFooter>
             <Button variant="outline" onClick={() => setCreateOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={submitCreate}>Create</Button>
+            <Button onClick={submitCreate} disabled={!form.yearId || !form.name.trim()}>
+              Create
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -210,7 +258,7 @@ export function PlanManager({
           <DialogHeader>
             <DialogTitle>Edit plan</DialogTitle>
           </DialogHeader>
-          <PlanFields form={form} setForm={setForm} />
+          <PlanFields form={form} setForm={setForm} years={years} showYearSelector={false} />
           <DialogFooter>
             <Button variant="outline" onClick={() => setEdit(null)}>
               Cancel
@@ -226,19 +274,36 @@ export function PlanManager({
 function PlanFields({
   form,
   setForm,
+  years,
+  showYearSelector,
 }: {
-  form: {
-    name: string;
-    description: string;
-    durationDays: string;
-    sortOrder: string;
-    isComplimentary: boolean;
-    isActive: boolean;
-  };
-  setForm: (f: typeof form) => void;
+  form: FormState;
+  setForm: (f: FormState) => void;
+  years: YearOption[];
+  showYearSelector: boolean;
 }) {
   return (
     <div className="grid gap-3">
+      {showYearSelector && (
+        <div className="grid gap-2">
+          <Label htmlFor="plan-year">Class</Label>
+          <Select
+            value={form.yearId}
+            onValueChange={(v) => setForm({ ...form, yearId: v })}
+          >
+            <SelectTrigger id="plan-year">
+              <SelectValue placeholder="Select class…" />
+            </SelectTrigger>
+            <SelectContent>
+              {years.map((y) => (
+                <SelectItem key={y.id} value={y.id}>
+                  {y.year_name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
       <div className="grid gap-2">
         <Label htmlFor="plan-name">Name</Label>
         <Input
@@ -255,7 +320,18 @@ function PlanFields({
           onChange={(e) => setForm({ ...form, description: e.target.value })}
         />
       </div>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-3 gap-3">
+        <div className="grid gap-2">
+          <Label htmlFor="plan-price">Price (PKR)</Label>
+          <Input
+            id="plan-price"
+            type="number"
+            min={0}
+            step={100}
+            value={form.price}
+            onChange={(e) => setForm({ ...form, price: e.target.value })}
+          />
+        </div>
         <div className="grid gap-2">
           <Label htmlFor="plan-days">Duration (days)</Label>
           <Input

@@ -100,6 +100,8 @@ export async function assignSubscriptionPlan(
 
 export async function createSubscriptionPlan(input: {
   name: string;
+  yearId: string;
+  price?: number | null;
   description?: string | null;
   durationDays?: number | null;
   isComplimentary?: boolean | null;
@@ -109,6 +111,8 @@ export async function createSubscriptionPlan(input: {
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("create_subscription_plan", {
     p_name: input.name,
+    p_year_id: input.yearId,
+    p_price: input.price ?? 0,
     p_description: input.description ?? "",
     p_duration_days: input.durationDays ?? 365,
     p_is_complimentary: input.isComplimentary ?? false,
@@ -128,6 +132,7 @@ export async function updateSubscriptionPlan(input: {
   isComplimentary?: boolean | null;
   isActive?: boolean | null;
   sortOrder?: number | null;
+  price?: number | null;
 }) {
   const supabase = await createClient();
   const { error } = await supabase.rpc("update_subscription_plan", {
@@ -138,7 +143,20 @@ export async function updateSubscriptionPlan(input: {
     p_is_complimentary: input.isComplimentary ?? null,
     p_is_active: input.isActive ?? null,
     p_sort_order: input.sortOrder ?? null,
+    p_price: input.price ?? null,
   });
   revalidateAdminSubscriptionPaths();
+  return actionRpcResult("action", error);
+}
+
+export async function setBlockFreeAccess(
+  subjectId: string,
+  freeAccess: boolean
+) {
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("set_block_free_access", {
+    p_subject_id: subjectId,
+    p_free_access: freeAccess,
+  });
   return actionRpcResult("action", error);
 }

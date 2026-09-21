@@ -23,6 +23,14 @@ const MESSAGES: Record<string, string> = {
   invalid_subscription_window: "The subscription start and end dates are not valid.",
   subscription_already_ended: "That subscription window has already ended.",
   subscription_already_active: "This student already has a live subscription.",
+  year_required: "A class must be selected for this plan.",
+  year_not_found: "The selected class was not found.",
+  invalid_price: "Price must be zero or a positive number.",
+  plan_year_mismatch: "The selected plan belongs to a different class than the application.",
+  plan_inactive: "That plan is not currently active.",
+  subject_not_found: "That subject was not found.",
+  subject_has_no_product_key: "Block access can only be toggled for Block/Final Year subjects.",
+  year_access_denied: "You are not enrolled in that class.",
 };
 
 export function adminSubscriptionErrorMessage(

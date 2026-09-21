@@ -25,6 +25,8 @@ const MESSAGES: Record<string, string> = {
   r2_not_configured:
     "Payment screenshot uploads are temporarily unavailable. Contact your academy admin.",
   plan_not_found: "No active subscription plan is available right now.",
+  year_access_denied: "You are not enrolled in that class.",
+  plan_year_mismatch: "That plan is not available for your class.",
   network_error:
     "Network error. Check your connection and try again.",
 };

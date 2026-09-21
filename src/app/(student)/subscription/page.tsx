@@ -5,6 +5,7 @@ import { createSubscriptionClassAdapter } from "@/lib/profile/adapter";
 import { formatDate, formatDateTime } from "@/lib/utils";
 import {
   buildStudentSubscriptionView,
+  remainingSubscriptionDays,
   type StudentApplicationRow,
   type StudentSubscriptionRow,
 } from "@/lib/subscriptions/student-status";
@@ -24,19 +25,41 @@ import { FieldRow } from "@/components/student/field-row";
 
 export const metadata = { title: "My Subscription — MedVerse LMS" };
 
+const PKT_TZ = "Asia/Karachi";
+
+function formatPKT(iso: string): string {
+  return new Date(iso).toLocaleDateString("en-PK", {
+    timeZone: PKT_TZ,
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+}
+
+function remainingDaysPKT(endsAt: string): number {
+  const now = new Date(
+    new Date().toLocaleString("en-US", { timeZone: PKT_TZ })
+  );
+  const end = new Date(
+    new Date(endsAt).toLocaleString("en-US", { timeZone: PKT_TZ })
+  );
+  const diffMs = end.getTime() - now.getTime();
+  return Math.max(0, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
+}
+
 export default async function SubscriptionPage() {
   const { supabase, userId, enrollment } = await requireStudent();
   const classAdapter = createSubscriptionClassAdapter(supabase);
 
   await supabase.rpc("expire_due_subscriptions");
 
-  const [liveRes, subsRes, appsRes, instructionsRes, yearsRes] =
+  const [liveRes, subsRes, appsRes, instructionsRes, yearsRes, plansRes, notifsRes] =
     await Promise.all([
       supabase.rpc("has_live_subscription"),
       supabase
         .from("subscriptions")
         .select(
-          "id, status, starts_at, ends_at, grace_days, paid_access_mode, subscription_plans(name)"
+          "id, status, starts_at, ends_at, grace_days, paid_access_mode, year_id, subscription_plans(name), years(year_name)"
         )
         .eq("student_id", userId)
         .order("ends_at", { ascending: false }),
@@ -49,6 +72,21 @@ export default async function SubscriptionPage() {
         .order("created_at", { ascending: false }),
       getPaymentInstructions(),
       classAdapter.listYears(),
+      // RLS automatically filters to the student's enrolled year.
+      supabase
+        .from("subscription_plans")
+        .select("id, name, description, duration_days, price, is_complimentary, sort_order")
+        .eq("is_active", true)
+        .order("sort_order")
+        .order("name"),
+      supabase
+        .from("student_notifications")
+        .select("id, kind, ref_id, payload, read_at, created_at")
+        .eq("student_id", userId)
+        .in("kind", ["application_approved", "application_rejected"])
+        .is("read_at", null)
+        .order("created_at", { ascending: false })
+        .limit(5),
     ]);
 
   const subscriptions: StudentSubscriptionRow[] = (subsRes.data ?? []).map(
@@ -107,6 +145,19 @@ export default async function SubscriptionPage() {
 
   const applyMode = view.pending ? "edit" : "create";
   const years = yearsRes.ok ? yearsRes.data : [];
+  const plans = plansRes.data ?? [];
+  const notifications = notifsRes.data ?? [];
+
+  // Compute PKT-aware remaining days for active subscription.
+  const activeSub = view.active;
+  const remainingDays = activeSub
+    ? remainingDaysPKT(activeSub.ends_at)
+    : null;
+
+  // Year name for active subscription.
+  const activeSubRow = subsRes.data?.find((s) => s.id === activeSub?.id);
+  const activeYearName =
+    (activeSubRow?.years as unknown as { year_name: string } | null)?.year_name ?? null;
 
   return (
     <StudentPage width="narrow">
@@ -114,6 +165,51 @@ export default async function SubscriptionPage() {
         title="My Subscription"
         description="Free resources stay available. Subscription-required resources stay visible but locked until you have an active subscription."
       />
+
+      {notifications.length > 0 && (
+        <div className="grid gap-2">
+          {notifications.map((n) => {
+            const payload = (n.payload ?? {}) as Record<string, unknown>;
+            if (n.kind === "application_approved") {
+              return (
+                <div
+                  key={n.id}
+                  className="flex items-start gap-3 rounded-md border border-green-200 bg-green-50 p-3 text-sm dark:border-green-900 dark:bg-green-950/30"
+                >
+                  <span className="text-green-600 dark:text-green-400">✓</span>
+                  <div>
+                    <p className="font-medium">Application approved</p>
+                    {Boolean(payload.plan_name) && (
+                      <p className="text-muted-foreground">
+                        Plan: {String(payload.plan_name)}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              );
+            }
+            if (n.kind === "application_rejected") {
+              return (
+                <div
+                  key={n.id}
+                  className="flex items-start gap-3 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm"
+                >
+                  <span className="text-destructive">✗</span>
+                  <div>
+                    <p className="font-medium">Application rejected</p>
+                    {Boolean(payload.review_note) && (
+                      <p className="text-muted-foreground">
+                        {String(payload.review_note)}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              );
+            }
+            return null;
+          })}
+        </div>
+      )}
 
       <Card className="shadow-none">
         <CardHeader>
@@ -137,13 +233,24 @@ export default async function SubscriptionPage() {
           {view.kind === "active" && view.active && (
             <div className="grid gap-2">
               <FieldRow label="Plan">{view.active.plan_name ?? "—"}</FieldRow>
-              <FieldRow label="Starts">{formatDate(view.active.starts_at)}</FieldRow>
-              <FieldRow label="Ends">{formatDate(view.active.ends_at)}</FieldRow>
-              {view.remainingDays != null && (
+              {activeYearName && (
+                <FieldRow label="Class">{activeYearName}</FieldRow>
+              )}
+              <FieldRow label="Starts">{formatPKT(view.active.starts_at)}</FieldRow>
+              <FieldRow label="Ends">{formatPKT(view.active.ends_at)}</FieldRow>
+              {remainingDays != null && (
                 <FieldRow label="Remaining">
-                  {view.remainingDays === 0
-                    ? "Ends today"
-                    : `${view.remainingDays} day${view.remainingDays === 1 ? "" : "s"}`}
+                  <span
+                    className={
+                      remainingDays <= 7
+                        ? "font-medium text-destructive"
+                        : undefined
+                    }
+                  >
+                    {remainingDays === 0
+                      ? "Ends today"
+                      : `${remainingDays} day${remainingDays === 1 ? "" : "s"}`}
+                  </span>
                 </FieldRow>
               )}
             </div>
@@ -206,6 +313,55 @@ export default async function SubscriptionPage() {
           )}
         </CardContent>
       </Card>
+
+      {plans.length > 0 && view.kind !== "active" && (
+        <Card className="shadow-none">
+          <CardHeader>
+            <CardTitle className="text-base text-[var(--student-ink)]">
+              Available plans
+            </CardTitle>
+            <CardDescription>
+              Plans for your enrolled class. Prices are in PKR unless otherwise
+              noted.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-3">
+              {plans.map((plan) => {
+                const approxMonths = Math.round(plan.duration_days / 30);
+                return (
+                  <div
+                    key={plan.id}
+                    className="flex items-center justify-between rounded-md border p-3"
+                  >
+                    <div>
+                      <p className="font-medium">{plan.name}</p>
+                      {plan.description ? (
+                        <p className="text-xs text-muted-foreground">
+                          {plan.description}
+                        </p>
+                      ) : null}
+                      <p className="text-xs text-muted-foreground">
+                        {approxMonths} month{approxMonths !== 1 ? "s" : ""}{" "}
+                        ({plan.duration_days} days)
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      {plan.is_complimentary ? (
+                        <Badge variant="secondary">Complimentary</Badge>
+                      ) : (
+                        <p className="font-semibold">
+                          {Number(plan.price).toLocaleString()} PKR
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {showApply && (
         <Card className="shadow-none">
