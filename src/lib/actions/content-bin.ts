@@ -5,9 +5,6 @@ import { actionRpcResult } from "@/lib/errors/safe-action-error";
 import { createClient } from "@/lib/supabase/server";
 import type { ContentBinEntityType } from "@/lib/content-bin/labels";
 
-export type { ContentBinEntityType } from "@/lib/content-bin/labels";
-export { contentBinEntityLabel } from "@/lib/content-bin/labels";
-
 export type ContentBinItem = {
   entity_type: ContentBinEntityType;
   entity_id: string;

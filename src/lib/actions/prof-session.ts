@@ -3,10 +3,10 @@
 import { revalidatePath } from "next/cache";
 import { actionRpcResult } from "@/lib/errors/safe-action-error";
 import { createClient } from "@/lib/supabase/server";
+import type { ContentBinEntityType } from "@/lib/content-bin/labels";
 import {
   moveContentToBin,
   restoreContentFromBin,
-  type ContentBinEntityType,
 } from "@/lib/actions/content-bin";
 
 function revalidateProfSession() {

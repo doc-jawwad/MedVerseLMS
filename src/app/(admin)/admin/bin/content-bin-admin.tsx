@@ -4,8 +4,8 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { contentBinEntityLabel } from "@/lib/content-bin/labels";
 import {
-  contentBinEntityLabel,
   purgeContentFromBin,
   restoreContentFromBin,
   type ContentBinItem,
