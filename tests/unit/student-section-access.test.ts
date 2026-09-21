@@ -82,6 +82,7 @@ describe("isPaidLmsSectionPath", () => {
     assert.equal(isPaidLmsSectionPath("/academic/prof-session"), true);
     assert.equal(isPaidLmsSectionPath("/academic/prof-session/day-1"), true);
     assert.equal(isPaidLmsSectionPath("/mcq-bank"), true);
+    assert.equal(isPaidLmsSectionPath("/mock-test"), true);
     assert.equal(isPaidLmsSectionPath("/practice/ospe"), false);
     // /performance redirects to /dashboard — no longer a paid section gate
     assert.equal(isPaidLmsSectionPath("/performance"), false);

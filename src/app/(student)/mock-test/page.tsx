@@ -3,6 +3,9 @@ import { requireUser } from "@/lib/auth/require-user";
 import { createClient } from "@/lib/supabase/server";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { SectionLock } from "@/components/subscription/section-lock";
+import { getStudentHasLiveSubscription } from "@/lib/subscriptions/student-live-access";
+import { studentHasPaidLmsSections } from "@/lib/subscriptions/student-section-access";
 
 export const metadata = { title: "Mock Tests — MedVerse" };
 
@@ -26,8 +29,19 @@ const attemptVariant: Record<string, "default" | "secondary" | "outline"> = {
 export default async function MockTestPage() {
   const supabase = await createClient();
 
-  // Auth check — student must be signed in (middleware also enforces paid section).
+  // Auth check — student must be signed in. Paid-section gate is in-page
+  // (proxy is optimistic only; RPC/entitlement remain authoritative to start).
   await requireUser();
+
+  const hasLiveAccess = await getStudentHasLiveSubscription();
+  if (!studentHasPaidLmsSections(hasLiveAccess)) {
+    return (
+      <SectionLock
+        title="Mock Tests"
+        description="Mock Tests unlock with a live subscription. Practice assessments stay unavailable on the free plan."
+      />
+    );
+  }
 
   const { data, error } = await supabase.rpc("list_student_mock_tests");
 

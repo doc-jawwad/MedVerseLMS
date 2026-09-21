@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { test, expect } from "@playwright/test";
 import { loadE2EEnv, STAGING_APP_ORIGIN } from "./load-e2e-env";
 
@@ -5,7 +6,34 @@ import { loadE2EEnv, STAGING_APP_ORIGIN } from "./load-e2e-env";
  * Free-student shell policy — unified Academic tree + locked Prof. Session.
  * Performance is merged into Dashboard; /performance redirects to /dashboard.
  * Staging credentials must be a free (non–live-subscription) student.
+ * Before login, expire any accidental live subscription on "Staging Student"
+ * so approve-application walkthroughs cannot poison this suite.
  */
+function ensureStagingStudentFixtureIsFree() {
+  const ssh = process.env.E2E_STAGING_SSH || "medverse-vps";
+  const sql =
+    "update public.subscriptions set status='expired', ends_at=now() " +
+    "where status='active' and student_id=(" +
+    "select id from public.profiles where full_name='Staging Student' limit 1" +
+    ") and current_database()='medverse_staging';";
+  try {
+    execFileSync(
+      "ssh",
+      [
+        "-o",
+        "BatchMode=yes",
+        ssh,
+        `sudo -u postgres psql -d medverse_staging -v ON_ERROR_STOP=1 -c ${JSON.stringify(sql)}`,
+      ],
+      { stdio: "pipe" }
+    );
+  } catch (err) {
+    throw new Error(
+      `free-student-nav: could not reset Staging Student to free via ${ssh}: ${err}`
+    );
+  }
+}
+
 test.describe("Free student navigation", () => {
   test("all years navigable; Prof. Session locked; /performance redirects to /dashboard", async ({
     page,
@@ -19,6 +47,8 @@ test.describe("Free student navigation", () => {
       !e2e.stagingStudentEmail || !e2e.stagingStudentPassword,
       "E2E_STAGING_STUDENT_EMAIL/PASSWORD required"
     );
+
+    ensureStagingStudentFixtureIsFree();
 
     await page.goto("/login");
     expect(page.url().startsWith(STAGING_APP_ORIGIN)).toBeTruthy();
@@ -54,6 +84,14 @@ test.describe("Free student navigation", () => {
     ).toBeVisible();
     await expect(
       page.getByRole("link", { name: "Browse Academic" })
+    ).toBeVisible();
+
+    await page.goto("/mock-test");
+    await expect(page.getByText(/subscription(?:\s+is)?\s+required/i)).toBeVisible({
+      timeout: 15000,
+    });
+    await expect(
+      page.getByRole("link", { name: "Get Subscription" })
     ).toBeVisible();
 
     await page.goto("/mcq-bank");
