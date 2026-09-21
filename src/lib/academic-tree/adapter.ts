@@ -16,8 +16,9 @@ import {
 import { searchAcademicTreeNames } from "./search.ts";
 
 /**
- * Structural scaffolding until `get_academic_tree` ships.
- * Shows Class → Block → 8 categories, plus a separate Prof. Session tree.
+ * Structural product chrome for non-enrolled years / offline fallback.
+ * Blocks come from product_key defs. Prof. Session days are empty —
+ * never invent Day 1–3 (Admin-created days only via Data Spine RPC).
  */
 export function buildStructuralAcademicTree(
   input: GetAcademicTreeInput
@@ -47,8 +48,9 @@ export function buildStructuralAcademicTree(
   });
 
   const prof_session: AcademicProfSession = {
-    locked: libraryLocked,
-    days: buildDefaultProfSessionDays({ locked: libraryLocked }),
+    // Free chrome: locked; subscribed browsing another year: unlocked empty.
+    locked: !input.has_live_subscription,
+    days: [],
   };
 
   return {
@@ -62,7 +64,10 @@ export function buildStructuralAcademicTree(
   };
 }
 
-/** Scaffold Day 1–3 under Prof. Session so the IA is navigable before Admin days exist. */
+/**
+ * @deprecated Fake Day 1–3 scaffolding — kept only for unit tests that
+ * assert historical shape. Production paths must not call this.
+ */
 export function buildDefaultProfSessionDays(args: {
   locked: boolean;
 }): AcademicTreeFolder[] {
@@ -120,7 +125,10 @@ export function findDayFolder(
   days: AcademicTreeFolder[],
   daySlug: string
 ): AcademicTreeFolder | null {
-  return days.find((f) => f.is_day && f.slug === daySlug) ?? null;
+  return (
+    days.find((f) => f.is_day && (f.slug === daySlug || f.id === daySlug)) ??
+    null
+  );
 }
 
 export function findFolderBySlug(

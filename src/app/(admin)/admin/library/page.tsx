@@ -102,6 +102,35 @@ export default async function AdminLibraryPage({
               </Card>
             </Link>
           )}
+          {canMaterials && (
+            <Link href={`/admin/prof-session?year=${year.id}`}>
+              <Card className="h-full shadow-none transition-colors hover:bg-accent/40">
+                <CardHeader>
+                  <CardTitle className="text-lg text-[var(--student-ink)]">
+                    Prof. Session
+                  </CardTitle>
+                  <CardDescription>
+                    Create and publish day-based syllabus, guidelines, one-liners,
+                    practice, and Test MCQ for this class.
+                  </CardDescription>
+                </CardHeader>
+              </Card>
+            </Link>
+          )}
+          {(canMaterials || canQuestions) && (
+            <Link href={`/admin/bin?year=${year.id}`}>
+              <Card className="h-full shadow-none transition-colors hover:bg-accent/40">
+                <CardHeader>
+                  <CardTitle className="text-lg text-[var(--student-ink)]">
+                    Content Bin
+                  </CardTitle>
+                  <CardDescription>
+                    Restore or permanently purge soft-deleted academic content.
+                  </CardDescription>
+                </CardHeader>
+              </Card>
+            </Link>
+          )}
           {canTests && (
             <Link href="/admin/tests">
               <Card className="h-full shadow-none transition-colors hover:bg-accent/40">

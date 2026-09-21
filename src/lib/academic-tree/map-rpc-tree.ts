@@ -11,6 +11,7 @@ import type {
 import {
   BLOCK_CATEGORIES,
   BLOCK_PRODUCT_DEFS,
+  TEST_DAY_SLOTS,
   blocksForYearNumber,
   classDisplayName,
   isBlockProductKey,
@@ -20,9 +21,8 @@ import {
  * Map Data Spine `get_academic_tree` jsonb into the AcademicTree UI model.
  * Never attaches Drive URLs, stems, or correct_key.
  *
- * Compatibility: live RPC may still return older category ids (test, ospe,
- * past_papers, flashcards). Those are remapped or ignored as block categories.
- * Prof. Session days come from RPC only when present — otherwise empty.
+ * Product keys come from RPC `product_key` (authoritative). Prof. Session
+ * days are Admin-created only — empty when RPC returns none (no Day 1–3 invent).
  */
 export function mapRpcTree(
   raw: unknown,
@@ -50,7 +50,7 @@ export function mapRpcTree(
 
   const mappedByKey = new Map<BlockProductKey, AcademicTreeSubject>();
   for (const subjectRaw of row.subjects) {
-    const mapped = mapRpcSubject(subjectRaw, yearNumber);
+    const mapped = mapRpcSubject(subjectRaw);
     if (mapped) mappedByKey.set(mapped.product_key, mapped);
   }
 
@@ -60,6 +60,8 @@ export function mapRpcTree(
       if (existing) {
         return {
           ...existing,
+          // Prefer canonical product display name from product_key defs.
+          name: def.name,
           categories: ensureEightCategories(existing.categories),
         };
       }
@@ -96,11 +98,77 @@ function mapRpcProfSession(
   const row = raw as Record<string, unknown>;
   const daysRaw = Array.isArray(row.days) ? row.days : [];
   const days = daysRaw
-    .map((d) => mapRpcFolder(d))
+    .map((d) => mapRpcProfDay(d))
     .filter((f): f is AcademicTreeFolder => Boolean(f));
   return {
     locked: row.locked != null ? Boolean(row.locked) : libraryLocked,
     days,
+  };
+}
+
+/** Data Spine day shape: `{ day_id, name, sort_order, slots: [{ slot_key, name }] }`. */
+function mapRpcProfDay(raw: unknown): AcademicTreeFolder | null {
+  if (!raw || typeof raw !== "object") return null;
+  const row = raw as Record<string, unknown>;
+  const dayId =
+    typeof row.day_id === "string"
+      ? row.day_id
+      : typeof row.folder_id === "string"
+        ? row.folder_id
+        : null;
+  const name = typeof row.name === "string" ? row.name.trim() : "";
+  if (!dayId || !name) return null;
+
+  const slotsRaw = Array.isArray(row.slots) ? row.slots : [];
+  const children: AcademicTreeFolder[] = [];
+  for (const slotRaw of slotsRaw) {
+    if (!slotRaw || typeof slotRaw !== "object") continue;
+    const slot = slotRaw as Record<string, unknown>;
+    const key =
+      typeof slot.slot_key === "string" ? slot.slot_key : "";
+    const def = TEST_DAY_SLOTS.find((s) => s.id === key);
+    if (!def) continue;
+    children.push({
+      id: `${dayId}:${def.id}`,
+      slug: def.slug,
+      name:
+        typeof slot.name === "string" && slot.name.trim()
+          ? slot.name.trim()
+          : def.name,
+      locked: false,
+      parent_id: dayId,
+      children: [],
+      items: [],
+      day_slot: def.id,
+    });
+  }
+
+  // Ensure fixed chrome even if RPC omitted a slot row.
+  if (children.length === 0) {
+    for (const def of TEST_DAY_SLOTS) {
+      children.push({
+        id: `${dayId}:${def.id}`,
+        slug: def.slug,
+        name: def.name,
+        locked: false,
+        parent_id: dayId,
+        children: [],
+        items: [],
+        day_slot: def.id,
+      });
+    }
+  }
+
+  return {
+    id: dayId,
+    // Stable URL slug = day UUID (Admin may rename freely).
+    slug: dayId,
+    name,
+    locked: Boolean(row.locked),
+    parent_id: null,
+    children,
+    items: [],
+    is_day: true,
   };
 }
 
@@ -137,16 +205,20 @@ function ensureEightCategories(
   });
 }
 
-function mapRpcSubject(
-  raw: unknown,
-  yearNumber: number
-): AcademicTreeSubject | null {
+function mapRpcSubject(raw: unknown): AcademicTreeSubject | null {
   if (!raw || typeof raw !== "object") return null;
   const row = raw as Record<string, unknown>;
   const subjectId =
     typeof row.subject_id === "string" ? row.subject_id : null;
   const name = typeof row.name === "string" ? row.name.trim() : "";
   if (!subjectId || !name) return null;
+
+  const rawKey =
+    typeof row.product_key === "string" ? row.product_key.trim() : "";
+  if (!isBlockProductKey(rawKey)) {
+    // Ignore departmental / unmapped subjects — chrome is product_key only.
+    return null;
+  }
 
   const categoriesRaw = Array.isArray(row.categories) ? row.categories : [];
   const categories: AcademicTreeCategory[] = [];
@@ -155,10 +227,12 @@ function mapRpcSubject(
     if (cat) categories.push(cat);
   }
 
+  const def = BLOCK_PRODUCT_DEFS.find((b) => b.key === rawKey);
+
   return {
     subject_id: subjectId,
-    product_key: productKeyForSubjectName(name, yearNumber),
-    name,
+    product_key: rawKey,
+    name: def?.name ?? name,
     locked: Boolean(row.locked),
     categories,
   };
@@ -248,10 +322,15 @@ function categoryIdFromLibraryType(
   }
 }
 
+/**
+ * Compatibility helper for legacy name → product_key resolution.
+ * Production tree mapping uses RPC `product_key` only — do not call this
+ * for live enrolled-year trees.
+ */
 export function productKeyForSubjectName(
   name: string,
   yearNumber: number
-): BlockProductKey {
+): BlockProductKey | null {
   const trimmed = name.trim();
   const lower = trimmed.toLowerCase();
   const byName = BLOCK_PRODUCT_DEFS.find(
@@ -265,5 +344,7 @@ export function productKeyForSubjectName(
     if (isBlockProductKey(key)) return key;
   }
 
-  return blocksForYearNumber(yearNumber)[0]?.key ?? "block-1";
+  // No year-default invent — callers must handle null.
+  void yearNumber;
+  return null;
 }

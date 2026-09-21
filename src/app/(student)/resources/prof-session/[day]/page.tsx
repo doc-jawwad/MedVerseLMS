@@ -1,18 +1,11 @@
-import { ProfSessionDayView } from "@/components/academic/academic-browse-views";
-import {
-  loadAcademicBrowse,
-  requireProfDay,
-} from "@/lib/academic-tree/browse";
+import { redirect } from "next/navigation";
+import { ACADEMIC_BASE_PATH, PROF_SESSION_SLUG } from "@/lib/academic-tree";
 
-export default async function ResourcesProfSessionDayPage({
-  params,
-}: {
-  params: Promise<{ day: string }>;
-}) {
-  const { day: daySlug } = await params;
-  const ctx = await loadAcademicBrowse("resources");
-  const day = requireProfDay(ctx.tree, daySlug);
-  return (
-    <ProfSessionDayView surface="resources" tree={ctx.tree} day={day} />
+type Props = { params: Promise<{ day: string }> };
+
+export default async function ResourcesProfDayRedirect({ params }: Props) {
+  const { day } = await params;
+  redirect(
+    `${ACADEMIC_BASE_PATH}/${PROF_SESSION_SLUG}/${encodeURIComponent(day)}`
   );
 }

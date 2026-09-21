@@ -162,6 +162,7 @@ export const STUDY_REVALIDATE_PATHS = [
   "/free-resources",
   "/resources",
   "/library",
+  "/academic",
   "/mcq-bank",
   "/pearl-points",
   "/practice/ospe",

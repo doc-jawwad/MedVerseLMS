@@ -53,6 +53,7 @@ export { mapRpcTree, productKeyForSubjectName } from "./map-rpc-tree.ts";
 // re-export from this barrel so client/unit imports stay free of `server-only`.
 
 export {
+  ACADEMIC_BASE_PATH,
   blockHref,
   categoryHref,
   categorySlugFromId,
@@ -61,11 +62,13 @@ export {
   daySlotHref,
   folderHref,
   isKnownDaySlotSlug,
+  isProfSessionPath,
   parseCategorySlug,
   profSessionHref,
   searchHref,
   surfaceBasePath,
   surfaceLabel,
+  yearHref,
 } from "./paths.ts";
 
 export {

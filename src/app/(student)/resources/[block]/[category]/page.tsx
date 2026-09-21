@@ -1,25 +1,11 @@
-import { BlockCategoryPage } from "@/components/academic/block-category-page";
-import {
-  loadAcademicBrowse,
-  requireBlock,
-  requireCategory,
-} from "@/lib/academic-tree/browse";
+import { redirect } from "next/navigation";
+import { ACADEMIC_BASE_PATH } from "@/lib/academic-tree";
 
-export default async function ResourcesBlockCategoryPage({
-  params,
-}: {
-  params: Promise<{ block: string; category: string }>;
-}) {
-  const { block, category: categorySlug } = await params;
-  const ctx = await loadAcademicBrowse("resources");
-  const subject = requireBlock(ctx.tree, block);
-  const { categoryId } = requireCategory(subject, categorySlug);
-  return (
-    <BlockCategoryPage
-      surface="resources"
-      tree={ctx.tree}
-      subject={subject}
-      categoryId={categoryId}
-    />
+type Props = { params: Promise<{ block: string; category: string }> };
+
+export default async function ResourcesCategoryRedirect({ params }: Props) {
+  const { block, category } = await params;
+  redirect(
+    `${ACADEMIC_BASE_PATH}/${encodeURIComponent(block)}/${encodeURIComponent(category)}`
   );
 }

@@ -125,18 +125,26 @@ export function GlobalSearch({
             setRpcHits(null);
             return;
           }
-          const mapped: AcademicSearchHit[] = (rows as RpcHit[]).map((row) => {
+          const mapped: AcademicSearchHit[] = (
+            rows as Array<RpcHit & { product_key?: string }>
+          ).map((row) => {
             const path_labels = Array.isArray(row.path_labels)
               ? row.path_labels.map(String)
               : [yearName, row.name];
-            const kind =
-              row.kind === "class" ||
-              row.kind === "block" ||
-              row.kind === "category" ||
-              row.kind === "folder" ||
-              row.kind === "day"
-                ? row.kind
-                : "folder";
+            const rawKind = String(row.kind ?? "");
+            const kind: AcademicSearchHit["kind"] =
+              rawKind === "class" ||
+              rawKind === "block" ||
+              rawKind === "category" ||
+              rawKind === "folder" ||
+              rawKind === "day" ||
+              rawKind === "prof_session"
+                ? rawKind
+                : rawKind === "prof_session_day"
+                  ? "day"
+                  : "folder";
+            const product_key =
+              typeof row.product_key === "string" ? row.product_key : null;
             const partial = {
               kind,
               id: String(row.id),
@@ -144,9 +152,15 @@ export function GlobalSearch({
               path_labels,
               locked: Boolean(row.locked),
               class_name: yearName,
+              product_key,
             };
             return {
-              ...partial,
+              kind: partial.kind,
+              id: partial.id,
+              name: partial.name,
+              path_labels: partial.path_labels,
+              locked: partial.locked,
+              class_name: partial.class_name,
               href: hrefForAcademicSearchHit(partial, surface),
             };
           });

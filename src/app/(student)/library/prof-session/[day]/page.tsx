@@ -1,25 +1,11 @@
-import { ProfSessionDayView } from "@/components/academic/academic-browse-views";
-import { SectionLock } from "@/components/subscription/section-lock";
-import {
-  loadAcademicBrowse,
-  requireProfDay,
-} from "@/lib/academic-tree/browse";
+import { redirect } from "next/navigation";
+import { ACADEMIC_BASE_PATH, PROF_SESSION_SLUG } from "@/lib/academic-tree";
 
-export default async function LibraryProfSessionDayPage({
-  params,
-}: {
-  params: Promise<{ day: string }>;
-}) {
-  const { day: daySlug } = await params;
-  const ctx = await loadAcademicBrowse("library");
-  if (!ctx.hasLiveAccess) {
-    return (
-      <SectionLock
-        title="Prof. Session"
-        description="Prof. Session unlocks with a live subscription. Browse unlocked Resources while you apply."
-      />
-    );
-  }
-  const day = requireProfDay(ctx.tree, daySlug);
-  return <ProfSessionDayView surface="library" tree={ctx.tree} day={day} />;
+type Props = { params: Promise<{ day: string }> };
+
+export default async function LibraryProfDayRedirect({ params }: Props) {
+  const { day } = await params;
+  redirect(
+    `${ACADEMIC_BASE_PATH}/${PROF_SESSION_SLUG}/${encodeURIComponent(day)}`
+  );
 }

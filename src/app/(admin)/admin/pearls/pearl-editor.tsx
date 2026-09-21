@@ -211,13 +211,20 @@ export function PearlEditor({
                 disabled={pending}
                 onClick={() =>
                   startTransition(async () => {
-                    if (!window.confirm("Delete this pearl point?")) return;
+                    if (
+                      !window.confirm(
+                        "Move this pearl point to the Bin? Recoverable for ~7 days. This is not a permanent delete."
+                      )
+                    ) {
+                      return;
+                    }
                     const { error } = await deletePearlPoint(pearlId);
                     if (error) toast.error(error);
+                    else toast.success("Moved to Bin");
                   })
                 }
               >
-                Delete
+                Move to Bin
               </Button>
             </>
           )}

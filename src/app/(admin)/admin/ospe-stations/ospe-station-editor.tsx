@@ -254,13 +254,20 @@ export function OspeStationEditor({
               disabled={pending}
               onClick={() =>
                 startTransition(async () => {
-                  if (!window.confirm("Delete this OSPE station?")) return;
+                  if (
+                    !window.confirm(
+                      "Move this OSPE station to the Bin? Image files stay in R2 until permanent purge (~7 days). This is not a permanent delete."
+                    )
+                  ) {
+                    return;
+                  }
                   const { error } = await deleteOspeStation(stationId);
                   if (error) toast.error(studyErrorMessage(error));
+                  else toast.success("Moved to Bin");
                 })
               }
             >
-              Delete
+              Move to Bin
             </Button>
           </>
         ) : null}

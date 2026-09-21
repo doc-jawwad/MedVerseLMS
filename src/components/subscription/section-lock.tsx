@@ -13,8 +13,9 @@ import { PageHeader } from "@/components/student/page-header";
 import { StudentPage } from "@/components/student/student-page";
 
 /**
- * Polished lock for full-library hubs (UX). Authorization for paid
- * content remains RPC/RLS. Free educational items stay on Free Resources.
+ * Polished lock for paid sections (UX). Authorization for paid
+ * content remains RPC/RLS. Academic year/Block browse stays open;
+ * individual items stay entitlement-gated.
  * Does not render protected catalog data.
  */
 export function SectionLock({
@@ -40,7 +41,7 @@ export function SectionLock({
           </CardTitle>
           <CardDescription>
             {description ??
-              "This full library is part of a MedVerse subscription. Free items selected by your academy stay under Resources. Pending applications do not unlock paid sections."}
+              "This section is part of a MedVerse subscription. You can still browse every class and Block — individual items stay entitlement-gated. Pending applications do not unlock paid sections."}
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-wrap gap-2">
@@ -51,7 +52,7 @@ export function SectionLock({
             <Link href="/contact">Contact MedVerse</Link>
           </Button>
           <Button asChild variant="ghost">
-            <Link href="/resources">Browse Resources</Link>
+            <Link href="/academic">Browse Academic</Link>
           </Button>
         </CardContent>
       </Card>

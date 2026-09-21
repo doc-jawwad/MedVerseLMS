@@ -28,6 +28,7 @@ export default async function AdminPearlsPage({
           "id, prompt, status, entitlement, year_id, subject_id, subjects(name), years(year_number, name)"
         )
         .eq("year_id", yearId)
+        .is("deleted_at", null)
         .order("created_at", { ascending: false })
         .limit(200);
       if (filters.status === "draft" || filters.status === "published") {

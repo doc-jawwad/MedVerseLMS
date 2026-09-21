@@ -3,11 +3,11 @@ import { McqBankPage } from "@/components/library/mcq-bank-page";
 import { PearlPointsLibraryPage } from "@/components/library/pearl-points-library-page";
 import { MaterialLibraryPage } from "@/components/library/material-library-page";
 import {
+  blockHref,
   buildAcademicBreadcrumbs,
   categorySlugFromId,
   type AcademicTree,
   type AcademicTreeSubject,
-  type AcademicTreeSurface,
   type BlockCategoryId,
 } from "@/lib/academic-tree";
 import type { FolderLibraryType } from "@/lib/library/types";
@@ -21,13 +21,15 @@ const MATERIAL_CATEGORIES = new Set<BlockCategoryId>([
   "lectures",
 ]);
 
+/**
+ * Block category content — hierarchy is open; item access is entitlement-gated.
+ * Always uses browse mode (no section lock on the category itself).
+ */
 export async function BlockCategoryPage({
-  surface,
   tree,
   subject,
   categoryId,
 }: {
-  surface: AcademicTreeSurface;
   tree: AcademicTree;
   subject: AcademicTreeSubject;
   categoryId: BlockCategoryId;
@@ -37,15 +39,14 @@ export async function BlockCategoryPage({
 
   const categorySlug = categorySlugFromId(categoryId);
   const breadcrumbs = buildAcademicBreadcrumbs({
-    surface,
     yearName: tree.year_name,
+    yearNumber: tree.year_number,
     blockName: subject.name,
     blockSlug: subject.product_key,
     categoryName: category.name,
     categorySlug,
   });
-  const backHref = `/${surface}/${subject.product_key}`;
-  const mode = surface === "resources" ? "resources" : "full";
+  const backHref = blockHref(subject.product_key);
   const subjectId = subject.subject_id.startsWith("product:")
     ? undefined
     : subject.subject_id;
@@ -53,7 +54,7 @@ export async function BlockCategoryPage({
   if (categoryId === "mcq_bank") {
     return (
       <McqBankPage
-        mode={mode}
+        mode="resources"
         subjectId={subjectId}
         breadcrumbs={breadcrumbs}
         title={category.name}
@@ -65,7 +66,7 @@ export async function BlockCategoryPage({
   if (categoryId === "pearl_points") {
     return (
       <PearlPointsLibraryPage
-        mode={mode}
+        mode="resources"
         subjectId={subjectId}
         breadcrumbs={breadcrumbs}
         title={category.name}
@@ -78,7 +79,7 @@ export async function BlockCategoryPage({
     return (
       <MaterialLibraryPage
         libraryType={categoryId as FolderLibraryType}
-        mode={mode}
+        mode="resources"
         subjectId={subjectId}
         breadcrumbs={breadcrumbs}
         title={category.name}

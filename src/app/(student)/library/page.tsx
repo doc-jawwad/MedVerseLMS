@@ -1,18 +1,7 @@
-import { ClassHomeView } from "@/components/academic/academic-browse-views";
-import { SectionLock } from "@/components/subscription/section-lock";
-import { loadAcademicBrowse } from "@/lib/academic-tree/browse";
+import { redirect } from "next/navigation";
+import { ACADEMIC_BASE_PATH } from "@/lib/academic-tree";
 
-export default async function LibraryHomePage() {
-  const ctx = await loadAcademicBrowse("library");
-  if (!ctx.hasLiveAccess) {
-    return (
-      <SectionLock
-        title="Library"
-        description="The full class library unlocks with a live subscription. Browse unlocked items under Resources."
-      />
-    );
-  }
-  return (
-    <ClassHomeView surface="library" tree={ctx.tree} error={ctx.error} />
-  );
+/** Legacy Library surface → unified Academic tree. */
+export default function LibraryRedirectPage() {
+  redirect(ACADEMIC_BASE_PATH);
 }

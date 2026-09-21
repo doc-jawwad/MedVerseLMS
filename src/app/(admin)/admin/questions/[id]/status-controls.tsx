@@ -3,9 +3,13 @@
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { setQuestionStatus } from "@/lib/actions/questions";
+import { moveQuestionToBin, setQuestionStatus } from "@/lib/actions/questions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  ConfirmDangerDialog,
+  purgeDateHint,
+} from "@/components/admin/confirm-danger-dialog";
 
 const transitions: Record<string, { to: string; label: string }[]> = {
   draft: [
@@ -41,7 +45,7 @@ export function StatusControls({
   const [pending, startTransition] = useTransition();
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex flex-wrap items-center gap-2">
       <Badge>{status.replace("_", " ")}</Badge>
       {(transitions[status] ?? []).map((t) => (
         <Button
@@ -63,6 +67,38 @@ export function StatusControls({
           {t.label}
         </Button>
       ))}
+      <ConfirmDangerDialog
+        title="Move MCQ to Bin?"
+        description={
+          <>
+            <p>
+              This hides the question from the Question Bank. Formal test history
+              that already references it is preserved.
+            </p>
+            <p className="mt-2">
+              It stays in the Bin until about <strong>{purgeDateHint()}</strong>.
+              This is not a permanent delete.
+            </p>
+          </>
+        }
+        confirmLabel="Move to Bin"
+        trigger={
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            className="text-destructive"
+            disabled={pending}
+          >
+            Move to Bin
+          </Button>
+        }
+        onConfirm={() => moveQuestionToBin(questionId)}
+        onSuccess={() => {
+          router.push("/admin/questions");
+          router.refresh();
+        }}
+      />
     </div>
   );
 }

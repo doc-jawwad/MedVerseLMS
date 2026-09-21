@@ -1,18 +1,12 @@
-import { BlockHomeView } from "@/components/academic/academic-browse-views";
-import {
-  loadAcademicBrowse,
-  requireBlock,
-} from "@/lib/academic-tree/browse";
+import { redirect } from "next/navigation";
+import { ACADEMIC_BASE_PATH, PROF_SESSION_SLUG } from "@/lib/academic-tree";
 
-export default async function ResourcesBlockPage({
-  params,
-}: {
-  params: Promise<{ block: string }>;
-}) {
+type Props = { params: Promise<{ block: string }> };
+
+export default async function ResourcesBlockRedirect({ params }: Props) {
   const { block } = await params;
-  const ctx = await loadAcademicBrowse("resources");
-  const subject = requireBlock(ctx.tree, block);
-  return (
-    <BlockHomeView surface="resources" tree={ctx.tree} subject={subject} />
-  );
+  if (block === PROF_SESSION_SLUG) {
+    redirect(`${ACADEMIC_BASE_PATH}/${PROF_SESSION_SLUG}`);
+  }
+  redirect(`${ACADEMIC_BASE_PATH}/${encodeURIComponent(block)}`);
 }

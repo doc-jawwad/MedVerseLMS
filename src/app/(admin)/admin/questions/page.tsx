@@ -98,6 +98,7 @@ export default async function QuestionsPage({
           "id, status, difficulty, tags, used_in_test, created_at, subjects(name), chapters(name), topics(name), question_versions!questions_current_version_fk(stem, version_no)",
           { count: "exact" }
         )
+        .is("deleted_at", null)
         .order(sort.column, { ascending: sort.ascending })
         .range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1);
 

@@ -11,8 +11,11 @@ import { StudentPage } from "@/components/student/student-page";
 import { EmptyState } from "@/components/student/empty-state";
 import { AcademicBreadcrumbs } from "@/components/academic/academic-breadcrumbs";
 import {
+  BLOCK_PRODUCT_DEFS,
+  CLASS_DISPLAY_BY_YEAR_NUMBER,
   PROF_SESSION_LABEL,
   TEST_DAY_SLOTS,
+  ACADEMIC_BASE_PATH,
   blockHref,
   buildAcademicBreadcrumbs,
   categoryHref,
@@ -20,10 +23,10 @@ import {
   dayHref,
   daySlotHref,
   profSessionHref,
+  yearHref,
   type AcademicTree,
   type AcademicTreeFolder,
   type AcademicTreeSubject,
-  type AcademicTreeSurface,
 } from "@/lib/academic-tree";
 
 function TreeLinkCard({
@@ -49,7 +52,10 @@ function TreeLinkCard({
             {title}
           </CardTitle>
           {locked ? (
-            <Lock className="size-3.5 shrink-0 text-muted-foreground" aria-label="Locked" />
+            <Lock
+              className="size-3.5 shrink-0 text-muted-foreground"
+              aria-label="Locked"
+            />
           ) : null}
         </div>
         {description ? <CardDescription>{description}</CardDescription> : null}
@@ -60,18 +66,42 @@ function TreeLinkCard({
   return locked ? <div>{body}</div> : <Link href={href}>{body}</Link>;
 }
 
+export function AcademicHomeView() {
+  const crumbs = buildAcademicBreadcrumbs({
+    yearName: "Academic",
+  });
+
+  return (
+    <StudentPage>
+      <AcademicBreadcrumbs crumbs={crumbs} />
+      <PageHeader
+        title="Academic"
+        description="Browse every MBBS class and Block. Individual items stay locked until your academy unlocks them or you subscribe. Prof. Session requires a subscription."
+      />
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {[1, 2, 3, 4, 5].map((yearNumber) => (
+          <TreeLinkCard
+            key={yearNumber}
+            href={yearHref(yearNumber)}
+            title={CLASS_DISPLAY_BY_YEAR_NUMBER[yearNumber]!}
+            description={`${BLOCK_PRODUCT_DEFS.filter((b) => b.year_number === yearNumber).length} Blocks / subjects`}
+          />
+        ))}
+      </div>
+    </StudentPage>
+  );
+}
+
 export function ClassHomeView({
-  surface,
   tree,
   error,
 }: {
-  surface: AcademicTreeSurface;
   tree: AcademicTree;
   error?: string | null;
 }) {
   const crumbs = buildAcademicBreadcrumbs({
-    surface,
     yearName: tree.year_name,
+    yearNumber: tree.year_number,
   });
 
   return (
@@ -79,10 +109,14 @@ export function ClassHomeView({
       <AcademicBreadcrumbs crumbs={crumbs} />
       <PageHeader
         title={tree.year_name}
-        description={
-          surface === "resources"
-            ? "Browse your class Blocks. Locked items stay locked until your academy unlocks them or you subscribe."
-            : "Your subscribed class library — Blocks and categories for this year."
+        description="Open any Block or Final-Year subject. Categories stay visible; item access follows entitlement."
+        actions={
+          <Link
+            href={ACADEMIC_BASE_PATH}
+            className="text-sm text-muted-foreground underline-offset-4 hover:underline"
+          >
+            All classes
+          </Link>
         }
       />
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
@@ -90,16 +124,15 @@ export function ClassHomeView({
         {tree.subjects.map((subject) => (
           <TreeLinkCard
             key={subject.product_key}
-            href={blockHref(surface, subject.product_key)}
+            href={blockHref(subject.product_key)}
             title={subject.name}
-            locked={subject.locked}
           />
         ))}
       </div>
       {tree.subjects.length === 0 ? (
         <EmptyState
           title="No Blocks for this class yet"
-          description="When your academy publishes Blocks for your year, they appear here."
+          description="When your academy publishes Blocks for this year, they appear here."
         />
       ) : null}
     </StudentPage>
@@ -107,17 +140,15 @@ export function ClassHomeView({
 }
 
 export function BlockHomeView({
-  surface,
   tree,
   subject,
 }: {
-  surface: AcademicTreeSurface;
   tree: AcademicTree;
   subject: AcademicTreeSubject;
 }) {
   const crumbs = buildAcademicBreadcrumbs({
-    surface,
     yearName: tree.year_name,
+    yearNumber: tree.year_number,
     blockName: subject.name,
     blockSlug: subject.product_key,
   });
@@ -134,12 +165,10 @@ export function BlockHomeView({
           <TreeLinkCard
             key={category.id}
             href={categoryHref(
-              surface,
               subject.product_key,
               categorySlugFromId(category.id)
             )}
             title={category.name}
-            locked={category.locked || subject.locked}
           />
         ))}
       </div>
@@ -147,15 +176,8 @@ export function BlockHomeView({
   );
 }
 
-export function ProfSessionHomeView({
-  surface,
-  tree,
-}: {
-  surface: AcademicTreeSurface;
-  tree: AcademicTree;
-}) {
+export function ProfSessionHomeView({ tree }: { tree: AcademicTree }) {
   const crumbs = buildAcademicBreadcrumbs({
-    surface,
     yearName: tree.year_name,
     profSession: true,
   });
@@ -178,9 +200,8 @@ export function ProfSessionHomeView({
           {days.map((day) => (
             <TreeLinkCard
               key={day.id}
-              href={dayHref(surface, day.slug)}
+              href={dayHref(day.slug)}
               title={day.name}
-              locked={day.locked || tree.prof_session.locked}
             />
           ))}
         </div>
@@ -190,16 +211,13 @@ export function ProfSessionHomeView({
 }
 
 export function ProfSessionDayView({
-  surface,
   tree,
   day,
 }: {
-  surface: AcademicTreeSurface;
   tree: AcademicTree;
   day: AcademicTreeFolder;
 }) {
   const crumbs = buildAcademicBreadcrumbs({
-    surface,
     yearName: tree.year_name,
     profSession: true,
     dayName: day.name,
@@ -228,7 +246,7 @@ export function ProfSessionDayView({
         description={`${PROF_SESSION_LABEL} containers for this day.`}
         actions={
           <Link
-            href={profSessionHref(surface)}
+            href={profSessionHref()}
             className="text-sm text-muted-foreground underline-offset-4 hover:underline"
           >
             All days
@@ -239,9 +257,8 @@ export function ProfSessionDayView({
         {slots.map((slot) => (
           <TreeLinkCard
             key={slot.id}
-            href={daySlotHref(surface, day.slug, slot.slug)}
+            href={daySlotHref(day.slug, slot.slug)}
             title={slot.name}
-            locked={slot.locked || day.locked || tree.prof_session.locked}
           />
         ))}
       </div>

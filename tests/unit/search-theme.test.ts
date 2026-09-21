@@ -35,7 +35,7 @@ describe("academic tree search scope", () => {
     assert.ok(hit.href.startsWith("/"));
   });
 
-  it("searches class, category, prof session, and day names", () => {
+  it("searches class, category, and prof session — no invented days", () => {
     const classHits = searchAcademicTreeNames({ query: "1st Year", tree });
     assert.ok(classHits.some((h) => h.kind === "class"));
 
@@ -43,7 +43,11 @@ describe("academic tree search scope", () => {
     assert.ok(categoryHits.some((h) => h.kind === "category"));
 
     const dayHits = searchAcademicTreeNames({ query: "Day 1", tree });
-    assert.ok(dayHits.some((h) => h.kind === "day"));
+    assert.equal(
+      dayHits.filter((h) => h.kind === "day").length,
+      0,
+      "structural tree has empty prof days"
+    );
 
     const profHits = searchAcademicTreeNames({ query: "Prof. Session", tree });
     assert.ok(profHits.some((h) => h.kind === "prof_session"));
@@ -101,8 +105,8 @@ describe("theme persistence", () => {
   });
 });
 
-describe("search hit hrefs (nested IA)", () => {
-  it("maps category, folder, and class hits onto resources/library routes", () => {
+describe("search hit hrefs (unified /academic IA)", () => {
+  it("maps category, folder, class, and day hits onto /academic routes", () => {
     assert.equal(
       hrefForAcademicSearchHit(
         {
@@ -112,7 +116,7 @@ describe("search hit hrefs (nested IA)", () => {
         },
         "library"
       ),
-      "/library/block-1/notes"
+      "/academic/block-1/notes"
     );
     assert.equal(
       hrefForAcademicSearchHit(
@@ -123,25 +127,26 @@ describe("search hit hrefs (nested IA)", () => {
         },
         "library"
       ),
-      "/library/block-1/books"
+      "/academic/block-1/books"
     );
     assert.equal(
       hrefForAcademicSearchHit(
         { kind: "class", name: "1st Year MBBS", path_labels: ["1st Year MBBS"] },
         "resources"
       ),
-      "/resources"
+      "/academic"
     );
     assert.equal(
       hrefForAcademicSearchHit(
         {
           kind: "day",
-          name: "Day 1",
-          path_labels: ["1st Year MBBS", "Prof. Session", "Day 1"],
+          id: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+          name: "Foundations Day",
+          path_labels: ["1st Year MBBS", "Prof. Session", "Foundations Day"],
         },
         "resources"
       ),
-      "/resources/prof-session/day-1"
+      "/academic/prof-session/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
     );
     assert.equal(
       hrefForAcademicSearchHit(
@@ -152,7 +157,7 @@ describe("search hit hrefs (nested IA)", () => {
         },
         "library"
       ),
-      "/library/prof-session"
+      "/academic/prof-session"
     );
   });
 });

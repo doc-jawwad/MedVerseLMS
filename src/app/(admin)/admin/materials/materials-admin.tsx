@@ -188,13 +188,20 @@ function FolderCard({
             disabled={pending}
             onClick={() =>
               startTransition(async () => {
-                if (!window.confirm(`Delete folder "${folder.name}" and its items?`)) return;
+                if (
+                  !window.confirm(
+                    `Move folder "${folder.name}" to the Bin? Items stay recoverable for ~7 days (until about ${new Date(Date.now() + 7 * 864e5).toLocaleDateString()}). This does not permanently delete.`
+                  )
+                ) {
+                  return;
+                }
                 const { error } = await deleteFolder(folder.id);
                 if (error) toast.error(error);
+                else toast.success("Moved to Bin");
               })
             }
           >
-            Delete folder
+            Move to Bin
           </Button>
         </div>
       </CardHeader>
@@ -275,13 +282,20 @@ function MaterialRow({ material }: { material: Material }) {
           disabled={pending}
           onClick={() =>
             startTransition(async () => {
-              if (!window.confirm(`Remove “${material.title}”?`)) return;
+              if (
+                !window.confirm(
+                  `Move “${material.title}” to the Bin? Recoverable for ~7 days. R2 files are kept until permanent purge.`
+                )
+              ) {
+                return;
+              }
               const { error } = await deleteMaterial(material.id);
               if (error) toast.error(error);
+              else toast.success("Moved to Bin");
             })
           }
         >
-          Remove
+          Move to Bin
         </Button>
       </div>
     </div>

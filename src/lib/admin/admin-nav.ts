@@ -119,6 +119,18 @@ export const ADMIN_NAV: AdminNavDef[] = [
     anyOf: ["manage_materials"],
   },
   {
+    href: "/admin/prof-session",
+    label: "Prof. Session",
+    icon: "classLibrary",
+    anyOf: ["manage_materials"],
+  },
+  {
+    href: "/admin/bin",
+    label: "Content Bin",
+    icon: "materialsFolder",
+    anyOf: ["manage_materials", "edit_questions"],
+  },
+  {
     href: "/admin/free-resources",
     label: "Free Resources",
     icon: "freeResources",

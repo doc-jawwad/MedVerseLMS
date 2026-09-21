@@ -12,10 +12,12 @@ import { createClient } from "@/lib/supabase/server";
 import { deleteR2Object, putR2Object } from "@/lib/r2/presign";
 import { isOspeStationImageFile } from "@/lib/study/upload-rules";
 import { allocateStudyObjectKey } from "@/lib/actions/study-content";
+import { moveContentToBin } from "@/lib/actions/content-bin";
 
 function revalidateOspe(id?: string) {
   revalidatePath("/admin/ospe-stations");
   revalidatePath("/admin/free-resources");
+  revalidatePath("/admin/bin");
   revalidatePath("/practice/ospe");
   revalidatePath("/free-resources");
   if (id) revalidatePath(`/admin/ospe-stations/${id}`);
@@ -222,19 +224,9 @@ export async function setOspeStationStatus(
 }
 
 export async function deleteOspeStation(id: string) {
-  const supabase = await createClient();
-  const { data: adminRow } = await supabase.rpc("get_ospe_station_for_admin", {
-    p_station_id: id,
-  });
-  const key =
-    adminRow && typeof adminRow === "object"
-      ? String((adminRow as { r2_object_key?: string }).r2_object_key ?? "")
-      : "";
-
-  const { error } = await supabase.from("ospe_stations").delete().eq("id", id);
-  if (error) return actionRpcResult("deleteOspeStation", error);
-
-  if (key) await discardStudyKey(supabase, key);
+  // Soft-delete only — R2 is retained until permanent purge via content bin.
+  const result = await moveContentToBin("ospe_station", id);
+  if (result.error) return result;
   revalidateOspe();
   redirect("/admin/ospe-stations");
 }

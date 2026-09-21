@@ -3,47 +3,61 @@ import {
   BLOCK_CATEGORIES,
   BLOCK_PRODUCT_DEFS,
   PROF_SESSION_LABEL,
+  isBlockProductKey,
 } from "./product-structure.ts";
 import {
+  ACADEMIC_BASE_PATH,
   blockHref,
   categoryHref,
-  classHref,
   dayHref,
   profSessionHref,
-  surfaceBasePath,
 } from "./paths.ts";
 
 /**
- * Map search hits onto class-first `/resources` + `/library` nested routes.
+ * Map search hits onto the unified `/academic` tree.
+ * Prefer authoritative `product_key` / day id when present on the hit.
  */
 export function hrefForAcademicSearchHit(
-  hit: Pick<AcademicSearchHit, "kind" | "name" | "path_labels">,
-  surface: AcademicTreeSurface
+  hit: Pick<AcademicSearchHit, "kind" | "name" | "path_labels" | "id"> & {
+    product_key?: string | null;
+  },
+  _surface?: AcademicTreeSurface
 ): string {
-  const home = classHref(surface);
+  const home = ACADEMIC_BASE_PATH;
   const labels = hit.path_labels ?? [];
 
   if (hit.kind === "class") return home;
-  if (hit.kind === "prof_session") return profSessionHref(surface);
+  if (hit.kind === "prof_session") return profSessionHref();
 
-  const blockSlug = blockSlugFromLabels(labels);
+  const productKey =
+    hit.product_key && isBlockProductKey(hit.product_key)
+      ? hit.product_key
+      : null;
+  const blockSlug = productKey ?? blockSlugFromLabels(labels);
   const categorySlug = categorySlugFromLabels(labels);
   const underProf = labels.some(
     (l) => normalizeKey(l) === normalizeKey(PROF_SESSION_LABEL)
   );
 
   if (hit.kind === "day") {
+    // Live days use UUID slug (= day id).
+    if (hit.id && !hit.id.includes(":")) {
+      return dayHref(hit.id);
+    }
     const daySlug = daySlugFromName(hit.name);
     if (underProf || !blockSlug) {
-      return daySlug ? dayHref(surface, daySlug) : profSessionHref(surface);
+      return daySlug ? dayHref(daySlug) : profSessionHref();
     }
-    return blockSlug ? blockHref(surface, blockSlug) : home;
+    return blockSlug ? blockHref(blockSlug) : home;
   }
 
   if (hit.kind === "block") {
     const slug =
-      blockSlugFromName(hit.name) ?? blockSlug ?? productKeyFromName(hit.name);
-    return slug ? blockHref(surface, slug) : home;
+      productKey ??
+      blockSlugFromName(hit.name) ??
+      blockSlug ??
+      productKeyFromName(hit.name);
+    return slug ? blockHref(slug) : home;
   }
 
   if (hit.kind === "category") {
@@ -52,20 +66,20 @@ export function hrefForAcademicSearchHit(
       categorySlug ??
       categorySlugFromLabels(labels);
     const block = blockSlug ?? blockSlugFromLabels(labels);
-    if (block && cat) return categoryHref(surface, block, cat);
+    if (block && cat) return categoryHref(block, cat);
     return home;
   }
 
   if (hit.kind === "folder") {
-    if (underProf) return profSessionHref(surface);
+    if (underProf) return profSessionHref();
     if (blockSlug && categorySlug) {
-      return categoryHref(surface, blockSlug, categorySlug);
+      return categoryHref(blockSlug, categorySlug);
     }
-    if (blockSlug) return blockHref(surface, blockSlug);
+    if (blockSlug) return blockHref(blockSlug);
     return home;
   }
 
-  return surfaceBasePath(surface);
+  return home;
 }
 
 function normalizeKey(value: string): string {

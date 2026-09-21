@@ -1,9 +1,7 @@
-import { ClassHomeView } from "@/components/academic/academic-browse-views";
-import { loadAcademicBrowse } from "@/lib/academic-tree/browse";
+import { redirect } from "next/navigation";
+import { ACADEMIC_BASE_PATH } from "@/lib/academic-tree";
 
-export default async function ResourcesHomePage() {
-  const ctx = await loadAcademicBrowse("resources");
-  return (
-    <ClassHomeView surface="resources" tree={ctx.tree} error={ctx.error} />
-  );
+/** Legacy Resources surface → unified Academic tree. */
+export default function ResourcesRedirectPage() {
+  redirect(ACADEMIC_BASE_PATH);
 }

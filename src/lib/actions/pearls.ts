@@ -5,11 +5,13 @@ import { redirect } from "next/navigation";
 import { readAdminSelectedYearId } from "@/lib/admin/selected-class";
 import { actionRpcResult } from "@/lib/errors/safe-action-error";
 import { createClient } from "@/lib/supabase/server";
+import { moveContentToBin } from "@/lib/actions/content-bin";
 
 function revalidatePearls(id?: string) {
   revalidatePath("/admin/pearls");
   revalidatePath("/admin/free-resources");
   revalidatePath("/admin/library");
+  revalidatePath("/admin/bin");
   revalidatePath("/pearl-points");
   revalidatePath("/free-resources");
   revalidatePath("/free-resources/pearl-points");
@@ -96,9 +98,8 @@ export async function setPearlStatus(id: string, status: "draft" | "published") 
 }
 
 export async function deletePearlPoint(id: string) {
-  const supabase = await createClient();
-  const { error } = await supabase.from("pearl_points").delete().eq("id", id);
-  if (error) return actionRpcResult("deletePearlPoint", error);
+  const result = await moveContentToBin("pearl_point", id);
+  if (result.error) return result;
   revalidatePearls();
   redirect("/admin/pearls");
 }

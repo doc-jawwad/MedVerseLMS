@@ -1,26 +1,11 @@
-import { ProfSessionSlotPage } from "@/components/academic/prof-session-slot-page";
-import {
-  loadAcademicBrowse,
-  requireDaySlot,
-  requireProfDay,
-} from "@/lib/academic-tree/browse";
+import { redirect } from "next/navigation";
+import { ACADEMIC_BASE_PATH, PROF_SESSION_SLUG } from "@/lib/academic-tree";
 
-export default async function ResourcesProfSessionSlotPage({
-  params,
-}: {
-  params: Promise<{ day: string; slot: string }>;
-}) {
-  const { day: daySlug, slot: slotSlug } = await params;
-  const ctx = await loadAcademicBrowse("resources");
-  const day = requireProfDay(ctx.tree, daySlug);
-  const { slot, slotId } = requireDaySlot(day, slotSlug);
-  return (
-    <ProfSessionSlotPage
-      surface="resources"
-      tree={ctx.tree}
-      day={day}
-      slot={slot}
-      slotId={slotId}
-    />
+type Props = { params: Promise<{ day: string; slot: string }> };
+
+export default async function ResourcesProfSlotRedirect({ params }: Props) {
+  const { day, slot } = await params;
+  redirect(
+    `${ACADEMIC_BASE_PATH}/${PROF_SESSION_SLUG}/${encodeURIComponent(day)}/${encodeURIComponent(slot)}`
   );
 }

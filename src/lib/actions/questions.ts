@@ -104,3 +104,13 @@ export async function setQuestionStatus(
   revalidatePath("/admin/questions");
   return actionRpcResult("action", error);
 }
+
+/** Soft-delete MCQ into Content Bin (keeps test_questions / attempt history). */
+export async function moveQuestionToBin(questionId: string) {
+  const { moveContentToBin } = await import("@/lib/actions/content-bin");
+  const result = await moveContentToBin("question", questionId);
+  revalidatePath("/admin/questions");
+  revalidatePath("/admin/bin");
+  revalidatePath(`/admin/questions/${questionId}`);
+  return result;
+}

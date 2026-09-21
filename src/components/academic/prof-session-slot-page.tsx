@@ -11,25 +11,22 @@ import {
   dayHref,
   type AcademicTree,
   type AcademicTreeFolder,
-  type AcademicTreeSurface,
   type TestDaySlotId,
 } from "@/lib/academic-tree";
 
+/** Only rendered for subscribed students (page gate shows SectionLock for free). */
 export async function ProfSessionSlotPage({
-  surface,
   tree,
   day,
   slotId,
   slot,
 }: {
-  surface: AcademicTreeSurface;
   tree: AcademicTree;
   day: AcademicTreeFolder;
   slotId: TestDaySlotId;
   slot: AcademicTreeFolder;
 }) {
   const breadcrumbs = buildAcademicBreadcrumbs({
-    surface,
     yearName: tree.year_name,
     profSession: true,
     dayName: day.name,
@@ -37,14 +34,13 @@ export async function ProfSessionSlotPage({
     slotName: slot.name,
     slotSlug: slot.slug,
   });
-  const backHref = dayHref(surface, day.slug);
-  const mode = surface === "resources" ? "resources" : "full";
+  const backHref = dayHref(day.slug);
 
   if (slotId === "syllabus" || slotId === "guidelines") {
     return (
       <MaterialLibraryPage
         libraryType="guidelines"
-        mode={mode}
+        mode="full"
         breadcrumbs={breadcrumbs}
         title={`${day.name} · ${slot.name}`}
         description={
@@ -60,7 +56,7 @@ export async function ProfSessionSlotPage({
   if (slotId === "one_liners") {
     return (
       <PearlPointsLibraryPage
-        mode={mode}
+        mode="full"
         breadcrumbs={breadcrumbs}
         title={`${day.name} · ${slot.name}`}
         description="One-liners and pearl points for this Prof. Session day."
@@ -72,7 +68,7 @@ export async function ProfSessionSlotPage({
   if (slotId === "practice_mcqs") {
     return (
       <McqBankPage
-        mode={mode}
+        mode="full"
         breadcrumbs={breadcrumbs}
         title={`${day.name} · ${slot.name}`}
         description="Practice MCQs for this Prof. Session day."

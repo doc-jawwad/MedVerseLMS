@@ -4,6 +4,7 @@ import { actionRpcResult } from "@/lib/errors/safe-action-error";
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { moveContentToBin } from "@/lib/actions/content-bin";
 
 function validDriveUrl(url: string) {
   try {
@@ -68,14 +69,11 @@ function revalidateStudyPaths() {
 }
 
 export async function deleteFolder(folderId: string) {
-  const supabase = await createClient();
-  const { error } = await supabase
-    .from("material_folders")
-    .delete()
-    .eq("id", folderId);
+  const result = await moveContentToBin("material_folder", folderId);
   revalidatePath("/admin/materials");
+  revalidatePath("/admin/bin");
   revalidatePath("/materials");
-  return actionRpcResult("action", error);
+  return result;
 }
 
 export async function addMaterial(
@@ -113,11 +111,11 @@ export async function openMaterial(materialId: string) {
 }
 
 export async function deleteMaterial(materialId: string) {
-  const supabase = await createClient();
-  const { error } = await supabase.from("materials").delete().eq("id", materialId);
+  const result = await moveContentToBin("material", materialId);
   revalidatePath("/admin/materials");
   revalidatePath("/admin/free-resources");
+  revalidatePath("/admin/bin");
   revalidatePath("/materials");
   revalidatePath("/free-resources");
-  return actionRpcResult("action", error);
+  return result;
 }

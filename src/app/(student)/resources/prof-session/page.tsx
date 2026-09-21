@@ -1,7 +1,6 @@
-import { ProfSessionHomeView } from "@/components/academic/academic-browse-views";
-import { loadAcademicBrowse } from "@/lib/academic-tree/browse";
+import { redirect } from "next/navigation";
+import { ACADEMIC_BASE_PATH, PROF_SESSION_SLUG } from "@/lib/academic-tree";
 
-export default async function ResourcesProfSessionPage() {
-  const ctx = await loadAcademicBrowse("resources");
-  return <ProfSessionHomeView surface="resources" tree={ctx.tree} />;
+export default function ResourcesProfSessionRedirect() {
+  redirect(`${ACADEMIC_BASE_PATH}/${PROF_SESSION_SLUG}`);
 }

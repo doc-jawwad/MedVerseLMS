@@ -36,6 +36,7 @@ describe("Data Spine academic tree mapping", () => {
           {
             subject_id: "subj-med",
             name: "Medicine",
+            product_key: "medicine",
             locked: true,
             categories: [
               {
@@ -106,9 +107,10 @@ describe("Data Spine academic tree mapping", () => {
     assert.deepEqual(tree!.prof_session.days, []);
   });
 
-  it("resolves product keys from subject names", () => {
+  it("resolves known product keys from display names only (no year invent)", () => {
     assert.equal(productKeyForSubjectName("Block 3", 1), "block-3");
     assert.equal(productKeyForSubjectName("Surgery", 5), "surgery");
+    assert.equal(productKeyForSubjectName("Anatomy", 1), null);
   });
 });
 

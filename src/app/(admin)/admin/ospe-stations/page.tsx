@@ -28,6 +28,7 @@ export default async function AdminOspeStationsPage({
           "id, title, status, entitlement, year_id, subject_id, sort_order, subjects(name), years(year_number, name)"
         )
         .eq("year_id", yearId)
+        .is("deleted_at", null)
         .order("sort_order")
         .order("created_at", { ascending: false })
         .limit(200);

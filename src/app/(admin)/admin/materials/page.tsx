@@ -31,11 +31,13 @@ export default async function AdminMaterialsPage({
       supabase
         .from("material_folders")
         .select("id, name, year_id, subject_id, entitlement, library_type")
+        .is("deleted_at", null)
         .order("sort_order")
         .order("name"),
       supabase
         .from("materials")
         .select("id, folder_id, title, description, file_type, kind, status")
+        .is("deleted_at", null)
         .order("sort_order")
         .order("title"),
     ]);
