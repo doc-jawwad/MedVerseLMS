@@ -31,31 +31,31 @@ export default async function AdminBlockAccessPage({
   const [{ data: subjects, error }, { data: years }] = await Promise.all([
     supabase
       .from("subjects")
-      .select("id, name, product_key, free_access, year_id, years(year_name)")
+      .select("id, name, product_key, free_access, year_id, years(name)")
       .not("product_key", "is", null)
       .order("year_id")
       .order("name"),
     supabase
       .from("years")
-      .select("id, year_name, year_number")
+      .select("id, name, year_number")
       .order("year_number"),
   ]);
 
   const subjectRows: SubjectRow[] = (subjects ?? []).map((s) => {
-    const yr = s.years as unknown as { year_name: string } | null;
+    const yr = s.years as unknown as { name: string } | null;
     return {
       id: s.id,
       name: s.name,
       product_key: s.product_key,
       free_access: s.free_access ?? false,
       year_id: s.year_id,
-      year_name: yr?.year_name ?? null,
+      year_name: yr?.name ?? null,
     };
   });
 
   const yearOptions = (years ?? []).map((y) => ({
     id: y.id,
-    year_name: y.year_name,
+    year_name: y.name,
     year_number: y.year_number,
   }));
 

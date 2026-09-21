@@ -23,19 +23,19 @@ export default async function AdminPlansPage({
     supabase
       .from("subscription_plans")
       .select(
-        "id, name, description, duration_days, price, is_complimentary, is_active, sort_order, year_id, years(year_name, year_number)"
+        "id, name, description, duration_days, price, is_complimentary, is_active, sort_order, year_id, years(name, year_number)"
       )
       .order("year_id")
       .order("sort_order")
       .order("name"),
     supabase
       .from("years")
-      .select("id, year_name, year_number")
+      .select("id, name, year_number")
       .order("year_number"),
   ]);
 
   const planRows: PlanRow[] = (plans ?? []).map((p) => {
-    const yr = p.years as unknown as { year_name: string; year_number: number } | null;
+    const yr = p.years as unknown as { name: string; year_number: number } | null;
     return {
       id: p.id,
       name: p.name,
@@ -46,13 +46,13 @@ export default async function AdminPlansPage({
       is_active: p.is_active,
       sort_order: p.sort_order,
       year_id: p.year_id,
-      year_name: yr?.year_name ?? null,
+      year_name: yr?.name ?? null,
     };
   });
 
   const yearOptions: YearOption[] = (years ?? []).map((y) => ({
     id: y.id,
-    year_name: y.year_name,
+    year_name: y.name,
     year_number: y.year_number,
   }));
 

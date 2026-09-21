@@ -59,7 +59,7 @@ export default async function SubscriptionPage() {
       supabase
         .from("subscriptions")
         .select(
-          "id, status, starts_at, ends_at, grace_days, paid_access_mode, year_id, subscription_plans(name), years(year_name)"
+          "id, status, starts_at, ends_at, grace_days, paid_access_mode, year_id, subscription_plans(name), years(name)"
         )
         .eq("student_id", userId)
         .order("ends_at", { ascending: false }),
@@ -157,7 +157,7 @@ export default async function SubscriptionPage() {
   // Year name for active subscription.
   const activeSubRow = subsRes.data?.find((s) => s.id === activeSub?.id);
   const activeYearName =
-    (activeSubRow?.years as unknown as { year_name: string } | null)?.year_name ?? null;
+    (activeSubRow?.years as unknown as { name: string } | null)?.name ?? null;
 
   return (
     <StudentPage width="narrow">
