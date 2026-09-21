@@ -261,7 +261,7 @@ select throws_ok(
 
 select test_helpers.as_user((select id from t_main));
 select ok(
-  (select jsonb_array_length(public.list_content_bin((select year_id from curriculum))) >= 1),
+  (select count(*)::int >= 1 from public.list_content_bin((select year_id from curriculum))),
   'admin lists soft-deleted items in bin'
 );
 

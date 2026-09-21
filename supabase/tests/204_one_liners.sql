@@ -26,7 +26,7 @@ select public.create_one_liner(
   p_title => 'OL Test liner',
   p_body => 'Body text here',
   p_status => 'draft'
-) into temp t_liner_id;
+) AS column1 into temp t_liner_id;
 grant select on t_liner_id to anon, authenticated;
 
 select ok(
@@ -34,9 +34,14 @@ select ok(
   '1. admin can create one-liner via RPC'
 );
 
--- 2. Manager with manage_materials can create
+-- 2. Manager with manage_materials can create (assign year first)
+select test_helpers.as_user((select id from t_admin));
+select public.set_admin_year_assignments(
+  (select id from t_manager),
+  array[(select year_id from curriculum)]
+);
 select test_helpers.as_user((select id from t_manager));
-select is_empty(
+select lives_ok(
   $$ select public.create_one_liner(
     p_year_id => (select year_id from curriculum),
     p_subject_id => (select subject_id from curriculum),
@@ -98,13 +103,11 @@ select ok(
   '7. enrolled student can see published one-liner'
 );
 
--- 8. Student cannot update one-liner directly
-select throws_ok(
-  format($$ update public.one_liners set title = 'hacked' where id = %L $$,
+-- 8. Student UPDATE hits 0 rows (RLS hides the row; same pattern as 010_rls.sql)
+select is_empty(
+  format($$ update public.one_liners set title = 'hacked' where id = %L returning id $$,
     (select column1::text from t_liner_id limit 1)),
-  null,
-  null,
-  '8. student cannot update one-liner directly (RLS)'
+  '8. student UPDATE on one_liners hits 0 rows (RLS)'
 );
 
 -- 9. Admin can soft-delete via soft_delete_content

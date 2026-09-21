@@ -20,13 +20,13 @@ select public.create_question(
   p_stem => 'BQ Q1', p_options => '[{"key":"a","text":"A"},{"key":"b","text":"B"},{"key":"c","text":"C"},{"key":"d","text":"D"}]'::jsonb,
   p_correct_key => 'a', p_explanation => '', p_reference => '',
   p_difficulty => 'easy', p_tags => '{}', p_status => 'approved'
-) into temp t_q1;
+) AS column1 into temp t_q1;
 select public.create_question(
   p_topic_id => (select topic_id from curriculum),
   p_stem => 'BQ Q2', p_options => '[{"key":"a","text":"A"},{"key":"b","text":"B"},{"key":"c","text":"C"},{"key":"d","text":"D"}]'::jsonb,
   p_correct_key => 'b', p_explanation => '', p_reference => '',
   p_difficulty => 'medium', p_tags => '{}', p_status => 'draft'
-) into temp t_q2;
+) AS column1 into temp t_q2;
 grant select on t_q1, t_q2 to anon, authenticated;
 
 -- 1. editor can bulk delete free questions

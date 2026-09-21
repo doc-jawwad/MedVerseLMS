@@ -14,15 +14,19 @@ grant select on curriculum, t_student, t_admin to anon, authenticated;
 
 -- 1. test_type column defaults to 'formal'
 select test_helpers.as_user((select id from t_admin));
-insert into public.tests (
-  title, year_id, opens_at, closes_at, duration_minutes,
-  marks_per_question, negative_mark, min_questions
-) values (
-  'MT Formal Default',
-  (select year_id from curriculum),
-  now() + interval '1 day', now() + interval '2 days',
-  60, 1, 0, 5
-) returning id into temp t_formal;
+create temp table t_formal as
+  with ins as (
+    insert into public.tests (
+      title, year_id, opens_at, closes_at, duration_minutes,
+      marks_per_question, negative_mark, min_questions
+    ) values (
+      'MT Formal Default',
+      (select year_id from curriculum),
+      now() + interval '1 day', now() + interval '2 days',
+      60, 1, 0, 5
+    ) returning id
+  )
+  select id from ins;
 grant select on t_formal to anon, authenticated;
 
 select is(
@@ -32,13 +36,17 @@ select is(
 );
 
 -- 2. can insert mock type
-insert into public.tests (
-  title, year_id, duration_minutes, marks_per_question, negative_mark, min_questions, test_type
-) values (
-  'MT Mock Test',
-  (select year_id from curriculum),
-  60, 1, 0, 5, 'mock'
-) returning id into temp t_mock;
+create temp table t_mock as
+  with ins as (
+    insert into public.tests (
+      title, year_id, duration_minutes, marks_per_question, negative_mark, min_questions, test_type
+    ) values (
+      'MT Mock Test',
+      (select year_id from curriculum),
+      60, 1, 0, 1, 'mock'
+    ) returning id
+  )
+  select id from ins;
 grant select on t_mock to anon, authenticated;
 
 select is(
@@ -59,9 +67,9 @@ select throws_ok(
 -- 4. validate_test for mock with no schedule passes the schedule checks
 -- First attach a question
 select test_helpers.as_user((select id from t_admin));
+do $$
 declare
   v_q_id uuid;
-  v_report jsonb;
 begin
   select public.create_question(
     p_topic_id => (select topic_id from curriculum),
@@ -79,9 +87,10 @@ begin
   insert into public.test_audiences (test_id, year_id)
   values ((select id from t_mock), (select year_id from curriculum));
 end;
+$$;
 
 select test_helpers.as_user((select id from t_admin));
-select public.validate_test((select id from t_mock)) into temp t_validate_mock;
+select public.validate_test((select id from t_mock)) AS column1 into temp t_validate_mock;
 grant select on t_validate_mock to anon, authenticated;
 
 -- The schedule check rows should pass = true for mock tests
@@ -109,13 +118,11 @@ select throws_ok(
   '6. student cannot insert tests (RLS)'
 );
 
--- 7. student cannot update test_type
-select throws_ok(
-  format($$ update public.tests set test_type = 'formal' where id = %L $$,
+-- 7. student UPDATE on tests hits 0 rows (RLS hides the row; same pattern as 010_rls.sql)
+select is_empty(
+  format($$ update public.tests set test_type = 'formal' where id = %L returning id $$,
     (select id from t_mock)::text),
-  null,
-  null,
-  '7. student cannot update tests (RLS)'
+  '7. student UPDATE on tests hits 0 rows (RLS)'
 );
 
 -- 8. test_type is frozen after publish — use admin
