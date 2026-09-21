@@ -10,7 +10,8 @@
 create table if not exists public.one_liners (
   id uuid primary key default gen_random_uuid(),
   tenant_id uuid not null default public.default_tenant(),
-  text text not null,
+  title text not null,
+  body text not null default '',
   year_id uuid not null references public.years (id) on delete cascade,
   subject_id uuid references public.subjects (id) on delete set null,
   chapter_id uuid references public.chapters (id) on delete set null,
@@ -25,7 +26,7 @@ create table if not exists public.one_liners (
   deleted_at timestamptz,
   purge_after timestamptz,
   deleted_by uuid references public.profiles (id),
-  check (length(btrim(text)) > 0)
+  check (length(btrim(title)) > 0)
 );
 
 comment on table public.one_liners is
@@ -86,7 +87,8 @@ revoke select on public.one_liners from authenticated;
 grant select (
   id,
   tenant_id,
-  text,
+  title,
+  body,
   year_id,
   subject_id,
   chapter_id,
@@ -103,7 +105,8 @@ grant select (
 
 create or replace function public.create_one_liner(
   p_year_id uuid,
-  p_text text,
+  p_title text,
+  p_body text default '',
   p_subject_id uuid default null,
   p_chapter_id uuid default null,
   p_topic_id uuid default null,
@@ -123,12 +126,12 @@ begin
   if not public.has_permission('manage_materials') then raise exception 'permission_denied'; end if;
   if not public.admin_can_access_year(p_year_id) then raise exception 'year_scope_denied'; end if;
   if p_status not in ('draft', 'published') then raise exception 'invalid_status'; end if;
-  if coalesce(btrim(p_text), '') = '' then raise exception 'text_required'; end if;
+  if coalesce(btrim(p_title), '') = '' then raise exception 'title_required'; end if;
 
   insert into public.one_liners
-    (year_id, text, subject_id, chapter_id, topic_id, status, sort_order, created_by)
+    (year_id, title, body, subject_id, chapter_id, topic_id, status, sort_order, created_by)
   values
-    (p_year_id, btrim(p_text), p_subject_id, p_chapter_id, p_topic_id,
+    (p_year_id, btrim(p_title), coalesce(btrim(p_body), ''), p_subject_id, p_chapter_id, p_topic_id,
      p_status, coalesce(p_sort_order, 0), v_uid)
   returning id into v_id;
 
@@ -138,7 +141,8 @@ $$;
 
 create or replace function public.update_one_liner(
   p_id uuid,
-  p_text text default null,
+  p_title text default null,
+  p_body text default null,
   p_subject_id uuid default null,
   p_chapter_id uuid default null,
   p_topic_id uuid default null,
@@ -163,7 +167,8 @@ begin
 
   update public.one_liners
   set
-    text = coalesce(nullif(btrim(p_text), ''), text),
+    title = coalesce(nullif(btrim(p_title), ''), title),
+    body = case when p_body is not null then coalesce(btrim(p_body), '') else body end,
     subject_id = case when p_subject_id is not null then p_subject_id else subject_id end,
     chapter_id = case when p_chapter_id is not null then p_chapter_id else chapter_id end,
     topic_id = case when p_topic_id is not null then p_topic_id else topic_id end,
@@ -173,15 +178,15 @@ begin
 end;
 $$;
 
-revoke execute on function public.create_one_liner(uuid, text, uuid, uuid, uuid, text, int) from public, anon;
-grant execute on function public.create_one_liner(uuid, text, uuid, uuid, uuid, text, int) to authenticated, service_role;
-revoke execute on function public.update_one_liner(uuid, text, uuid, uuid, uuid, text, int) from public, anon;
-grant execute on function public.update_one_liner(uuid, text, uuid, uuid, uuid, text, int) to authenticated, service_role;
+revoke execute on function public.create_one_liner(uuid, text, text, uuid, uuid, uuid, text, int) from public, anon;
+grant execute on function public.create_one_liner(uuid, text, text, uuid, uuid, uuid, text, int) to authenticated, service_role;
+revoke execute on function public.update_one_liner(uuid, text, text, uuid, uuid, uuid, text, int) from public, anon;
+grant execute on function public.update_one_liner(uuid, text, text, uuid, uuid, uuid, text, int) to authenticated, service_role;
 
 -- ---------------------------------------------------------------------------
 -- PART C — CSV batch import for one_liners
 -- ---------------------------------------------------------------------------
--- Row shape: {row_number, text, subject_name?, chapter_name?, topic_name?, status?}
+-- Row shape: {row_number, title, body?, subject_name?, chapter_name?, topic_name?, status?}
 -- subject_name / chapter_name / topic_name resolved under p_year_id.
 
 create table if not exists public.one_liner_import_batches (
@@ -216,7 +221,7 @@ create policy one_liner_import_rows_admin on public.one_liner_import_rows
 create or replace function public.import_one_liner_batch(
   p_year_id uuid,
   p_batch_id uuid,
-  p_rows jsonb -- [{row_number, text, subject_name?, chapter_name?, topic_name?, status?}]
+  p_rows jsonb -- [{row_number, title, body?, subject_name?, chapter_name?, topic_name?, status?}]
 )
 returns jsonb
 language plpgsql
@@ -232,7 +237,8 @@ declare
   v_inserted int := 0;
   v_skipped int := 0;
   v_errors int := 0;
-  v_text text;
+  v_title text;
+  v_body text;
   v_status text;
 begin
   if not public.has_permission('manage_materials') then raise exception 'permission_denied'; end if;
@@ -240,10 +246,11 @@ begin
 
   for r in select * from jsonb_array_elements(p_rows) loop
     begin
-      v_text := btrim(r ->> 'text');
-      if v_text is null or v_text = '' then
-        raise exception 'text_required';
+      v_title := btrim(r ->> 'title');
+      if v_title is null or v_title = '' then
+        raise exception 'title_required';
       end if;
+      v_body := coalesce(btrim(r ->> 'body'), '');
 
       -- Optional subject/chapter/topic by name
       v_subject_id := null;
@@ -270,11 +277,11 @@ begin
         limit 1;
       end if;
 
-      -- Skip exact-text duplicate within same year
+      -- Skip exact-title duplicate within same year
       if exists (
         select 1 from public.one_liners
         where year_id = p_year_id
-          and lower(text) = lower(v_text)
+          and lower(title) = lower(v_title)
           and deleted_at is null
       ) then
         v_skipped := v_skipped + 1;
@@ -286,9 +293,9 @@ begin
       v_status := coalesce(nullif(r ->> 'status', ''), 'draft');
 
       insert into public.one_liners
-        (year_id, text, subject_id, chapter_id, topic_id, status, created_by)
+        (year_id, title, body, subject_id, chapter_id, topic_id, status, created_by)
       values
-        (p_year_id, v_text, v_subject_id, v_chapter_id, v_topic_id, v_status, auth.uid())
+        (p_year_id, v_title, v_body, v_subject_id, v_chapter_id, v_topic_id, v_status, auth.uid())
       returning id into v_one_liner_id;
 
       v_inserted := v_inserted + 1;
@@ -616,6 +623,9 @@ grant execute on function public.restore_content(text, uuid) to authenticated, s
 revoke execute on function public.purge_content(text, uuid) from public, anon;
 grant execute on function public.purge_content(text, uuid) to authenticated, service_role;
 
+-- Drop old jsonb-returning variant before recreating as RETURNS TABLE
+drop function if exists public.list_content_bin(uuid);
+
 -- Also update list_content_bin to include one_liner rows
 create or replace function public.list_content_bin(p_year_id uuid default null)
 returns table (
@@ -674,7 +684,7 @@ as $$
     and (p_year_id is null or psd.year_id = p_year_id)
     and public.admin_can_access_year(psd.year_id)
   union all
-  select 'one_liner'::text, ol.id, left(ol.text, 80), ol.year_id, ol.deleted_at, ol.purge_after, ol.deleted_by, false
+  select 'one_liner'::text, ol.id, left(ol.title, 80), ol.year_id, ol.deleted_at, ol.purge_after, ol.deleted_by, false
   from public.one_liners ol
   where ol.deleted_at is not null
     and (p_year_id is null or ol.year_id = p_year_id)
