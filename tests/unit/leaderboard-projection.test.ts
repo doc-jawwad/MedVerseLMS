@@ -64,22 +64,30 @@ describe("leaderboard projection adapter", () => {
     assert.equal(row?.avatar_object_key, "avatars/aaa.png");
   });
 
-  it("slices to Top 3 / Top 20 without re-sorting by score", () => {
+  it("slices to Top 5 / Top 20 without re-sorting by score", () => {
     const raw = [
       { rank: 2, student_id: "b", full_name: "B", score: 80 },
       { rank: 1, student_id: "a", full_name: "A", score: 90 },
       { rank: 3, student_id: "c", full_name: "C", score: 70 },
       { rank: 4, student_id: "d", full_name: "D", score: 60 },
     ];
-    const top3 = adaptTestLeaderboardRows(
+    // dashboardTop = 5; the fixture only has 4 rows so all 4 are returned
+    const top5 = adaptTestLeaderboardRows(
       raw,
       LEADERBOARD_PROJECTION_LIMITS.dashboardTop
     );
-    assert.equal(top3.length, 3);
+    assert.equal(top5.length, 4); // fewer rows than limit — returns all
     assert.deepEqual(
-      top3.map((r) => r.rank),
-      [2, 1, 3]
+      top5.map((r) => r.rank),
+      [2, 1, 3, 4]
     );
+
+    // dashboardFull = 20; same fixture
+    const top20 = adaptTestLeaderboardRows(
+      raw,
+      LEADERBOARD_PROJECTION_LIMITS.dashboardFull
+    );
+    assert.equal(top20.length, 4);
   });
 
   it("rejects rows missing rank or score", () => {

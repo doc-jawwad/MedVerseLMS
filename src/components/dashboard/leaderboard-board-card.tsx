@@ -1,6 +1,10 @@
-import { User } from "lucide-react";
+"use client";
+
+import { useState } from "react";
+import { User, ChevronDown, ChevronUp } from "lucide-react";
 import { EmptyState } from "@/components/student/empty-state";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -28,13 +32,28 @@ export function LeaderboardBoardCard({
   description,
   board,
   viewerStudentId,
+  /**
+   * When provided, the card initially displays only this many rows and
+   * renders a "View Full Leaderboard" toggle. When omitted or 0, all rows
+   * are shown immediately.
+   */
+  initialDisplayCount,
 }: {
   title: string;
   description?: string;
   board: LeaderboardBoardState;
   /** Highlight the viewer's row when student_id matches. */
   viewerStudentId?: string | null;
+  initialDisplayCount?: number;
 }) {
+  const canCollapse =
+    board.status === "ready" &&
+    initialDisplayCount != null &&
+    initialDisplayCount > 0 &&
+    board.rows.length > initialDisplayCount;
+
+  const [expanded, setExpanded] = useState(false);
+
   if (board.status === "empty") {
     const copy = leaderboardEmptyCopy(board.reason);
     return (
@@ -53,12 +72,19 @@ export function LeaderboardBoardCard({
     );
   }
 
+  const displayCount =
+    canCollapse && !expanded ? initialDisplayCount! : board.rows.length;
+  const visibleRows = board.rows.slice(0, displayCount);
+  const badgeLabel = `Top ${displayCount}`;
+
   return (
     <Card className="shadow-none" data-testid="leaderboard-board">
       <CardHeader>
         <div className="flex flex-wrap items-center gap-2">
           <CardTitle className="text-base text-[var(--student-ink)]">{title}</CardTitle>
-          <Badge variant="secondary">Top {board.limit}</Badge>
+          <Badge variant="secondary" data-testid="leaderboard-limit-badge">
+            {badgeLabel}
+          </Badge>
         </div>
         <CardDescription>
           {description ??
@@ -67,7 +93,7 @@ export function LeaderboardBoardCard({
         <p className="text-sm font-medium text-[var(--student-ink)]">{board.testTitle}</p>
       </CardHeader>
       <CardContent className="grid gap-2">
-        {board.rows.map((row) => {
+        {visibleRows.map((row) => {
           const isMe =
             viewerStudentId != null && row.student_id === viewerStudentId;
           return (
@@ -100,6 +126,28 @@ export function LeaderboardBoardCard({
             </div>
           );
         })}
+
+        {canCollapse && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="mt-1 w-full text-[var(--brand-teal-ink)] hover:text-[var(--brand-teal-ink)]"
+            onClick={() => setExpanded((v) => !v)}
+            data-testid="leaderboard-toggle"
+          >
+            {expanded ? (
+              <>
+                <ChevronUp className="mr-1.5 size-4" />
+                Show less
+              </>
+            ) : (
+              <>
+                <ChevronDown className="mr-1.5 size-4" />
+                View Full Leaderboard
+              </>
+            )}
+          </Button>
+        )}
       </CardContent>
     </Card>
   );

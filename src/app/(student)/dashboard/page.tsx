@@ -1,7 +1,10 @@
 import Link from "next/link";
 import { requireStudent } from "@/lib/auth/require-user";
 import { formatDateTime } from "@/lib/utils";
-import { buildStudentDashboardPresentation } from "@/lib/tests/student-dashboard-presentation";
+import {
+  buildStudentDashboardPresentation,
+  PERFORMANCE_GRAIN_COPY,
+} from "@/lib/tests/student-dashboard-presentation";
 import {
   classifyCatalogTestStates,
   displayTestTitle,
@@ -11,6 +14,8 @@ import {
 } from "@/lib/tests/student-test-state";
 import { finalizeOwnExpiredAttempts } from "@/lib/tests/finalize-own-expired";
 import { buildStudentSubscriptionView } from "@/lib/subscriptions/student-status";
+import { studentHasPaidLmsSections } from "@/lib/subscriptions/student-section-access";
+import { getStudentHasLiveSubscription } from "@/lib/subscriptions/student-live-access";
 import { ResourceLockNotice } from "@/components/subscription/resource-lock-notice";
 import {
   Card,
@@ -39,9 +44,10 @@ import {
   adaptStudentTrendForChart,
 } from "@/lib/dashboard/trend-chart-adapter";
 import {
-  dashboardTop3Limit,
+  dashboardFullLimit,
   loadLastCompletedLeaderboardBoard,
 } from "@/lib/leaderboard/load-last-completed-board";
+import { LEADERBOARD_PROJECTION_LIMITS } from "@/lib/leaderboard/projection-contract";
 
 export const metadata = { title: "Dashboard — MedVerse LMS" };
 
@@ -55,9 +61,28 @@ type RecentTest = {
   submitted_at: string;
 };
 
+type SubjectPerf = {
+  subject_id: string;
+  subject_name: string;
+  test_average_percentage: number;
+  tests_taken: number;
+  practice_accuracy: number;
+  practice_answered: number;
+};
+
+type WeakChapter = {
+  chapter_id: string;
+  chapter_name: string;
+  subject_name: string;
+  accuracy: number;
+  answered: number;
+};
+
 export default async function DashboardPage() {
   const { supabase, profile, enrollment, userId } = await requireStudent();
   await finalizeOwnExpiredAttempts(supabase);
+  const hasLiveAccess = await getStudentHasLiveSubscription();
+  const paidDetails = studentHasPaidLmsSections(hasLiveAccess);
 
   const now = new Date();
   const nowIso = now.toISOString();
@@ -120,6 +145,18 @@ export default async function DashboardPage() {
       .eq("grant_type", "test"),
     supabase.rpc("accessible_test_prep"),
   ]);
+
+  // Paid-only: subject performance and weak chapters (skip fetch for free students)
+  let subjectRows: SubjectPerf[] = [];
+  let weakRows: WeakChapter[] = [];
+  if (paidDetails) {
+    const [{ data: subjects }, { data: weak }] = await Promise.all([
+      supabase.rpc("student_subject_performance"),
+      supabase.rpc("student_weak_chapters", { p_limit: 5 }),
+    ]);
+    subjectRows = (subjects ?? []) as SubjectPerf[];
+    weakRows = (weak ?? []) as WeakChapter[];
+  }
 
   const prepByTest = new Map(
     ((prepRows ?? []) as { test_id: string; body_text: string }[]).map((row) => [
@@ -214,7 +251,9 @@ export default async function DashboardPage() {
     nowMs,
   });
 
-  const top3Board = await loadLastCompletedLeaderboardBoard(supabase, {
+  // Fetch up to 20 rows server-side; the card renders Top 5 initially with a
+  // client-side "View Full Leaderboard" toggle to reveal up to Top 20.
+  const leaderboardBoard = await loadLastCompletedLeaderboardBoard(supabase, {
     candidates: (catalogTests ?? []).map((t) => ({
       id: t.id as string,
       title: (t.title as string) ?? "",
@@ -224,7 +263,7 @@ export default async function DashboardPage() {
       entitlement: (t.entitlement as string | null) ?? null,
     })),
     nowMs,
-    limit: dashboardTop3Limit(),
+    limit: dashboardFullLimit(),
   });
 
   const trendSeries = adaptStudentTrendForChart(trend);
@@ -236,7 +275,7 @@ export default async function DashboardPage() {
       <PageHeader
         eyebrow={enrollment.year_name}
         title={`Welcome, ${profile.full_name || "Student"}`}
-        description="Incoming scheduled tests for your class, plus lifetime results and the last-test Top 3."
+        description="Incoming tests, your performance, and the last-test leaderboard — all in one place."
       />
 
       <InstallMedverseApp variant="card" />
@@ -326,9 +365,10 @@ export default async function DashboardPage() {
 
       <LeaderboardBoardCard
         title="Last test leaderboard"
-        description="Top 3 from the most recently completed formal test. Free and paid students can view this board."
-        board={top3Board}
+        description="Top 5 from the most recently completed formal test. Free and paid students can view this board."
+        board={leaderboardBoard}
         viewerStudentId={userId}
+        initialDisplayCount={LEADERBOARD_PROJECTION_LIMITS.dashboardTop}
       />
 
       {presentation.showHistoricalPerformance && (
@@ -364,6 +404,112 @@ export default async function DashboardPage() {
 
       <DashboardPerformanceGraphs trend={trendSeries} summary={summaryBars} />
 
+      {paidDetails ? (
+        <>
+          {subjectRows.length > 0 && (
+            <Card className="shadow-none">
+              <CardHeader>
+                <CardTitle className="text-base text-[var(--student-ink)]">
+                  Subject performance
+                </CardTitle>
+                <CardDescription>{PERFORMANCE_GRAIN_COPY.subject}</CardDescription>
+              </CardHeader>
+              <CardContent className="grid gap-4">
+                {subjectRows.map((sub) => (
+                  <div key={sub.subject_id} className="grid gap-2">
+                    <p className="text-sm font-medium text-[var(--student-ink)]">
+                      {sub.subject_name}
+                    </p>
+                    <div className="grid gap-1">
+                      <div className="flex items-baseline justify-between gap-2 text-sm">
+                        <span className="text-muted-foreground">Tests</span>
+                        <span className="shrink-0 tabular-nums text-muted-foreground">
+                          {sub.test_average_percentage}% ({sub.tests_taken})
+                        </span>
+                      </div>
+                      <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+                        <div
+                          className="h-full rounded-full bg-[var(--brand-teal)]"
+                          style={{
+                            width: `${Math.max(0, Math.min(100, sub.test_average_percentage))}%`,
+                          }}
+                        />
+                      </div>
+                    </div>
+                    <div className="grid gap-1">
+                      <div className="flex items-baseline justify-between gap-2 text-sm">
+                        <span className="text-muted-foreground">Practice</span>
+                        <span className="shrink-0 tabular-nums text-muted-foreground">
+                          {sub.practice_accuracy}% ({sub.practice_answered} answered)
+                        </span>
+                      </div>
+                      <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+                        <div
+                          className="h-full rounded-full bg-[var(--brand-teal)]"
+                          style={{
+                            width: `${Math.max(0, Math.min(100, sub.practice_accuracy))}%`,
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )}
+
+          {weakRows.length > 0 && (
+            <Card className="shadow-none">
+              <CardHeader>
+                <CardTitle className="text-base text-[var(--student-ink)]">
+                  Weak chapters
+                </CardTitle>
+                <CardDescription>{PERFORMANCE_GRAIN_COPY.weakChapters}</CardDescription>
+              </CardHeader>
+              <CardContent className="grid gap-2">
+                {weakRows.map((w) => (
+                  <div
+                    key={w.chapter_id}
+                    className="flex items-center justify-between text-sm"
+                  >
+                    <span>
+                      {w.chapter_name}{" "}
+                      <span className="text-muted-foreground">
+                        ({w.subject_name})
+                      </span>
+                    </span>
+                    <Badge variant={w.accuracy < 50 ? "destructive" : "outline"}>
+                      {w.accuracy}% ({w.answered})
+                    </Badge>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )}
+        </>
+      ) : (
+        <Card className="border-dashed shadow-none">
+          <CardHeader>
+            <div className="flex flex-wrap items-center gap-2">
+              <CardTitle className="text-base text-[var(--student-ink)]">
+                Subject &amp; practice analytics
+              </CardTitle>
+              <Badge variant="outline">locked</Badge>
+            </div>
+            <CardDescription>
+              Subject bars and weak chapters unlock with a live subscription.
+              Lifetime score graphs and leaderboard are always available.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-3">
+            <ResourceLockNotice compact />
+            <Button asChild size="sm" variant="secondary" className="w-fit">
+              <Link href="/subscription">My subscription</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
       <div className="grid gap-3">
         <SectionHeading
           title="Your tests at a glance"
@@ -388,25 +534,6 @@ export default async function DashboardPage() {
           />
         </div>
       </div>
-
-      {presentation.paidFeatureLock.show && (
-        <Card className="border-dashed shadow-none">
-          <CardHeader>
-            <div className="flex flex-wrap items-center gap-2">
-              <CardTitle className="text-base text-[var(--student-ink)]">
-                {presentation.paidFeatureLock.title}
-              </CardTitle>
-              <Badge variant="outline">locked</Badge>
-            </div>
-            <CardDescription>
-              {presentation.paidFeatureLock.body}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ResourceLockNotice compact />
-          </CardContent>
-        </Card>
-      )}
 
       <Card className="shadow-none">
         <CardHeader>

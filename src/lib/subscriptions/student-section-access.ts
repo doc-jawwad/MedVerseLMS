@@ -27,7 +27,7 @@ export const PAID_LMS_SECTION_HREFS = [
   "/lectures",
   "/materials",
   "/practice",
-  "/performance",
+  // /performance removed — merged into Dashboard; route redirects to /dashboard.
 ] as const;
 
 export type PaidLmsSectionHref = (typeof PAID_LMS_SECTION_HREFS)[number];
@@ -122,12 +122,7 @@ export function buildStudentShellNav(
       icon: "ospeMaterial",
       locked: false,
     },
-    {
-      href: "/performance",
-      label: "Performance",
-      icon: "performance",
-      locked: !paid,
-    },
+    // /performance removed from nav — analytics merged into Dashboard.
     { href: "/contact", label: "Contact Us", icon: "contact", locked: false },
     {
       href: "/career-counselling",

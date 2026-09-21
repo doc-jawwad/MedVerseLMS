@@ -78,6 +78,17 @@ export async function loadLastCompletedLeaderboardBoard(
   });
 }
 
+/** Top 5 – initial collapsed view on Dashboard. */
+export function dashboardTop5Limit(): LeaderboardProjectionLimit {
+  return LEADERBOARD_PROJECTION_LIMITS.dashboardTop;
+}
+
+/** Top 20 – full server fetch for Dashboard expandable board. */
+export function dashboardFullLimit(): LeaderboardProjectionLimit {
+  return LEADERBOARD_PROJECTION_LIMITS.dashboardFull;
+}
+
+/** @deprecated Use dashboardTop5Limit / dashboardFullLimit. */
 export function dashboardTop3Limit(): LeaderboardProjectionLimit {
   return LEADERBOARD_PROJECTION_LIMITS.dashboardTop;
 }

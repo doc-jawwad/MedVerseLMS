@@ -9,7 +9,11 @@
  */
 
 export const LEADERBOARD_PROJECTION_LIMITS = {
-  dashboardTop: 3,
+  /** Initial collapsed view on the Dashboard (Top 5). */
+  dashboardTop: 5,
+  /** Full expanded board on the Dashboard (Top 20). */
+  dashboardFull: 20,
+  /** Legacy alias kept for any direct callers. */
   analyticsTop: 20,
 } as const;
 

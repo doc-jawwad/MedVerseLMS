@@ -3,10 +3,11 @@ import { loadE2EEnv, STAGING_APP_ORIGIN } from "./load-e2e-env";
 
 /**
  * Free-student shell policy — unified Academic tree + locked Prof. Session.
+ * Performance is merged into Dashboard; /performance redirects to /dashboard.
  * Staging credentials must be a free (non–live-subscription) student.
  */
 test.describe("Free student navigation", () => {
-  test("all years navigable; Prof. Session and Performance locked", async ({
+  test("all years navigable; Prof. Session locked; /performance redirects to /dashboard", async ({
     page,
   }) => {
     const e2e = loadE2EEnv();
@@ -71,9 +72,14 @@ test.describe("Free student navigation", () => {
     });
     await expect(page.getByText(/subscription(?:\s+is)?\s+required/i)).toHaveCount(0);
 
+    // /performance merged into Dashboard — must redirect, not show a lock page
     await page.goto("/performance");
-    await expect(page.getByText(/subscription(?:\s+is)?\s+required/i)).toBeVisible({
+    await page.waitForURL(/\/dashboard/, { timeout: 15000 });
+    await expect(page.getByRole("heading", { name: /welcome/i })).toBeVisible({
       timeout: 15000,
     });
+
+    // Performance nav item must not appear in the sidebar
+    await expect(page.getByRole("link", { name: "Performance" })).toHaveCount(0);
   });
 });

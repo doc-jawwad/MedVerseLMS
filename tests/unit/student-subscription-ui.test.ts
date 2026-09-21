@@ -103,11 +103,12 @@ describe("student subscription status view", () => {
     });
     assert.equal(view.kind, "expired");
     assert.equal(studentHasPaidLmsSections(view.hasLiveAccess), false);
+    // /performance removed from nav — merged into Dashboard; verify Prof. Session stays locked
     assert.ok(
       buildStudentShellNav(view.hasLiveAccess, {
         year_number: 1,
         year_name: "1st Year MBBS",
-      }).items.some((i) => i.href === "/performance" && i.locked)
+      }).items.some((i) => i.href === "/academic/prof-session" && i.locked)
     );
   });
 
