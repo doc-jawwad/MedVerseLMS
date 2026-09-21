@@ -280,12 +280,9 @@ select ok(
 );
 select ok(
   jsonb_array_length(
-    public.search_academic_tree(
-      (select name from public.subjects where id = (select subject_id from curriculum)),
-      10
-    )
+    public.search_academic_tree('Block 1', 10)
   ) >= 1,
-  '27 search finds subject name'
+  '27 search finds product block name'
 );
 
 ------------------------------------------------------------------

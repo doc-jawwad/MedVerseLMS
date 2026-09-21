@@ -10,7 +10,11 @@
 
 **Flashcards:** placeholder category only — **no** flashcard table or engine. `material_folders.library_type` may be `'flashcards'` for empty placeholder folders.
 
-**Subjects → Blocks remap:** **NOT SHIPPED.** Existing departmental `subjects` remain. Controlled mapping is a separate approved migration. `get_academic_tree` returns current subject names for the enrolled year.
+**Subjects → Blocks remap:** **SHIPPED** (migration `20260920073248`). `subjects.product_key` is the authoritative Block / Final Year clinical key. Departmental subjects keep `product_key` NULL for QB taxonomy. `get_academic_tree` returns only `product_key IS NOT NULL` subjects with canonical names.
+
+**Prof. Session days:** **SHIPPED** — `prof_session_days` + `prof_session_day_slots` (fixed chrome). Free students get `prof_session.locked=true` and empty `days`. Subscribed students see Admin-created published days only (no structural Day 1–3 fallback in RPC).
+
+**Content bin:** **SHIPPED** — soft-delete (`deleted_at` / `purge_after` / `deleted_by`) on materials, folders, pearls, OSPE stations, questions, prof session days; polymorphic `soft_delete_content` / `restore_content` / `list_content_bin` / `purge_content`; `purge_expired_bin_items` + `r2_purge_queue` (R2 bytes deleted by claim/complete worker after DB purge).
 
 ---
 

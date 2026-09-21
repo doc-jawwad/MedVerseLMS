@@ -22,9 +22,23 @@ Conventions: every table has `id uuid primary key default gen_random_uuid()`, `t
 
 **Class model (`years`):** `year_number` 1–5 unique, `name`. Existing years remain the class model — do **not** create a `classes` table. Canonical display names (SPEC FREEZE): 1st Year MBBS, 2nd Year MBBS, 3rd Year MBBS, 4th Year MBBS, **Final Year MBBS** (`year_number = 5`; existing “5th Year” / Year 5 may be displayed as Final Year MBBS rather than introducing a new class entity).
 
-**Second level (`subjects`):** today rows are traditional departments (Anatomy, Physiology, …) under each year. **Frozen product meaning:** Blocks 1–3 (1st Year), Blocks 4–6 (2nd), Blocks 7–9 (3rd), Blocks 10–12 (4th), and Final Year **Medicine, Surgery, Gynecology, Pediatrics**. Keep the table name `subjects` and denormalized `year_id` for join-free RLS. Do **not** invent a parallel `blocks` table.
+**Second level (`subjects`):** keep the table name `subjects` and denormalized `year_id` for join-free RLS. Do **not** invent a parallel `blocks` table.
 
-**Migration risk (controlled mapping required):** existing `subjects` are referenced by Question Bank and material data (`questions` + denormalized `subject_id` / `year_id` chains, `material_folders.subject_id`, `pearl_points.subject_id`, practice entitlement on subjects, CSV import under subject → book → chapter → topic). Reinterpreting department subjects as Blocks **must** use a controlled mapping/backfill — **not** destructive in-place renaming that breaks FKs or orphans bank content. No such migration in this SPEC FREEZE pass.
+**Authoritative Block / Final Year keys (`subjects.product_key`, SHIPPED):** student chrome uses only rows with non-null `product_key`:
+
+| Year | `product_key` values | Canonical names |
+|---|---|---|
+| 1 | `block-1`…`block-3` | Block 1–3 |
+| 2 | `block-4`…`block-6` | Block 4–6 |
+| 3 | `block-7`…`block-9` | Block 7–9 |
+| 4 | `block-10`…`block-12` | Block 10–12 |
+| 5 | `medicine`,`surgery`,`gynecology`,`pediatrics` | Medicine, Surgery, Gynecology, Pediatrics |
+
+Departmental subjects (Anatomy, …) remain with `product_key` NULL for Question Bank authoring taxonomy. Controlled insert/map migration does **not** destroy departmental UUIDs.
+
+**Prof. Session days (SHIPPED):** `prof_session_days` (per `year_id`, draft/published, soft-delete) + fixed `prof_session_day_slots` (`syllabus`,`guidelines`,`one_liners`,`practice_mcqs`,`test_mcq`). Free students: locked empty days in `get_academic_tree`. Subscribed: Admin-created published days only.
+
+**Content bin (SHIPPED):** soft-delete columns `deleted_at` / `purge_after` / `deleted_by` on academic content tables; polymorphic bin RPCs; `purge_expired_bin_items` (7-day) + `r2_purge_queue` for deferred R2 object deletion. Do not hard-delete immutable exam attempts, payments, or audit logs when content is purged.
 
 Hierarchy (unchanged table chain): `years` → `subjects` → `books` (subject_id, name, sort_order) → `chapters` (book_id, name, sort_order, **denormalized subject_id, year_id**) → `topics` (chapter_id, name, sort_order, **denormalized book_id, subject_id, year_id**).
 

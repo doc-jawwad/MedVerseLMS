@@ -143,11 +143,17 @@ Each Block (and each Final Year clinical subject) contains exactly these eight s
 
 ### 2c. Prof. Session (separate from Blocks)
 
-**Prof. Session** is a first-class student nav node beside the enrolled class Blocks — **never** nested under a Block or under a block category.
+**Prof. Session** is a first-class student nav node beside class Blocks — **never** nested under a Block or under a block category.
 
 Hierarchy: **Prof. Session → Day N →** Syllabus | Guidelines | One-liners / Pearl Points | Practice MCQs | Test MCQ.
 
-Routes live under `/resources/prof-session/...` (free surface) and `/library/prof-session/...` (subscribed surface). Formal **Test MCQ** remains the existing exam engine (`/tests`); Prof. Session only links into it.
+Primary routes live under `/academic/prof-session/...`. Legacy `/resources/...` and `/library/...` redirect into `/academic`. Formal **Test MCQ** remains the existing exam engine (`/tests`); Prof. Session only links into it.
+
+**Access (frozen):** Free students see Prof. Session in navigation but the **entire** surface is locked (subscription CTA). Do not expose Day contents as accessible free content. Subscribed students enter Prof. Session and see Admin-created Days.
+
+### 2d. Free student academic navigation (frozen)
+
+Free students may navigate **all** Classes/Years and open **all** Blocks / Final-Year subjects. The eight Block categories remain visible. Individual content remains governed by its own entitlement. Do **not** use Resources = free tree / Library = full tree as the primary student navigation model — one academic hierarchy (`/academic`) for everyone.
 
 ### 3. Notes
 
