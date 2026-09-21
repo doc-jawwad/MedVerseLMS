@@ -2,7 +2,7 @@
 -- and approval/rejection notifications.
 
 begin;
-select plan(32);
+select plan(23);
 
 select test_helpers.as_runner();
 select * into temp curriculum from test_helpers.make_curriculum();
@@ -30,7 +30,7 @@ grant select on curriculum, t_student, t_other, t_admin, t_manager,
 
 -- Activate payment settings so applications can be created.
 select test_helpers.as_user((select id from t_admin));
-perform public.upsert_payment_settings(
+select public.upsert_payment_settings(
   p_bank_name => 'PGTAP PY Bank',
   p_account_number => '99999',
   p_is_active => true
@@ -141,7 +141,7 @@ select throws_ok(
     )$$,
     (select year_id from curriculum)
   ),
-  'permission_denied',
+  'admin only',
   '8 student cannot call create_subscription_plan'
 );
 
@@ -150,7 +150,7 @@ select throws_ok(
 -- -------------------------------------------------------------------------
 -- Create a plan for year2 that student should NOT see.
 select test_helpers.as_user((select id from t_manager));
-perform public.create_subscription_plan(
+select public.create_subscription_plan(
   p_name => 'PGTAP Year2 Plan',
   p_year_id => (select id from t_year2),
   p_price => 3000,
@@ -231,7 +231,7 @@ select ok(true, '13 set_block_free_access runs without error for manager');
 select test_helpers.as_user((select id from t_student));
 select throws_ok(
   $$select public.set_block_free_access(gen_random_uuid(), true)$$,
-  'permission_denied',
+  'admin only',
   '14 student cannot call set_block_free_access'
 );
 
@@ -247,105 +247,106 @@ select throws_ok(
 
 -- -------------------------------------------------------------------------
 -- 16. approve_subscription_application: plan_year_mismatch guard
+-- Insert a mismatched application as runner: app.year_id = year1, plan.year_id = year2.
 -- -------------------------------------------------------------------------
--- Create an application for year1 plan, then try to approve with a year2 plan.
-select test_helpers.as_user((select id from t_admin));
-perform public.upsert_payment_settings(p_is_active => true);
 
-select test_helpers.as_user((select id from t_student));
+-- Always create these tables so later SQL can reference them unconditionally.
+create temp table t_app  (id uuid);
+create temp table t_app2 (id uuid);
 
--- Allocate a screenshot key and create application.
+-- Use runner to bypass the GUC trigger and insert a deliberately mismatched row.
+select test_helpers.as_runner();
+do $$
+declare
+  v_plan_y2 uuid;
+  v_student_id uuid;
+  v_app_id uuid;
+begin
+  select id into v_plan_y2 from public.subscription_plans
+    where name = 'PGTAP Year2 Plan' limit 1;
+  select id into v_student_id from t_student;
+
+  -- Insert with year1 enrollment but year2 plan — the deliberate mismatch.
+  perform set_config('medverse.subscription_application_rpc', '1', true);
+  insert into public.subscription_applications (
+    student_id, plan_id, amount, currency, screenshot_object_key, status, year_id
+  ) values (
+    v_student_id,
+    v_plan_y2,
+    5000, 'PKR',
+    'payment-proofs/pgtap-202-mismatch-proof.jpg',
+    'pending',
+    (select year_id from curriculum)
+  ) returning id into v_app_id;
+  perform set_config('medverse.subscription_application_rpc', '', true);
+
+  insert into t_app values (v_app_id);
+end $$;
+
+select test_helpers.as_user((select id from t_reviewer));
+select throws_ok(
+  format(
+    $$select public.approve_subscription_application(
+      %L::uuid,
+      p_review_note => 'should fail'
+    )$$,
+    (select id from t_app limit 1)
+  ),
+  'plan_year_mismatch',
+  '16 approve_subscription_application raises plan_year_mismatch when plan year differs'
+);
+
+-- -------------------------------------------------------------------------
+-- 17. Notifications: application_rejected inserts notification.
+-- Use t_other (different student) so the unique-pending index is not violated.
+-- -------------------------------------------------------------------------
+select test_helpers.as_runner();
 do $$
 declare
   v_plan_y1 uuid;
-  v_plan_y2 uuid;
-  v_app_id uuid;
-  v_key text;
+  v_other_id uuid;
+  v_app_id  uuid;
 begin
   select id into v_plan_y1 from public.subscription_plans
-  where name = 'PGTAP Year1 Plan' limit 1;
+    where name = 'PGTAP Year1 Plan' limit 1;
+  select id into v_other_id from t_other;
 
-  select id into v_plan_y2 from public.subscription_plans
-  where name = 'PGTAP Year2 Plan' limit 1;
+  perform set_config('medverse.subscription_application_rpc', '1', true);
+  insert into public.subscription_applications (
+    student_id, plan_id, amount, currency, screenshot_object_key, status, year_id
+  ) values (
+    v_other_id,
+    v_plan_y1,
+    5000, 'PKR',
+    'payment-proofs/pgtap-202-reject-proof.jpg',
+    'pending',
+    (select year_id from curriculum)
+  ) returning id into v_app_id;
+  perform set_config('medverse.subscription_application_rpc', '', true);
 
-  v_key := public.payment_screenshot_key_prefix((select auth.uid()))
-           || 'proof-test.jpg';
-
-  -- Create application referencing year1 plan.
-  v_app_id := public.create_subscription_application(
-    p_amount => 5000,
-    p_screenshot_object_key => v_key,
-    p_plan_id => v_plan_y1
-  );
-
-  -- Store for later tests.
-  create temp table if not exists t_app (id uuid);
-  insert into t_app values (v_app_id);
-  create temp table if not exists t_plans (y1 uuid, y2 uuid);
-  insert into t_plans values (v_plan_y1, v_plan_y2);
-exception when others then
-  -- Application creation may fail if payment settings incomplete; treat as skip.
-  null;
+  insert into t_app2 values (v_app_id);
 end $$;
 
--- Try approving with year2 plan — should raise plan_year_mismatch.
 select test_helpers.as_user((select id from t_reviewer));
-select case
-  when exists (select 1 from information_schema.tables where table_name = 't_app' and table_schema = 'pg_temp')
-    and (select id from t_app limit 1) is not null
-  then (
-    select throws_ok(
-      format(
-        $$select public.approve_subscription_application(
-          %L::uuid,
-          p_review_note => 'should fail'
-        )$$,
-        (select id from t_app limit 1)
-      ),
-      'plan_year_mismatch',
-      '16 approve_subscription_application raises plan_year_mismatch when plan year differs'
-    )
-  )
-  else ok(true, '16 skipped — application fixture unavailable')
-end;
+select lives_ok(
+  format(
+    $$select public.reject_subscription_application(
+      %L::uuid,
+      p_review_note => 'Test rejection'
+    )$$,
+    (select id from t_app2 limit 1)
+  ),
+  '17 reject_subscription_application succeeds'
+);
 
--- -------------------------------------------------------------------------
--- 17. Notifications: application_rejected inserts notification
--- -------------------------------------------------------------------------
-select test_helpers.as_user((select id from t_reviewer));
-select case
-  when exists (select 1 from information_schema.tables where table_name = 't_app' and table_schema = 'pg_temp')
-    and (select id from t_app limit 1) is not null
-  then (
-    select lives_ok(
-      format(
-        $$select public.reject_subscription_application(
-          %L::uuid,
-          p_review_note => 'Test rejection'
-        )$$,
-        (select id from t_app limit 1)
-      ),
-      '17 reject_subscription_application succeeds'
-    )
-  )
-  else ok(true, '17 skipped — application fixture unavailable')
-end;
-
-select case
-  when exists (select 1 from information_schema.tables where table_name = 't_app' and table_schema = 'pg_temp')
-    and (select id from t_app limit 1) is not null
-  then (
-    select ok(
-      exists (
-        select 1 from public.student_notifications
-        where kind = 'application_rejected'
-          and ref_id = (select id from t_app limit 1)
-      ),
-      '17b rejection notification inserted'
-    )
-  )
-  else ok(true, '17b skipped')
-end;
+select ok(
+  exists (
+    select 1 from public.student_notifications
+    where kind = 'application_rejected'
+      and ref_id = (select id from t_app2 limit 1)
+  ),
+  '17b rejection notification inserted'
+);
 
 -- -------------------------------------------------------------------------
 -- 18. update_subscription_plan: can update price

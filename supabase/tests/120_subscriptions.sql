@@ -175,8 +175,16 @@ select ok(
 );
 
 select test_helpers.as_user((select id from t_admin));
-select public.create_subscription_plan('Alt plan', 'other plan', 30, false, true, 1)
-  as id into temp t_alt;
+select public.create_subscription_plan(
+  p_name => 'Alt plan',
+  p_year_id => (select year_id from curriculum),
+  p_price => 1000,
+  p_description => 'other plan',
+  p_duration_days => 30,
+  p_is_complimentary => false,
+  p_is_active => true,
+  p_sort_order => 1
+) as id into temp t_alt;
 grant select on t_alt to authenticated;
 select public.set_resource_entitlement(
   'test', (select id from t_plan_res), 'plan', (select id from t_alt)
@@ -386,8 +394,16 @@ select public.deactivate_subscription((
   select id from public.subscriptions
   where student_id = (select id from t_student) and status = 'active'
 ));
-select public.create_subscription_plan('Complimentary', 'comp', 14, true, true, 9)
-  as id into temp t_comp;
+select public.create_subscription_plan(
+  p_name => 'Complimentary',
+  p_year_id => (select year_id from curriculum),
+  p_price => 0,
+  p_description => 'comp',
+  p_duration_days => 14,
+  p_is_complimentary => true,
+  p_is_active => true,
+  p_sort_order => 9
+) as id into temp t_comp;
 grant select on t_comp to authenticated;
 select public.activate_subscription((select id from t_student), (select id from t_comp))
   as id into temp t_comp_sub;
