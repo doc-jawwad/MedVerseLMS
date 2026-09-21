@@ -125,6 +125,18 @@ export const ADMIN_NAV: AdminNavDef[] = [
     anyOf: ["manage_materials"],
   },
   {
+    href: "/admin/mock-tests",
+    label: "Mock Tests",
+    icon: "tests",
+    anyOf: ["publish_tests", "edit_questions"],
+  },
+  {
+    href: "/admin/one-liners",
+    label: "One-liners",
+    icon: "pearlPoints",
+    anyOf: ["manage_materials"],
+  },
+  {
     href: "/admin/bin",
     label: "Content Bin",
     icon: "materialsFolder",

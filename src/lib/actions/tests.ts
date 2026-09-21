@@ -21,6 +21,7 @@ export type TestConfig = {
   shuffle_options: boolean;
   show_review: "after_submit" | "after_close" | "never";
   min_questions: number;
+  test_type: "formal" | "mock";
 };
 
 function reval(testId?: string) {

@@ -51,6 +51,7 @@ export function TestConfigForm({
 }) {
   const [pending, startTransition] = useTransition();
   const [title, setTitle] = useState(initial?.title ?? "");
+  const [testType, setTestType] = useState<"formal" | "mock">(initial?.test_type ?? "formal");
   const [yearId, setYearId] = useState(initial?.year_id ?? "");
   const [subjectId, setSubjectId] = useState(initial?.subject_id ?? "");
   const [opensAt, setOpensAt] = useState(toLocalInput(initial?.opens_at ?? null));
@@ -80,6 +81,7 @@ export function TestConfigForm({
       shuffle_options: shuffleO,
       show_review: showReview as TestConfig["show_review"],
       min_questions: Number(minQuestions),
+      test_type: testType,
     };
   }
 
@@ -176,6 +178,18 @@ export function TestConfigForm({
           <Switch checked={shuffleO} onCheckedChange={setShuffleO} disabled={disabled} />
           Shuffle options
         </label>
+      </div>
+
+      <div className="grid max-w-xs gap-2">
+        <Label>Test type</Label>
+        <Select value={testType} onValueChange={(v) => setTestType(v as "formal" | "mock")} disabled={disabled || Boolean(testId)}>
+          <SelectTrigger data-testid="test-type-select"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="formal">Formal (timed, competitive)</SelectItem>
+            <SelectItem value="mock">Mock (practice, schedule optional)</SelectItem>
+          </SelectContent>
+        </Select>
+        {testId && <p className="text-xs text-muted-foreground">Test type is frozen after creation.</p>}
       </div>
 
       <div className="grid max-w-xs gap-2">

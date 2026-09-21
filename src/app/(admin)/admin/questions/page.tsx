@@ -5,24 +5,9 @@ import { setAdminClassAction } from "@/lib/actions/admin-class";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { QuestionsBulkTable } from "./questions-bulk-table";
 
 export const metadata = { title: "Question Bank — MedVerse Admin" };
-
-const statusVariant: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
-  approved: "default",
-  draft: "secondary",
-  review: "outline",
-  needs_revision: "destructive",
-  archived: "outline",
-};
 
 const PAGE_SIZE = 50;
 
@@ -361,76 +346,36 @@ export default async function QuestionsPage({
             </p>
           )}
 
-          <div className="overflow-x-auto rounded-xl border border-border/80 bg-card">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="min-w-[12rem] max-w-md">Question</TableHead>
-                  <TableHead className="hidden sm:table-cell">Subject</TableHead>
-                  <TableHead className="hidden md:table-cell">
-                    Chapter / Topic
-                  </TableHead>
-                  <TableHead>Difficulty</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="hidden lg:table-cell">Ver.</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {(questions ?? []).length === 0 && (
-                  <TableRow>
-                    <TableCell
-                      colSpan={6}
-                      className="text-center text-muted-foreground"
-                    >
-                      No questions match.
-                    </TableCell>
-                  </TableRow>
-                )}
-                {(questions ?? []).map((q) => {
-                  const v = q.question_versions as unknown as {
-                    stem: string;
-                    version_no: number;
-                  } | null;
-                  const subj = q.subjects as unknown as { name: string } | null;
-                  const chap = q.chapters as unknown as { name: string } | null;
-                  const top = q.topics as unknown as { name: string } | null;
-                  return (
-                    <TableRow key={q.id}>
-                      <TableCell className="max-w-md">
-                        <Link
-                          href={`/admin/questions/${q.id}`}
-                          className="line-clamp-2 hover:underline"
-                        >
-                          {v?.stem ?? "(no version)"}
-                        </Link>
-                        {q.used_in_test && (
-                          <span className="text-xs text-muted-foreground">
-                            {" "}
-                            used in test
-                          </span>
-                        )}
-                      </TableCell>
-                      <TableCell className="hidden sm:table-cell">
-                        {subj?.name}
-                      </TableCell>
-                      <TableCell className="hidden text-sm text-muted-foreground md:table-cell">
-                        {chap?.name} / {top?.name}
-                      </TableCell>
-                      <TableCell>{q.difficulty}</TableCell>
-                      <TableCell>
-                        <Badge variant={statusVariant[q.status] ?? "outline"}>
-                          {q.status.replace("_", " ")}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="hidden lg:table-cell">
-                        v{v?.version_no ?? "?"}
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </div>
+          {/* Draft / review indicator — prominent approval queue link */}
+          {!params.status && (() => {
+            const draftCount = (questions ?? []).filter(
+              (q) => q.status === "draft" || q.status === "review"
+            ).length;
+            return draftCount > 0 ? (
+              <Link
+                href={filterLink({ status: "review" })}
+                className="flex items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-4 py-2.5 text-sm font-medium text-amber-800 hover:bg-amber-100 dark:border-amber-600 dark:bg-amber-950/40 dark:text-amber-200"
+              >
+                <Badge variant="outline" className="border-amber-400 text-amber-700 dark:text-amber-300">
+                  {draftCount}
+                </Badge>
+                question{draftCount !== 1 ? "s" : ""} awaiting review/approval — click to filter
+              </Link>
+            ) : null;
+          })()}
+
+          <QuestionsBulkTable
+            questions={(questions ?? []).map((q) => ({
+              id: q.id,
+              status: q.status,
+              difficulty: q.difficulty ?? null,
+              used_in_test: q.used_in_test ?? null,
+              subjects: q.subjects as unknown as { name: string } | null,
+              chapters: q.chapters as unknown as { name: string } | null,
+              topics: q.topics as unknown as { name: string } | null,
+              question_versions: q.question_versions as unknown as { stem: string; version_no: number } | null,
+            }))}
+          />
 
           {totalPages > 1 && (
             <div className="flex items-center justify-between text-sm">

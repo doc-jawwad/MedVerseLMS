@@ -114,3 +114,23 @@ export async function moveQuestionToBin(questionId: string) {
   revalidatePath(`/admin/questions/${questionId}`);
   return result;
 }
+
+export type BulkSoftDeleteResult = {
+  binned: number;
+  blocked_active_test: number;
+  not_found: number;
+  blocked_ids: string[];
+};
+
+/** Bulk soft-delete questions; blocks any referenced by active tests. */
+export async function bulkMoveQuestionsToBin(ids: string[]) {
+  if (!ids.length) return { error: "No questions selected." };
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("bulk_soft_delete_questions", {
+    p_ids: ids,
+  });
+  revalidatePath("/admin/questions");
+  revalidatePath("/admin/bin");
+  if (error) return actionRpcResult("bulkMoveQuestionsToBin", error);
+  return { result: data as BulkSoftDeleteResult };
+}

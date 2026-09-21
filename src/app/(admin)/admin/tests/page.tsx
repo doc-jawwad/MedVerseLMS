@@ -27,32 +27,40 @@ const statusVariant: Record<string, "default" | "secondary" | "destructive" | "o
 export default async function AdminTestsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ year?: string }>;
+  searchParams: Promise<{ year?: string; type?: string }>;
 }) {
   const { supabase } = await requireAdmin();
   const params = await searchParams;
+  const typeFilter = params.type === "mock" ? "mock" : params.type === "formal" ? "formal" : null;
 
   return requireAdminClass({
     searchYear: params.year,
     next: "/admin/tests",
     children: async (year) => {
-      const { data: tests } = await supabase
+      let query = supabase
         .from("tests")
         .select(
-          "id, title, status, opens_at, closes_at, duration_minutes, years(year_number), subjects(name), test_questions(count)"
+          "id, title, status, test_type, opens_at, closes_at, duration_minutes, years(year_number), subjects(name), test_questions(count)"
         )
         .eq("year_id", year.id)
         .order("created_at", { ascending: false });
+      if (typeFilter) query = query.eq("test_type", typeFilter);
+      const { data: tests } = await query;
 
   return (
     <div className="grid gap-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-            Tests
+            {typeFilter === "mock" ? "Mock Tests" : typeFilter === "formal" ? "Formal Tests" : "Tests"}
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
             {yearDisplayName(year)} — publish, schedule, and review assessments.
+            {typeFilter && (
+              <Link href="/admin/tests" className="ml-2 text-primary hover:underline text-xs">
+                Show all
+              </Link>
+            )}
           </p>
         </div>
         <Button asChild className="h-9">

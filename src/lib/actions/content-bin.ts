@@ -23,6 +23,7 @@ const ENTITY_TYPES = new Set<string>([
   "ospe_station",
   "question",
   "prof_session_day",
+  "one_liner",
 ]);
 
 function revalidateBinSurfaces() {
@@ -34,6 +35,7 @@ function revalidateBinSurfaces() {
   revalidatePath("/admin/ospe-stations");
   revalidatePath("/admin/questions");
   revalidatePath("/admin/prof-session");
+  revalidatePath("/admin/one-liners");
   revalidatePath("/academic");
   revalidatePath("/materials");
   revalidatePath("/free-resources");

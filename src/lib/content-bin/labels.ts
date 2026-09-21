@@ -6,7 +6,8 @@ export type ContentBinEntityType =
   | "pearl_point"
   | "ospe_station"
   | "question"
-  | "prof_session_day";
+  | "prof_session_day"
+  | "one_liner";
 
 export function contentBinEntityLabel(type: ContentBinEntityType): string {
   switch (type) {
@@ -22,6 +23,8 @@ export function contentBinEntityLabel(type: ContentBinEntityType): string {
       return "MCQ";
     case "prof_session_day":
       return "Prof. Session day";
+    case "one_liner":
+      return "One-liner";
     default:
       return type;
   }

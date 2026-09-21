@@ -82,3 +82,119 @@ export async function getImportReport(batchId: string) {
   revalidatePath("/admin/questions");
   return { rows: rows ?? [] };
 }
+
+// ---------------------------------------------------------------------------
+// Pearl point import
+// ---------------------------------------------------------------------------
+
+export type PearlImportRow = {
+  row_number: number;
+  prompt: string;
+  answer: string;
+  explanation: string;
+  subject: string;
+  chapter: string;
+  topic: string;
+  entitlement: string;
+  sort_order: number;
+  client_errors?: string[];
+};
+
+export async function createPearlImportBatch(
+  yearId: string,
+  filename: string,
+  totalRows: number
+) {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("pearl_import_batches")
+    .insert({ year_id: yearId, filename, total_rows: totalRows })
+    .select("id")
+    .single();
+  if (error) return actionRpcResult("createPearlImportBatch", error);
+  return { id: data.id as string };
+}
+
+export async function importPearlChunk(
+  yearId: string,
+  batchId: string,
+  rows: PearlImportRow[]
+) {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("import_pearl_batch", {
+    p_year_id: yearId,
+    p_batch_id: batchId,
+    p_rows: rows,
+  });
+  if (error) return actionRpcResult("importPearlChunk", error);
+  const result = data as { inserted: number; skipped: number; errors: number };
+  return { result: { inserted: result.inserted, skipped: result.skipped, errors: result.errors } };
+}
+
+export async function getPearlImportReport(batchId: string) {
+  const supabase = await createClient();
+  const { data: rows } = await supabase
+    .from("pearl_import_rows")
+    .select("row_number, outcome, error_message")
+    .eq("batch_id", batchId)
+    .order("row_number");
+  revalidatePath("/admin/pearls/import");
+  revalidatePath("/admin/pearls");
+  return { rows: rows ?? [] };
+}
+
+// ---------------------------------------------------------------------------
+// One-liner import
+// ---------------------------------------------------------------------------
+
+export type OneLinerImportRow = {
+  row_number: number;
+  title: string;
+  body: string;
+  subject: string;
+  status: string;
+  client_errors?: string[];
+};
+
+export async function createOneLinerImportBatch(
+  yearId: string,
+  filename: string,
+  totalRows: number
+) {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("one_liner_import_batches")
+    .insert({ year_id: yearId, filename, total_rows: totalRows })
+    .select("id")
+    .single();
+  if (error) return actionRpcResult("createOneLinerImportBatch", error);
+  return { id: data.id as string };
+}
+
+export async function importOneLinerChunk(
+  yearId: string,
+  batchId: string,
+  rows: OneLinerImportRow[]
+) {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("import_one_liner_batch", {
+    p_year_id: yearId,
+    p_batch_id: batchId,
+    p_rows: rows,
+  });
+  if (error) return actionRpcResult("importOneLinerChunk", error);
+  const result = data as { inserted: number; skipped: number; errors: number };
+  return { result: { inserted: result.inserted, skipped: result.skipped, errors: result.errors } };
+}
+
+export async function getOneLinerImportReport(batchId: string) {
+  const supabase = await createClient();
+  const { data: rows } = await supabase
+    .from("one_liner_import_rows")
+    .select("row_number, outcome, error_message")
+    .eq("batch_id", batchId)
+    .order("row_number");
+  revalidatePath("/admin/one-liners/import");
+  revalidatePath("/admin/one-liners");
+  return { rows: rows ?? [] };
+}
