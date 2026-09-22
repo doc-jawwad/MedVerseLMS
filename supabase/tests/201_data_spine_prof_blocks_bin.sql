@@ -1,6 +1,6 @@
 -- Data Spine: prof session days, block product_key mapping, content bin.
 begin;
-select plan(38);
+select plan(40);
 
 select test_helpers.as_runner();
 select * into temp curriculum from test_helpers.make_curriculum();
@@ -102,18 +102,28 @@ select ok(
 );
 
 ------------------------------------------------------------------
--- Prof Session: admin create / student access
+-- Prof Session: admin create / student access (subject-scoped)
 ------------------------------------------------------------------
+select id into temp t_block1
+  from public.subjects
+  where year_id = (select id from t_year1) and product_key = 'block-1'
+  limit 1;
+select id into temp t_block4
+  from public.subjects
+  where year_id = (select id from t_year2) and product_key = 'block-4'
+  limit 1;
+grant select on t_block1, t_block4 to anon, authenticated;
+
 select test_helpers.as_user((select id from t_main));
 select lives_ok(
   $$select public.admin_create_prof_session_day(
-    (select id from t_year1), 'Day 1', 1
+    (select id from t_block1), 'Day 1', 1
   )$$,
-  'main admin creates prof session day'
+  'main admin creates prof session day under Block 1'
 );
 
 select id into temp t_day from public.prof_session_days
-where year_id = (select id from t_year1) and name = 'Day 1' and deleted_at is null
+where subject_id = (select id from t_block1) and name = 'Day 1' and deleted_at is null
 limit 1;
 
 select is(
@@ -123,6 +133,22 @@ select is(
   'create day scaffolds five fixed slots'
 );
 
+select ok(
+  not exists (
+    select 1 from public.prof_session_day_slots
+    where day_id = (select id from t_day) and slot_key = 'syllabus'
+  ),
+  'day slots no longer include syllabus'
+);
+
+select ok(
+  exists (
+    select 1 from public.prof_session_day_slots
+    where day_id = (select id from t_day) and slot_key = 'los'
+  ),
+  'day slots include los'
+);
+
 select lives_ok(
   $$select public.admin_update_prof_session_day(
     (select id from t_day), 'Day 1 Published', null, 'published'
@@ -130,7 +156,7 @@ select lives_ok(
   'admin publishes prof session day'
 );
 
--- Free student: tree has locked empty prof_session
+-- Free student: tree has locked empty prof_session subjects
 select test_helpers.as_user((select id from t_free));
 select is(
   (select (public.get_academic_tree('resources')->'prof_session'->>'locked')::boolean),
@@ -138,20 +164,25 @@ select is(
   'free student prof_session locked'
 );
 select is(
-  (select jsonb_array_length(public.get_academic_tree('resources')->'prof_session'->'days')),
+  (select jsonb_array_length(public.get_academic_tree('resources')->'prof_session'->'subjects')),
   0,
-  'free student does not see prof session days'
+  'free student does not see prof session subjects'
 );
 
--- Paid student: sees published day
+-- Paid student: sees published day nested under subject
 select test_helpers.as_user((select id from t_paid));
 select ok(
   (select public.get_academic_tree('library')->'prof_session'->>'locked')::boolean = false,
   'paid student prof_session unlocked'
 );
 select ok(
-  (select jsonb_array_length(public.get_academic_tree('library')->'prof_session'->'days')) >= 1,
-  'paid student sees published days'
+  (
+    select coalesce(sum(jsonb_array_length(s->'days')), 0)::int
+    from jsonb_array_elements(
+      public.get_academic_tree('library')->'prof_session'->'subjects'
+    ) s
+  ) >= 1,
+  'paid student sees published days under subjects'
 );
 
 -- Tree returns product blocks only for year 1
@@ -175,14 +206,14 @@ select ok(
 select test_helpers.as_user((select id from t_limited));
 select lives_ok(
   $$select public.admin_create_prof_session_day(
-    (select id from t_year1), 'Day Limited', 2
+    (select id from t_block1), 'Day Limited', 2
   )$$,
-  'limited admin can create day in assigned year'
+  'limited admin can create day in assigned year subject'
 );
 
 select throws_ok(
   $$select public.admin_create_prof_session_day(
-    (select id from t_year2), 'Day Denied', 1
+    (select id from t_block4), 'Day Denied', 1
   )$$,
   'year_scope_denied',
   'limited admin cannot create day outside assigned year'
@@ -220,7 +251,7 @@ with ins as (
 )
 select id into temp t_material from ins;
 
-grant select on t_day, t_folder, t_material to anon, authenticated;
+grant select on t_day, t_folder, t_material, t_block1, t_block4 to anon, authenticated;
 
 select test_helpers.as_user((select id from t_main));
 select lives_ok(
@@ -338,7 +369,10 @@ select test_helpers.as_user((select id from t_paid));
 select ok(
   not exists (
     select 1
-    from jsonb_array_elements(public.get_academic_tree('library')->'prof_session'->'days') d
+    from jsonb_array_elements(
+      public.get_academic_tree('library')->'prof_session'->'subjects'
+    ) s,
+    jsonb_array_elements(s->'days') d
     where d->>'day_id' = (select id::text from t_day)
   ),
   'soft-deleted day hidden from paid student tree'
