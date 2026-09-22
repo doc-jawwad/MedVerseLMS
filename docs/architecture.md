@@ -146,15 +146,27 @@ Each Block (and each Final Year clinical subject) shows these student-facing chr
 
 **Flashcards** is **not** a student block category in this IA (placeholder-only product note remains in §10). Legacy hubs such as Past Papers / combined OSPE may still exist in storage or older RPC payloads; the student tree remaps or omits them from Block category chrome.
 
-### 2c. Prof. Session (separate from Blocks)
+### 2c. Prof. Session (guided course under enrolled class)
 
-**Prof. Session** is a first-class student nav node beside class Blocks — **never** nested under a Block or under a block category.
+**Prof. Session** is a first-class student nav node. Students see **only** Blocks / Final-Year subjects for their **current enrolled class** (`enrollments.year_number`), using the same product_key map as Academic (§2d).
 
-Hierarchy: **Prof. Session → Day N →** Syllabus | Guidelines | One-liners / Pearl Points | Practice MCQs | Test MCQ.
+Hierarchy (frozen):
 
-Primary routes live under `/academic/prof-session/...`. Legacy `/resources/...` and `/library/...` redirect into `/academic`. Formal **Test MCQ** remains the existing exam engine (`/tests`); Prof. Session only links into it.
+**Prof. Session → [enrolled class] → Block / Final-Year subject →**
 
-**Access (frozen):** Free students see Prof. Session in navigation but the **entire** surface is locked (subscription CTA). Do not expose Day contents as accessible free content. Subscribed students enter Prof. Session and see Admin-created Days.
+Block/Subject-level (Prof. Session surface — **not** Academic Block categories):
+
+- Syllabus (PDF)
+- Schedule (PDF and/or structured table stored as materials)
+- Books · Notes · Lectures (YouTube / Google Drive via existing materials)
+- OSPE → Past OSPE (PDF/pictures) · Practice OSPE (existing `/practice/ospe` engine, subject-filtered) · OSPE Lectures
+- **MCQ Bank** → Admin-created **Days** only (no fake Day 1/2/3)
+
+Each Day contains exactly: Guidelines (PDF) · LoS (PDF) · Practice MCQs (CSV/manual, day-scoped question set) · Test MCQs (CSV/manual via exam `tests` linked to the day) · One-Liners (`one_liners` table + optional PDF — **not** Pearl Points).
+
+Primary routes under `/academic/prof-session/...`. Legacy `/resources/...` and `/library/...` redirect into `/academic`.
+
+**Access (frozen):** Free students see Prof. Session in navigation but the **entire** surface is locked (subscription CTA). Do not expose Day or Block Prof. Session contents as free content. Subscribed students enter and see only their enrolled class.
 
 ### 2d. Student academic navigation (frozen)
 
@@ -162,7 +174,7 @@ Shell nav and Academic home show **only the student’s current enrolled class**
 
 ### 3. Notes
 
-**Notes** remains a distinct **storage** `library_type` (not folded into Books or Past Papers). Preserve `material_folders.library_type` / category identity for Notes in admin and DB. Student Block chrome **omits** Notes (§2b).
+**Notes** remains a distinct **storage** `library_type` (not folded into Books or Past Papers). Preserve `material_folders.library_type` / category identity for Notes in admin and DB. Student **Academic** Block chrome **omits** Notes (§2b). Student **Prof. Session** Block/Subject chrome **includes** Notes (`content_surface = 'prof_session'`).
 
 ### 4. Leaderboards (presentation; ranking source unchanged)
 

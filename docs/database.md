@@ -36,7 +36,11 @@ Conventions: every table has `id uuid primary key default gen_random_uuid()`, `t
 
 Departmental subjects (Anatomy, …) remain with `product_key` NULL for Question Bank authoring taxonomy. Controlled insert/map migration does **not** destroy departmental UUIDs.
 
-**Prof. Session days (SHIPPED):** `prof_session_days` (per `year_id`, draft/published, soft-delete) + fixed `prof_session_day_slots` (`syllabus`,`guidelines`,`one_liners`,`practice_mcqs`,`test_mcq`). Free students: locked empty days in `get_academic_tree`. Subscribed: Admin-created published days only.
+**Prof. Session (SHIPPED — subject-scoped IA):** `prof_session_days` belong to a product Block / Final-Year `subjects` row (`subject_id` required for live days; denormalized `year_id` always derived from the subject). Fixed `prof_session_day_slots`: `guidelines`, `los`, `one_liners`, `practice_mcqs`, `test_mcq`. Soft-delete → content Bin.
+
+Block-level Prof. Session materials use `material_folders.content_surface = 'prof_session'` with `library_type` in (`syllabus`,`schedule`,`books`,`notes`,`lectures`,`ospe_past`,`ospe_lectures`,`ospe_material`). Day-scoped Guidelines/LoS folders set `prof_session_day_id` + `day_slot_key`. Practice MCQs: `prof_session_day_practice_questions` (references existing `questions`). Test MCQs: `tests.prof_session_day_id`. One-Liners: `one_liners.prof_session_day_id` (not Pearl Points).
+
+Free students: locked empty Prof. Session in tree. Subscribed: published days + surface folders for enrolled year only.
 
 **Content bin (SHIPPED):** soft-delete columns `deleted_at` / `purge_after` / `deleted_by` on academic content tables; polymorphic bin RPCs; `purge_expired_bin_items` (7-day) + `r2_purge_queue` for deferred R2 object deletion. Do not hard-delete immutable exam attempts, payments, or audit logs when content is purged.
 
@@ -189,7 +193,7 @@ Practice list RPCs return catalog rows with a lock flag; start/fetch RPCs enforc
 
 ## Materials
 
-**material_folders** — `name`, `year_id`, `subject_id null`, `sort_order`, `library_type text check in ('guidelines','ospe_material','ospe_lectures','books','notes','lectures')` (existing folders: guideline-containing → `guidelines`, else `notes`), plus entitlement columns (existing folders backfilled `free`). Folder entitlement is the access policy for every item in the folder. `library_type` is the **student/admin library category**. **Notes remains its own storage `library_type`** (SPEC FREEZE — do not fold Notes into Books). Student Block chrome omits Notes; see [architecture.md](architecture.md) §2b/§3. Delivery `materials.kind` is **not** that category. Future nesting (`parent_id`) and additional category values (e.g. past papers, flashcards placeholder) are implementation/migration concerns after this freeze; Flashcards stays empty/placeholder with no card table.
+**material_folders** — `name`, `year_id`, `subject_id null`, `sort_order`, `library_type` in (`guidelines`,`los`,`ospe_material`,`ospe_lectures`,`ospe_past`,`books`,`notes`,`lectures`,`syllabus`,`schedule`,`past_papers`,`flashcards`), `content_surface` `academic|prof_session` (default `academic`), optional `prof_session_day_id` + `day_slot_key` for day-scoped Guidelines/LoS. Plus entitlement columns. **Notes remains its own storage `library_type`**. Student Academic Block chrome omits Notes; Prof. Session Block chrome includes Notes when `content_surface = 'prof_session'`. Delivery `materials.kind` is **not** that category. Flashcards stays empty/placeholder with no card table.
 
 **materials** — `folder_id`, `title`, `description`, `file_type text`, `kind text check in ('drive','pdf','guideline') default 'drive'`, `status text check in ('draft','published') default 'published'` (existing Drive rows backfilled published), optional `chapter_id` / `topic_id` / `reference_text`, plus kind-specific payload:
 - `drive` — `drive_url` https-only (YouTube or Google Drive / other https). No R2 key / body. Students open via `open_material` (never catalog SELECT of the URL).
