@@ -116,7 +116,10 @@ where s.year_id = y.id
   and s.name = 'Pediatrics'
   and s.product_key is distinct from 'pediatrics';
 
--- Years 1–4: insert Block product subjects (idempotent by product_key).
+-- Years 1–4: upsert Block product subjects.
+-- ON CONFLICT (year_id, name): set product_key + sort_order on any pre-existing
+-- subject that already carries the same name but no product_key (production
+-- data migration case). Missing blocks are inserted fresh. Fully idempotent.
 -- entitlement stays default 'free' (protect_resource_entitlement); chrome
 -- navigation is open — item open remains RPC-gated.
 insert into public.subjects (year_id, name, sort_order, product_key)
@@ -138,12 +141,11 @@ join (
     (4, 'Block 12', 3, 'block-12')
 ) as v(year_number, name, sort_order, product_key)
   on v.year_number = y.year_number
-where not exists (
-  select 1
-  from public.subjects s
-  where s.year_id = y.id
-    and s.product_key = v.product_key
-);
+on conflict (year_id, name) do update
+  set product_key  = excluded.product_key,
+      sort_order   = excluded.sort_order,
+      updated_at   = now()
+  where public.subjects.product_key is distinct from excluded.product_key;
 
 -- ###########################################################################
 -- PART B — Prof Session Days (chrome only; content engines link later)
