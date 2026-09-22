@@ -59,7 +59,8 @@ export function PracticeSessionChrome({
             <h1 className="font-heading text-xl font-semibold tracking-tight text-[var(--student-ink)] sm:text-2xl">
               {title}
             </h1>
-            <p className="mt-0.5 text-sm text-muted-foreground">{positionLabel}</p>
+            <div className="brand-rule mt-2" aria-hidden />
+            <p className="mt-1.5 text-sm text-muted-foreground">{positionLabel}</p>
           </div>
           <PracticeTimer elapsedMs={elapsedMs} />
         </div>

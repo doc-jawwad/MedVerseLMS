@@ -111,7 +111,7 @@ export default async function AdminApplicationsPage({
 
       {error && <p className="text-sm text-destructive">Could not load this page. Please try again.</p>}
 
-      <div className="overflow-x-auto rounded-md border">
+      <div className="overflow-x-auto rounded-xl border border-border/80 bg-card">
         <Table>
           <TableHeader>
             <TableRow>

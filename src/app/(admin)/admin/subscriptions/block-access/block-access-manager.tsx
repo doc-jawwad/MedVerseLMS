@@ -35,7 +35,7 @@ export function BlockAccessManager({ subjects }: { subjects: SubjectRow[] }) {
   }
 
   return (
-    <div className="overflow-x-auto rounded-md border">
+    <div className="overflow-x-auto rounded-xl border border-border/80 bg-card">
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b text-left">

@@ -72,9 +72,13 @@ test.describe("Free student navigation", () => {
     await expect(page.getByRole("heading", { name: "Academic" })).toBeVisible({
       timeout: 15000,
     });
-    // Academic home lists Blocks for enrolled class only — not five year cards.
-    await expect(page.getByRole("link", { name: "1st Year MBBS" })).toHaveCount(0);
-    await expect(page.getByRole("link", { name: "Final Year MBBS" })).toHaveCount(0);
+    // Main lists Blocks for enrolled class — not a grid of all five year cards.
+    // Sidebar may still show the enrolled year name as a nav link.
+    const main = page.locator("main");
+    await expect(main.getByRole("link", { name: /Year MBBS|Final Year MBBS/ })).toHaveCount(0);
+    await expect(
+      main.getByRole("link", { name: /^(Block \d+|Medicine|Surgery|Gynecology|Pediatrics)$/ }).first()
+    ).toBeVisible();
 
     await page.goto("/academic/year/5");
     await page.waitForURL(/\/academic\/?$/, { timeout: 15000 });

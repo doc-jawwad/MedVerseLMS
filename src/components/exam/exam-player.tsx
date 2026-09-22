@@ -424,7 +424,7 @@ export function ExamPlayer({
           ref={scrollerRef}
           className="min-h-0 flex-1 overflow-y-auto px-4 py-4 lg:pr-6"
         >
-          <Card className="shadow-none">
+          <Card className="surface-card border-border/80 shadow-none">
             <CardContent className="grid gap-4 pt-6">
               <p className="whitespace-pre-wrap text-[15px] leading-relaxed text-[var(--student-ink)] sm:text-base">
                 <span className="mr-2 font-semibold">{index + 1}.</span>

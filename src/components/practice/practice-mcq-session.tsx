@@ -273,7 +273,7 @@ export function PracticeMcqSession({
           Nothing matches this filter. Try All or Remaining, or reset Done items.
         </div>
       ) : (
-        <article className="grid gap-4 rounded-3xl border border-[var(--student-ink)]/10 bg-card p-4 sm:p-6">
+        <article className="surface-card grid gap-4 rounded-3xl border border-border/80 p-4 shadow-none sm:p-6">
           <div className="flex flex-wrap items-center gap-2 text-xs">
             <span className="rounded-full bg-[var(--student-ink)]/8 px-2.5 py-1 font-semibold tracking-wide text-[var(--student-ink)]/70 uppercase">
               {currentContent.difficulty}
@@ -301,9 +301,9 @@ export function PracticeMcqSession({
                   onClick={() => setSelected(o.key)}
                   className={`rounded-2xl border p-3.5 text-left text-sm transition-colors ${
                     isCorrect
-                      ? "border-emerald-600 bg-emerald-50"
+                      ? "border-emerald-600 bg-emerald-50 dark:border-emerald-500 dark:bg-emerald-950 dark:text-emerald-100"
                       : isWrongPick
-                        ? "border-red-500 bg-red-50"
+                        ? "border-red-500 bg-red-50 dark:border-red-500 dark:bg-red-950 dark:text-red-100"
                         : isSelected
                           ? "border-[var(--brand-teal)] bg-[var(--brand-teal)]/10"
                           : "border-[var(--student-ink)]/12 hover:bg-[var(--student-ink)]/[0.03]"
@@ -322,8 +322,8 @@ export function PracticeMcqSession({
             <div
               className={`rounded-2xl p-4 text-sm ${
                 feedback.isCorrect
-                  ? "bg-emerald-50 text-emerald-950"
-                  : "bg-red-50 text-red-950"
+                  ? "bg-emerald-50 text-emerald-950 dark:bg-emerald-950 dark:text-emerald-100"
+                  : "bg-red-50 text-red-950 dark:bg-red-950 dark:text-red-100"
               }`}
             >
               <p className="font-semibold">

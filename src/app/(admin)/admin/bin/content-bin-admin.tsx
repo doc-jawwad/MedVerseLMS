@@ -57,7 +57,7 @@ export function ContentBinAdmin({
           {items.map((item) => (
             <li
               key={`${item.entity_type}:${item.entity_id}`}
-              className="flex flex-wrap items-start justify-between gap-3 rounded-xl border bg-card p-4"
+              className="flex flex-wrap items-start justify-between gap-3 rounded-xl border border-border/80 surface-card p-4 shadow-none transition-colors hover:border-[var(--brand-teal)]/35"
             >
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
