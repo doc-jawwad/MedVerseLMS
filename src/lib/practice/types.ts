@@ -40,7 +40,24 @@ export type PracticeSessionReport = {
   accuracyPercent: number;
 };
 
-export type PracticeScopeType = "subject" | "book" | "chapter" | "topic";
+export type PracticeScopeType =
+  | "subject"
+  | "book"
+  | "chapter"
+  | "topic"
+  | "prof_session_day";
+
+export const PRACTICE_SCOPE_TYPES = [
+  "subject",
+  "book",
+  "chapter",
+  "topic",
+  "prof_session_day",
+] as const satisfies readonly PracticeScopeType[];
+
+export function isPracticeScopeType(value: string): value is PracticeScopeType {
+  return (PRACTICE_SCOPE_TYPES as readonly string[]).includes(value);
+}
 
 export type PracticeScope = {
   type: PracticeScopeType;

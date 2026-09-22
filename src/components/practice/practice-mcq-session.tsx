@@ -16,6 +16,7 @@ import type {
   PracticeAnswerFeedback,
   PracticeMcqContent,
 } from "@/lib/practice/content";
+import { practiceBatchAccessMessage } from "@/lib/practice/scope";
 import type { PracticeScope } from "@/lib/practice/types";
 
 const BATCH_SIZE = 50;
@@ -100,11 +101,7 @@ export function PracticeMcqSession({
       });
       setLoading(false);
       if (rpcError) {
-        setError(
-          rpcError.message.includes("practice_access_denied")
-            ? "You don't have practice access for this subject. Ask your admin."
-            : "Could not load practice questions. Please try again."
-        );
+        setError(practiceBatchAccessMessage(rpcError.message));
         return;
       }
       const rows = ((data ?? []) as RpcQuestion[]).map(toContent);
@@ -117,22 +114,33 @@ export function PracticeMcqSession({
       }
       setContents(unique);
 
-      if (scope.type === "subject") {
-        setSubjectIds([scope.id]);
-      } else if (unique[0]) {
+      let resolvedSubjectId: string | null =
+        scope.type === "subject" ? scope.id : null;
+
+      if (!resolvedSubjectId && unique[0]) {
         const { data: q } = await supabase
           .from("questions")
           .select("subject_id")
           .eq("id", unique[0].itemId)
           .maybeSingle();
-        if (q?.subject_id) setSubjectIds([q.subject_id as string]);
+        if (q?.subject_id) resolvedSubjectId = q.subject_id as string;
       }
 
-      const sid =
-        scope.type === "subject"
-          ? scope.id
-          : null;
-      sessionIdRef.current = await startPracticeSessionRpc(supabase, sid);
+      if (!resolvedSubjectId && scope.type === "prof_session_day") {
+        const { data: day } = await supabase
+          .from("prof_session_days")
+          .select("subject_id")
+          .eq("id", scope.id)
+          .maybeSingle();
+        if (day?.subject_id) resolvedSubjectId = day.subject_id as string;
+      }
+
+      if (resolvedSubjectId) setSubjectIds([resolvedSubjectId]);
+
+      sessionIdRef.current = await startPracticeSessionRpc(
+        supabase,
+        resolvedSubjectId
+      );
     })();
   }, [supabase, scope.type, scope.id]);
 

@@ -6,20 +6,26 @@ export function AdminLibraryTypeTabs({
   basePath,
   active,
   extraParams,
+  extras,
 }: {
   basePath: string;
   active: string;
   extraParams?: string;
+  extras?: { slug: string; label: string }[];
 }) {
   const suffix = extraParams ? `&${extraParams}` : "";
+  const tabs = [
+    ...LIBRARY_LIST.map((t) => ({ slug: t.slug, label: t.label })),
+    ...(extras ?? []),
+  ];
   return (
     <div className="flex flex-wrap gap-2">
-      {LIBRARY_LIST.map((t) => {
+      {tabs.map((t) => {
         const href = `${basePath}?type=${t.slug}${suffix}`;
         const on = active === t.slug;
         return (
           <Link
-            key={t.id}
+            key={t.slug}
             href={href}
             className={cn(
               "rounded-full border px-3 py-1 text-sm",

@@ -4,12 +4,43 @@ import { requireAdminClass } from "@/lib/admin/require-admin-class";
 import { AdminLibraryTypeTabs } from "@/components/admin/library-type-tabs";
 import {
   LIBRARY_LIST,
+  LIBRARY_META,
+  isFolderLibraryType,
   parseLibrarySlug,
   yearDisplayName,
   type FolderLibraryType,
 } from "@/lib/library/types";
 
 export const metadata = { title: "Full library — MedVerse Admin" };
+
+function resolveMaterialsLibraryType(typeParam?: string): {
+  libraryType: FolderLibraryType;
+  activeSlug: string;
+} {
+  if (!typeParam) {
+    return { libraryType: "notes", activeSlug: "notes" };
+  }
+  const asFolder = typeParam.replace(/-/g, "_");
+  if (isFolderLibraryType(asFolder)) {
+    return {
+      libraryType: asFolder,
+      activeSlug: typeParam,
+    };
+  }
+  const parsed = parseLibrarySlug(typeParam);
+  const folderType =
+    parsed && LIBRARY_META[parsed].folderType
+      ? LIBRARY_META[parsed].folderType
+      : null;
+  if (folderType) {
+    return {
+      libraryType: folderType,
+      activeSlug:
+        LIBRARY_LIST.find((t) => t.id === parsed)?.slug ?? typeParam,
+    };
+  }
+  return { libraryType: "notes", activeSlug: "notes" };
+}
 
 export default async function AdminMaterialsPage({
   searchParams,
@@ -18,11 +49,7 @@ export default async function AdminMaterialsPage({
 }) {
   const { supabase } = await requireAdmin();
   const params = await searchParams;
-  const parsed = params.type ? parseLibrarySlug(params.type) : "notes";
-  const libraryType: FolderLibraryType =
-    parsed && LIBRARY_LIST.find((t) => t.id === parsed)?.folderType
-      ? (parsed as FolderLibraryType)
-      : "notes";
+  const { libraryType, activeSlug } = resolveMaterialsLibraryType(params.type);
 
   const [{ data: years }, { data: subjects }, { data: folders }, { data: materials }] =
     await Promise.all([
@@ -61,9 +88,12 @@ export default async function AdminMaterialsPage({
         </div>
         <AdminLibraryTypeTabs
           basePath="/admin/materials"
-          active={
-            LIBRARY_LIST.find((t) => t.id === libraryType)?.slug ?? "notes"
-          }
+          active={activeSlug}
+          extras={[
+            { slug: "los", label: "LoS" },
+            { slug: "syllabus", label: "Syllabus" },
+            { slug: "schedule", label: "Schedule" },
+          ]}
         />
         <MaterialsAdmin
           years={years ?? []}

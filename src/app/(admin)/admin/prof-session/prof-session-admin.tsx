@@ -220,6 +220,11 @@ export function ProfSessionAdmin({
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
+                <Button asChild type="button" size="sm" variant="secondary">
+                  <Link href={`/admin/prof-session/${day.id}`}>
+                    Manage day content
+                  </Link>
+                </Button>
                 <Button
                   type="button"
                   size="sm"

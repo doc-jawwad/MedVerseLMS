@@ -98,19 +98,12 @@ export async function McqBankPage({
               {ids.length} practice question{ids.length === 1 ? "" : "s"} linked
               to this day.
             </p>
-            {subjectId ? (
-              <Link
-                href={`/practice/${subjectId}`}
-                className="inline-flex w-fit text-sm font-medium text-[var(--brand-teal-ink)] underline-offset-4 hover:underline"
-              >
-                Open practice for this subject
-              </Link>
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                Practice engine opens from the subject practice bank once
-                available.
-              </p>
-            )}
+            <Link
+              href={`/practice/session?scope=prof_session_day&id=${encodeURIComponent(profSessionDayId)}&name=${encodeURIComponent(pageTitle)}`}
+              className="inline-flex w-fit text-sm font-medium text-[var(--brand-teal-ink)] underline-offset-4 hover:underline"
+            >
+              Start day practice
+            </Link>
           </div>
         )}
       </StudentPage>

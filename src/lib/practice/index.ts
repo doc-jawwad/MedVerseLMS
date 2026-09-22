@@ -11,6 +11,16 @@ export type {
   PracticeSessionStats,
 } from "./types.ts";
 
+export {
+  PRACTICE_SCOPE_TYPES,
+  isPracticeScopeType,
+} from "./types.ts";
+
+export {
+  parsePracticeScopeParam,
+  practiceBatchAccessMessage,
+} from "./scope.ts";
+
 export type { PracticeProgressStore } from "./progress-store.ts";
 export { progressKey } from "./progress-store.ts";
 export { createMemoryProgressStore } from "./memory-progress-store.ts";

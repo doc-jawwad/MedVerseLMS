@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import { requireStudent } from "@/lib/auth/require-user";
 import { PracticeMcqSession } from "@/components/practice/practice-mcq-session";
-import type { PracticeScopeType } from "@/lib/practice/types";
+import { parsePracticeScopeParam } from "@/lib/practice/scope";
 
 export const metadata = { title: "Practice session — MedVerse LMS" };
 
@@ -12,8 +12,9 @@ export default async function PracticeSessionPage({
 }) {
   const { userId } = await requireStudent();
   const { scope, id, name } = await searchParams;
+  const scopeType = parsePracticeScopeParam(scope);
 
-  if (!scope || !id || !["subject", "book", "chapter", "topic"].includes(scope)) {
+  if (!scopeType || !id) {
     return <p className="text-muted-foreground">Invalid practice scope.</p>;
   }
 
@@ -22,7 +23,7 @@ export default async function PracticeSessionPage({
       <PracticeMcqSession
         studentId={userId}
         scope={{
-          type: scope as PracticeScopeType,
+          type: scopeType,
           id,
           title: name ?? "Practice",
         }}
