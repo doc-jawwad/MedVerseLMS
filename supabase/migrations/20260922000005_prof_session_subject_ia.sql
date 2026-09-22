@@ -219,18 +219,11 @@ comment on column public.prof_session_days.subject_id is
   'Product Block / Final-Year subject. Required for live days. year_id is derived from subject.';
 
 -- ---------------------------------------------------------------------------
--- 3. Day slots: drop syllabus, add los, tighten CHECK
+-- 3. Day slots: drop syllabus, tighten CHECK, then add los
+-- (CHECK must allow 'los' before insert — order matters on live DBs.)
 -- ---------------------------------------------------------------------------
 
 delete from public.prof_session_day_slots where slot_key = 'syllabus';
-
-insert into public.prof_session_day_slots (day_id, slot_key)
-select d.id, 'los'
-from public.prof_session_days d
-where not exists (
-  select 1 from public.prof_session_day_slots s
-  where s.day_id = d.id and s.slot_key = 'los'
-);
 
 alter table public.prof_session_day_slots
   drop constraint if exists prof_session_day_slots_slot_key_check;
@@ -240,6 +233,14 @@ alter table public.prof_session_day_slots
   check (slot_key in (
     'guidelines', 'los', 'one_liners', 'practice_mcqs', 'test_mcq'
   ));
+
+insert into public.prof_session_day_slots (day_id, slot_key)
+select d.id, 'los'
+from public.prof_session_days d
+where not exists (
+  select 1 from public.prof_session_day_slots s
+  where s.day_id = d.id and s.slot_key = 'los'
+);
 
 comment on table public.prof_session_day_slots is
   'Fixed Prof. Session day chrome: guidelines, los, one_liners, practice_mcqs, test_mcq.';
