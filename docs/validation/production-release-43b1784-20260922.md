@@ -163,5 +163,85 @@ The following require admin/student login credentials which cannot be entered by
 
 ---
 
+## Authenticated Smoke Test — 2026-09-22 (Partial Automated / Partial Operator Required)
+
+**Test date:** 2026-09-22  
+**Method:** Claude Code automated browser (Chrome extension) + SSH DB verification  
+**Authentication:** Browser-saved credentials were stale (auth rejected "Invalid email or password."). Authenticated UI walkthrough could not be completed automatically.
+
+### Security & Route Guards — AUTOMATED PASS
+
+| Check | Result |
+|-------|--------|
+| `/admin` unauthenticated | 307 → `/login?next=%2Fadmin` ✓ |
+| `/admin/students` unauthenticated | 307 → `/login?next=%2Fadmin%2Fstudents` ✓ |
+| `/admin/questions` unauthenticated | 307 → login ✓ |
+| `/admin/mock-tests` unauthenticated | 307 → login ✓ |
+| `/admin/one-liners` unauthenticated | 307 → login ✓ |
+| `/admin/prof-session` unauthenticated | 307 → login ✓ |
+| `/admin/content-bin` unauthenticated | 307 → login ✓ |
+| `/dashboard` unauthenticated | 307 → login ✓ |
+| `/library` unauthenticated | 307 → login ✓ |
+| `/resources` unauthenticated | 307 → login ✓ |
+| `/profile` unauthenticated | 307 → login ✓ |
+| `/api/r2/study-content/*` unauthenticated | 307 → login ✓ |
+| PostgREST port 3001 external | Not exposed (connection refused) ✓ |
+| `/rest/v1/profiles` (no JWT) | 401 permission denied ✓ |
+| `/rest/v1/tests` (no JWT) | 401 permission denied ✓ |
+| `/rest/v1/one_liners` (no JWT) | 200 `[]` — intentional (anon SELECT + RLS returns 0 rows, documented in migration 20260922000004) ✓ |
+| Auth error handling | "Invalid email or password." shown correctly ✓ |
+
+### Public Pages — AUTOMATED PASS
+
+| Page | HTTP | Console Errors |
+|------|------|----------------|
+| `/` | 200 | None ✓ |
+| `/register` | 200 | None ✓ |
+| `/forgot-password` | 200 | None ✓ |
+| `/login` | 200 | None ✓ |
+| `/api/health` | 200 `{"ok":true,"service":"medverse-lms"}` | — ✓ |
+
+### DB Feature Verification — AUTOMATED PASS (see Phase 6 sign-off above)
+
+All 17 RPCs, all new tables, RLS policies, Block subjects, subscription plan year backfill, pg_cron job — all verified via SSH DB queries.
+
+### Items Requiring Operator Manual Verification
+
+Browser-saved credentials were stale. The following require a valid authenticated session:
+
+**Admin walkthrough (operator must verify):**
+- [ ] Admin login succeeds, dashboard loads without errors
+- [ ] Students list renders (pagination, search)
+- [ ] Admin permissions page
+- [ ] Subscription plans: year_id field shows, block access toggles
+- [ ] Subscription applications list
+- [ ] Question Bank: question list, create/edit, CSV import
+- [ ] Mock Tests: create mock test, verify SectionLock shows for free students
+- [ ] One-Liners: create, publish, CSV import (Pearl import)
+- [ ] OSPE stations admin
+- [ ] Prof Session: create day, add slots, publish
+- [ ] Content Bin: soft-delete, restore, purge actions
+- [ ] Search returns results
+- [ ] Dark/light theme toggle works
+
+**Student walkthrough (operator must verify):**
+- [ ] Student login succeeds, dashboard loads
+- [ ] Session persists on refresh
+- [ ] Academic tree renders: free blocks visible, locked blocks show lock state
+- [ ] Free block content accessible, locked block content blocked (server-side 307)
+- [ ] Subscription flow visible
+- [ ] Prof Session shows locked for free student
+- [ ] Mock Tests: show locked with SectionLock for free student
+- [ ] Formal tests: accessible per entitlement
+- [ ] OSPE practice stations
+- [ ] Question practice mode
+- [ ] One-Liners: published items visible to enrolled student
+- [ ] Search returns results
+- [ ] Profile page renders
+- [ ] Dark mode toggle works
+- [ ] MCQ readability acceptable
+
+---
+
 *Append-only. Do not modify after signing.*  
 *Staging phase sign-offs do NOT authorize production deployment.*
