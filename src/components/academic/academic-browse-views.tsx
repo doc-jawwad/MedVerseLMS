@@ -15,7 +15,11 @@ import {
   BLOCK_PRODUCT_DEFS,
   CLASS_DISPLAY_BY_YEAR_NUMBER,
   OSPE_GROUP_CATEGORY_IDS,
+  OSPE_PRACTICE_HREF,
+  PROF_SESSION_CHROME_GROUPS,
   PROF_SESSION_LABEL,
+  PROF_SESSION_MCQ_BANK_SLUG,
+  PROF_SESSION_OSPE_GROUP_CATEGORY_IDS,
   TEST_DAY_SLOTS,
   ACADEMIC_BASE_PATH,
   blockHref,
@@ -24,13 +28,18 @@ import {
   categorySlugFromId,
   dayHref,
   daySlotHref,
+  findProfSessionCategoryById,
+  profSessionCategoryHref,
   profSessionHref,
+  profSessionSubjectHref,
+  type AcademicProfSessionSubject,
   type AcademicTree,
   type AcademicTreeFolder,
   type AcademicTreeSubject,
 } from "@/lib/academic-tree";
 
 const OSPE_IDS = new Set<string>(OSPE_GROUP_CATEGORY_IDS);
+const PS_OSPE_IDS = new Set<string>(PROF_SESSION_OSPE_GROUP_CATEGORY_IDS);
 
 function TreeLinkCard({
   href,
@@ -234,26 +243,188 @@ export function ProfSessionHomeView({ tree }: { tree: AcademicTree }) {
     yearName: tree.year_name,
     profSession: true,
   });
-  const days = tree.prof_session.days;
+  const subjects = tree.prof_session.subjects;
 
   return (
     <StudentPage>
       <AcademicBreadcrumbs crumbs={crumbs} />
       <PageHeader
         title={PROF_SESSION_LABEL}
-        description="Day-based syllabus, guidelines, one-liners, practice, and Test MCQ — separate from Block categories."
+        description={`${tree.year_name} — Blocks and Final-Year subjects with syllabus, schedule, materials, OSPE, and day-scoped MCQ Bank.`}
+      />
+      {subjects.length === 0 ? (
+        <EmptyState
+          title="No Prof. Session subjects yet"
+          description="Subjects appear here for your enrolled class when your academy publishes them."
+        />
+      ) : (
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {subjects.map((subject) => (
+            <TreeLinkCard
+              key={subject.product_key}
+              href={profSessionSubjectHref(subject.product_key)}
+              title={subject.name}
+              description={
+                subject.days.length > 0
+                  ? `${subject.days.length} published day${subject.days.length === 1 ? "" : "s"}`
+                  : "No published days yet"
+              }
+            />
+          ))}
+        </div>
+      )}
+    </StudentPage>
+  );
+}
+
+export function ProfSessionSubjectView({
+  tree,
+  subject,
+}: {
+  tree: AcademicTree;
+  subject: AcademicProfSessionSubject;
+}) {
+  const crumbs = buildAcademicBreadcrumbs({
+    yearName: tree.year_name,
+    profSession: true,
+    blockName: subject.name,
+    blockSlug: subject.product_key,
+  });
+
+  const flatCategories = subject.categories.filter(
+    (c) => c.id !== "mcq_bank" && !PS_OSPE_IDS.has(c.id)
+  );
+  const ospeGroup = PROF_SESSION_CHROME_GROUPS.find((g) => g.id === "ospe");
+  const mcqBank = findProfSessionCategoryById("mcq_bank");
+
+  return (
+    <StudentPage>
+      <AcademicBreadcrumbs crumbs={crumbs} />
+      <PageHeader
+        title={subject.name}
+        description={`${PROF_SESSION_LABEL} resources for this subject. Day-scoped MCQ Bank is separate from Academic Block practice.`}
+        actions={
+          <Link
+            href={profSessionHref()}
+            className="text-sm text-muted-foreground underline-offset-4 hover:underline"
+          >
+            All subjects
+          </Link>
+        }
+      />
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {flatCategories.map((category) => {
+          const def = findProfSessionCategoryById(category.id);
+          if (!def) return null;
+          return (
+            <TreeLinkCard
+              key={category.id}
+              href={profSessionCategoryHref(subject.product_key, def.slug)}
+              title={category.name}
+              description={def.description}
+            />
+          );
+        })}
+        {mcqBank ? (
+          <TreeLinkCard
+            href={profSessionCategoryHref(
+              subject.product_key,
+              PROF_SESSION_MCQ_BANK_SLUG
+            )}
+            title={mcqBank.name}
+            description={
+              subject.days.length > 0
+                ? `${subject.days.length} day${subject.days.length === 1 ? "" : "s"}`
+                : mcqBank.description
+            }
+          />
+        ) : null}
+      </div>
+      {ospeGroup ? (
+        <section className="mt-8 overflow-hidden rounded-xl border border-border/80 surface-card">
+          <div className="border-b border-border/80 bg-[color-mix(in_srgb,var(--brand-navy)_5%,var(--student-surface))] px-4 py-3.5">
+            <h2 className="font-heading text-lg font-semibold text-[var(--student-ink)]">
+              {ospeGroup.name}
+            </h2>
+            <p className="mt-0.5 text-sm text-muted-foreground">
+              {ospeGroup.description}
+            </p>
+            <div className="brand-rule mt-2.5" aria-hidden />
+          </div>
+          <div className="grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-3">
+            {ospeGroup.children.map((child) => {
+              const href =
+                "href" in child && child.href
+                  ? child.href
+                  : child.categorySlug
+                    ? profSessionCategoryHref(
+                        subject.product_key,
+                        child.categorySlug
+                      )
+                    : OSPE_PRACTICE_HREF;
+              const practiceHref =
+                child.id === "ospe_practice" &&
+                !subject.subject_id.startsWith("product:")
+                  ? `${OSPE_PRACTICE_HREF}?subject=${encodeURIComponent(subject.subject_id)}`
+                  : href;
+              return (
+                <TreeLinkCard
+                  key={child.id}
+                  href={practiceHref}
+                  title={child.name}
+                />
+              );
+            })}
+          </div>
+        </section>
+      ) : null}
+    </StudentPage>
+  );
+}
+
+export function ProfSessionMcqBankView({
+  tree,
+  subject,
+}: {
+  tree: AcademicTree;
+  subject: AcademicProfSessionSubject;
+}) {
+  const crumbs = buildAcademicBreadcrumbs({
+    yearName: tree.year_name,
+    profSession: true,
+    blockName: subject.name,
+    blockSlug: subject.product_key,
+    categoryName: "MCQ Bank",
+    categorySlug: PROF_SESSION_MCQ_BANK_SLUG,
+  });
+  const days = subject.days;
+
+  return (
+    <StudentPage>
+      <AcademicBreadcrumbs crumbs={crumbs} />
+      <PageHeader
+        title="MCQ Bank"
+        description={`Admin-created days for ${subject.name}. Each day has Guidelines, LoS, Practice MCQs, Test MCQs, and One-Liners.`}
+        actions={
+          <Link
+            href={profSessionSubjectHref(subject.product_key)}
+            className="text-sm text-muted-foreground underline-offset-4 hover:underline"
+          >
+            Back to {subject.name}
+          </Link>
+        }
       />
       {days.length === 0 ? (
         <EmptyState
-          title="No Prof. Session days yet"
-          description="Days appear here when your academy publishes them."
+          title="No published days yet"
+          description="Days appear here when your academy creates and publishes them for this subject."
         />
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {days.map((day) => (
             <TreeLinkCard
               key={day.id}
-              href={dayHref(day.slug)}
+              href={dayHref(subject.product_key, day.slug)}
               title={day.name}
             />
           ))}
@@ -265,14 +436,20 @@ export function ProfSessionHomeView({ tree }: { tree: AcademicTree }) {
 
 export function ProfSessionDayView({
   tree,
+  subject,
   day,
 }: {
   tree: AcademicTree;
+  subject: AcademicProfSessionSubject;
   day: AcademicTreeFolder;
 }) {
   const crumbs = buildAcademicBreadcrumbs({
     yearName: tree.year_name,
     profSession: true,
+    blockName: subject.name,
+    blockSlug: subject.product_key,
+    categoryName: "MCQ Bank",
+    categorySlug: PROF_SESSION_MCQ_BANK_SLUG,
     dayName: day.name,
     daySlug: day.slug,
   });
@@ -296,10 +473,13 @@ export function ProfSessionDayView({
       <AcademicBreadcrumbs crumbs={crumbs} />
       <PageHeader
         title={day.name}
-        description={`${PROF_SESSION_LABEL} containers for this day.`}
+        description={`${PROF_SESSION_LABEL} day containers — Guidelines, LoS, practice, tests, and one-liners.`}
         actions={
           <Link
-            href={profSessionHref()}
+            href={profSessionCategoryHref(
+              subject.product_key,
+              PROF_SESSION_MCQ_BANK_SLUG
+            )}
             className="text-sm text-muted-foreground underline-offset-4 hover:underline"
           >
             All days
@@ -310,7 +490,7 @@ export function ProfSessionDayView({
         {slots.map((slot) => (
           <TreeLinkCard
             key={slot.id}
-            href={daySlotHref(day.slug, slot.slug)}
+            href={daySlotHref(subject.product_key, day.slug, slot.slug)}
             title={slot.name}
           />
         ))}

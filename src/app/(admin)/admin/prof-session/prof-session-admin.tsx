@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -22,15 +23,26 @@ export type ProfSessionDayRow = {
   name: string;
   sort_order: number;
   status: "draft" | "published";
+  subject_id: string;
+};
+
+export type ProfSessionSubjectOption = {
+  id: string;
+  name: string;
+  product_key: string;
 };
 
 export function ProfSessionAdmin({
   yearId,
   yearLabel,
+  subjects,
+  selectedSubject,
   days: initialDays,
 }: {
   yearId: string;
   yearLabel: string;
+  subjects: ProfSessionSubjectOption[];
+  selectedSubject: ProfSessionSubjectOption | null;
   days: ProfSessionDayRow[];
 }) {
   const router = useRouter();
@@ -39,7 +51,10 @@ export function ProfSessionAdmin({
   const [pending, startTransition] = useTransition();
 
   const sorted = useMemo(
-    () => [...days].sort((a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name)),
+    () =>
+      [...days].sort(
+        (a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name)
+      ),
     [days]
   );
 
@@ -47,19 +62,54 @@ export function ProfSessionAdmin({
     router.refresh();
   }
 
+  if (!selectedSubject) {
+    return (
+      <div className="grid gap-2">
+        <h1 className="font-heading text-2xl font-semibold text-[var(--student-ink)]">
+          Prof. Session
+        </h1>
+        <p className="text-sm text-muted-foreground">
+          Select a class with product Blocks to manage subject-scoped days.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="grid gap-6">
       <div>
         <p className="text-[11px] font-semibold tracking-[0.16em] text-primary uppercase">
-          {yearLabel}
+          {yearLabel} · {selectedSubject.name}
         </p>
         <h1 className="font-heading text-2xl font-semibold text-[var(--student-ink)]">
           Prof. Session days
         </h1>
         <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-          Admin-created days only. Students see published days when subscribed.
-          Free students see Prof. Session locked. Delete moves a day to the Bin.
+          Days belong to this product subject. Students see published days when
+          subscribed. Slots: Guidelines · LoS · Practice MCQs · Test MCQs ·
+          One-Liners. Materials and one-liners are managed in Library / One-liners
+          with day links.
         </p>
+        <div className="mt-3 flex flex-wrap gap-3 text-sm">
+          <Link
+            href={`/admin/library?year=${yearId}`}
+            className="text-[var(--brand-teal-ink)] underline-offset-4 hover:underline"
+          >
+            Materials
+          </Link>
+          <Link
+            href="/admin/one-liners"
+            className="text-[var(--brand-teal-ink)] underline-offset-4 hover:underline"
+          >
+            One-liners
+          </Link>
+          <Link
+            href="/admin/questions"
+            className="text-[var(--brand-teal-ink)] underline-offset-4 hover:underline"
+          >
+            Questions
+          </Link>
+        </div>
       </div>
 
       <form
@@ -67,7 +117,10 @@ export function ProfSessionAdmin({
         onSubmit={(e) => {
           e.preventDefault();
           startTransition(async () => {
-            const { error, id } = await createProfSessionDay(yearId, name);
+            const { error, id } = await createProfSessionDay(
+              selectedSubject.id,
+              name
+            );
             if (error) {
               toast.error(error);
               return;
@@ -82,6 +135,7 @@ export function ProfSessionAdmin({
                   name: name.trim(),
                   sort_order: prev.length + 1,
                   status: "draft",
+                  subject_id: selectedSubject.id,
                 },
               ]);
             }
@@ -90,7 +144,10 @@ export function ProfSessionAdmin({
         }}
       >
         <div className="grid min-w-[14rem] flex-1 gap-1">
-          <label className="text-xs font-medium text-muted-foreground" htmlFor="day-name">
+          <label
+            className="text-xs font-medium text-muted-foreground"
+            htmlFor="day-name"
+          >
             New day name
           </label>
           <Input
@@ -106,9 +163,17 @@ export function ProfSessionAdmin({
         </Button>
       </form>
 
+      {subjects.length > 1 ? (
+        <p className="text-xs text-muted-foreground">
+          Switch subjects with the links above. Reorder applies within{" "}
+          {selectedSubject.name} only.
+        </p>
+      ) : null}
+
       {sorted.length === 0 ? (
         <p className="text-sm text-muted-foreground">
-          No days yet. Create a day to publish Prof. Session content for this class.
+          No days yet for {selectedSubject.name}. Create a day to publish Prof.
+          Session MCQ Bank content for this subject.
         </p>
       ) : (
         <ul className="grid gap-3">
@@ -144,12 +209,14 @@ export function ProfSessionAdmin({
                       });
                     }}
                   />
-                  <Badge variant={day.status === "published" ? "default" : "outline"}>
+                  <Badge
+                    variant={day.status === "published" ? "default" : "outline"}
+                  >
                     {day.status}
                   </Badge>
                 </div>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Slots: Syllabus · Guidelines · One-liners · Practice MCQs · Test MCQ
+                  Slots: Guidelines · LoS · Practice MCQs · Test MCQs · One-Liners
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
@@ -162,8 +229,14 @@ export function ProfSessionAdmin({
                     startTransition(async () => {
                       const ids = sorted.map((d) => d.id);
                       const next = [...ids];
-                      [next[index - 1], next[index]] = [next[index]!, next[index - 1]!];
-                      const { error } = await reorderProfSessionDays(yearId, next);
+                      [next[index - 1], next[index]] = [
+                        next[index]!,
+                        next[index - 1]!,
+                      ];
+                      const { error } = await reorderProfSessionDays(
+                        selectedSubject.id,
+                        next
+                      );
                       if (error) toast.error(error);
                       else {
                         toast.success("Reordered");
@@ -195,7 +268,9 @@ export function ProfSessionAdmin({
                           )
                         );
                         toast.success(
-                          nextStatus === "published" ? "Published" : "Unpublished"
+                          nextStatus === "published"
+                            ? "Published"
+                            : "Unpublished"
                         );
                         refresh();
                       }
@@ -209,10 +284,10 @@ export function ProfSessionAdmin({
                   description={
                     <>
                       <p>
-                        “{day.name}” will be hidden from students and normal admin
-                        lists. It stays in the Bin until about{" "}
-                        <strong>{purgeDateHint()}</strong>, then can be permanently
-                        purged.
+                        “{day.name}” will be hidden from students and normal
+                        admin lists. It stays in the Bin until about{" "}
+                        <strong>{purgeDateHint()}</strong>, then can be
+                        permanently purged.
                       </p>
                       <p className="mt-2">This is not a permanent delete.</p>
                     </>

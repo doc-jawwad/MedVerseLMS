@@ -30,6 +30,7 @@ type PracticeSubject = {
 export async function McqBankPage({
   mode,
   subjectId,
+  profSessionDayId,
   breadcrumbs,
   title,
   description,
@@ -37,6 +38,8 @@ export async function McqBankPage({
 }: {
   mode: "full" | "free" | "resources";
   subjectId?: string;
+  /** When set, show day-curated practice set (Prof. Session). */
+  profSessionDayId?: string;
   breadcrumbs?: BreadcrumbCrumb[];
   title?: string;
   description?: string;
@@ -51,6 +54,66 @@ export async function McqBankPage({
         title="MCQ Bank"
         description="The full MCQ Bank unlocks with a live subscription. Admin-selected free practice stays under Resources."
       />
+    );
+  }
+
+  if (profSessionDayId) {
+    const { data: dayQuestionIds } = await supabase.rpc(
+      "list_day_practice_question_ids",
+      { p_day_id: profSessionDayId }
+    );
+    const ids = Array.isArray(dayQuestionIds)
+      ? (dayQuestionIds as string[])
+      : [];
+    const pageTitle = title ?? "Practice MCQs";
+    const pageDescription =
+      description ??
+      "Practice MCQs curated for this Prof. Session day.";
+
+    return (
+      <StudentPage>
+        {breadcrumbs ? <AcademicBreadcrumbs crumbs={breadcrumbs} /> : null}
+        <PageHeader
+          title={pageTitle}
+          description={pageDescription}
+          actions={
+            backHref ? (
+              <Link
+                href={backHref}
+                className="text-sm text-muted-foreground underline-offset-4 hover:underline"
+              >
+                Back
+              </Link>
+            ) : undefined
+          }
+        />
+        {ids.length === 0 ? (
+          <EmptyState
+            title="No practice MCQs for this day"
+            description="When your academy links practice questions to this day, they appear here."
+          />
+        ) : (
+          <div className="grid gap-4">
+            <p className="text-sm text-muted-foreground">
+              {ids.length} practice question{ids.length === 1 ? "" : "s"} linked
+              to this day.
+            </p>
+            {subjectId ? (
+              <Link
+                href={`/practice/${subjectId}`}
+                className="inline-flex w-fit text-sm font-medium text-[var(--brand-teal-ink)] underline-offset-4 hover:underline"
+              >
+                Open practice for this subject
+              </Link>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Practice engine opens from the subject practice bank once
+                available.
+              </p>
+            )}
+          </div>
+        )}
+      </StudentPage>
     );
   }
 

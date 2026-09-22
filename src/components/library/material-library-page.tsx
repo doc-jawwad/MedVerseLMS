@@ -19,7 +19,12 @@ import type { BreadcrumbCrumb } from "@/lib/academic-tree";
 import { belongsOnFreeResources } from "@/lib/library/free-surface";
 import { getStudentHasLiveSubscription } from "@/lib/subscriptions/student-live-access";
 import { studentHasPaidLmsSections } from "@/lib/subscriptions/student-section-access";
-import { LIBRARY_META, type FolderLibraryType } from "@/lib/library/types";
+import {
+  LIBRARY_META,
+  folderLibraryLabel,
+  type FolderLibraryType,
+  type StudentLibraryType,
+} from "@/lib/library/types";
 
 type Folder = {
   id: string;
@@ -42,6 +47,9 @@ export async function MaterialLibraryPage({
   libraryType,
   mode,
   subjectId,
+  contentSurface,
+  profSessionDayId,
+  daySlotKey,
   breadcrumbs,
   title,
   description,
@@ -50,13 +58,22 @@ export async function MaterialLibraryPage({
   libraryType: FolderLibraryType;
   mode: "full" | "free" | "resources";
   subjectId?: string;
+  /** academic (default) or prof_session Block chrome. */
+  contentSurface?: "academic" | "prof_session";
+  /** When set, only day-scoped Guidelines/LoS folders. */
+  profSessionDayId?: string;
+  daySlotKey?: "guidelines" | "los";
   breadcrumbs?: BreadcrumbCrumb[];
   title?: string;
   description?: string;
   backHref?: string;
 }) {
   const { supabase, userId } = await requireStudent();
-  const meta = LIBRARY_META[libraryType];
+  const folderMeta = folderLibraryLabel(libraryType);
+  const meta =
+    libraryType in LIBRARY_META
+      ? LIBRARY_META[libraryType as StudentLibraryType]
+      : { label: folderMeta.label, description: folderMeta.description };
   const hasLiveAccess = await getStudentHasLiveSubscription();
 
   if (mode === "full" && !studentHasPaidLmsSections(hasLiveAccess)) {
@@ -68,6 +85,31 @@ export async function MaterialLibraryPage({
     );
   }
 
+  let foldersQuery = supabase
+    .from("material_folders")
+    .select("id, name, subject_id, library_type, entitlement")
+    .eq("library_type", libraryType)
+    .is("deleted_at", null)
+    .order("sort_order")
+    .order("name");
+
+  if (contentSurface) {
+    foldersQuery = foldersQuery.eq("content_surface", contentSurface);
+  } else {
+    foldersQuery = foldersQuery.or(
+      "content_surface.eq.academic,content_surface.is.null"
+    );
+  }
+
+  if (profSessionDayId) {
+    foldersQuery = foldersQuery.eq("prof_session_day_id", profSessionDayId);
+    if (daySlotKey) {
+      foldersQuery = foldersQuery.eq("day_slot_key", daySlotKey);
+    }
+  } else if (contentSurface === "prof_session") {
+    foldersQuery = foldersQuery.is("prof_session_day_id", null);
+  }
+
   const [
     { data: folders },
     { data: materials },
@@ -75,15 +117,11 @@ export async function MaterialLibraryPage({
     { data: accessible },
     { data: grants },
   ] = await Promise.all([
-    supabase
-      .from("material_folders")
-      .select("id, name, subject_id, library_type, entitlement")
-      .eq("library_type", libraryType)
-      .order("sort_order")
-      .order("name"),
+    foldersQuery,
     supabase
       .from("materials")
       .select("id, folder_id, title, description, file_type, kind")
+      .is("deleted_at", null)
       .order("sort_order")
       .order("title"),
     supabase.from("subjects").select("id, name").order("name"),

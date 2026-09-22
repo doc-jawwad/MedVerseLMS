@@ -29,8 +29,8 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import {
+  folderLibraryLabel,
   itemDeliveryModes,
-  LIBRARY_META,
   type FolderLibraryType,
 } from "@/lib/library/types";
 import { OpenMaterialButton } from "@/components/materials/open-material-button";
@@ -80,7 +80,7 @@ export function MaterialsAdmin({
   const yearFolders = folders.filter(
     (f) => f.year_id === yearId && f.library_type === libraryType
   );
-  const meta = LIBRARY_META[libraryType];
+  const meta = folderLibraryLabel(libraryType);
   const modes = itemDeliveryModes(libraryType);
 
   return (

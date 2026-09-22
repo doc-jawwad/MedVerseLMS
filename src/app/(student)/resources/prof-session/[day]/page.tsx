@@ -4,8 +4,6 @@ import { ACADEMIC_BASE_PATH, PROF_SESSION_SLUG } from "@/lib/academic-tree";
 type Props = { params: Promise<{ day: string }> };
 
 export default async function ResourcesProfDayRedirect({ params }: Props) {
-  const { day } = await params;
-  redirect(
-    `${ACADEMIC_BASE_PATH}/${PROF_SESSION_SLUG}/${encodeURIComponent(day)}`
-  );
+  void (await params);
+  redirect(`${ACADEMIC_BASE_PATH}/${PROF_SESSION_SLUG}`);
 }
