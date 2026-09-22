@@ -282,9 +282,11 @@ export default async function DashboardPage() {
 
       <DashboardAlerts alerts={alerts} />
 
-      <Card className="overflow-hidden shadow-none">
-        <CardHeader className="border-b border-border bg-card">
-          <CardTitle className="text-base text-foreground">Incoming tests</CardTitle>
+      <Card className="surface-card overflow-hidden border-border/80 shadow-none">
+        <CardHeader className="border-b border-border/80 bg-[color-mix(in_srgb,var(--brand-navy)_4%,var(--student-surface))]">
+          <CardTitle className="font-heading text-base text-[var(--student-ink)]">
+            Incoming tests
+          </CardTitle>
           <CardDescription>
             Scheduled and currently open tests for your class. History lives under Tests.
           </CardDescription>
@@ -307,7 +309,7 @@ export default async function DashboardPage() {
               return (
                 <div
                   key={t.id}
-                  className="grid gap-2 rounded-xl border p-3"
+                  className="grid gap-2 rounded-xl border border-border/80 bg-card/60 p-3.5"
                 >
                   <div className="flex flex-wrap items-start justify-between gap-2">
                     <p className="font-heading text-lg font-semibold text-[var(--student-ink)]">

@@ -129,6 +129,43 @@ Replaced `INSERT ... WHERE NOT EXISTS (... product_key = v.product_key)` with
 
 ---
 
+## Auth Fix — 2026-09-22 (Post-Deploy Hotfix)
+
+**Applied by:** Claude Code (docjawwadahmad@gmail.com)  
+**Time:** 2026-09-22 09:46–09:49 PKT  
+**Constraint:** Infrastructure env change only — no code deployment, no DB/schema change, no Auth user modification
+
+### Root Cause
+Server-side Next.js auth calls (signIn, requestPasswordReset, signUp, verifyOtp) were failing silently. `makeServerFetch()` in `src/lib/supabase/server.ts` contains logic to rewrite auth URLs from `https://lms.medversepk.com/auth/...` to a direct Supabase URL when `SUPABASE_DIRECT_URL` is set — bypassing the Cloudflare loopback that causes a 522 timeout for VPS-to-VPS traffic. This env var was not set in production, so all server-side auth calls hit `https://lms.medversepk.com/auth/v1/...` → Cloudflare → VPS → Caddy → Supabase Cloud, which fails intermittently with a 522 for Node.js server-side requests.
+
+Evidence: Zero POST `/auth/v1/token` entries in Supabase edge logs (`source = 'edge_logs'`) between deploy time 03:15 UTC and 04:50 UTC. User account `jawwadahmadaimc26@gmail.com` confirmed healthy: exists, email_confirmed_at set, not banned, email+password provider. Password reset emails also silently failed (`requestPasswordReset` swallows non-rate-limit errors per `auth.ts:202`).
+
+### Fix Applied
+- Backed up: `/etc/medverse/nextjs.env` → `/etc/medverse/nextjs.env.bak-20260922-auth-fix` (09:46:39 +0500)
+- Added: `SUPABASE_DIRECT_URL=https://pxoxijlhcvbrostrquft.supabase.co` to `/etc/medverse/nextjs.env` (09:47:21 +0500)
+- Verified: production project ref `pxoxijlhcvbrostrquft` present (count=1), staging ref `vygtwrsshcyfahfzurgq` absent (count=0)
+- All 6 existing env vars preserved unchanged
+- Restarted: `medverse-next.service` (09:48:43 +0500, clean startup, ready in 671ms)
+
+### Post-Fix Verification
+| Check | Result |
+|-------|--------|
+| `medverse-next.service` | active (running), restart at 09:48:43 +0500 ✓ |
+| `medverse-postgrest.service` | active, unchanged ✓ |
+| `caddy.service` | active, unchanged ✓ |
+| Health `GET /api/health` | 200 `{"ok":true,"service":"medverse-lms"}` ✓ |
+| Supabase edge log — POST `/auth/v1/token` (04:50 UTC) | Reached `pxoxijlhcvbrostrquft`, IP 194.233.67.184, 401 Kong no-apikey (expected — no real credentials in test) ✓ |
+| Supabase edge log — POST `/auth/v1/token` (04:52 UTC) | Direct-path curl to `pxoxijlhcvbrostrquft.supabase.co` also reached, same result ✓ |
+| Production DB/schema | No changes — confirmed no migration, no DDL executed ✓ |
+| Code deployment | None — no git pull, no Next.js restart from new code ✓ |
+| Supabase Auth users | None modified — no password reset, no user changes ✓ |
+| `SUPABASE_DIRECT_URL` project ref | `pxoxijlhcvbrostrquft` (production) only — not staging ✓ |
+
+### Pending (Operator)
+Real login with correct credentials for `jawwadahmadaimc26@gmail.com` needed to confirm end-to-end fix. The network path is now: Next.js → `pxoxijlhcvbrostrquft.supabase.co` directly (no Cloudflare loopback). If login still fails, the password itself is incorrect — use the forgot-password flow, which will now also route directly to Supabase and deliver an email.
+
+---
+
 ## Items Requiring Manual Browser Verification by Operator
 
 The following require admin/student login credentials which cannot be entered by the automated deployer:

@@ -124,20 +124,25 @@ Student-facing second level under each class. Product names map onto existing `s
 | 4th Year MBBS | Block 10, Block 11, Block 12 |
 | Final Year MBBS | Medicine, Surgery, Gynecology, Pediatrics |
 
-### 2b. Eight categories under every Block / Final Year subject
+### 2b. Block / Final Year subject chrome categories
 
-Each Block (and each Final Year clinical subject) contains exactly these eight student-facing categories:
+Each Block (and each Final Year clinical subject) shows these student-facing chrome entries:
 
-| Category | Notes |
+| Category / group | Notes |
 |---|---|
 | MCQ Bank | Practice with instant feedback |
 | Pearl Points | High-yield recall (not formal exams) |
 | Guidelines | Study guidelines / protocols |
-| OSPE Material | OSPE PDFs and station packs |
-| OSPE Lectures | OSPE lecture media |
+| **OSPE** (group) | Parent chrome only — children below |
+| → OSPE Material | OSPE PDFs and station packs |
+| → OSPE Lectures | OSPE lecture media |
+| → OSPE Practice | Links to the existing global `/practice/ospe` surface (not a Block-scoped content store) |
 | Books | Reference texts |
-| Notes | Class notes (own category — not folded into Books) |
 | Lectures | Lecture videos / recordings |
+
+**Notes** is **not** shown in student Block chrome. Storage may still use `material_folders.library_type = 'notes'` and admin materials tooling; legacy `/notes` stays unlisted in global nav. Do **not** fold Notes rows into Books.
+
+**OSPE Practice** is **not** a top-level shell nav item; students reach it from the Block OSPE group (or deep link).
 
 **Flashcards** is **not** a student block category in this IA (placeholder-only product note remains in §10). Legacy hubs such as Past Papers / combined OSPE may still exist in storage or older RPC payloads; the student tree remaps or omits them from Block category chrome.
 
@@ -151,13 +156,13 @@ Primary routes live under `/academic/prof-session/...`. Legacy `/resources/...` 
 
 **Access (frozen):** Free students see Prof. Session in navigation but the **entire** surface is locked (subscription CTA). Do not expose Day contents as accessible free content. Subscribed students enter Prof. Session and see Admin-created Days.
 
-### 2d. Free student academic navigation (frozen)
+### 2d. Student academic navigation (frozen)
 
-Free students may navigate **all** Classes/Years and open **all** Blocks / Final-Year subjects. The eight Block categories remain visible. Individual content remains governed by its own entitlement. Do **not** use Resources = free tree / Library = full tree as the primary student navigation model — one academic hierarchy (`/academic`) for everyone.
+Shell nav and Academic home show **only the student’s current enrolled class** (`enrollments.year_number`) and that class’s Blocks / Final-Year subjects. Free students may **change class** (§6); after a class change, chrome and Academic home show the new class’s blocks only. Subscribed students remain locked to their subscription year (§6). Deep links to another year’s academic routes redirect to the enrolled year’s academic home. Individual content remains governed by its own entitlement. Do **not** use Resources = free tree / Library = full tree as the primary student navigation model — one academic hierarchy (`/academic`) for everyone.
 
 ### 3. Notes
 
-**Notes** remains its **own** library category (not folded into Books or Past Papers). Preserve `material_folders.library_type` / category identity for Notes.
+**Notes** remains a distinct **storage** `library_type` (not folded into Books or Past Papers). Preserve `material_folders.library_type` / category identity for Notes in admin and DB. Student Block chrome **omits** Notes (§2b).
 
 ### 4. Leaderboards (presentation; ranking source unchanged)
 

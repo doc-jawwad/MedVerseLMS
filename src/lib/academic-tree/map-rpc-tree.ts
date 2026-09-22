@@ -62,7 +62,7 @@ export function mapRpcTree(
           ...existing,
           // Prefer canonical product display name from product_key defs.
           name: def.name,
-          categories: ensureEightCategories(existing.categories),
+          categories: ensureChromeCategories(existing.categories),
         };
       }
       return {
@@ -70,7 +70,7 @@ export function mapRpcTree(
         product_key: def.key,
         name: def.name,
         locked: libraryLocked,
-        categories: emptyEightCategories(libraryLocked),
+        categories: emptyChromeCategories(libraryLocked),
       };
     }
   );
@@ -172,7 +172,7 @@ function mapRpcProfDay(raw: unknown): AcademicTreeFolder | null {
   };
 }
 
-function emptyEightCategories(locked: boolean): AcademicTreeCategory[] {
+function emptyChromeCategories(locked: boolean): AcademicTreeCategory[] {
   return BLOCK_CATEGORIES.map((cat) => ({
     id: cat.id,
     name: cat.name,
@@ -182,7 +182,8 @@ function emptyEightCategories(locked: boolean): AcademicTreeCategory[] {
   }));
 }
 
-function ensureEightCategories(
+/** Keep only student Block chrome categories (Notes omitted). */
+function ensureChromeCategories(
   categories: AcademicTreeCategory[]
 ): AcademicTreeCategory[] {
   const byId = new Map(categories.map((c) => [c.id, c]));

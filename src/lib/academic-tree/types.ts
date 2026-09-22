@@ -25,7 +25,10 @@ export type BlockProductKey =
   | "gynecology"
   | "pediatrics";
 
-/** Eight academic categories under each Block / Final-Year subject. */
+/**
+ * Block category ids. Student chrome omits `notes` (storage/deep-link only).
+ * See BLOCK_CATEGORIES / NOTES_CATEGORY in product-structure.
+ */
 export type BlockCategoryId =
   | "mcq_bank"
   | "pearl_points"

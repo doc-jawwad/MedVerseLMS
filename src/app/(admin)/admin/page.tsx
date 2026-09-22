@@ -73,7 +73,15 @@ export default async function AdminOverviewPage() {
 
   return (
     <div className="grid gap-6">
-      <h1 className="text-2xl font-semibold">Overview</h1>
+      <div>
+        <p className="mb-1.5 text-[11px] font-semibold tracking-[0.16em] text-[var(--brand-teal-ink)] uppercase">
+          Admin
+        </p>
+        <h1 className="font-heading text-2xl font-semibold tracking-tight text-[var(--student-ink)] sm:text-[1.85rem]">
+          Overview
+        </h1>
+        <div className="brand-rule mt-2.5" aria-hidden />
+      </div>
       <InstallMedverseApp variant="card" />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -125,9 +133,11 @@ export default async function AdminOverviewPage() {
         />
       </div>
 
-      <Card>
+      <Card className="surface-card border-border/80 shadow-none">
         <CardHeader>
-          <CardTitle className="text-base">Most missed questions</CardTitle>
+          <CardTitle className="font-heading text-base text-[var(--student-ink)]">
+            Most missed questions
+          </CardTitle>
           <CardDescription>
             Lowest correctness across tests and practice (minimum 3 attempts)
           </CardDescription>
@@ -143,7 +153,7 @@ export default async function AdminOverviewPage() {
               <Link
                 key={q.question_id}
                 href={`/admin/questions/${q.question_id}`}
-                className="flex items-center justify-between gap-2 rounded-md border p-2 text-sm transition-colors hover:bg-accent/50"
+                className="flex items-center justify-between gap-2 rounded-lg border border-border/80 p-2.5 text-sm transition-colors hover:bg-accent/50"
               >
                 <span className="truncate">{q.stem}</span>
                 <span className="shrink-0 text-muted-foreground">
@@ -170,12 +180,21 @@ function Tile({
   small?: boolean;
 }) {
   return (
-    <Card className="transition-colors hover:bg-accent/40">
-      <CardHeader>
-        <CardTitle className={small ? "truncate text-lg" : "text-3xl"}>
+    <Card className="surface-card h-full gap-0 border-border/80 py-0 shadow-none transition-colors hover:border-[var(--brand-teal)]/35">
+      <CardHeader className="gap-2 px-4 py-4">
+        <CardDescription className="text-[11px] font-semibold tracking-[0.14em] uppercase">
+          {label}
+        </CardDescription>
+        <div className="brand-rule" aria-hidden />
+        <CardTitle
+          className={
+            small
+              ? "truncate font-heading text-lg text-[var(--student-ink)]"
+              : "metric-value font-heading text-3xl text-[var(--student-ink)]"
+          }
+        >
           {value}
         </CardTitle>
-        <CardDescription>{label}</CardDescription>
       </CardHeader>
     </Card>
   );

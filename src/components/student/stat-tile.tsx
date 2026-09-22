@@ -1,6 +1,6 @@
-import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { cn } from "@/lib/utils";
+import { MetricCard } from "@/components/student/metric-card";
 
+/** @deprecated Prefer MetricCard — kept as a thin alias for existing call sites. */
 export function StatTile({
   label,
   value,
@@ -13,16 +13,6 @@ export function StatTile({
   className?: string;
 }) {
   return (
-    <Card className={cn("shadow-none", className)}>
-      <CardHeader className="gap-1 pb-1">
-        <CardDescription className="text-[11px] font-medium tracking-wide uppercase">
-          {label}
-        </CardDescription>
-        <CardTitle className="font-heading text-2xl font-semibold tracking-tight text-[var(--student-ink)]">
-          {value}
-        </CardTitle>
-        {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
-      </CardHeader>
-    </Card>
+    <MetricCard label={label} value={value} hint={hint} className={className} />
   );
 }

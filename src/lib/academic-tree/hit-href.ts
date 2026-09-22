@@ -1,6 +1,6 @@
 import type { AcademicSearchHit, AcademicTreeSurface } from "./types.ts";
 import {
-  BLOCK_CATEGORIES,
+  ALL_BLOCK_CATEGORIES,
   BLOCK_PRODUCT_DEFS,
   PROF_SESSION_LABEL,
   isBlockProductKey,
@@ -108,7 +108,7 @@ function blockSlugFromLabels(labels: string[]): string | null {
 
 function categorySlugFromName(name: string): string | null {
   const key = normalizeKey(name);
-  const found = BLOCK_CATEGORIES.find(
+  const found = ALL_BLOCK_CATEGORIES.find(
     (c) => normalizeKey(c.name) === key || normalizeKey(c.slug) === key
   );
   return found?.slug ?? null;

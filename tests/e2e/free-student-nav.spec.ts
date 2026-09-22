@@ -35,7 +35,7 @@ function ensureStagingStudentFixtureIsFree() {
 }
 
 test.describe("Free student navigation", () => {
-  test("all years navigable; Prof. Session locked; /performance redirects to /dashboard", async ({
+  test("enrolled-class Blocks only; Prof. Session locked; /performance redirects to /dashboard", async ({
     page,
   }) => {
     const e2e = loadE2EEnv();
@@ -58,8 +58,11 @@ test.describe("Free student navigation", () => {
     await page.getByRole("button", { name: "Sign in" }).click();
     await page.waitForURL(/\/dashboard/, { timeout: 30000 });
 
-    await expect(page.getByRole("link", { name: "1st Year MBBS" })).toBeVisible();
-    await expect(page.getByRole("link", { name: "Final Year MBBS" })).toBeVisible();
+    // Exactly one class year in shell — not all five.
+    const yearLinks = page.getByRole("link", { name: /Year MBBS|Final Year MBBS/ });
+    await expect(yearLinks.first()).toBeVisible();
+    expect(await yearLinks.count()).toBe(1);
+    await expect(page.getByRole("link", { name: "OSPE Practice" })).toHaveCount(0);
     await expect(page.getByRole("link", { name: "Tests" }).first()).toBeVisible();
     await expect(page.getByRole("link", { name: "Contact Us" })).toBeVisible();
     await expect(page.getByRole("link", { name: "Prof. Session" })).toBeVisible();
@@ -69,11 +72,13 @@ test.describe("Free student navigation", () => {
     await expect(page.getByRole("heading", { name: "Academic" })).toBeVisible({
       timeout: 15000,
     });
+    // Academic home lists Blocks for enrolled class only — not five year cards.
+    await expect(page.getByRole("link", { name: "1st Year MBBS" })).toHaveCount(0);
+    await expect(page.getByRole("link", { name: "Final Year MBBS" })).toHaveCount(0);
 
-    await page.goto("/academic/year/1");
-    await expect(page.getByRole("heading", { name: "1st Year MBBS" })).toBeVisible({
-      timeout: 15000,
-    });
+    await page.goto("/academic/year/5");
+    await page.waitForURL(/\/academic\/year\/\d+/, { timeout: 15000 });
+    expect(page.url()).not.toMatch(/\/academic\/year\/5$/);
 
     await page.goto("/academic/prof-session");
     await expect(page.getByText(/subscription(?:\s+is)?\s+required/i)).toBeVisible({

@@ -14,35 +14,34 @@ describe("studentHasPaidLmsSections", () => {
 });
 
 describe("buildStudentShellNav", () => {
-  it("shows all years + Blocks for free students; locks Prof. Session", () => {
-    const { items, bottomItems } = buildStudentShellNav(false);
+  it("shows only enrolled year Blocks; locks Prof. Session; omits OSPE Practice top-level", () => {
+    const { items, bottomItems } = buildStudentShellNav(false, {
+      year_number: 2,
+      year_name: "2nd Year MBBS",
+    });
     const byHref = Object.fromEntries(items.map((i) => [i.href, i]));
 
     assert.equal(byHref["/dashboard"]?.locked, false);
     assert.equal(byHref["/tests"]?.locked, false);
-    assert.equal(byHref["/academic/year/1"]?.label, "1st Year MBBS");
-    assert.equal(byHref["/academic/year/5"]?.label, "Final Year MBBS");
-    assert.ok(
-      byHref["/academic/year/1"]?.children?.some(
-        (c) => c.href === "/academic/block-1"
-      )
-    );
+    assert.equal(byHref["/academic/year/2"]?.label, "2nd Year MBBS");
+    assert.equal(byHref["/academic/year/1"], undefined);
+    assert.equal(byHref["/academic/year/5"], undefined);
     assert.ok(
       byHref["/academic/year/2"]?.children?.some(
         (c) => c.href === "/academic/block-4"
       )
     );
     assert.ok(
-      byHref["/academic/year/5"]?.children?.some(
-        (c) => c.href === "/academic/medicine"
+      !byHref["/academic/year/2"]?.children?.some(
+        (c) => c.href === "/academic/block-1"
       )
     );
+    assert.equal(byHref["/practice/ospe"], undefined);
     assert.equal(byHref["/academic/prof-session"]?.label, "Prof. Session");
     assert.equal(byHref["/academic/prof-session"]?.locked, true);
     assert.equal(byHref["/mcq-bank"], undefined);
     assert.equal(byHref["/resources"], undefined);
     assert.equal(byHref["/library"], undefined);
-    // /performance removed from nav — merged into Dashboard
     assert.equal(byHref["/performance"], undefined);
 
     assert.deepEqual(
@@ -52,10 +51,12 @@ describe("buildStudentShellNav", () => {
   });
 
   it("unlocks Prof. Session for live subscribers", () => {
-    const { items, bottomItems } = buildStudentShellNav(true);
+    const { items, bottomItems } = buildStudentShellNav(true, {
+      year_number: 1,
+      year_name: "1st Year MBBS",
+    });
     const byHref = Object.fromEntries(items.map((i) => [i.href, i]));
     assert.equal(byHref["/academic/prof-session"]?.locked, false);
-    // /performance removed from nav — merged into Dashboard
     assert.equal(byHref["/performance"], undefined);
     assert.deepEqual(
       bottomItems.map((i) => i.href),
@@ -64,8 +65,9 @@ describe("buildStudentShellNav", () => {
   });
 
   it("keeps the same top-level labels for free and paid", () => {
-    const free = buildStudentShellNav(false);
-    const paid = buildStudentShellNav(true);
+    const enrollment = { year_number: 3, year_name: "3rd Year MBBS" };
+    const free = buildStudentShellNav(false, enrollment);
+    const paid = buildStudentShellNav(true, enrollment);
     assert.equal(free.items.length, paid.items.length);
     assert.deepEqual(
       free.items.map((i) => i.label),
@@ -84,7 +86,6 @@ describe("isPaidLmsSectionPath", () => {
     assert.equal(isPaidLmsSectionPath("/mcq-bank"), true);
     assert.equal(isPaidLmsSectionPath("/mock-test"), true);
     assert.equal(isPaidLmsSectionPath("/practice/ospe"), false);
-    // /performance redirects to /dashboard — no longer a paid section gate
     assert.equal(isPaidLmsSectionPath("/performance"), false);
     assert.equal(isPaidLmsSectionPath("/tests"), false);
   });

@@ -75,13 +75,14 @@ export type StudentEnrollmentNav = {
 };
 
 /**
- * Class-first student shell nav — all years visible to free and paid.
+ * Class-first student shell nav — enrolled class Blocks only.
  * Prof. Session is visible but locked without a live subscription.
+ * OSPE Practice lives under each Block’s OSPE group (not top-level).
  * Legacy flat hubs stay routable but are not listed in global nav.
  */
 export function buildStudentShellNav(
   hasLiveAccess: boolean,
-  _enrollment?: StudentEnrollmentNav
+  enrollment?: StudentEnrollmentNav
 ): {
   items: NavItem[];
   bottomItems: NavItem[];
@@ -89,13 +90,16 @@ export function buildStudentShellNav(
   const paid = studentHasPaidLmsSections(hasLiveAccess);
   const profHref = profSessionHref();
 
-  const yearItems: NavItem[] = [1, 2, 3, 4, 5].map((yearNumber) => {
-    const label =
-      CLASS_DISPLAY_BY_YEAR_NUMBER[yearNumber] ??
-      classDisplayName(yearNumber);
-    return {
+  const yearNumber = enrollment?.year_number ?? 1;
+  const yearLabel =
+    CLASS_DISPLAY_BY_YEAR_NUMBER[yearNumber] ??
+    enrollment?.year_name ??
+    classDisplayName(yearNumber);
+
+  const yearItems: NavItem[] = [
+    {
       href: yearHref(yearNumber),
-      label,
+      label: yearLabel,
       icon: "classLibrary" as IconKey,
       locked: false,
       children: blocksForYearNumber(yearNumber).map((block) => ({
@@ -104,8 +108,8 @@ export function buildStudentShellNav(
         icon: "classLibrary" as IconKey,
         locked: false,
       })),
-    };
-  });
+    },
+  ];
 
   const items: NavItem[] = [
     { href: "/dashboard", label: "Dashboard", icon: "dashboard", locked: false },
@@ -123,12 +127,6 @@ export function buildStudentShellNav(
       locked: !paid,
     },
     { href: "/tests", label: "Tests", icon: "tests", locked: false },
-    {
-      href: "/practice/ospe",
-      label: "OSPE Practice",
-      icon: "ospeMaterial",
-      locked: false,
-    },
     // /performance removed from nav — analytics merged into Dashboard.
     { href: "/contact", label: "Contact Us", icon: "contact", locked: false },
     {

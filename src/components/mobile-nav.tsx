@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link, { useLinkStatus } from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, type ReactNode } from "react";
 import {
@@ -29,6 +29,7 @@ import {
   Phone,
   GraduationCap,
   Award,
+  Loader2,
 } from "lucide-react";
 import {
   Sheet,
@@ -189,7 +190,7 @@ export function MobileNav({
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex min-h-14 flex-1 flex-col items-center justify-center gap-0.5 px-1 py-2 text-[10px] sm:text-[11px] ${
+                className={`relative flex min-h-14 flex-1 flex-col items-center justify-center gap-0.5 px-1 py-2 text-[10px] sm:text-[11px] ${
                   item.locked
                     ? "text-[var(--sidebar-muted)]"
                     : active
@@ -207,12 +208,35 @@ export function MobileNav({
                   ) : null}
                 </span>
                 <span className="max-w-full truncate">{item.label}</span>
+                <NavPendingDot />
               </Link>
             );
           })}
         </nav>
       ) : null}
     </Sheet>
+  );
+}
+
+function NavPendingMark() {
+  const { pending } = useLinkStatus();
+  if (!pending) return null;
+  return (
+    <Loader2
+      className="size-3.5 shrink-0 animate-spin text-[var(--brand-teal)]"
+      aria-label="Loading"
+    />
+  );
+}
+
+function NavPendingDot() {
+  const { pending } = useLinkStatus();
+  if (!pending) return null;
+  return (
+    <span
+      className="absolute top-1.5 right-1.5 size-1.5 rounded-full bg-[var(--brand-teal)] animate-pulse"
+      aria-hidden
+    />
   );
 }
 
@@ -244,6 +268,7 @@ function MobileNavEntry({
         >
           <Icon className="size-4 shrink-0 opacity-90" />
           <span className="flex-1 truncate">{item.label}</span>
+          <NavPendingMark />
           {item.locked ? (
             <Lock
               className="size-3.5 shrink-0 opacity-70"

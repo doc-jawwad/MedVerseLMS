@@ -11,8 +11,10 @@ import { StudentPage } from "@/components/student/student-page";
 import { EmptyState } from "@/components/student/empty-state";
 import { AcademicBreadcrumbs } from "@/components/academic/academic-breadcrumbs";
 import {
+  BLOCK_CHROME_GROUPS,
   BLOCK_PRODUCT_DEFS,
   CLASS_DISPLAY_BY_YEAR_NUMBER,
+  OSPE_GROUP_CATEGORY_IDS,
   PROF_SESSION_LABEL,
   TEST_DAY_SLOTS,
   ACADEMIC_BASE_PATH,
@@ -29,6 +31,8 @@ import {
   type AcademicTreeSubject,
 } from "@/lib/academic-tree";
 
+const OSPE_IDS = new Set<string>(OSPE_GROUP_CATEGORY_IDS);
+
 function TreeLinkCard({
   href,
   title,
@@ -42,13 +46,13 @@ function TreeLinkCard({
 }) {
   const body = (
     <Card
-      className={`h-full shadow-none transition-colors ${
-        locked ? "opacity-90" : "hover:bg-accent/40"
+      className={`surface-card h-full gap-0 border-border/80 py-0 shadow-none transition-colors ${
+        locked ? "opacity-90" : "hover:border-[var(--brand-teal)]/40 hover:bg-accent/30"
       }`}
     >
-      <CardHeader className="gap-2">
+      <CardHeader className="gap-2 px-4 py-4">
         <div className="flex items-start justify-between gap-2">
-          <CardTitle className="text-base text-[var(--student-ink)]">
+          <CardTitle className="font-heading text-base font-semibold text-[var(--student-ink)]">
             {title}
           </CardTitle>
           {locked ? (
@@ -58,6 +62,7 @@ function TreeLinkCard({
             />
           ) : null}
         </div>
+        <div className="brand-rule" aria-hidden />
         {description ? <CardDescription>{description}</CardDescription> : null}
       </CardHeader>
     </Card>
@@ -66,9 +71,21 @@ function TreeLinkCard({
   return locked ? <div>{body}</div> : <Link href={href}>{body}</Link>;
 }
 
-export function AcademicHomeView() {
+export function AcademicHomeView({
+  yearNumber,
+  yearName,
+}: {
+  yearNumber: number;
+  yearName?: string;
+}) {
+  const title =
+    CLASS_DISPLAY_BY_YEAR_NUMBER[yearNumber] ??
+    yearName ??
+    `Year ${yearNumber}`;
+  const blocks = BLOCK_PRODUCT_DEFS.filter((b) => b.year_number === yearNumber);
   const crumbs = buildAcademicBreadcrumbs({
-    yearName: "Academic",
+    yearName: title,
+    yearNumber,
   });
 
   return (
@@ -76,18 +93,23 @@ export function AcademicHomeView() {
       <AcademicBreadcrumbs crumbs={crumbs} />
       <PageHeader
         title="Academic"
-        description="Browse every MBBS class and Block. Individual items stay locked until your academy unlocks them or you subscribe. Prof. Session requires a subscription."
+        description={`Blocks and subjects for ${title}. Individual items stay locked until your academy unlocks them or you subscribe. Prof. Session requires a subscription.`}
       />
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {[1, 2, 3, 4, 5].map((yearNumber) => (
+        {blocks.map((block) => (
           <TreeLinkCard
-            key={yearNumber}
-            href={yearHref(yearNumber)}
-            title={CLASS_DISPLAY_BY_YEAR_NUMBER[yearNumber]!}
-            description={`${BLOCK_PRODUCT_DEFS.filter((b) => b.year_number === yearNumber).length} Blocks / subjects`}
+            key={block.key}
+            href={blockHref(block.key)}
+            title={block.name}
           />
         ))}
       </div>
+      {blocks.length === 0 ? (
+        <EmptyState
+          title="No Blocks for your class yet"
+          description="When your academy publishes Blocks for your year, they appear here."
+        />
+      ) : null}
     </StudentPage>
   );
 }
@@ -115,7 +137,7 @@ export function ClassHomeView({
             href={ACADEMIC_BASE_PATH}
             className="text-sm text-muted-foreground underline-offset-4 hover:underline"
           >
-            All classes
+            Academic home
           </Link>
         }
       />
@@ -153,15 +175,18 @@ export function BlockHomeView({
     blockSlug: subject.product_key,
   });
 
+  const flatCategories = subject.categories.filter((c) => !OSPE_IDS.has(c.id));
+  const ospeGroup = BLOCK_CHROME_GROUPS.find((g) => g.id === "ospe");
+
   return (
     <StudentPage>
       <AcademicBreadcrumbs crumbs={crumbs} />
       <PageHeader
         title={subject.name}
-        description="Eight study categories for this Block. Prof. Session lives separately in the sidebar."
+        description="Study categories for this Block. OSPE Material, Lectures, and Practice sit under OSPE. Prof. Session lives separately in the sidebar."
       />
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {subject.categories.map((category) => (
+        {flatCategories.map((category) => (
           <TreeLinkCard
             key={category.id}
             href={categoryHref(
@@ -172,6 +197,34 @@ export function BlockHomeView({
           />
         ))}
       </div>
+      {ospeGroup ? (
+        <section className="mt-8 space-y-3">
+          <div>
+            <h2 className="text-lg font-semibold text-[var(--student-ink)]">
+              {ospeGroup.name}
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              {ospeGroup.description}
+            </p>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {ospeGroup.children.map((child) => {
+              const href =
+                child.href ??
+                (child.categorySlug
+                  ? categoryHref(subject.product_key, child.categorySlug)
+                  : yearHref(tree.year_number));
+              return (
+                <TreeLinkCard
+                  key={child.id}
+                  href={href}
+                  title={child.name}
+                />
+              );
+            })}
+          </div>
+        </section>
+      ) : null}
     </StudentPage>
   );
 }

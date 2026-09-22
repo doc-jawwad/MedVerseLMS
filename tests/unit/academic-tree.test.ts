@@ -45,7 +45,7 @@ describe("product structure freeze", () => {
     assert.equal(BLOCK_PRODUCT_DEFS.length, 16);
   });
 
-  it("includes the eight student block categories", () => {
+  it("includes student Block chrome categories without Notes", () => {
     const ids = BLOCK_CATEGORIES.map((c) => c.id);
     assert.deepEqual(ids, [
       "mcq_bank",
@@ -54,11 +54,12 @@ describe("product structure freeze", () => {
       "ospe_material",
       "ospe_lectures",
       "books",
-      "notes",
       "lectures",
     ]);
+    assert.ok(!ids.includes("notes"));
     assert.equal(findCategoryBySlug("pearl-points")?.id, "pearl_points");
     assert.equal(findCategoryBySlug("ospe-material")?.id, "ospe_material");
+    assert.equal(findCategoryBySlug("notes")?.id, "notes");
   });
 
   it("defines fixed Prof. Session day slots", () => {

@@ -39,8 +39,14 @@ describe("academic tree search scope", () => {
     const classHits = searchAcademicTreeNames({ query: "1st Year", tree });
     assert.ok(classHits.some((h) => h.kind === "class"));
 
-    const categoryHits = searchAcademicTreeNames({ query: "Notes", tree });
+    const categoryHits = searchAcademicTreeNames({ query: "MCQ Bank", tree });
     assert.ok(categoryHits.some((h) => h.kind === "category"));
+    const notesHits = searchAcademicTreeNames({ query: "Notes", tree });
+    assert.equal(
+      notesHits.filter((h) => h.kind === "category").length,
+      0,
+      "Notes omitted from student Block chrome"
+    );
 
     const dayHits = searchAcademicTreeNames({ query: "Day 1", tree });
     assert.equal(

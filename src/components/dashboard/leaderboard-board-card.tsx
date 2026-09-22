@@ -57,7 +57,7 @@ export function LeaderboardBoardCard({
   if (board.status === "empty") {
     const copy = leaderboardEmptyCopy(board.reason);
     return (
-      <Card className="shadow-none" data-testid="leaderboard-board">
+      <Card className="surface-card border-border/80 shadow-none" data-testid="leaderboard-board">
         <CardHeader>
           <CardTitle className="text-base text-[var(--student-ink)]">{title}</CardTitle>
           {description && <CardDescription>{description}</CardDescription>}
@@ -78,10 +78,10 @@ export function LeaderboardBoardCard({
   const badgeLabel = `Top ${displayCount}`;
 
   return (
-    <Card className="shadow-none" data-testid="leaderboard-board">
+    <Card className="surface-card border-border/80 shadow-none" data-testid="leaderboard-board">
       <CardHeader>
         <div className="flex flex-wrap items-center gap-2">
-          <CardTitle className="text-base text-[var(--student-ink)]">{title}</CardTitle>
+          <CardTitle className="font-heading text-base text-[var(--student-ink)]">{title}</CardTitle>
           <Badge variant="secondary" data-testid="leaderboard-limit-badge">
             {badgeLabel}
           </Badge>

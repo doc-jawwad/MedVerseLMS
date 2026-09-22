@@ -1,7 +1,8 @@
 "use client";
 
-import Link from "next/link";
+import Link, { useLinkStatus } from "next/link";
 import { usePathname } from "next/navigation";
+import { Loader2 } from "lucide-react";
 import { ICONS, isActivePath, type NavItem } from "@/components/mobile-nav";
 
 /** Desktop sidebar nav shared by student + admin shells. */
@@ -13,6 +14,17 @@ export function ShellNav({ items }: { items: NavItem[] }) {
         <ShellNavEntry key={item.href} item={item} pathname={pathname} />
       ))}
     </nav>
+  );
+}
+
+function NavPendingMark() {
+  const { pending } = useLinkStatus();
+  if (!pending) return null;
+  return (
+    <Loader2
+      className="size-3.5 shrink-0 animate-spin text-[var(--brand-teal)]"
+      aria-label="Loading"
+    />
   );
 }
 
@@ -43,6 +55,7 @@ function ShellNavEntry({
       >
         <Icon className="size-4 shrink-0 opacity-90" />
         <span className="flex-1 truncate">{item.label}</span>
+        <NavPendingMark />
         {item.locked ? (
           <span className="text-[10px] tracking-wide text-sidebar-foreground/50 uppercase">
             locked

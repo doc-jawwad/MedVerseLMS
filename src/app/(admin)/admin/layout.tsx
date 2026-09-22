@@ -51,9 +51,9 @@ export default async function AdminLayout({
   );
 
   return (
-    <div className="flex min-h-svh bg-[var(--student-canvas)]">
+    <div className="flex h-svh overflow-hidden canvas-atmosphere">
       <SessionWatch userId={userId} />
-      <aside className="hidden w-64 shrink-0 flex-col border-r border-sidebar-border bg-sidebar p-4 text-sidebar-foreground md:flex">
+      <aside className="hidden h-full w-64 shrink-0 flex-col overflow-y-auto border-r border-sidebar-border bg-sidebar p-4 text-sidebar-foreground md:flex">
         <div className="mb-6">
           <Logo />
           <div className="mt-4 truncate text-sm font-medium text-white">
@@ -80,7 +80,7 @@ export default async function AdminLayout({
           <BrandCredit tone="sidebar" />
         </div>
       </aside>
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto">
         <MobileNav
           navItems={nav}
           userLabel={profile.full_name}

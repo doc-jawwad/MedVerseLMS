@@ -25,7 +25,7 @@ describe("Data Spine practice kind mapping", () => {
 });
 
 describe("Data Spine academic tree mapping", () => {
-  it("maps RPC subjects into eight categories and empty prof_session", () => {
+  it("maps RPC subjects into chrome categories and empty prof_session", () => {
     const tree = mapRpcTree(
       {
         surface: "library",
@@ -93,10 +93,7 @@ describe("Data Spine academic tree mapping", () => {
     assert.ok(medicine);
     assert.equal(medicine!.locked, true);
     assert.equal(medicine!.categories.length, BLOCK_CATEGORIES.length);
-    const notes = medicine!.categories.find((c) => c.id === "notes");
-    assert.ok(notes);
-    assert.equal(notes!.folders[0]?.is_day, true);
-    assert.deepEqual(notes!.folders[0]?.items, []);
+    assert.ok(!medicine!.categories.some((c) => c.id === "notes"));
     assert.ok(
       medicine!.categories.some((c) => c.id === "ospe_material"),
       "legacy ospe remaps to ospe_material"

@@ -2,13 +2,11 @@ import "server-only";
 
 import { notFound } from "next/navigation";
 import {
-  buildStructuralAcademicTree,
   findCategoryInSubject,
   findDayFolder,
   findSubjectInTree,
 } from "./adapter.ts";
 import {
-  classDisplayName,
   findBlockProduct,
   findCategoryBySlug,
   findDaySlotBySlug,
@@ -40,57 +38,33 @@ export type AcademicBrowseContext = {
 };
 
 /**
- * Load academic browse context for a year.
- * Enrolled year prefers Data Spine; other years use structural product tree
- * so free students can navigate all classes.
+ * Load academic browse context for the enrolled year (architecture §2d).
+ * Other year URLs redirect at the page layer before calling this.
  */
 export async function loadAcademicBrowseForYear(
-  yearNumber: number
+  _yearNumber: number
 ): Promise<AcademicBrowseContext> {
   const { supabase, enrollment } = await requireStudent();
   const hasLiveAccess = await getStudentHasLiveSubscription();
   const surface: AcademicTreeSurface = hasLiveAccess ? "library" : "resources";
 
-  if (yearNumber === enrollment.year_number) {
-    const { tree, error } = await loadAcademicTree({
-      supabase,
-      surface,
-      year_id: enrollment.year_id,
-      year_number: enrollment.year_number,
-      year_name: enrollment.year_name,
-      has_live_subscription: hasLiveAccess,
-    });
-    // Free students must navigate unlocked chrome; content stays RPC-gated.
-    const navigable = unlockNavigationChrome(tree);
-    return {
-      tree: navigable,
-      error,
-      hasLiveAccess,
-      year_id: enrollment.year_id,
-      year_number: enrollment.year_number,
-      year_name: enrollment.year_name,
-      surface,
-    };
-  }
-
-  const yearName = classDisplayName(yearNumber);
-  const tree = unlockNavigationChrome(
-    buildStructuralAcademicTree({
-      surface,
-      year_id: `product:year-${yearNumber}`,
-      year_number: yearNumber,
-      year_name: yearName,
-      has_live_subscription: hasLiveAccess,
-    })
-  );
-
+  const { tree, error } = await loadAcademicTree({
+    supabase,
+    surface,
+    year_id: enrollment.year_id,
+    year_number: enrollment.year_number,
+    year_name: enrollment.year_name,
+    has_live_subscription: hasLiveAccess,
+  });
+  // Free students must navigate unlocked chrome; content stays RPC-gated.
+  const navigable = unlockNavigationChrome(tree);
   return {
-    tree,
-    error: null,
+    tree: navigable,
+    error,
     hasLiveAccess,
-    year_id: tree.year_id,
-    year_number: yearNumber,
-    year_name: yearName,
+    year_id: enrollment.year_id,
+    year_number: enrollment.year_number,
+    year_name: enrollment.year_name,
     surface,
   };
 }

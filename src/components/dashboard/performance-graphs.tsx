@@ -31,7 +31,7 @@ function SummaryBar({
       </div>
       <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
         <div
-          className="h-full rounded-full bg-[var(--brand-teal)]"
+          className="h-full rounded-full bg-gradient-to-r from-[var(--brand-navy)] to-[var(--brand-teal)]"
           style={{ width: `${Math.max(0, Math.min(100, value))}%` }}
         />
       </div>
@@ -48,9 +48,9 @@ export function DashboardPerformanceGraphs({
 }) {
   return (
     <div className="grid gap-3" data-testid="dashboard-graphs">
-      <Card className="shadow-none">
+      <Card className="surface-card border-border/80 shadow-none">
         <CardHeader>
-          <CardTitle className="text-base text-[var(--student-ink)]">
+          <CardTitle className="font-heading text-base text-[var(--student-ink)]">
             Score overview
           </CardTitle>
           <CardDescription>{PERFORMANCE_GRAIN_COPY.overall}</CardDescription>
@@ -74,9 +74,9 @@ export function DashboardPerformanceGraphs({
         </CardContent>
       </Card>
 
-      <Card className="shadow-none">
+      <Card className="surface-card border-border/80 shadow-none">
         <CardHeader>
-          <CardTitle className="text-base text-[var(--student-ink)]">
+          <CardTitle className="font-heading text-base text-[var(--student-ink)]">
             Historical trend
           </CardTitle>
           <CardDescription>{PERFORMANCE_GRAIN_COPY.trend}</CardDescription>
@@ -105,7 +105,7 @@ export function DashboardPerformanceGraphs({
                       {point.percentage}%
                     </span>
                     <div
-                      className="w-full max-w-12 rounded-t bg-[var(--brand-teal)]"
+                      className="w-full max-w-12 rounded-t bg-gradient-to-t from-[var(--brand-navy)] to-[var(--brand-teal)]"
                       style={{
                         height: `${Math.max(
                           4,

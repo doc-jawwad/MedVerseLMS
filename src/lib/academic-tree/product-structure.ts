@@ -65,7 +65,10 @@ export type BlockCategoryDef = {
   placeholder?: boolean;
 };
 
-/** Eight academic categories under each Block / Final-Year subject. */
+/**
+ * Student Block chrome leaf categories (Notes omitted — storage-only).
+ * OSPE Material / Lectures also appear under the OSPE chrome group with Practice.
+ */
 export const BLOCK_CATEGORIES: readonly BlockCategoryDef[] = [
   {
     id: "mcq_bank",
@@ -104,12 +107,6 @@ export const BLOCK_CATEGORIES: readonly BlockCategoryDef[] = [
     description: "Reference books and complete texts.",
   },
   {
-    id: "notes",
-    name: "Notes",
-    slug: "notes",
-    description: "Class notes and concise write-ups.",
-  },
-  {
     id: "lectures",
     name: "Lectures",
     slug: "lectures",
@@ -117,12 +114,72 @@ export const BLOCK_CATEGORIES: readonly BlockCategoryDef[] = [
   },
 ] as const;
 
+/** Storage / deep-link only — not shown in student Block chrome. */
+export const NOTES_CATEGORY: BlockCategoryDef = {
+  id: "notes",
+  name: "Notes",
+  slug: "notes",
+  description: "Class notes and concise write-ups.",
+};
+
+export const ALL_BLOCK_CATEGORIES: readonly BlockCategoryDef[] = [
+  ...BLOCK_CATEGORIES,
+  NOTES_CATEGORY,
+];
+
+/** Category ids folded under the Block OSPE chrome group. */
+export const OSPE_GROUP_CATEGORY_IDS = [
+  "ospe_material",
+  "ospe_lectures",
+] as const satisfies readonly BlockCategoryId[];
+
+export const OSPE_PRACTICE_HREF = "/practice/ospe";
+
+export type BlockChromeGroupDef = {
+  id: "ospe";
+  name: string;
+  description: string;
+  children: readonly {
+    id: string;
+    name: string;
+    /** Category slug for Material/Lectures; null for Practice. */
+    categorySlug: string | null;
+    href?: string;
+  }[];
+};
+
+export const BLOCK_CHROME_GROUPS: readonly BlockChromeGroupDef[] = [
+  {
+    id: "ospe",
+    name: "OSPE",
+    description: "OSPE material, lectures, and practice stations.",
+    children: [
+      {
+        id: "ospe_material",
+        name: "OSPE Material",
+        categorySlug: "ospe-material",
+      },
+      {
+        id: "ospe_lectures",
+        name: "OSPE Lectures",
+        categorySlug: "ospe-lectures",
+      },
+      {
+        id: "ospe_practice",
+        name: "OSPE Practice",
+        categorySlug: null,
+        href: OSPE_PRACTICE_HREF,
+      },
+    ],
+  },
+];
+
 export function findCategoryById(id: string): BlockCategoryDef | null {
-  return BLOCK_CATEGORIES.find((c) => c.id === id) ?? null;
+  return ALL_BLOCK_CATEGORIES.find((c) => c.id === id) ?? null;
 }
 
 export function findCategoryBySlug(slug: string): BlockCategoryDef | null {
-  return BLOCK_CATEGORIES.find((c) => c.slug === slug) ?? null;
+  return ALL_BLOCK_CATEGORIES.find((c) => c.slug === slug) ?? null;
 }
 
 export type TestDaySlotDef = {
