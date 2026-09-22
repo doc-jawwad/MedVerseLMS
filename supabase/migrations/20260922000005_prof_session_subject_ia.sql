@@ -4,7 +4,62 @@
 -- Block-level PS materials via content_surface + new library_types.
 -- Day attachments: folder day FKs, one_liners.day, tests.day, practice question junction.
 -- Safe on empty staging (0 days). Live year-level days without subject → soft-deleted to Bin
--- (do not invent Block parents). Docs: architecture.md §2c, database.md Prof. Session.
+-- (do not invent Block/Final-Year Day parents — legacy year-level Days are never mapped).
+-- Docs: architecture.md §2c, database.md Prof. Session.
+
+-- ---------------------------------------------------------------------------
+-- 0. Ensure Final-Year product subjects BEFORE day soft-delete / tree IA
+-- Canonical chrome: Medicine, Surgery, Gynecology, Pediatrics.
+-- Reuse existing subject rows by product_key; else attach product_key to an
+-- exact-name match; else insert. Idempotent; never duplicates product_keys.
+-- Does NOT set prof_session_days.subject_id (no invented Day mapping).
+-- ---------------------------------------------------------------------------
+
+-- 0a. Attach product_key to exact canonical-name rows that lack one
+-- (preserves UUID). Skips when that product_key already exists on another row.
+update public.subjects s
+set
+  product_key = v.product_key,
+  name = v.canonical_name,
+  sort_order = v.sort_order,
+  updated_at = now()
+from public.years y
+join (
+  values
+    ('medicine', 'Medicine', 1),
+    ('surgery', 'Surgery', 2),
+    ('gynecology', 'Gynecology', 3),
+    ('pediatrics', 'Pediatrics', 4)
+) as v(product_key, canonical_name, sort_order) on true
+where s.year_id = y.id
+  and y.year_number = 5
+  and lower(btrim(s.name)) = lower(v.canonical_name)
+  and s.product_key is null
+  and not exists (
+    select 1
+    from public.subjects other
+    where other.year_id = s.year_id
+      and other.product_key = v.product_key
+  );
+
+-- 0b. Insert any Final-Year product subject still missing by product_key
+insert into public.subjects (year_id, name, sort_order, product_key)
+select y.id, v.canonical_name, v.sort_order, v.product_key
+from public.years y
+join (
+  values
+    ('medicine', 'Medicine', 1),
+    ('surgery', 'Surgery', 2),
+    ('gynecology', 'Gynecology', 3),
+    ('pediatrics', 'Pediatrics', 4)
+) as v(product_key, canonical_name, sort_order) on true
+where y.year_number = 5
+  and not exists (
+    select 1
+    from public.subjects s
+    where s.year_id = y.id
+      and s.product_key = v.product_key
+  );
 
 -- ---------------------------------------------------------------------------
 -- 1. material_folders: surface + day attach + library_type expand
@@ -93,7 +148,8 @@ alter table public.prof_session_days
   add column if not exists subject_id uuid
     references public.subjects (id) on delete cascade;
 
--- Preserve year-level live days: soft-delete into Bin; do not invent subject parents.
+-- Preserve year-level live days: soft-delete into Bin; do not invent subject
+-- parents and do NOT map legacy year-level Days onto Final-Year product subjects.
 update public.prof_session_days
 set
   deleted_at = coalesce(deleted_at, now()),
