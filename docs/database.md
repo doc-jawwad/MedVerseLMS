@@ -38,7 +38,7 @@ Departmental subjects (Anatomy, …) remain with `product_key` NULL for Question
 
 **Prof. Session (SHIPPED — subject-scoped IA):** `prof_session_days` belong to a product Block / Final-Year `subjects` row (`subject_id` required for live days; denormalized `year_id` always derived from the subject). Fixed `prof_session_day_slots`: `guidelines`, `los`, `one_liners`, `practice_mcqs`, `test_mcq`. Soft-delete → content Bin.
 
-Block-level Prof. Session materials use `material_folders.content_surface = 'prof_session'` with `library_type` in (`syllabus`,`schedule`,`books`,`notes`,`lectures`,`ospe_past`,`ospe_lectures`,`ospe_material`). Day-scoped Guidelines/LoS folders set `prof_session_day_id` + `day_slot_key`. Practice MCQs: `prof_session_day_practice_questions` (references existing `questions`). Test MCQs: `tests.prof_session_day_id`. One-Liners: `one_liners.prof_session_day_id` (not Pearl Points).
+Block-level Prof. Session materials use `material_folders.content_surface = 'prof_session'` with `library_type` in (`syllabus`,`schedule`,`books`,`notes`,`lectures`,`ospe_past`,`ospe_lectures`,`ospe_material`). Day-scoped Guidelines/LoS folders set `prof_session_day_id` + `day_slot_key`. Practice MCQs: `prof_session_day_practice_questions` (references existing `questions` in the **same year** as the day — typically departmental Q-bank subjects, not the product Block row). Test MCQs: `tests.prof_session_day_id`. One-Liners: `one_liners.prof_session_day_id` (not Pearl Points).
 
 Free students: locked empty Prof. Session in tree. Subscribed: published days + surface folders for enrolled year only.
 

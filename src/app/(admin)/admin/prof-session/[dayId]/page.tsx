@@ -52,8 +52,10 @@ export default async function AdminProfSessionDayPage({
     supabase.rpc("list_day_practice_question_ids", { p_day_id: dayId }),
     supabase
       .from("questions")
-      .select("id, difficulty, status, question_versions!questions_current_version_fk(stem)")
-      .eq("subject_id", subjectId)
+      .select(
+        "id, difficulty, status, subjects!inner(year_id), question_versions!questions_current_version_fk(stem)"
+      )
+      .eq("subjects.year_id", yearId)
       .eq("status", "approved")
       .is("deleted_at", null)
       .order("created_at", { ascending: false })
@@ -67,8 +69,8 @@ export default async function AdminProfSessionDayPage({
       .limit(200),
     supabase
       .from("one_liners")
-      .select("id, title, status, prof_session_day_id")
-      .eq("subject_id", subjectId)
+      .select("id, title, status, prof_session_day_id, subjects!inner(year_id)")
+      .eq("subjects.year_id", yearId)
       .is("deleted_at", null)
       .order("sort_order")
       .order("title")

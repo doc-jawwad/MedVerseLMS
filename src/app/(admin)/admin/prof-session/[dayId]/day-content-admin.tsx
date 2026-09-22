@@ -230,13 +230,13 @@ export function ProfSessionDayContentAdmin({
           Practice MCQs
         </h2>
         <p className="text-sm text-muted-foreground">
-          Approved questions for {subjectName}. Selected set is what students
-          practice for this day.
+          Approved Question Bank items in {yearLabel} (any subject). Selected
+          set is what students practice for this day only — no duplication.
         </p>
         {questions.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            No approved questions under this product subject yet. Author
-            questions with this subject, or map bank content accordingly.
+            No approved questions in this class yet. Author questions in the
+            Question Bank for {yearLabel}, then attach them here.
           </p>
         ) : (
           <ul className="max-h-80 overflow-y-auto grid gap-2">
@@ -383,8 +383,8 @@ export function ProfSessionDayContentAdmin({
           One-Liners
         </h2>
         <p className="text-sm text-muted-foreground">
-          Attach subject one-liners to this day, or create a simple one and
-          attach it.
+          Attach one-liners from this class to this day, or create a simple one
+          under {subjectName} and attach it.
         </p>
         <form
           className="grid gap-2 rounded-lg border border-dashed p-3"
@@ -440,7 +440,7 @@ export function ProfSessionDayContentAdmin({
         </form>
         {oneLiners.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            No one-liners for this subject yet.
+            No one-liners in this class yet.
           </p>
         ) : (
           <ul className="grid gap-2">
