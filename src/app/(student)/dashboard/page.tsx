@@ -24,7 +24,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/student/page-header";
 import { StudentPage } from "@/components/student/student-page";
@@ -32,6 +31,9 @@ import { InstallMedverseApp } from "@/components/pwa/install-medverse-app";
 import { StatTile } from "@/components/student/stat-tile";
 import { SectionHeading } from "@/components/student/section-heading";
 import { EmptyState } from "@/components/student/empty-state";
+import { ProgressBar } from "@/components/student/progress-bar";
+import { StatusBadge } from "@/components/student/status-badge";
+import { ActivityItem } from "@/components/student/activity-item";
 import { OpensCountdown } from "@/components/study/opens-countdown";
 import { StudyMarkdown } from "@/components/study/study-markdown";
 import { sortByOpensAtAsc } from "@/lib/study/upcoming";
@@ -315,9 +317,9 @@ export default async function DashboardPage() {
                     <p className="font-heading text-lg font-semibold text-[var(--student-ink)]">
                       {displayTestTitle(t.title, pricing)}
                     </p>
-                    <Badge variant={pricing === "FREE" ? "secondary" : "outline"}>
+                    <StatusBadge tone={pricing === "FREE" ? "info" : "muted"}>
                       {pricing}
-                    </Badge>
+                    </StatusBadge>
                   </div>
                   <p className="text-sm text-muted-foreground">
                     {subj?.name && `${subj.name} · `}
@@ -409,51 +411,27 @@ export default async function DashboardPage() {
       {paidDetails ? (
         <>
           {subjectRows.length > 0 && (
-            <Card className="shadow-none">
+            <Card className="surface-card border-border/80 shadow-none">
               <CardHeader>
-                <CardTitle className="text-base text-[var(--student-ink)]">
+                <CardTitle className="font-heading text-base text-[var(--student-ink)]">
                   Subject performance
                 </CardTitle>
                 <CardDescription>{PERFORMANCE_GRAIN_COPY.subject}</CardDescription>
               </CardHeader>
-              <CardContent className="grid gap-4">
+              <CardContent className="grid gap-5">
                 {subjectRows.map((sub) => (
-                  <div key={sub.subject_id} className="grid gap-2">
-                    <p className="text-sm font-medium text-[var(--student-ink)]">
+                  <div key={sub.subject_id} className="grid gap-3">
+                    <p className="text-sm font-semibold text-[var(--student-ink)]">
                       {sub.subject_name}
                     </p>
-                    <div className="grid gap-1">
-                      <div className="flex items-baseline justify-between gap-2 text-sm">
-                        <span className="text-muted-foreground">Tests</span>
-                        <span className="shrink-0 tabular-nums text-muted-foreground">
-                          {sub.test_average_percentage}% ({sub.tests_taken})
-                        </span>
-                      </div>
-                      <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
-                        <div
-                          className="h-full rounded-full bg-[var(--brand-teal)]"
-                          style={{
-                            width: `${Math.max(0, Math.min(100, sub.test_average_percentage))}%`,
-                          }}
-                        />
-                      </div>
-                    </div>
-                    <div className="grid gap-1">
-                      <div className="flex items-baseline justify-between gap-2 text-sm">
-                        <span className="text-muted-foreground">Practice</span>
-                        <span className="shrink-0 tabular-nums text-muted-foreground">
-                          {sub.practice_accuracy}% ({sub.practice_answered} answered)
-                        </span>
-                      </div>
-                      <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
-                        <div
-                          className="h-full rounded-full bg-[var(--brand-teal)]"
-                          style={{
-                            width: `${Math.max(0, Math.min(100, sub.practice_accuracy))}%`,
-                          }}
-                        />
-                      </div>
-                    </div>
+                    <ProgressBar
+                      label={`Tests (${sub.tests_taken})`}
+                      value={sub.test_average_percentage}
+                    />
+                    <ProgressBar
+                      label={`Practice (${sub.practice_answered} answered)`}
+                      value={sub.practice_accuracy}
+                    />
                   </div>
                 ))}
               </CardContent>
@@ -461,9 +439,9 @@ export default async function DashboardPage() {
           )}
 
           {weakRows.length > 0 && (
-            <Card className="shadow-none">
+            <Card className="surface-card border-border/80 shadow-none">
               <CardHeader>
-                <CardTitle className="text-base text-[var(--student-ink)]">
+                <CardTitle className="font-heading text-base text-[var(--student-ink)]">
                   Weak chapters
                 </CardTitle>
                 <CardDescription>{PERFORMANCE_GRAIN_COPY.weakChapters}</CardDescription>
@@ -472,7 +450,7 @@ export default async function DashboardPage() {
                 {weakRows.map((w) => (
                   <div
                     key={w.chapter_id}
-                    className="flex items-center justify-between text-sm"
+                    className="flex items-center justify-between gap-3 rounded-lg border border-border/80 px-3 py-2 text-sm"
                   >
                     <span>
                       {w.chapter_name}{" "}
@@ -480,9 +458,9 @@ export default async function DashboardPage() {
                         ({w.subject_name})
                       </span>
                     </span>
-                    <Badge variant={w.accuracy < 50 ? "destructive" : "outline"}>
+                    <StatusBadge tone={w.accuracy < 50 ? "danger" : "warning"}>
                       {w.accuracy}% ({w.answered})
-                    </Badge>
+                    </StatusBadge>
                   </div>
                 ))}
               </CardContent>
@@ -490,13 +468,13 @@ export default async function DashboardPage() {
           )}
         </>
       ) : (
-        <Card className="border-dashed shadow-none">
+        <Card className="surface-card border-dashed border-border/80 shadow-none">
           <CardHeader>
             <div className="flex flex-wrap items-center gap-2">
-              <CardTitle className="text-base text-[var(--student-ink)]">
+              <CardTitle className="font-heading text-base text-[var(--student-ink)]">
                 Subject &amp; practice analytics
               </CardTitle>
-              <Badge variant="outline">locked</Badge>
+              <StatusBadge tone="muted">locked</StatusBadge>
             </div>
             <CardDescription>
               Subject bars and weak chapters unlock with a live subscription.
@@ -537,9 +515,11 @@ export default async function DashboardPage() {
         </div>
       </div>
 
-      <Card className="shadow-none">
+      <Card className="surface-card border-border/80 shadow-none">
         <CardHeader>
-          <CardTitle className="text-base text-[var(--student-ink)]">Recent tests</CardTitle>
+          <CardTitle className="font-heading text-base text-[var(--student-ink)]">
+            Recent tests
+          </CardTitle>
           <CardDescription>
             Submitted history — kept after subscription expiry.
           </CardDescription>
@@ -553,21 +533,19 @@ export default async function DashboardPage() {
           ) : (
             <div className="grid gap-2">
               {recentRows.map((r) => (
-                <Link
+                <ActivityItem
                   key={r.test_id}
                   href={`/tests/${r.test_id}/result`}
-                  className="flex items-center justify-between rounded-xl border bg-card px-3 py-2.5 text-sm transition-colors hover:bg-accent/50"
-                >
-                  <span className="font-medium text-[var(--student-ink)]">{r.title}</span>
-                  <div className="flex items-center gap-2">
-                    <Badge>{r.percentage}%</Badge>
-                    {r.rank != null && (
-                      <span className="text-muted-foreground">
-                        Rank #{r.rank}
-                      </span>
-                    )}
-                  </div>
-                </Link>
+                  title={r.title}
+                  meta={
+                    r.rank != null
+                      ? `${formatDateTime(r.submitted_at)} · Rank #${r.rank}`
+                      : formatDateTime(r.submitted_at)
+                  }
+                  trailing={
+                    <StatusBadge tone="info">{r.percentage}%</StatusBadge>
+                  }
+                />
               ))}
             </div>
           )}

@@ -77,8 +77,13 @@ test.describe("Free student navigation", () => {
     await expect(page.getByRole("link", { name: "Final Year MBBS" })).toHaveCount(0);
 
     await page.goto("/academic/year/5");
-    await page.waitForURL(/\/academic\/year\/\d+/, { timeout: 15000 });
-    expect(page.url()).not.toMatch(/\/academic\/year\/5$/);
+    await page.waitForURL(/\/academic\/?$/, { timeout: 15000 });
+    expect(page.url()).toMatch(/\/academic\/?$/);
+
+    await page.goto("/academic/block-12");
+    await page.waitForURL(/\/academic\/?$/, { timeout: 15000 });
+    // Cross-year block deep links redirect to Academic home when enrolled elsewhere.
+    // (block-12 is Year 4 — Staging Student is typically Year 1 or 2)
 
     await page.goto("/academic/prof-session");
     await expect(page.getByText(/subscription(?:\s+is)?\s+required/i)).toBeVisible({

@@ -69,7 +69,7 @@ export default async function ProfilePage() {
 
       <InstallMedverseApp variant="card" />
 
-      <Card className="shadow-none">
+      <Card className="surface-card border-border/80 shadow-none">
         <CardHeader>
           <CardTitle className="text-base text-[var(--student-ink)]">Profile</CardTitle>
           <CardDescription>
@@ -88,7 +88,7 @@ export default async function ProfilePage() {
         </CardContent>
       </Card>
 
-      <Card className="shadow-none">
+      <Card className="surface-card border-border/80 shadow-none">
         <CardHeader>
           <CardTitle className="text-base text-[var(--student-ink)]">Class</CardTitle>
           <CardDescription>
@@ -106,7 +106,7 @@ export default async function ProfilePage() {
         </CardContent>
       </Card>
 
-      <Card className="shadow-none">
+      <Card className="surface-card border-border/80 shadow-none">
         <CardHeader>
           <CardTitle className="text-base text-[var(--student-ink)]">Subscription</CardTitle>
           <CardDescription>
@@ -128,7 +128,7 @@ export default async function ProfilePage() {
         </CardContent>
       </Card>
 
-      <Card className="shadow-none">
+      <Card className="surface-card border-border/80 shadow-none">
         <CardHeader>
           <CardTitle className="text-base text-[var(--student-ink)]">Practice access</CardTitle>
           <CardDescription>
@@ -148,7 +148,7 @@ export default async function ProfilePage() {
         </CardContent>
       </Card>
 
-      <Card className="shadow-none">
+      <Card className="surface-card border-border/80 shadow-none">
         <CardHeader>
           <CardTitle className="text-base text-[var(--student-ink)]">Change password</CardTitle>
         </CardHeader>

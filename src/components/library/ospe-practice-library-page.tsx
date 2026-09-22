@@ -48,7 +48,7 @@ export async function OspePracticeLibraryPage() {
     <StudentPage width="narrow">
       <PageHeader
         title="OSPE Practice"
-        description="Station images with a reveal answer. This is practice — not a formal exam and not library OSPE packs."
+        description="Station images with a reveal answer. Reach this from any Block → OSPE → OSPE Practice. Practice only — not a formal exam and not library OSPE packs."
       />
       {items.length === 0 ? (
         <EmptyState

@@ -25,7 +25,6 @@ import {
   dayHref,
   daySlotHref,
   profSessionHref,
-  yearHref,
   type AcademicTree,
   type AcademicTreeFolder,
   type AcademicTreeSubject,
@@ -198,22 +197,23 @@ export function BlockHomeView({
         ))}
       </div>
       {ospeGroup ? (
-        <section className="mt-8 space-y-3">
-          <div>
-            <h2 className="text-lg font-semibold text-[var(--student-ink)]">
+        <section className="mt-8 overflow-hidden rounded-xl border border-border/80 surface-card">
+          <div className="border-b border-border/80 bg-[color-mix(in_srgb,var(--brand-navy)_5%,var(--student-surface))] px-4 py-3.5">
+            <h2 className="font-heading text-lg font-semibold text-[var(--student-ink)]">
               {ospeGroup.name}
             </h2>
-            <p className="text-sm text-muted-foreground">
+            <p className="mt-0.5 text-sm text-muted-foreground">
               {ospeGroup.description}
             </p>
+            <div className="brand-rule mt-2.5" aria-hidden />
           </div>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-3">
             {ospeGroup.children.map((child) => {
               const href =
                 child.href ??
                 (child.categorySlug
                   ? categoryHref(subject.product_key, child.categorySlug)
-                  : yearHref(tree.year_number));
+                  : ACADEMIC_BASE_PATH);
               return (
                 <TreeLinkCard
                   key={child.id}

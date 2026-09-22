@@ -211,7 +211,7 @@ export default async function SubscriptionPage() {
         </div>
       )}
 
-      <Card className="shadow-none">
+      <Card className="surface-card border-border/80 shadow-none">
         <CardHeader>
           <CardTitle className="flex flex-wrap items-center gap-2 text-base text-[var(--student-ink)]">
             {view.label}
@@ -315,7 +315,7 @@ export default async function SubscriptionPage() {
       </Card>
 
       {plans.length > 0 && view.kind !== "active" && (
-        <Card className="shadow-none">
+        <Card className="surface-card border-border/80 shadow-none">
           <CardHeader>
             <CardTitle className="text-base text-[var(--student-ink)]">
               Available plans
@@ -364,7 +364,7 @@ export default async function SubscriptionPage() {
       )}
 
       {showApply && (
-        <Card className="shadow-none">
+        <Card className="surface-card border-border/80 shadow-none">
           <CardHeader>
             <CardTitle className="text-base text-[var(--student-ink)]">
               {applyMode === "edit"
@@ -392,7 +392,7 @@ export default async function SubscriptionPage() {
         </Card>
       )}
 
-      <Card id="contact-admin" className="shadow-none">
+      <Card id="contact-admin" className="surface-card border-border/80 shadow-none">
         <CardHeader>
           <CardTitle className="text-base text-[var(--student-ink)]">Contact Admin</CardTitle>
           <CardDescription>

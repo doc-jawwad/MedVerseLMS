@@ -169,7 +169,7 @@ export default async function StudentTestsPage() {
                 const qc = t.question_count;
                 const pricing = testPricingLabel(t.entitlement);
                 return (
-                  <Card key={t.id} className="shadow-none">
+                  <Card key={t.id} className="surface-card border-border/80 shadow-none">
                     <CardHeader>
                       <div className="flex flex-wrap items-start justify-between gap-2">
                         <CardTitle className="text-base text-[var(--student-ink)]">

@@ -4,7 +4,7 @@ import {
   loadAcademicBrowseForYear,
   requireYearNumber,
 } from "@/lib/academic-tree/browse";
-import { yearHref } from "@/lib/academic-tree";
+import { ACADEMIC_BASE_PATH } from "@/lib/academic-tree";
 import { requireStudent } from "@/lib/auth/require-user";
 
 export default async function AcademicYearPage({
@@ -17,7 +17,7 @@ export default async function AcademicYearPage({
   const { enrollment } = await requireStudent();
 
   if (yearNumber !== enrollment.year_number) {
-    redirect(yearHref(enrollment.year_number));
+    redirect(ACADEMIC_BASE_PATH);
   }
 
   const ctx = await loadAcademicBrowseForYear(yearNumber);
