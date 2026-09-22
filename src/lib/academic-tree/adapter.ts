@@ -1,5 +1,6 @@
 import type {
   AcademicProfSession,
+  AcademicProfSessionSubject,
   AcademicTree,
   AcademicTreeAdapter,
   AcademicTreeCategory,
@@ -9,6 +10,7 @@ import type {
 } from "./types.ts";
 import {
   BLOCK_CATEGORIES,
+  PROF_SESSION_CATEGORIES,
   TEST_DAY_SLOTS,
   blocksForYearNumber,
   classDisplayName,
@@ -17,7 +19,7 @@ import { searchAcademicTreeNames } from "./search.ts";
 
 /**
  * Structural product chrome for non-enrolled years / offline fallback.
- * Blocks come from product_key defs. Prof. Session days are empty —
+ * Blocks come from product_key defs. Prof. Session subjects are empty days —
  * never invent Day 1–3 (Admin-created days only via Data Spine RPC).
  */
 export function buildStructuralAcademicTree(
@@ -47,10 +49,24 @@ export function buildStructuralAcademicTree(
     };
   });
 
+  const profSubjects: AcademicProfSessionSubject[] = input.has_live_subscription
+    ? blocksForYearNumber(input.year_number).map((block) => ({
+        subject_id: `product:${block.key}`,
+        product_key: block.key,
+        name: block.name,
+        categories: PROF_SESSION_CATEGORIES.map((cat) => ({
+          id: cat.id,
+          name: cat.name,
+          locked: false,
+          folders: [],
+        })),
+        days: [],
+      }))
+    : [];
+
   const prof_session: AcademicProfSession = {
-    // Free chrome: locked; subscribed browsing another year: unlocked empty.
     locked: !input.has_live_subscription,
-    days: [],
+    subjects: profSubjects,
   };
 
   return {
@@ -112,6 +128,16 @@ export function findSubjectInTree(
   productKey: string
 ): AcademicTreeSubject | null {
   return tree.subjects.find((s) => s.product_key === productKey) ?? null;
+}
+
+export function findProfSubjectInTree(
+  tree: AcademicTree,
+  productKey: string
+): AcademicProfSessionSubject | null {
+  return (
+    tree.prof_session.subjects.find((s) => s.product_key === productKey) ??
+    null
+  );
 }
 
 export function findCategoryInSubject(

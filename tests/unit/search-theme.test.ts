@@ -43,9 +43,20 @@ describe("academic tree search scope", () => {
     assert.ok(categoryHits.some((h) => h.kind === "category"));
     const notesHits = searchAcademicTreeNames({ query: "Notes", tree });
     assert.equal(
-      notesHits.filter((h) => h.kind === "category").length,
+      notesHits.filter(
+        (h) =>
+          h.kind === "category" &&
+          !h.path_labels.includes("Prof. Session")
+      ).length,
       0,
-      "Notes omitted from student Block chrome"
+      "Notes omitted from student Academic Block chrome"
+    );
+    assert.ok(
+      notesHits.some(
+        (h) =>
+          h.kind === "category" && h.path_labels.includes("Prof. Session")
+      ),
+      "Notes included under Prof. Session subject chrome"
     );
 
     const dayHits = searchAcademicTreeNames({ query: "Day 1", tree });
@@ -61,7 +72,14 @@ describe("academic tree search scope", () => {
 
   it("does not return day slots or invent stem/PDF hits", () => {
     const syllabus = searchAcademicTreeNames({ query: "Syllabus", tree });
-    assert.equal(syllabus.length, 0);
+    assert.ok(
+      syllabus.every((h) => h.path_labels.includes("Prof. Session")),
+      "Syllabus is Prof. Session chrome, not Academic Block or day slots"
+    );
+    assert.equal(
+      syllabus.filter((h) => h.kind === "day" || h.kind === "day_slot").length,
+      0
+    );
 
     const stemy = searchAcademicTreeNames({
       query: "which of the following",
@@ -148,11 +166,18 @@ describe("search hit hrefs (unified /academic IA)", () => {
           kind: "day",
           id: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
           name: "Foundations Day",
-          path_labels: ["1st Year MBBS", "Prof. Session", "Foundations Day"],
+          path_labels: [
+            "1st Year MBBS",
+            "Prof. Session",
+            "Block 1",
+            "MCQ Bank",
+            "Foundations Day",
+          ],
+          product_key: "block-1",
         },
         "resources"
       ),
-      "/academic/prof-session/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+      "/academic/prof-session/block-1/mcq-bank/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
     );
     assert.equal(
       hrefForAcademicSearchHit(

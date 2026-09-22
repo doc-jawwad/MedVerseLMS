@@ -1,4 +1,9 @@
-import type { BlockCategoryId, BlockProductKey, TestDaySlotId } from "./types.ts";
+import type {
+  BlockCategoryId,
+  BlockProductKey,
+  ProfSessionCategoryId,
+  TestDaySlotId,
+} from "./types.ts";
 
 /** Canonical class display names (SPEC FREEZE). */
 export const CLASS_DISPLAY_BY_YEAR_NUMBER: Record<number, string> = {
@@ -192,22 +197,16 @@ export type TestDaySlotDef = {
 /** Fixed containers under each Prof. Session day (product law). */
 export const TEST_DAY_SLOTS: readonly TestDaySlotDef[] = [
   {
-    id: "syllabus",
-    name: "Syllabus",
-    slug: "syllabus",
-    description: "Day syllabus and coverage outline.",
-  },
-  {
     id: "guidelines",
     name: "Guidelines",
     slug: "guidelines",
     description: "Study guidelines for this day.",
   },
   {
-    id: "one_liners",
-    name: "One-liners / Pearl Points",
-    slug: "one-liners",
-    description: "High-yield one-liners and pearl points.",
+    id: "los",
+    name: "LoS",
+    slug: "los",
+    description: "Learning outcomes for this day.",
   },
   {
     id: "practice_mcqs",
@@ -217,9 +216,15 @@ export const TEST_DAY_SLOTS: readonly TestDaySlotDef[] = [
   },
   {
     id: "test_mcq",
-    name: "Test MCQ",
+    name: "Test MCQs",
     slug: "test-mcq",
     description: "Formal timed Test MCQ (exam engine).",
+  },
+  {
+    id: "one_liners",
+    name: "One-Liners",
+    slug: "one-liners",
+    description: "Day-scoped one-liners (not Pearl Points).",
   },
 ] as const;
 
@@ -227,6 +232,134 @@ export function findDaySlotBySlug(slug: string): TestDaySlotDef | null {
   return TEST_DAY_SLOTS.find((s) => s.slug === slug) ?? null;
 }
 
+export type ProfSessionCategoryDef = {
+  id: ProfSessionCategoryId;
+  name: string;
+  slug: string;
+  description: string;
+  /** When set, maps to material_folders.library_type. */
+  libraryType?: string;
+};
+
+/**
+ * Student Prof. Session Block chrome (Notes included).
+ * OSPE Material / Lectures / Past also appear under the OSPE group with Practice.
+ */
+export const PROF_SESSION_CATEGORIES: readonly ProfSessionCategoryDef[] = [
+  {
+    id: "syllabus",
+    name: "Syllabus",
+    slug: "syllabus",
+    description: "Block syllabus PDF.",
+    libraryType: "syllabus",
+  },
+  {
+    id: "schedule",
+    name: "Schedule",
+    slug: "schedule",
+    description: "Block schedule (PDF or structured materials).",
+    libraryType: "schedule",
+  },
+  {
+    id: "books",
+    name: "Books",
+    slug: "books",
+    description: "Reference books for this Prof. Session subject.",
+    libraryType: "books",
+  },
+  {
+    id: "notes",
+    name: "Notes",
+    slug: "notes",
+    description: "Notes for this Prof. Session subject.",
+    libraryType: "notes",
+  },
+  {
+    id: "lectures",
+    name: "Lectures",
+    slug: "lectures",
+    description: "Lecture videos and recordings.",
+    libraryType: "lectures",
+  },
+  {
+    id: "ospe_past",
+    name: "Past OSPE",
+    slug: "ospe-past",
+    description: "Past OSPE PDFs and pictures.",
+    libraryType: "ospe_past",
+  },
+  {
+    id: "ospe_material",
+    name: "OSPE Material",
+    slug: "ospe-material",
+    description: "OSPE PDFs and station packs.",
+    libraryType: "ospe_material",
+  },
+  {
+    id: "ospe_lectures",
+    name: "OSPE Lectures",
+    slug: "ospe-lectures",
+    description: "OSPE lecture videos and recordings.",
+    libraryType: "ospe_lectures",
+  },
+  {
+    id: "mcq_bank",
+    name: "MCQ Bank",
+    slug: "mcq-bank",
+    description: "Admin-created Days with Guidelines, LoS, practice, tests, and one-liners.",
+  },
+] as const;
+
+export const PROF_SESSION_OSPE_GROUP_CATEGORY_IDS = [
+  "ospe_past",
+  "ospe_material",
+  "ospe_lectures",
+] as const satisfies readonly ProfSessionCategoryId[];
+
+export const PROF_SESSION_CHROME_GROUPS = [
+  {
+    id: "ospe" as const,
+    name: "OSPE",
+    description: "Past OSPE, practice stations, and OSPE lectures.",
+    children: [
+      {
+        id: "ospe_past",
+        name: "Past OSPE",
+        categorySlug: "ospe-past",
+      },
+      {
+        id: "ospe_material",
+        name: "OSPE Material",
+        categorySlug: "ospe-material",
+      },
+      {
+        id: "ospe_lectures",
+        name: "OSPE Lectures",
+        categorySlug: "ospe-lectures",
+      },
+      {
+        id: "ospe_practice",
+        name: "Practice OSPE",
+        categorySlug: null as string | null,
+        href: OSPE_PRACTICE_HREF,
+      },
+    ],
+  },
+] as const;
+
+export function findProfSessionCategoryById(
+  id: string
+): ProfSessionCategoryDef | null {
+  return PROF_SESSION_CATEGORIES.find((c) => c.id === id) ?? null;
+}
+
+export function findProfSessionCategoryBySlug(
+  slug: string
+): ProfSessionCategoryDef | null {
+  return PROF_SESSION_CATEGORIES.find((c) => c.slug === slug) ?? null;
+}
+
 /** Prof. Session sits beside class Blocks — never nested under a Block. */
 export const PROF_SESSION_LABEL = "Prof. Session";
 export const PROF_SESSION_SLUG = "prof-session";
+export const PROF_SESSION_MCQ_BANK_SLUG = "mcq-bank";

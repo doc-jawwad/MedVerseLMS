@@ -1,6 +1,8 @@
 export type {
   AcademicNodeKind,
   AcademicProfSession,
+  AcademicProfSessionCategory,
+  AcademicProfSessionSubject,
   AcademicSearchHit,
   AcademicTree,
   AcademicTreeAdapter,
@@ -14,6 +16,7 @@ export type {
   BlockCategoryId,
   BlockProductKey,
   GetAcademicTreeInput,
+  ProfSessionCategoryId,
   TestDaySlotId,
 } from "./types.ts";
 
@@ -26,7 +29,11 @@ export {
   NOTES_CATEGORY,
   OSPE_GROUP_CATEGORY_IDS,
   OSPE_PRACTICE_HREF,
+  PROF_SESSION_CATEGORIES,
+  PROF_SESSION_CHROME_GROUPS,
   PROF_SESSION_LABEL,
+  PROF_SESSION_MCQ_BANK_SLUG,
+  PROF_SESSION_OSPE_GROUP_CATEGORY_IDS,
   PROF_SESSION_SLUG,
   TEST_DAY_SLOTS,
   blocksForYearNumber,
@@ -35,6 +42,8 @@ export {
   findCategoryById,
   findCategoryBySlug,
   findDaySlotBySlug,
+  findProfSessionCategoryById,
+  findProfSessionCategoryBySlug,
   isBlockProductKey,
 } from "./product-structure.ts";
 
@@ -44,6 +53,7 @@ export {
   findCategoryInSubject,
   findDayFolder,
   findFolderBySlug,
+  findProfSubjectInTree,
   findSubjectInTree,
   structuralAcademicTreeAdapter,
 } from "./adapter.ts";
@@ -67,9 +77,12 @@ export {
   daySlotHref,
   folderHref,
   isKnownDaySlotSlug,
+  isProfSessionCategorySlug,
   isProfSessionPath,
   parseCategorySlug,
+  profSessionCategoryHref,
   profSessionHref,
+  profSessionSubjectHref,
   searchHref,
   surfaceBasePath,
   surfaceLabel,

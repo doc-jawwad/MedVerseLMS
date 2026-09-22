@@ -4,12 +4,14 @@ import { notFound } from "next/navigation";
 import {
   findCategoryInSubject,
   findDayFolder,
+  findProfSubjectInTree,
   findSubjectInTree,
 } from "./adapter.ts";
 import {
   findBlockProduct,
   findCategoryBySlug,
   findDaySlotBySlug,
+  findProfSessionCategoryBySlug,
   isBlockProductKey,
 } from "./product-structure.ts";
 import { getAcademicTreePageContext } from "./page-context.ts";
@@ -17,12 +19,15 @@ import { loadAcademicTree } from "./load-tree.ts";
 import { requireStudent } from "@/lib/auth/require-user";
 import { getStudentHasLiveSubscription } from "@/lib/subscriptions/student-live-access";
 import type {
+  AcademicProfSessionCategory,
+  AcademicProfSessionSubject,
   AcademicTree,
   AcademicTreeCategory,
   AcademicTreeFolder,
   AcademicTreeSubject,
   AcademicTreeSurface,
   BlockCategoryId,
+  ProfSessionCategoryId,
   TestDaySlotId,
 } from "./types.ts";
 
@@ -135,11 +140,38 @@ export function requireCategory(
   return { category, categoryId: def.id };
 }
 
-export function requireProfDay(
+export function requireProfSubject(
   tree: AcademicTree,
+  productKey: string
+): AcademicProfSessionSubject {
+  if (!isBlockProductKey(productKey)) notFound();
+  const subject = findProfSubjectInTree(tree, productKey);
+  if (subject) return subject;
+
+  const product = findBlockProduct(productKey);
+  if (!product || product.year_number !== tree.year_number) notFound();
+  notFound();
+}
+
+export function requireProfCategory(
+  subject: AcademicProfSessionSubject,
+  categorySlug: string
+): {
+  category: AcademicProfSessionCategory;
+  categoryId: ProfSessionCategoryId;
+} {
+  const def = findProfSessionCategoryBySlug(categorySlug);
+  if (!def) notFound();
+  const category = subject.categories.find((c) => c.id === def.id) ?? null;
+  if (!category) notFound();
+  return { category, categoryId: def.id };
+}
+
+export function requireProfDay(
+  subject: AcademicProfSessionSubject,
   daySlug: string
 ): AcademicTreeFolder {
-  const day = findDayFolder(tree.prof_session.days, daySlug);
+  const day = findDayFolder(subject.days, daySlug);
   if (!day) notFound();
   return day;
 }

@@ -65,15 +65,10 @@ describe("product structure freeze", () => {
   it("defines fixed Prof. Session day slots", () => {
     assert.deepEqual(
       TEST_DAY_SLOTS.map((s) => s.name),
-      [
-        "Syllabus",
-        "Guidelines",
-        "One-liners / Pearl Points",
-        "Practice MCQs",
-        "Test MCQ",
-      ]
+      ["Guidelines", "LoS", "Practice MCQs", "Test MCQs", "One-Liners"]
     );
     assert.equal(findDaySlotBySlug("practice-mcqs")?.id, "practice_mcqs");
+    assert.equal(findDaySlotBySlug("los")?.id, "los");
     assert.equal(PROF_SESSION_LABEL, "Prof. Session");
     assert.equal(PROF_SESSION_SLUG, "prof-session");
   });
@@ -107,9 +102,9 @@ describe("structural academic tree adapter", () => {
 
     assert.ok(tree.prof_session);
     assert.equal(
-      tree.prof_session.days.length,
+      tree.prof_session.subjects.length,
       0,
-      "structural tree must not invent Day 1–3"
+      "free structural tree must lock Prof. Session with empty subjects"
     );
     assert.equal(tree.prof_session.locked, true);
   });
@@ -141,6 +136,11 @@ describe("structural academic tree adapter", () => {
       ["medicine", "surgery", "gynecology", "pediatrics"]
     );
     assert.equal(tree.prof_session.locked, false);
+    assert.equal(tree.prof_session.subjects.length, 4);
+    assert.ok(
+      tree.prof_session.subjects.every((s) => s.days.length === 0),
+      "structural tree must not invent Day 1–3"
+    );
   });
 });
 
@@ -189,16 +189,20 @@ describe("paths and breadcrumbs", () => {
       surface: "resources",
       yearName: "2nd Year MBBS",
       profSession: true,
+      blockName: "Block 4",
+      blockSlug: "block-4",
+      categoryName: "MCQ Bank",
+      categorySlug: "mcq-bank",
       dayName: "Day 1",
       daySlug: "day-1",
-      slotName: "Syllabus",
-      slotSlug: "syllabus",
+      slotName: "Guidelines",
+      slotSlug: "guidelines",
     });
 
     assert.equal(crumbs[0]?.label, "Academic");
     assert.equal(crumbs[0]?.href, "/academic");
     assert.equal(crumbs[1]?.label, PROF_SESSION_LABEL);
-    assert.equal(crumbs.at(-1)?.label, "Syllabus");
+    assert.equal(crumbs.at(-1)?.label, "Guidelines");
     assert.equal(crumbs.at(-1)?.href, undefined);
   });
 });

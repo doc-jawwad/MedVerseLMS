@@ -18,17 +18,19 @@ function revalidateProfSession() {
 }
 
 export async function createProfSessionDay(
-  yearId: string,
+  subjectId: string,
   name: string,
   sortOrder?: number | null
 ) {
-  if (!yearId) return { error: "Class required.", id: null as string | null };
+  if (!subjectId) {
+    return { error: "Subject required.", id: null as string | null };
+  }
   const trimmed = name.trim();
   if (!trimmed) return { error: "Day name required.", id: null as string | null };
 
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("admin_create_prof_session_day", {
-    p_year_id: yearId,
+    p_subject_id: subjectId,
     p_name: trimmed,
     p_sort_order: sortOrder ?? null,
   });
@@ -59,15 +61,15 @@ export async function updateProfSessionDay(args: {
 }
 
 export async function reorderProfSessionDays(
-  yearId: string,
+  subjectId: string,
   dayIds: string[]
 ) {
-  if (!yearId || dayIds.length === 0) {
-    return { error: "Reorder requires a class and day list." };
+  if (!subjectId || dayIds.length === 0) {
+    return { error: "Reorder requires a subject and day list." };
   }
   const supabase = await createClient();
   const { error } = await supabase.rpc("admin_reorder_prof_session_days", {
-    p_year_id: yearId,
+    p_subject_id: subjectId,
     p_day_ids: dayIds,
   });
   revalidateProfSession();

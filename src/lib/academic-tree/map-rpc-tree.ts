@@ -1,5 +1,7 @@
 import type {
   AcademicProfSession,
+  AcademicProfSessionCategory,
+  AcademicProfSessionSubject,
   AcademicTree,
   AcademicTreeCategory,
   AcademicTreeFolder,
@@ -7,10 +9,12 @@ import type {
   BlockCategoryId,
   BlockProductKey,
   GetAcademicTreeInput,
+  ProfSessionCategoryId,
 } from "./types.ts";
 import {
   BLOCK_CATEGORIES,
   BLOCK_PRODUCT_DEFS,
+  PROF_SESSION_CATEGORIES,
   TEST_DAY_SLOTS,
   blocksForYearNumber,
   classDisplayName,
@@ -22,7 +26,7 @@ import {
  * Never attaches Drive URLs, stems, or correct_key.
  *
  * Product keys come from RPC `product_key` (authoritative). Prof. Session
- * days are Admin-created only — empty when RPC returns none (no Day 1–3 invent).
+ * subjects nest Admin-created days — empty subjects when locked / none published.
  */
 export function mapRpcTree(
   raw: unknown,
@@ -60,7 +64,6 @@ export function mapRpcTree(
       if (existing) {
         return {
           ...existing,
-          // Prefer canonical product display name from product_key defs.
           name: def.name,
           categories: ensureChromeCategories(existing.categories),
         };
@@ -75,7 +78,7 @@ export function mapRpcTree(
     }
   );
 
-  const prof_session = mapRpcProfSession(row.prof_session, libraryLocked);
+  const prof_session = mapRpcProfSession(row.prof_session, yearNumber);
 
   return {
     surface: input.surface,
@@ -90,20 +93,132 @@ export function mapRpcTree(
 
 function mapRpcProfSession(
   raw: unknown,
-  libraryLocked: boolean
+  yearNumber: number
 ): AcademicProfSession {
   if (!raw || typeof raw !== "object") {
-    return { locked: libraryLocked, days: [] };
+    return { locked: true, subjects: [] };
   }
   const row = raw as Record<string, unknown>;
+  const locked = row.locked != null ? Boolean(row.locked) : true;
+  if (locked) {
+    return { locked: true, subjects: [] };
+  }
+
+  const subjectsRaw = Array.isArray(row.subjects) ? row.subjects : [];
+  const mappedByKey = new Map<BlockProductKey, AcademicProfSessionSubject>();
+  for (const subjectRaw of subjectsRaw) {
+    const mapped = mapRpcProfSubject(subjectRaw);
+    if (mapped) mappedByKey.set(mapped.product_key, mapped);
+  }
+
+  // Structural chrome for enrolled-year product keys even when RPC omitted a subject.
+  const subjects: AcademicProfSessionSubject[] = blocksForYearNumber(
+    yearNumber
+  ).map((def) => {
+    const existing = mappedByKey.get(def.key);
+    if (existing) {
+      return {
+        ...existing,
+        name: def.name,
+        categories: ensurePsChromeCategories(existing.categories),
+      };
+    }
+    return {
+      subject_id: `product:${def.key}`,
+      product_key: def.key,
+      name: def.name,
+      categories: emptyPsChromeCategories(),
+      days: [],
+    };
+  });
+
+  return { locked: false, subjects };
+}
+
+function mapRpcProfSubject(raw: unknown): AcademicProfSessionSubject | null {
+  if (!raw || typeof raw !== "object") return null;
+  const row = raw as Record<string, unknown>;
+  const subjectId =
+    typeof row.subject_id === "string" ? row.subject_id : null;
+  const name = typeof row.name === "string" ? row.name.trim() : "";
+  if (!subjectId || !name) return null;
+
+  const rawKey =
+    typeof row.product_key === "string" ? row.product_key.trim() : "";
+  if (!isBlockProductKey(rawKey)) return null;
+
+  const foldersRaw = Array.isArray(row.folders) ? row.folders : [];
+  const folders = foldersRaw
+    .map((f) => mapRpcFolder(f))
+    .filter((f): f is AcademicTreeFolder => Boolean(f));
+
   const daysRaw = Array.isArray(row.days) ? row.days : [];
   const days = daysRaw
     .map((d) => mapRpcProfDay(d))
     .filter((f): f is AcademicTreeFolder => Boolean(f));
+
+  const categories = categoriesFromPsFolders(folders);
+  const def = BLOCK_PRODUCT_DEFS.find((b) => b.key === rawKey);
+
   return {
-    locked: row.locked != null ? Boolean(row.locked) : libraryLocked,
+    subject_id: subjectId,
+    product_key: rawKey,
+    name: def?.name ?? name,
+    categories,
     days,
   };
+}
+
+function categoriesFromPsFolders(
+  folders: AcademicTreeFolder[]
+): AcademicProfSessionCategory[] {
+  const byType = new Map<string, AcademicTreeFolder[]>();
+  for (const folder of folders) {
+    const lt = folder.library_type ?? "";
+    if (!lt) continue;
+    const list = byType.get(lt) ?? [];
+    list.push(folder);
+    byType.set(lt, list);
+  }
+
+  return PROF_SESSION_CATEGORIES.map((def) => ({
+    id: def.id,
+    name: def.name,
+    locked: false,
+    folders:
+      def.id === "mcq_bank"
+        ? []
+        : def.libraryType
+          ? (byType.get(def.libraryType) ?? [])
+          : [],
+  }));
+}
+
+function emptyPsChromeCategories(): AcademicProfSessionCategory[] {
+  return PROF_SESSION_CATEGORIES.map((def) => ({
+    id: def.id,
+    name: def.name,
+    locked: false,
+    folders: [],
+  }));
+}
+
+function ensurePsChromeCategories(
+  categories: AcademicProfSessionCategory[]
+): AcademicProfSessionCategory[] {
+  const byId = new Map(categories.map((c) => [c.id, c]));
+  return PROF_SESSION_CATEGORIES.map((def) => {
+    const existing = byId.get(def.id);
+    if (existing) {
+      return { ...existing, name: existing.name || def.name };
+    }
+    return {
+      id: def.id,
+      name: def.name,
+      locked: false,
+      folders: [],
+    };
+  });
 }
 
 /** Data Spine day shape: `{ day_id, name, sort_order, slots: [{ slot_key, name }] }`. */
@@ -217,7 +332,6 @@ function mapRpcSubject(raw: unknown): AcademicTreeSubject | null {
   const rawKey =
     typeof row.product_key === "string" ? row.product_key.trim() : "";
   if (!isBlockProductKey(rawKey)) {
-    // Ignore departmental / unmapped subjects — chrome is product_key only.
     return null;
   }
 
@@ -289,6 +403,8 @@ function mapRpcFolder(raw: unknown): AcademicTreeFolder | null {
     children: [],
     items: [],
     is_day: Boolean(dayMatch),
+    library_type:
+      typeof row.library_type === "string" ? row.library_type : undefined,
   };
 }
 
@@ -317,6 +433,10 @@ function categoryIdFromLibraryType(
     case "test":
     case "past_papers":
     case "flashcards":
+    case "syllabus":
+    case "schedule":
+    case "los":
+    case "ospe_past":
       return null;
     default:
       return null;
@@ -345,7 +465,12 @@ export function productKeyForSubjectName(
     if (isBlockProductKey(key)) return key;
   }
 
-  // No year-default invent — callers must handle null.
   void yearNumber;
   return null;
+}
+
+export function isProfSessionCategoryId(
+  value: string
+): value is ProfSessionCategoryId {
+  return PROF_SESSION_CATEGORIES.some((c) => c.id === value);
 }

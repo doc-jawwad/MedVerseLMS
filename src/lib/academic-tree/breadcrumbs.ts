@@ -7,7 +7,9 @@ import {
   dayHref,
   daySlotHref,
   folderHref,
+  profSessionCategoryHref,
   profSessionHref,
+  profSessionSubjectHref,
   searchHref,
   yearHref,
 } from "./paths.ts";
@@ -28,7 +30,7 @@ export function buildAcademicBreadcrumbs(args: {
   categorySlug?: string;
   folderName?: string;
   folderSlug?: string;
-  /** When true, day crumbs hang under Prof. Session (not under a Block). */
+  /** When true, crumbs hang under Prof. Session. */
   profSession?: boolean;
   dayName?: string;
   daySlug?: string;
@@ -51,24 +53,39 @@ export function buildAcademicBreadcrumbs(args: {
     return crumbs;
   }
 
-  if (args.profSession || (args.dayName && args.daySlug && !args.blockSlug)) {
+  if (args.profSession) {
     crumbs.push({
       label: PROF_SESSION_LABEL,
       href: profSessionHref(),
     });
 
-    if (args.dayName && args.daySlug) {
+    if (args.blockName && args.blockSlug) {
+      crumbs.push({
+        label: args.blockName,
+        href: profSessionSubjectHref(args.blockSlug),
+      });
+    }
+
+    if (args.categoryName && args.categorySlug && args.blockSlug) {
+      crumbs.push({
+        label: args.categoryName,
+        href: profSessionCategoryHref(args.blockSlug, args.categorySlug),
+      });
+    }
+
+    if (args.dayName && args.daySlug && args.blockSlug) {
       crumbs.push({
         label: args.dayName,
-        href: dayHref(args.daySlug),
+        href: dayHref(args.blockSlug, args.daySlug),
       });
       if (args.slotName && args.slotSlug) {
         crumbs.push({
           label: args.slotName,
-          href: daySlotHref(args.daySlug, args.slotSlug),
+          href: daySlotHref(args.blockSlug, args.daySlug, args.slotSlug),
         });
       }
     }
+
     return finalize(crumbs);
   }
 
@@ -123,7 +140,9 @@ export {
   dayHref,
   daySlotHref,
   folderHref,
+  profSessionCategoryHref,
   profSessionHref,
+  profSessionSubjectHref,
   searchHref,
   surfaceBasePath,
   surfaceLabel,

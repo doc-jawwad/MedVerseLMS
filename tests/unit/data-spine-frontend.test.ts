@@ -32,7 +32,7 @@ describe("mapRpcTree product_key mapping", () => {
             categories: [],
           },
         ],
-        prof_session: { locked: true, days: [] },
+        prof_session: { locked: true, subjects: [] },
       },
       {
         surface: "resources",
@@ -51,11 +51,11 @@ describe("mapRpcTree product_key mapping", () => {
     );
     assert.equal(tree!.subjects[0]!.subject_id, "s-block-1");
     assert.equal(tree!.subjects[0]!.name, "Block 1");
-    assert.equal(tree!.prof_session.days.length, 0);
+    assert.equal(tree!.prof_session.subjects.length, 0);
     assert.equal(tree!.prof_session.locked, true);
   });
 
-  it("maps real Prof Session days from day_id + slots (no fake days)", () => {
+  it("maps subject-scoped Prof Session days from RPC subjects", () => {
     const dayId = "11111111-1111-1111-1111-111111111111";
     const tree = mapRpcTree(
       {
@@ -73,17 +73,33 @@ describe("mapRpcTree product_key mapping", () => {
         ],
         prof_session: {
           locked: false,
-          days: [
+          subjects: [
             {
-              day_id: dayId,
-              name: "Foundations Day",
-              sort_order: 1,
-              slots: [
-                { slot_key: "syllabus", name: "Syllabus" },
-                { slot_key: "guidelines", name: "Guidelines" },
-                { slot_key: "one_liners", name: "One-liners" },
-                { slot_key: "practice_mcqs", name: "Practice MCQs" },
-                { slot_key: "test_mcq", name: "Test MCQ" },
+              subject_id: "s1",
+              name: "Block 1",
+              product_key: "block-1",
+              folders: [
+                {
+                  folder_id: "f-syl",
+                  name: "Syllabus PDF",
+                  locked: false,
+                  parent_id: null,
+                  library_type: "syllabus",
+                },
+              ],
+              days: [
+                {
+                  day_id: dayId,
+                  name: "Foundations Day",
+                  sort_order: 1,
+                  slots: [
+                    { slot_key: "guidelines", name: "Guidelines" },
+                    { slot_key: "los", name: "LoS" },
+                    { slot_key: "one_liners", name: "One-Liners" },
+                    { slot_key: "practice_mcqs", name: "Practice MCQs" },
+                    { slot_key: "test_mcq", name: "Test MCQs" },
+                  ],
+                },
               ],
             },
           ],
@@ -99,14 +115,26 @@ describe("mapRpcTree product_key mapping", () => {
     );
 
     assert.ok(tree);
-    assert.equal(tree!.prof_session.days.length, 1);
-    assert.equal(tree!.prof_session.days[0]!.name, "Foundations Day");
-    assert.equal(tree!.prof_session.days[0]!.slug, dayId);
-    assert.equal(tree!.prof_session.days[0]!.children.length, 5);
+    assert.equal(tree!.prof_session.locked, false);
+    assert.equal(tree!.prof_session.subjects.length, 3);
+    const block1 = tree!.prof_session.subjects.find(
+      (s) => s.product_key === "block-1"
+    );
+    assert.ok(block1);
+    assert.equal(block1!.days.length, 1);
+    assert.equal(block1!.days[0]!.name, "Foundations Day");
+    assert.equal(block1!.days[0]!.slug, dayId);
+    assert.equal(block1!.days[0]!.children.length, 5);
     assert.ok(
-      tree!.prof_session.days[0]!.children.every((c) => c.day_slot),
+      block1!.days[0]!.children.every((c) => c.day_slot),
       "slots must carry day_slot ids"
     );
+    assert.ok(
+      block1!.categories.some(
+        (c) => c.id === "syllabus" && c.folders.length === 1
+      )
+    );
+    assert.ok(!block1!.days[0]!.children.some((c) => c.day_slot === "syllabus"));
   });
 
   it("does not invent year-default product keys from departmental names", () => {

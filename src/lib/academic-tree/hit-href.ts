@@ -2,6 +2,7 @@ import type { AcademicSearchHit, AcademicTreeSurface } from "./types.ts";
 import {
   ALL_BLOCK_CATEGORIES,
   BLOCK_PRODUCT_DEFS,
+  PROF_SESSION_CATEGORIES,
   PROF_SESSION_LABEL,
   isBlockProductKey,
 } from "./product-structure.ts";
@@ -10,7 +11,9 @@ import {
   blockHref,
   categoryHref,
   dayHref,
+  profSessionCategoryHref,
   profSessionHref,
+  profSessionSubjectHref,
 } from "./paths.ts";
 
 /**
@@ -38,17 +41,19 @@ export function hrefForAcademicSearchHit(
   const underProf = labels.some(
     (l) => normalizeKey(l) === normalizeKey(PROF_SESSION_LABEL)
   );
+  const psCategorySlug = psCategorySlugFromLabels(labels);
 
   if (hit.kind === "day") {
-    // Live days use UUID slug (= day id).
-    if (hit.id && !hit.id.includes(":")) {
-      return dayHref(hit.id);
+    const key = productKey ?? blockSlugFromLabels(labels);
+    if (hit.id && !hit.id.includes(":") && key) {
+      return dayHref(key, hit.id);
     }
     const daySlug = daySlugFromName(hit.name);
-    if (underProf || !blockSlug) {
-      return daySlug ? dayHref(daySlug) : profSessionHref();
+    if (underProf && key) {
+      return daySlug ? dayHref(key, daySlug) : profSessionSubjectHref(key);
     }
-    return blockSlug ? blockHref(blockSlug) : home;
+    if (underProf) return profSessionHref();
+    return key ? blockHref(key) : home;
   }
 
   if (hit.kind === "block") {
@@ -57,10 +62,21 @@ export function hrefForAcademicSearchHit(
       blockSlugFromName(hit.name) ??
       blockSlug ??
       productKeyFromName(hit.name);
+    if (underProf && slug) return profSessionSubjectHref(slug);
     return slug ? blockHref(slug) : home;
   }
 
   if (hit.kind === "category") {
+    if (underProf) {
+      const key = productKey ?? blockSlugFromLabels(labels);
+      const cat =
+        psCategorySlug ??
+        psCategorySlugFromName(hit.name) ??
+        categorySlugFromName(hit.name);
+      if (key && cat) return profSessionCategoryHref(key, cat);
+      if (key) return profSessionSubjectHref(key);
+      return profSessionHref();
+    }
     const cat =
       categorySlugFromName(hit.name) ??
       categorySlug ??
@@ -71,7 +87,14 @@ export function hrefForAcademicSearchHit(
   }
 
   if (hit.kind === "folder") {
-    if (underProf) return profSessionHref();
+    if (underProf) {
+      const key = productKey ?? blockSlugFromLabels(labels);
+      if (key && psCategorySlug) {
+        return profSessionCategoryHref(key, psCategorySlug);
+      }
+      if (key) return profSessionSubjectHref(key);
+      return profSessionHref();
+    }
     if (blockSlug && categorySlug) {
       return categoryHref(blockSlug, categorySlug);
     }
@@ -117,6 +140,22 @@ function categorySlugFromName(name: string): string | null {
 function categorySlugFromLabels(labels: string[]): string | null {
   for (const label of labels) {
     const slug = categorySlugFromName(label);
+    if (slug) return slug;
+  }
+  return null;
+}
+
+function psCategorySlugFromName(name: string): string | null {
+  const key = normalizeKey(name);
+  const found = PROF_SESSION_CATEGORIES.find(
+    (c) => normalizeKey(c.name) === key || normalizeKey(c.slug) === key
+  );
+  return found?.slug ?? null;
+}
+
+function psCategorySlugFromLabels(labels: string[]): string | null {
+  for (const label of labels) {
+    const slug = psCategorySlugFromName(label);
     if (slug) return slug;
   }
   return null;

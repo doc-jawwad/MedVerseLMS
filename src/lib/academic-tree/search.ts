@@ -64,6 +64,7 @@ export function searchAcademicTreeNames(input: {
       path_labels: [className, subject.name],
       locked: subject.locked,
       class_name: className,
+      product_key: subject.product_key,
     });
 
     for (const category of subject.categories) {
@@ -76,6 +77,7 @@ export function searchAcademicTreeNames(input: {
         path_labels: [className, subject.name, category.name],
         locked: category.locked,
         class_name: className,
+        product_key: subject.product_key,
       });
 
       walkFolders({
@@ -86,6 +88,8 @@ export function searchAcademicTreeNames(input: {
         query: q,
         hits,
         limit,
+        productKey: subject.product_key,
+        underProf: false,
       });
     }
   }
@@ -101,15 +105,63 @@ export function searchAcademicTreeNames(input: {
       class_name: className,
     });
 
-    walkFolders({
-      folders: prof.days,
-      path: [className, PROF_SESSION_LABEL],
-      className,
-      surface,
-      query: q,
-      hits,
-      limit,
-    });
+    for (const subject of prof.subjects) {
+      if (hits.length >= limit) break;
+
+      tryPush({
+        kind: "block",
+        id: `ps:${subject.subject_id}`,
+        name: subject.name,
+        path_labels: [className, PROF_SESSION_LABEL, subject.name],
+        locked: prof.locked,
+        class_name: className,
+        product_key: subject.product_key,
+      });
+
+      for (const category of subject.categories) {
+        if (hits.length >= limit) break;
+        if (category.id === "mcq_bank") continue;
+
+        tryPush({
+          kind: "category",
+          id: `ps:${subject.subject_id}:${category.id}`,
+          name: category.name,
+          path_labels: [
+            className,
+            PROF_SESSION_LABEL,
+            subject.name,
+            category.name,
+          ],
+          locked: prof.locked,
+          class_name: className,
+          product_key: subject.product_key,
+        });
+
+        walkFolders({
+          folders: category.folders,
+          path: [className, PROF_SESSION_LABEL, subject.name, category.name],
+          className,
+          surface,
+          query: q,
+          hits,
+          limit,
+          productKey: subject.product_key,
+          underProf: true,
+        });
+      }
+
+      walkFolders({
+        folders: subject.days,
+        path: [className, PROF_SESSION_LABEL, subject.name, "MCQ Bank"],
+        className,
+        surface,
+        query: q,
+        hits,
+        limit,
+        productKey: subject.product_key,
+        underProf: true,
+      });
+    }
   }
 
   return hits.slice(0, limit);
@@ -123,6 +175,8 @@ function walkFolders(args: {
   query: string;
   hits: AcademicSearchHit[];
   limit: number;
+  productKey?: AcademicSearchHit["product_key"];
+  underProf?: boolean;
 }): void {
   for (const folder of args.folders) {
     if (args.hits.length >= args.limit) return;
@@ -139,6 +193,7 @@ function walkFolders(args: {
         path_labels: path,
         locked: folder.locked,
         class_name: args.className,
+        product_key: args.productKey ?? null,
       };
       args.hits.push({
         ...partial,

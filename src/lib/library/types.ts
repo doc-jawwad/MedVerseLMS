@@ -2,19 +2,29 @@ import type { IconKey } from "@/components/mobile-nav";
 
 export const FOLDER_LIBRARY_TYPES = [
   "guidelines",
+  "los",
+  "ospe_material",
+  "ospe_lectures",
+  "ospe_past",
+  "books",
+  "notes",
+  "lectures",
+  "syllabus",
+  "schedule",
+] as const;
+
+export type FolderLibraryType = (typeof FOLDER_LIBRARY_TYPES)[number];
+
+/** Student top-level library nav (excludes Prof. Session–only folder types). */
+export const STUDENT_LIBRARY_TYPES = [
+  "mcq_bank",
+  "pearl_points",
+  "guidelines",
   "ospe_material",
   "ospe_lectures",
   "books",
   "notes",
   "lectures",
-] as const;
-
-export type FolderLibraryType = (typeof FOLDER_LIBRARY_TYPES)[number];
-
-export const STUDENT_LIBRARY_TYPES = [
-  "mcq_bank",
-  "pearl_points",
-  ...FOLDER_LIBRARY_TYPES,
 ] as const;
 
 export type StudentLibraryType = (typeof STUDENT_LIBRARY_TYPES)[number];
@@ -119,6 +129,42 @@ export const LIBRARY_LIST: LibraryMeta[] = STUDENT_LIBRARY_TYPES.map(
 
 export function isFolderLibraryType(value: string): value is FolderLibraryType {
   return (FOLDER_LIBRARY_TYPES as readonly string[]).includes(value);
+}
+
+/** Labels for any material folder type (including Prof. Session–only). */
+export function folderLibraryLabel(type: FolderLibraryType): {
+  label: string;
+  description: string;
+} {
+  switch (type) {
+    case "syllabus":
+      return {
+        label: "Syllabus",
+        description: "Block syllabus PDF.",
+      };
+    case "schedule":
+      return {
+        label: "Schedule",
+        description: "Block schedule materials.",
+      };
+    case "los":
+      return {
+        label: "LoS",
+        description: "Learning outcomes.",
+      };
+    case "ospe_past":
+      return {
+        label: "Past OSPE",
+        description: "Past OSPE PDFs and pictures.",
+      };
+    default: {
+      const meta = LIBRARY_META[type as StudentLibraryType];
+      return {
+        label: meta?.label ?? type,
+        description: meta?.description ?? "",
+      };
+    }
+  }
 }
 
 export function parseLibrarySlug(slug: string): StudentLibraryType | null {

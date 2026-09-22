@@ -1,8 +1,10 @@
 import type { AcademicTreeSurface } from "./types.ts";
 import {
+  PROF_SESSION_MCQ_BANK_SLUG,
   PROF_SESSION_SLUG,
   findCategoryById,
   findCategoryBySlug,
+  findProfSessionCategoryBySlug,
 } from "./product-structure.ts";
 
 /** Primary student academic tree base (not Resources/Library dual surfaces). */
@@ -30,8 +32,8 @@ export function parseCategorySlug(slug: string) {
 
 export function isKnownDaySlotSlug(slug: string): boolean {
   return (
-    slug === "syllabus" ||
     slug === "guidelines" ||
+    slug === "los" ||
     slug === "one-liners" ||
     slug === "practice-mcqs" ||
     slug === "test-mcq"
@@ -106,37 +108,37 @@ export function profSessionHref(_surface?: AcademicTreeSurface): string {
   return `${ACADEMIC_BASE_PATH}/${PROF_SESSION_SLUG}`;
 }
 
-export function dayHref(
-  _surface: AcademicTreeSurface | undefined,
-  daySlug: string
-): string;
-export function dayHref(daySlug: string): string;
-export function dayHref(
-  surfaceOrDay: AcademicTreeSurface | string | undefined,
-  daySlug?: string
+/** Prof. Session → Block / Final-Year subject home. */
+export function profSessionSubjectHref(productKey: string): string {
+  return `${profSessionHref()}/${encodeURIComponent(productKey)}`;
+}
+
+/** Block-level PS category (syllabus, books, mcq-bank, …). */
+export function profSessionCategoryHref(
+  productKey: string,
+  categorySlug: string
 ): string {
-  const slug =
-    typeof surfaceOrDay === "string" && daySlug === undefined
-      ? surfaceOrDay
-      : daySlug!;
-  return `${profSessionHref()}/${encodeURIComponent(slug)}`;
+  return `${profSessionSubjectHref(productKey)}/${encodeURIComponent(categorySlug)}`;
+}
+
+export function isProfSessionCategorySlug(slug: string): boolean {
+  return Boolean(findProfSessionCategoryBySlug(slug));
+}
+
+/**
+ * Day under subject MCQ Bank:
+ * `/academic/prof-session/{productKey}/mcq-bank/{dayId}`
+ */
+export function dayHref(productKey: string, daySlug: string): string {
+  return `${profSessionCategoryHref(productKey, PROF_SESSION_MCQ_BANK_SLUG)}/${encodeURIComponent(daySlug)}`;
 }
 
 export function daySlotHref(
-  _surface: AcademicTreeSurface | undefined,
+  productKey: string,
   daySlug: string,
   slotSlug: string
-): string;
-export function daySlotHref(daySlug: string, slotSlug: string): string;
-export function daySlotHref(
-  a: AcademicTreeSurface | string | undefined,
-  b: string,
-  c?: string
 ): string {
-  if (c !== undefined) {
-    return `${dayHref(undefined, b)}/${encodeURIComponent(c)}`;
-  }
-  return `${dayHref(undefined, a as string)}/${encodeURIComponent(b)}`;
+  return `${dayHref(productKey, daySlug)}/${encodeURIComponent(slotSlug)}`;
 }
 
 export function searchHref(

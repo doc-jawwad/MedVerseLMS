@@ -101,7 +101,8 @@ describe("Data Spine academic tree mapping", () => {
     assert.ok(!medicine!.categories.some((c) => (c.id as string) === "flashcards"));
     assert.ok(!medicine!.categories.some((c) => (c.id as string) === "test"));
     assert.ok(tree!.prof_session);
-    assert.deepEqual(tree!.prof_session.days, []);
+    assert.deepEqual(tree!.prof_session.subjects, []);
+    assert.equal(tree!.prof_session.locked, true);
   });
 
   it("resolves known product keys from display names only (no year invent)", () => {

@@ -39,10 +39,25 @@ export type BlockCategoryId =
   | "notes"
   | "lectures";
 
+/**
+ * Prof. Session Block/Subject chrome (content_surface = prof_session).
+ * Notes included. Pearl Points / Academic MCQ Bank are not PS chrome.
+ */
+export type ProfSessionCategoryId =
+  | "syllabus"
+  | "schedule"
+  | "books"
+  | "notes"
+  | "lectures"
+  | "ospe_past"
+  | "ospe_material"
+  | "ospe_lectures"
+  | "mcq_bank";
+
 /** Fixed containers under each Prof. Session day (product law). */
 export type TestDaySlotId =
-  | "syllabus"
   | "guidelines"
+  | "los"
   | "one_liners"
   | "practice_mcqs"
   | "test_mcq";
@@ -86,6 +101,8 @@ export type AcademicTreeFolder = {
   is_day?: boolean;
   /** When set, this node is one of the fixed day slots. */
   day_slot?: TestDaySlotId;
+  /** Optional library_type from material_folders (PS block folders). */
+  library_type?: string;
 };
 
 export type AcademicTreeCategory = {
@@ -106,11 +123,28 @@ export type AcademicTreeSubject = {
   categories: AcademicTreeCategory[];
 };
 
-/** Prof. Session sits beside class Blocks — never nested under a Block. */
+export type AcademicProfSessionCategory = {
+  id: ProfSessionCategoryId;
+  name: string;
+  locked: boolean;
+  folders: AcademicTreeFolder[];
+};
+
+/** Product Block / Final-Year subject under Prof. Session. */
+export type AcademicProfSessionSubject = {
+  subject_id: string;
+  product_key: BlockProductKey;
+  name: string;
+  categories: AcademicProfSessionCategory[];
+  /** Admin-created published days only (never invented). */
+  days: AcademicTreeFolder[];
+};
+
+/** Prof. Session sits beside class Blocks — never nested under an Academic Block. */
 export type AcademicProfSession = {
   locked: boolean;
-  /** Only days that exist (Admin-created when Data Spine provides them). */
-  days: AcademicTreeFolder[];
+  /** Empty when locked (free students). */
+  subjects: AcademicProfSessionSubject[];
 };
 
 export type AcademicTree = {
@@ -140,6 +174,8 @@ export type AcademicSearchHit = {
   /** Class display name (years / enrollment class). */
   class_name: string;
   href: string;
+  /** Present for Prof. Session subject / day hits when known. */
+  product_key?: BlockProductKey | null;
 };
 
 export type AcademicTreeLoadState =
