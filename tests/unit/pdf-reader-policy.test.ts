@@ -9,11 +9,10 @@ describe("protected pdf reader policy", () => {
       join("src", "app", "api", "study-content", "[materialId]", "route.ts"),
       "utf8"
     );
+    assert.match(src, /bytes=0-65535/);
     assert.match(src, /fetchR2ObjectStream/);
     assert.match(src, /rangeHeader/);
-    assert.match(src, /headR2ObjectViaPresign/);
     assert.doesNotMatch(src, /getR2Object\(/);
-    assert.match(src, /Unscoped GET would stream/);
   });
 
   it("pdf viewer uses PDF.js and has no Download control", () => {

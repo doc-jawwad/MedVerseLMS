@@ -66,25 +66,12 @@ export async function GET(
 
   const rangeHeader = request.headers.get("range");
   // Unscoped GET would stream the entire object through Next/Caddy and can
-  // starve PDF.js Range requests on large files. Advertise size + Accept-Ranges
-  // without a body so the client must use Range (or HEAD).
-  if (!rangeHeader) {
-    const head = await headR2ObjectViaPresign({ key });
-    if ("error" in head) {
-      return NextResponse.json({ error: head.error }, { status: 502 });
-    }
-    return new NextResponse(null, {
-      status: 200,
-      headers: {
-        ...COMMON_HEADERS,
-        "Content-Length": String(head.contentLength),
-      },
-    });
-  }
-
+  // starve PDF.js Range requests on large files. Answer with a small leading
+  // 206 so clients learn Content-Length via Content-Range and continue with Range.
+  const effectiveRange = rangeHeader || "bytes=0-65535";
   const upstream = await fetchR2ObjectStream({
     key,
-    rangeHeader,
+    rangeHeader: effectiveRange,
   });
   if ("error" in upstream) {
     return NextResponse.json({ error: upstream.error }, { status: 502 });
@@ -108,7 +95,7 @@ export async function GET(
 
   // Stream body through — do not arrayBuffer().
   return new NextResponse(upstream.body, {
-    status: upstream.status,
+    status: upstream.status === 200 && !rangeHeader ? 206 : upstream.status,
     headers,
   });
 }
