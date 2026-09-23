@@ -460,7 +460,11 @@ export function PdfViewer({
         return;
       }
       setOfflineUi("save_failed");
-      toast.error("Could not save for offline.");
+      toast.error(
+        msg.startsWith("offline_range_failed")
+          ? `Could not save for offline (${msg}).`
+          : "Could not save for offline."
+      );
     }
   };
 

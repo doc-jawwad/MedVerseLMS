@@ -167,18 +167,37 @@ export async function savePdfForOffline(options: {
     for (let start = 0; start < total; start += chunkSize) {
       if (options.signal?.aborted) throw new Error("offline_cancelled");
       const end = Math.min(start + chunkSize - 1, total - 1);
-      const res = await fetch(url, {
-        method: "GET",
-        credentials: "same-origin",
-        cache: "no-store",
-        headers: { Range: `bytes=${start}-${end}` },
-        signal: options.signal,
-      });
-      if (res.status === 403) throw new Error("study_object_denied");
-      if (res.status !== 206 && res.status !== 200) {
-        throw new Error(`offline_range_failed:${res.status}`);
+      let buf: Uint8Array | null = null;
+      let lastErr = "offline_range_failed";
+      for (let attempt = 0; attempt < 3; attempt++) {
+        if (options.signal?.aborted) throw new Error("offline_cancelled");
+        try {
+          const res = await fetch(url, {
+            method: "GET",
+            credentials: "same-origin",
+            cache: "no-store",
+            headers: { Range: `bytes=${start}-${end}` },
+            signal: options.signal,
+          });
+          if (res.status === 403) throw new Error("study_object_denied");
+          if (res.status !== 206 && res.status !== 200) {
+            lastErr = `offline_range_failed:${res.status}`;
+            continue;
+          }
+          buf = new Uint8Array(await res.arrayBuffer());
+          break;
+        } catch (e) {
+          if (e instanceof Error && e.message === "study_object_denied") {
+            throw e;
+          }
+          if (e instanceof Error && e.message === "offline_cancelled") {
+            throw e;
+          }
+          lastErr = e instanceof Error ? e.message : lastErr;
+          await new Promise((r) => setTimeout(r, 250 * (attempt + 1)));
+        }
       }
-      const buf = new Uint8Array(await res.arrayBuffer());
+      if (!buf) throw new Error(lastErr);
       await writable.write(buf);
       loaded += buf.byteLength;
       options.onProgress?.({ loaded, total });

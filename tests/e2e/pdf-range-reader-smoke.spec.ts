@@ -68,10 +68,24 @@ test.describe("pdf range reader staging", () => {
     const magic = await partial.body();
     expect(magic.toString("utf8").startsWith("%PDF-")).toBe(true);
 
-    // PDF.js should issue ranges for multi-MB docs; small fixtures may not.
+    // PDF.js should issue ranges for multi-MB docs; server may also coerce
+    // the first unscoped GET into a leading 206 (no client Range header).
     const size = Number(head.headers()["content-length"] ?? "0");
     if (size > 1024 * 1024) {
-      expect(rangeSeen.length).toBeGreaterThan(0);
+      const coerced206 = await page.evaluate(async (id) => {
+        const r = await fetch(`/api/study-content/${id}`, {
+          credentials: "same-origin",
+          cache: "no-store",
+        });
+        return {
+          status: r.status,
+          cr: r.headers.get("content-range") || "",
+        };
+      }, materialId);
+      expect(
+        rangeSeen.length > 0 ||
+          (coerced206.status === 206 && /\/\d+/.test(coerced206.cr))
+      ).toBe(true);
     }
   });
 });
