@@ -17,7 +17,7 @@ export default async function StudyReadPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const { supabase } = await requireStudent();
+  const { supabase, profile } = await requireStudent();
   const { id } = await params;
 
   const { data: catalog } = await supabase
@@ -26,6 +26,12 @@ export default async function StudyReadPage({
     .eq("id", id)
     .maybeSingle();
   if (!catalog) notFound();
+
+  const { data: bio } = await supabase
+    .from("profiles")
+    .select("college_name")
+    .eq("id", profile.id)
+    .maybeSingle();
 
   const { data, error } = await supabase.rpc("open_study_item", {
     p_material_id: id,
@@ -66,7 +72,14 @@ export default async function StudyReadPage({
         </Card>
       )}
       {item.kind === "pdf" && item.has_pdf && (
-        <PdfViewer materialId={id} title={item.title} />
+        <PdfViewer
+          materialId={id}
+          title={item.title}
+          watermarkName={profile.full_name}
+          watermarkCollege={
+            typeof bio?.college_name === "string" ? bio.college_name : undefined
+          }
+        />
       )}
     </StudentPage>
   );

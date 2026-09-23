@@ -199,3 +199,68 @@ export async function getR2Object(options: {
     res.headers.get("content-type") || "application/octet-stream";
   return { body, contentType };
 }
+
+/**
+ * Stream (or range) an R2 object without buffering the full body in Node.
+ * Pass through upstream status (200/206) and Content-* / Accept-Ranges.
+ */
+export async function fetchR2ObjectStream(options: {
+  key: string;
+  rangeHeader?: string | null;
+  config?: R2Config;
+}): Promise<Response | { error: string }> {
+  const signed = presignR2Object({
+    method: "GET",
+    key: options.key,
+    expiresSeconds: 600,
+    config: options.config,
+  });
+  if ("error" in signed) return signed;
+  const headers: HeadersInit = {};
+  if (options.rangeHeader) {
+    headers.Range = options.rangeHeader;
+  }
+  const res = await fetch(signed.url, { method: "GET", headers });
+  if (!res.ok && res.status !== 206) {
+    return { error: `r2_download_failed:${res.status}` };
+  }
+  return res;
+}
+
+export async function headR2ObjectViaPresign(options: {
+  key: string;
+  config?: R2Config;
+}): Promise<
+  | { contentLength: number; contentType: string; acceptRanges: boolean }
+  | { error: string }
+> {
+  const signed = presignR2Object({
+    method: "GET",
+    key: options.key,
+    expiresSeconds: 120,
+    config: options.config,
+  });
+  if ("error" in signed) return signed;
+  // Prefer HEAD against the object via unsigned Range probe on GET 0-0 when
+  // S3 HEAD through query-presign is awkward — use bytes=0-0 for length.
+  const res = await fetch(signed.url, {
+    method: "GET",
+    headers: { Range: "bytes=0-0" },
+  });
+  if (res.status !== 206 && res.status !== 200) {
+    return { error: `r2_head_failed:${res.status}` };
+  }
+  const contentRange = res.headers.get("content-range");
+  let contentLength = Number(res.headers.get("content-length") ?? "0");
+  if (contentRange) {
+    const m = contentRange.match(/\/(\d+)\s*$/);
+    if (m?.[1]) contentLength = Number(m[1]);
+  }
+  // Drain tiny body so the connection can close.
+  await res.arrayBuffer().catch(() => undefined);
+  return {
+    contentLength: Number.isFinite(contentLength) ? contentLength : 0,
+    contentType: res.headers.get("content-type") || "application/pdf",
+    acceptRanges: true,
+  };
+}
