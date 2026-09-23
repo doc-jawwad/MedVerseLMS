@@ -337,11 +337,19 @@ export function PdfViewer({
       loadingTaskRef.current = null;
       pdfRef.current?.destroy().catch(() => undefined);
       pdfRef.current = null;
-      offlineAbortRef.current?.abort();
+      // Do NOT abort Save-for-Offline here — document reloads must not
+      // cancel a multi-minute OPFS range save still in progress.
     };
     // Intentionally once per materialId — scale changes re-render below.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [materialId, preferOfflineDefault]);
+
+  // Abort in-flight offline save only when leaving the reader entirely.
+  useEffect(() => {
+    return () => {
+      offlineAbortRef.current?.abort();
+    };
+  }, []);
 
   useEffect(() => {
     const doc = pdfRef.current;
