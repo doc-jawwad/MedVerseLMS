@@ -82,6 +82,10 @@ export function PdfViewer({
   const pdfjsRef = useRef<PdfjsLib | null>(null);
   const renderTaskRef = useRef<{ cancel: () => void } | null>(null);
   const offlineAbortRef = useRef<AbortController | null>(null);
+  const loadGenRef = useRef(0);
+  const loadingTaskRef = useRef<{ destroy: () => Promise<unknown> } | null>(
+    null
+  );
 
   const [page, setPage] = useState(1);
   const [pageCount, setPageCount] = useState(0);
@@ -148,17 +152,24 @@ export function PdfViewer({
 
   const loadDocument = useCallback(
     async (opts: { preferOffline: boolean }) => {
+      const gen = ++loadGenRef.current;
       setLoading(true);
       setError(null);
       setUsingOffline(false);
       try {
         await purgeExpiredOffline();
-        await refreshOfflineUsage();
+        if (gen !== loadGenRef.current) return;
+        // Defer quota UI work so first page is not blocked on estimate().
+        void refreshOfflineUsage();
         const pdfjs = await import("pdfjs-dist");
+        if (gen !== loadGenRef.current) return;
         pdfjsRef.current = pdfjs;
         pdfjs.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
 
-        let loadingTask;
+        let loadingTask: {
+          promise: Promise<PdfDocument>;
+          destroy: () => Promise<unknown>;
+        } | null = null;
         let offlineMeta: OfflinePdfMeta | null = null;
 
         if (opts.preferOffline || !navigator.onLine) {
@@ -166,6 +177,7 @@ export function PdfViewer({
           const bytes = offlineMeta
             ? await readOfflinePdfBytes(materialId)
             : null;
+          if (gen !== loadGenRef.current) return;
           if (bytes) {
             loadingTask = pdfjs.getDocument({ data: new Uint8Array(bytes) });
             setUsingOffline(true);
@@ -195,6 +207,7 @@ export function PdfViewer({
             credentials: "same-origin",
             cache: "no-store",
           });
+          if (gen !== loadGenRef.current) return;
           if (probe.status === 403) {
             await removeOfflinePdf(materialId);
             setOfflineUi("online_only");
@@ -220,19 +233,29 @@ export function PdfViewer({
 
           const expiresAt = Date.now() + ENTITLEMENT_TTL_MS;
           await touchOfflineEntitlement(materialId, expiresAt);
+          if (gen !== loadGenRef.current) return;
           offlineMeta = await getOfflineMeta(materialId);
           setOfflineUi(offlineMeta ? "offline_ready" : "online_only");
 
+          // Range-only: avoid a competing full-body stream that can stall
+          // behind aborted connections through the Next/Caddy proxy.
           loadingTask = pdfjs.getDocument({
             url: sourceUrl,
             withCredentials: true,
             disableRange: false,
-            disableStream: false,
+            disableStream: true,
+            disableAutoFetch: true,
             rangeChunkSize: 512 * 1024,
           });
         }
 
+        loadingTaskRef.current?.destroy().catch(() => undefined);
+        loadingTaskRef.current = loadingTask;
         const doc = await loadingTask.promise;
+        if (gen !== loadGenRef.current) {
+          doc.destroy().catch(() => undefined);
+          return;
+        }
         pdfRef.current?.destroy().catch(() => undefined);
         pdfRef.current = doc;
         setPageCount(doc.numPages);
@@ -241,6 +264,7 @@ export function PdfViewer({
           saved && saved >= 1 && saved <= doc.numPages ? saved : 1;
         setPage(startPage);
         await renderPage(doc, startPage, scale);
+        if (gen !== loadGenRef.current) return;
 
         try {
           const rawOutline = await doc.getOutline();
@@ -275,9 +299,11 @@ export function PdfViewer({
           setOutline([]);
         }
 
+        if (gen !== loadGenRef.current) return;
         setLoading(false);
-        await refreshOfflineUsage();
+        void refreshOfflineUsage();
       } catch (e) {
+        if (gen !== loadGenRef.current) return;
         setLoading(false);
         setError(e instanceof Error ? e.message : "Could not load this PDF.");
       }
@@ -288,8 +314,12 @@ export function PdfViewer({
   useEffect(() => {
     void loadDocument({ preferOffline: !navigator.onLine });
     return () => {
+      loadGenRef.current += 1;
       renderTaskRef.current?.cancel();
+      loadingTaskRef.current?.destroy().catch(() => undefined);
+      loadingTaskRef.current = null;
       pdfRef.current?.destroy().catch(() => undefined);
+      pdfRef.current = null;
       offlineAbortRef.current?.abort();
     };
     // Intentionally once per materialId — scale changes re-render below.

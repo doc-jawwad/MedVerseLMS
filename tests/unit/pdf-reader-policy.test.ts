@@ -43,6 +43,8 @@ describe("protected pdf reader policy", () => {
       join("src", "components", "study", "pdf-viewer.tsx"),
       "utf8"
     );
+    assert.match(src, /disableRange:\s*false/);
+    assert.match(src, /disableAutoFetch:\s*true/);
     assert.match(src, /Confirm save/);
     assert.match(src, /estimateOfflineQuota/);
     assert.match(src, /mv-pdf-page:/);
