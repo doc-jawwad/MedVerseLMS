@@ -15,10 +15,15 @@ const nextConfig: NextConfig = {
   // default to 1MB — that mismatch rejected valid Main Books PDFs with a
   // generic page/server error before app validation ran. Leave headroom for
   // multipart boundaries. App MIME/size checks remain authoritative.
+  //
+  // Next.js 16 also defaults `experimental.proxyClientMaxBodySize` to 10MB
+  // (proxy/middleware body buffer). Bodies above that are truncated with
+  // "Unexpected end of form" even when serverActions.bodySizeLimit is 26mb.
   experimental: {
     serverActions: {
       bodySizeLimit: "26mb",
     },
+    proxyClientMaxBodySize: "26mb",
   },
   async headers() {
     return [
