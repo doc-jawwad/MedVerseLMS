@@ -140,11 +140,11 @@ async function signedS3Fetch(options: {
     host,
     "x-amz-content-sha256": payloadHash,
     "x-amz-date": date,
-    ...(options.headers ?? {}),
   };
-  const signedHeaderKeys = Object.keys(headerMap)
-    .map((k) => k.toLowerCase())
-    .sort();
+  for (const [k, v] of Object.entries(options.headers ?? {})) {
+    headerMap[k.toLowerCase()] = v;
+  }
+  const signedHeaderKeys = Object.keys(headerMap).sort();
   const canonicalHeaders = signedHeaderKeys
     .map((k) => `${k}:${headerMap[k].trim()}\n`)
     .join("");
