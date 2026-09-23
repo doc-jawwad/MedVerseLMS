@@ -11,6 +11,15 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  // Study PDF policy is 25MB (`STUDY_PDF_MAX_BYTES`). Next.js Server Actions
+  // default to 1MB — that mismatch rejected valid Main Books PDFs with a
+  // generic page/server error before app validation ran. Leave headroom for
+  // multipart boundaries. App MIME/size checks remain authoritative.
+  experimental: {
+    serverActions: {
+      bodySizeLimit: "26mb",
+    },
+  },
   async headers() {
     return [
       {

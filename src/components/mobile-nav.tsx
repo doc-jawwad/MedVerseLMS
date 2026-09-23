@@ -69,6 +69,8 @@ export const ICONS = {
   books: Library,
   notes: StickyNote,
   lectures: Video,
+  pastPapers: FileText,
+  otherServices: Gift,
   contact: Phone,
   career: GraduationCap,
   imd: Award,

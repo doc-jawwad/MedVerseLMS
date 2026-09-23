@@ -111,14 +111,14 @@ export function MaterialsAdmin({
           disabled={pending || !folderName.trim() || !yearId}
           onClick={() =>
             startTransition(async () => {
-              const { error } = await addFolder(
+              const result = await addFolder(
                 yearId,
                 subjectId || null,
                 folderName,
                 libraryType,
                 defaultEntitlement
               );
-              if (error) toast.error(error);
+              if ("error" in result && result.error) toast.error(result.error);
               else setFolderName("");
             })
           }

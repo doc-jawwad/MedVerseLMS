@@ -11,6 +11,9 @@ export const FOLDER_LIBRARY_TYPES = [
   "lectures",
   "syllabus",
   "schedule",
+  "past_papers",
+  "flashcards",
+  "other_services",
 ] as const;
 
 export type FolderLibraryType = (typeof FOLDER_LIBRARY_TYPES)[number];
@@ -157,6 +160,21 @@ export function folderLibraryLabel(type: FolderLibraryType): {
         label: "Past OSPE",
         description: "Past OSPE PDFs and pictures.",
       };
+    case "past_papers":
+      return {
+        label: "Past Papers",
+        description: "Exam past papers organized by category.",
+      };
+    case "other_services":
+      return {
+        label: "Other Services",
+        description: "Academy services and external resources.",
+      };
+    case "flashcards":
+      return {
+        label: "Flashcards",
+        description: "Placeholder category — no flashcard engine yet.",
+      };
     default: {
       const meta = LIBRARY_META[type as StudentLibraryType];
       return {
@@ -193,6 +211,10 @@ export function itemDeliveryModes(type: FolderLibraryType): Array<
     case "ospe_lectures":
     case "lectures":
       return ["drive"];
+    case "past_papers":
+      return ["pdf"];
+    case "other_services":
+      return ["drive"];
     default:
       return ["pdf", "drive"];
   }
@@ -204,6 +226,8 @@ export const STUDY_REVALIDATE_PATHS = [
   "/admin/library",
   "/admin/pearls",
   "/admin/ospe-stations",
+  "/admin/past-papers",
+  "/admin/other-services",
   "/materials",
   "/free-resources",
   "/resources",
@@ -218,4 +242,6 @@ export const STUDY_REVALIDATE_PATHS = [
   "/books",
   "/notes",
   "/lectures",
+  "/past-papers",
+  "/other-services",
 ] as const;

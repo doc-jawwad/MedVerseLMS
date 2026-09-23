@@ -144,7 +144,30 @@ Each Block (and each Final Year clinical subject) shows these student-facing chr
 
 **OSPE Practice** is **not** a top-level shell nav item; students reach it from the Block OSPE group (or deep link).
 
-**Flashcards** is **not** a student block category in this IA (placeholder-only product note remains in §10). Legacy hubs such as Past Papers / combined OSPE may still exist in storage or older RPC payloads; the student tree remaps or omits them from Block category chrome.
+**Flashcards** is **not** a student block category in this IA (placeholder-only product note remains in §10). Combined/legacy OSPE library packs may still exist in storage; the student Block tree remaps or omits them from Block category chrome.
+
+### 2b-ii. Past Papers (top-level shell nav)
+
+**Past Papers** is a first-class student shell nav item (not a Block chrome category). Storage reuses `material_folders` / `materials` with `library_type = 'past_papers'`.
+
+Hierarchy (frozen):
+
+**Past Papers → Sub Nav (root folder) → optional Sub-Sub Nav (child folder) → PDF materials**
+
+- Sub Navs are `material_folders` with `library_type = 'past_papers'` and `parent_id` null.
+- Sub-Sub Navs are the same type with `parent_id` set to a Sub Nav (cycle-guarded `parent_id`; depth is not product-limited beyond the existing DB guard).
+- PDFs (`materials.kind = 'pdf'`) may attach to **either** a Sub Nav or a Sub-Sub Nav folder.
+- Scoped to the student’s **enrolled class year** (`material_folders.year_id` + existing folder view/access helpers). Do not invent a global past-papers catalog outside year enrollment.
+- Section lock: without a live subscription the shell entry is locked (same pattern as Books / Lectures materials hubs). Individual folder entitlement remains the content boundary after unlock.
+- Soft-delete / Bin / R2 purge use the existing materials lifecycle. Do not create a parallel CMS.
+
+### 2b-iii. Other Services (top-level shell nav)
+
+**Other Services** is a first-class student shell nav item. Storage reuses `material_folders` with `library_type = 'other_services'` (one folder row = one service).
+
+- Folder `name` = service title; optional folder `description` = user-facing blurb; optional Drive `materials` row under the folder = destination link (existing `kind = 'drive'`).
+- Year-scoped like other materials (`year_id` + enrolled class). Section-locked without a live subscription; folder entitlement governs open/content.
+- Soft-delete / Bin use the existing materials lifecycle. Do not invent a marketplace or second CMS.
 
 ### 2c. Prof. Session (guided course under enrolled class)
 

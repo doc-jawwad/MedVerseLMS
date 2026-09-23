@@ -107,6 +107,18 @@ export const ADMIN_NAV: AdminNavDef[] = [
     anyOf: ["manage_materials"],
   },
   {
+    href: "/admin/past-papers",
+    label: "Past Papers",
+    icon: "guidelines",
+    anyOf: ["manage_materials"],
+  },
+  {
+    href: "/admin/other-services",
+    label: "Other Services",
+    icon: "freeResources",
+    anyOf: ["manage_materials"],
+  },
+  {
     href: "/admin/pearls",
     label: "Pearl Points",
     icon: "pearlPoints",

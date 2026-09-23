@@ -39,6 +39,10 @@ describe("buildStudentShellNav", () => {
     assert.equal(byHref["/practice/ospe"], undefined);
     assert.equal(byHref["/academic/prof-session"]?.label, "Prof. Session");
     assert.equal(byHref["/academic/prof-session"]?.locked, true);
+    assert.equal(byHref["/past-papers"]?.label, "Past Papers");
+    assert.equal(byHref["/past-papers"]?.locked, true);
+    assert.equal(byHref["/other-services"]?.label, "Other Services");
+    assert.equal(byHref["/other-services"]?.locked, true);
     assert.equal(byHref["/mcq-bank"], undefined);
     assert.equal(byHref["/resources"], undefined);
     assert.equal(byHref["/library"], undefined);
@@ -57,6 +61,8 @@ describe("buildStudentShellNav", () => {
     });
     const byHref = Object.fromEntries(items.map((i) => [i.href, i]));
     assert.equal(byHref["/academic/prof-session"]?.locked, false);
+    assert.equal(byHref["/past-papers"]?.locked, false);
+    assert.equal(byHref["/other-services"]?.locked, false);
     assert.equal(byHref["/performance"], undefined);
     assert.deepEqual(
       bottomItems.map((i) => i.href),
@@ -85,6 +91,9 @@ describe("isPaidLmsSectionPath", () => {
     assert.equal(isPaidLmsSectionPath("/academic/prof-session/day-1"), true);
     assert.equal(isPaidLmsSectionPath("/mcq-bank"), true);
     assert.equal(isPaidLmsSectionPath("/mock-test"), true);
+    assert.equal(isPaidLmsSectionPath("/past-papers"), true);
+    assert.equal(isPaidLmsSectionPath("/past-papers/abc"), true);
+    assert.equal(isPaidLmsSectionPath("/other-services"), true);
     assert.equal(isPaidLmsSectionPath("/practice/ospe"), false);
     assert.equal(isPaidLmsSectionPath("/performance"), false);
     assert.equal(isPaidLmsSectionPath("/tests"), false);

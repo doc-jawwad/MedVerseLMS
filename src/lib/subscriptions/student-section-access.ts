@@ -28,6 +28,8 @@ export const PAID_LMS_SECTION_HREFS = [
   "/materials",
   "/practice",
   "/mock-test",
+  "/past-papers",
+  "/other-services",
   // /performance removed — merged into Dashboard; route redirects to /dashboard.
 ] as const;
 
@@ -124,6 +126,18 @@ export function buildStudentShellNav(
       href: "/mock-test",
       label: "Mock Test",
       icon: "tests",
+      locked: !paid,
+    },
+    {
+      href: "/past-papers",
+      label: "Past Papers",
+      icon: "pastPapers",
+      locked: !paid,
+    },
+    {
+      href: "/other-services",
+      label: "Other Services",
+      icon: "otherServices",
       locked: !paid,
     },
     { href: "/tests", label: "Tests", icon: "tests", locked: false },

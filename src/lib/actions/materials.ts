@@ -5,6 +5,7 @@ import { actionRpcResult } from "@/lib/errors/safe-action-error";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { moveContentToBin } from "@/lib/actions/content-bin";
+import { STUDY_REVALIDATE_PATHS } from "@/lib/library/types";
 
 function validDriveUrl(url: string) {
   try {
@@ -15,12 +16,22 @@ function validDriveUrl(url: string) {
   }
 }
 
+function revalidateStudyPaths() {
+  for (const path of STUDY_REVALIDATE_PATHS) revalidatePath(path);
+  revalidatePath("/admin/bin");
+}
+
 export async function addFolder(
   yearId: string,
   subjectId: string | null,
   name: string,
   libraryType: string,
-  entitlement: "free" | "any_subscription" = "any_subscription"
+  entitlement: "free" | "any_subscription" = "any_subscription",
+  opts?: {
+    parentId?: string | null;
+    description?: string | null;
+    sortOrder?: number;
+  }
 ) {
   if (!name.trim()) return { error: "Folder name required." };
   const supabase = await createClient();
@@ -34,12 +45,18 @@ export async function addFolder(
       name: name.trim(),
       library_type: libraryType,
       entitlement: "free",
+      parent_id: opts?.parentId || null,
+      description: opts?.description?.trim() || null,
+      sort_order: opts?.sortOrder ?? 0,
     })
     .select("id")
     .single();
   if (error || !folder?.id) {
     revalidateStudyPaths();
-    return actionRpcResult("addFolder.insert", error ?? { message: "folder_create_failed" });
+    return actionRpcResult(
+      "addFolder.insert",
+      error ?? { message: "folder_create_failed" }
+    );
   }
 
   if (entitlement !== "free") {
@@ -57,22 +74,58 @@ export async function addFolder(
   }
 
   revalidateStudyPaths();
-  return {};
+  return { id: folder.id };
 }
 
-function revalidateStudyPaths() {
-  revalidatePath("/admin/materials");
-  revalidatePath("/admin/free-resources");
-  revalidatePath("/admin/library");
-  revalidatePath("/materials");
-  revalidatePath("/free-resources");
+export async function updateFolder(
+  folderId: string,
+  patch: {
+    name?: string;
+    description?: string | null;
+    sortOrder?: number;
+  }
+) {
+  if (patch.name !== undefined && !patch.name.trim()) {
+    return { error: "Folder name required." };
+  }
+  const supabase = await createClient();
+  const row: Record<string, unknown> = {};
+  if (patch.name !== undefined) row.name = patch.name.trim();
+  if (patch.description !== undefined) {
+    row.description = patch.description?.trim() || null;
+  }
+  if (patch.sortOrder !== undefined) row.sort_order = patch.sortOrder;
+  if (Object.keys(row).length === 0) return {};
+  const { error } = await supabase
+    .from("material_folders")
+    .update(row)
+    .eq("id", folderId);
+  revalidateStudyPaths();
+  return actionRpcResult("updateFolder", error);
+}
+
+export async function reorderFolders(
+  orderedIds: string[]
+): Promise<{ error?: string }> {
+  if (orderedIds.length === 0) return {};
+  const supabase = await createClient();
+  for (let i = 0; i < orderedIds.length; i++) {
+    const { error } = await supabase
+      .from("material_folders")
+      .update({ sort_order: i })
+      .eq("id", orderedIds[i]);
+    if (error) {
+      revalidateStudyPaths();
+      return actionRpcResult("reorderFolders", error);
+    }
+  }
+  revalidateStudyPaths();
+  return {};
 }
 
 export async function deleteFolder(folderId: string) {
   const result = await moveContentToBin("material_folder", folderId);
-  revalidatePath("/admin/materials");
-  revalidatePath("/admin/bin");
-  revalidatePath("/materials");
+  revalidateStudyPaths();
   return result;
 }
 
@@ -92,9 +145,9 @@ export async function addMaterial(
     drive_url: driveUrl.trim(),
     description: description.trim(),
     file_type: fileType,
+    kind: "drive",
   });
-  revalidatePath("/admin/materials");
-  revalidatePath("/materials");
+  revalidateStudyPaths();
   return actionRpcResult("action", error);
 }
 
@@ -112,10 +165,6 @@ export async function openMaterial(materialId: string) {
 
 export async function deleteMaterial(materialId: string) {
   const result = await moveContentToBin("material", materialId);
-  revalidatePath("/admin/materials");
-  revalidatePath("/admin/free-resources");
-  revalidatePath("/admin/bin");
-  revalidatePath("/materials");
-  revalidatePath("/free-resources");
+  revalidateStudyPaths();
   return result;
 }
