@@ -604,14 +604,27 @@ export function PdfViewer({
             </Button>
           )}
           {offlineUi === "offline_ready" && (
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              onClick={() => void clearOffline()}
-            >
-              Remove offline
-            </Button>
+            <>
+              {!usingOffline && (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => void loadDocument({ preferOffline: true })}
+                  data-testid="pdf-open-offline"
+                >
+                  Open offline copy
+                </Button>
+              )}
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                onClick={() => void clearOffline()}
+              >
+                Remove offline
+              </Button>
+            </>
           )}
           <Button type="button" size="sm" variant="outline" onClick={fullscreen}>
             Fullscreen
