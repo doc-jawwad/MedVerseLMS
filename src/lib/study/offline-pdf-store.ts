@@ -198,7 +198,9 @@ export async function savePdfForOffline(options: {
         }
       }
       if (!buf) throw new Error(lastErr);
-      await writable.write(new Blob([buf]));
+      const chunk = new Uint8Array(buf.byteLength);
+      chunk.set(buf);
+      await writable.write(chunk);
       loaded += buf.byteLength;
       options.onProgress?.({ loaded, total });
     }
