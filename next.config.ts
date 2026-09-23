@@ -11,20 +11,14 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
-  // Study PDF policy is 25MB (`STUDY_PDF_MAX_BYTES`). Next.js Server Actions
-  // default to 1MB — that mismatch rejected valid Main Books PDFs with a
-  // generic page/server error before app validation ran.
-  //
-  // Next.js 16 also defaults `experimental.proxyClientMaxBodySize` to 10MB
-  // (proxy/middleware body buffer). Bodies above that are truncated with
-  // "Unexpected end of form" even when serverActions.bodySizeLimit is raised.
-  // Use 28mb so a 25MB PDF + multipart overhead still reaches app-level
-  // MIME/size validation (authoritative reject >25MB with pdf_too_large).
+  // Study PDFs upload direct-to-R2 (presigned PUT / multipart). Bodies that
+  // still hit Server Actions are small metadata + optional cover (≤2MB) or
+  // OSPE station images (≤10MB). Keep a modest ceiling — not for PDF bytes.
   experimental: {
     serverActions: {
-      bodySizeLimit: "28mb",
+      bodySizeLimit: "12mb",
     },
-    proxyClientMaxBodySize: "28mb",
+    proxyClientMaxBodySize: "12mb",
   },
   async headers() {
     return [

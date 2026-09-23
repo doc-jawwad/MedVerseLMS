@@ -10,10 +10,9 @@ import {
 } from "@/lib/actions/materials";
 import {
   addGuidelineMaterial,
-  addPdfMaterial,
   setMaterialStatus,
 } from "@/lib/actions/study-content";
-import { STUDY_PDF_MAX_BYTES } from "@/lib/study/upload-rules";
+import { StudyPdfUploader } from "@/components/admin/study-pdf-uploader";
 import { MaterialOpenLink } from "@/components/study/material-open-link";
 import { EntitlementSelect } from "@/components/admin/entitlement-select";
 import { Badge } from "@/components/ui/badge";
@@ -344,49 +343,7 @@ function DriveForm({ folderId }: { folderId: string }) {
 }
 
 function PdfForm({ folderId }: { folderId: string }) {
-  const [pending, startTransition] = useTransition();
-  return (
-    <form
-      className="grid gap-2 sm:grid-cols-2"
-      onSubmit={(e) => {
-        e.preventDefault();
-        const form = e.currentTarget;
-        const data = new FormData(form);
-        data.set("folderId", folderId);
-        const file = data.get("file");
-        if (file instanceof File && file.size > STUDY_PDF_MAX_BYTES) {
-          toast.error("pdf_too_large");
-          return;
-        }
-        startTransition(async () => {
-          const { error } = await addPdfMaterial(data);
-          if (error) toast.error(error);
-          else {
-            toast.success("PDF saved");
-            form.reset();
-          }
-        });
-      }}
-    >
-      <Input name="title" required placeholder="Title" />
-      <Input name="description" placeholder="Description (optional)" />
-      <div className="grid gap-1 text-sm">
-        <Label>PDF file</Label>
-        <Input name="file" type="file" accept="application/pdf" required />
-      </div>
-      <div className="grid gap-1 text-sm">
-        <Label>Cover (optional)</Label>
-        <Input name="cover" type="file" accept="image/jpeg,image/png,image/webp" />
-      </div>
-      <label className="flex items-center gap-2 text-sm">
-        <input type="checkbox" name="publish" value="1" defaultChecked />
-        Publish now
-      </label>
-      <Button type="submit" size="sm" disabled={pending} className="w-fit">
-        {pending ? "Uploading…" : "Add PDF"}
-      </Button>
-    </form>
-  );
+  return <StudyPdfUploader folderId={folderId} />;
 }
 
 function GuidelineForm({ folderId }: { folderId: string }) {

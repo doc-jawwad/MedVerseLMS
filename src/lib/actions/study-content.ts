@@ -1,29 +1,12 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import {
-  actionRpcResult,
-  clientActionFailed,
-  toClientActionError,
-} from "@/lib/errors/safe-action-error";
+import { actionRpcResult } from "@/lib/errors/safe-action-error";
 import { createClient } from "@/lib/supabase/server";
-import {
-  deleteR2Object,
-  putR2Object,
-} from "@/lib/r2/presign";
-import { isStudyCoverFile, isStudyPdfFile } from "@/lib/study/upload-rules";
 import { STUDY_REVALIDATE_PATHS } from "@/lib/library/types";
 
 function revalidateStudy() {
   for (const path of STUDY_REVALIDATE_PATHS) revalidatePath(path);
-}
-
-async function discardStudyKey(supabase: Awaited<ReturnType<typeof createClient>>, key: string) {
-  const { error } = await supabase.rpc("authorize_study_object_discard", {
-    p_object_key: key,
-  });
-  if (error) return;
-  await deleteR2Object({ key });
 }
 
 export async function allocateStudyObjectKey() {
@@ -36,92 +19,15 @@ export async function allocateStudyObjectKey() {
   return { key: data };
 }
 
-export async function addPdfMaterial(formData: FormData) {
-  const folderId = String(formData.get("folderId") ?? "");
-  const title = String(formData.get("title") ?? "").trim();
-  const description = String(formData.get("description") ?? "").trim();
-  const chapterId = String(formData.get("chapterId") ?? "") || null;
-  const topicId = String(formData.get("topicId") ?? "") || null;
-  const referenceText = String(formData.get("referenceText") ?? "").trim();
-  const publish = String(formData.get("publish") ?? "") === "1";
-  const file = formData.get("file");
-  const cover = formData.get("cover");
-
-  if (!folderId || !title) return { error: "Title and folder are required." };
-  if (!(file instanceof File) || file.size === 0) {
-    return { error: "Choose a PDF file." };
-  }
-  const pdfErr = isStudyPdfFile(file);
-  if (pdfErr) return { error: pdfErr };
-
-  let coverErr: string | null = null;
-  if (cover instanceof File && cover.size > 0) {
-    coverErr = isStudyCoverFile(cover);
-    if (coverErr) return { error: coverErr };
-  }
-
-  const supabase = await createClient();
-  const allocated = await allocateStudyObjectKey();
-  if ("error" in allocated && allocated.error) return allocated;
-  if (!("key" in allocated)) return { error: "study_object_denied" };
-  const key = allocated.key;
-
-  const uploaded = await putR2Object({
-    key,
-    body: Buffer.from(await file.arrayBuffer()),
-    contentType: file.type || "application/pdf",
-  });
-  if (uploaded.error) {
-    await discardStudyKey(supabase, key);
-    return clientActionFailed("addPdfMaterial.put", uploaded.error);
-  }
-
-  let coverKey: string | null = null;
-  if (cover instanceof File && cover.size > 0) {
-    const coverAlloc = await allocateStudyObjectKey();
-    if ("error" in coverAlloc && coverAlloc.error) {
-      await discardStudyKey(supabase, key);
-      return coverAlloc;
-    }
-    if (!("key" in coverAlloc)) {
-      await discardStudyKey(supabase, key);
-      return { error: "study_object_denied" };
-    }
-    coverKey = coverAlloc.key;
-    const coverPut = await putR2Object({
-      key: coverKey,
-      body: Buffer.from(await cover.arrayBuffer()),
-      contentType: cover.type,
-    });
-    if (coverPut.error) {
-      await discardStudyKey(supabase, key);
-      await discardStudyKey(supabase, coverKey);
-      return clientActionFailed("addPdfMaterial.cover", coverPut.error);
-    }
-  }
-
-  const { error } = await supabase.from("materials").insert({
-    folder_id: folderId,
-    title,
-    description,
-    file_type: "pdf",
-    kind: "pdf",
-    status: publish ? "published" : "draft",
-    r2_object_key: key,
-    r2_content_type: "application/pdf",
-    r2_byte_size: file.size,
-    cover_object_key: coverKey,
-    chapter_id: chapterId,
-    topic_id: topicId,
-    reference_text: referenceText,
-  });
-  if (error) {
-    await discardStudyKey(supabase, key);
-    if (coverKey) await discardStudyKey(supabase, coverKey);
-    return { error: toClientActionError(error, "addPdfMaterial.insert") };
-  }
-  revalidateStudy();
-  return {};
+/**
+ * @deprecated PDF binaries must not transit Next.js. Use
+ * `beginStudyPdfUpload` / `completeStudyPdfUpload` (direct-to-R2).
+ */
+export async function addPdfMaterial(_formData: FormData) {
+  return {
+    error:
+      "PDF upload must use direct-to-R2. Refresh the admin page and try again.",
+  };
 }
 
 export async function addGuidelineMaterial(input: {
