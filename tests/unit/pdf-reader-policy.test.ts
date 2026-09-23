@@ -34,6 +34,19 @@ describe("protected pdf reader policy", () => {
     );
     assert.match(src, /getDirectory/);
     assert.match(src, /entitlementExpiresAt/);
+    assert.match(src, /estimateOfflineQuota/);
     assert.doesNotMatch(src, /showSaveFilePicker/);
+  });
+
+  it("viewer confirms offline size and persists reading progress", () => {
+    const src = readFileSync(
+      join("src", "components", "study", "pdf-viewer.tsx"),
+      "utf8"
+    );
+    assert.match(src, /Confirm save/);
+    assert.match(src, /estimateOfflineQuota/);
+    assert.match(src, /mv-pdf-page:/);
+    assert.match(src, /Retry offline save/);
+    assert.match(src, /contentRevision/);
   });
 });

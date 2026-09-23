@@ -1,0 +1,137 @@
+{
+  "tag": "ACC-mudmod8m",
+  "results": [
+    {
+      "area": "bin",
+      "msg": "PDF in Bin=true",
+      "ok": true
+    },
+    {
+      "area": "bin",
+      "msg": "Restored PDF A",
+      "ok": true
+    },
+    {
+      "area": "services",
+      "msg": "Service present",
+      "ok": true
+    },
+    {
+      "area": "student",
+      "msg": "Paid sees SubNav=true",
+      "ok": true
+    },
+    {
+      "area": "student",
+      "msg": "Inside PDF-A=false SubSub=false",
+      "ok": false
+    },
+    {
+      "area": "student",
+      "msg": "Open ACC-mudmod8m-B; R2 public leak=false; url=https://staging.medversepk.com/materials/27f95fee-d0e6-4089-ad01-24e540d8d673/read",
+      "ok": true
+    },
+    {
+      "area": "student",
+      "msg": "Paid sees service ACC-mudmod8m-Svc",
+      "ok": true
+    },
+    {
+      "area": "student",
+      "msg": "Free seesQA=false lock=true",
+      "ok": true
+    },
+    {
+      "area": "student",
+      "msg": "Free other-services lockish=true",
+      "ok": true
+    },
+    {
+      "area": "mobile",
+      "msg": "320px past-papers overflow=false",
+      "ok": true
+    },
+    {
+      "area": "mobile",
+      "msg": "320px other-services overflow=false",
+      "ok": true
+    },
+    {
+      "area": "mobile",
+      "msg": "375px past-papers overflow=false",
+      "ok": true
+    },
+    {
+      "area": "mobile",
+      "msg": "375px other-services overflow=false",
+      "ok": true
+    },
+    {
+      "area": "dark",
+      "msg": "dark class on past-papers",
+      "ok": false
+    },
+    {
+      "area": "regression",
+      "msg": "/dashboard → 200",
+      "ok": true
+    },
+    {
+      "area": "regression",
+      "msg": "/academic → 200",
+      "ok": true
+    },
+    {
+      "area": "regression",
+      "msg": "/subscription → 200",
+      "ok": true
+    },
+    {
+      "area": "regression",
+      "msg": "/prof-session → 200",
+      "ok": true
+    },
+    {
+      "area": "regression",
+      "msg": "/mock-tests → 200",
+      "ok": true
+    },
+    {
+      "area": "regression",
+      "msg": "/ospe → 200",
+      "ok": true
+    },
+    {
+      "area": "regression",
+      "msg": "/tests → 200",
+      "ok": true
+    },
+    {
+      "area": "regression",
+      "msg": "/question-bank → 200",
+      "ok": true
+    },
+    {
+      "area": "regression",
+      "msg": "/one-liners → 200",
+      "ok": true
+    },
+    {
+      "area": "regression",
+      "msg": "/admin/bin → 200",
+      "ok": true
+    },
+    {
+      "area": "services",
+      "msg": "Bin+restore ACC-mudmod8m-Svc",
+      "ok": true
+    }
+  ],
+  "defects": [
+    "student: Inside PDF-A=false SubSub=false",
+    "dark: dark class on past-papers"
+  ],
+  "meta": {
+    "knownNonCascade": "Parent Sub Nav soft-delete does not cascade children — existing behavior; not redesigned this pass."
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "CORSRules": [
+    {
+      "AllowedOrigins": [
+        "https://staging.medversepk.com",
+        "https://lms.medversepk.com"
+      ],
+      "AllowedMethods": ["GET", "PUT", "HEAD"],
+      "AllowedHeaders": [
+        "Content-Type",
+        "Content-Length",
+        "x-amz-content-sha256",
+        "x-amz-date",
+        "Authorization"
+      ],
+      "ExposeHeaders": ["ETag", "Content-Length", "Content-Type"],
+      "MaxAgeSeconds": 3600
+    }
+  ]
+}

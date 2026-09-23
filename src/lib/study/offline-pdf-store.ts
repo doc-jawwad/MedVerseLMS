@@ -227,3 +227,40 @@ export async function purgeExpiredOffline(): Promise<number> {
   }
   return n;
 }
+
+/** Origin storage estimate for pre-save quota checks (OPFS-backed). */
+export async function estimateOfflineQuota(): Promise<{
+  usage: number;
+  quota: number;
+  remaining: number;
+} | null> {
+  if (!navigator.storage?.estimate) return null;
+  try {
+    const est = await navigator.storage.estimate();
+    const usage = Number(est.usage ?? 0);
+    const quota = Number(est.quota ?? 0);
+    if (!Number.isFinite(quota) || quota <= 0) return null;
+    return {
+      usage,
+      quota,
+      remaining: Math.max(0, quota - usage),
+    };
+  } catch {
+    return null;
+  }
+}
+
+export function formatByteSize(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes < 0) return "—";
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  if (bytes < 1024 * 1024 * 1024) {
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  }
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+}
+
+export async function totalOfflineBytes(): Promise<number> {
+  const all = await listOfflineMetas();
+  return all.reduce((sum, m) => sum + (m.byteSize || 0), 0);
+}

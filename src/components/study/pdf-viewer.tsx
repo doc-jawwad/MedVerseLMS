@@ -11,11 +11,14 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
+  estimateOfflineQuota,
+  formatByteSize,
   getOfflineMeta,
   purgeExpiredOffline,
   readOfflinePdfBytes,
   removeOfflinePdf,
   savePdfForOffline,
+  totalOfflineBytes,
   touchOfflineEntitlement,
   type OfflinePdfMeta,
 } from "@/lib/study/offline-pdf-store";
@@ -32,11 +35,34 @@ type OfflineUi =
   | "saving"
   | "offline_ready"
   | "offline_expired"
-  | "offline_unavailable";
+  | "offline_unavailable"
+  | "save_failed";
 
 function formatPct(loaded: number, total: number): string {
   if (total <= 0) return "0%";
   return `${Math.min(100, Math.round((loaded / total) * 100))}%`;
+}
+
+function progressKey(materialId: string): string {
+  return `mv-pdf-page:${materialId}`;
+}
+
+function readSavedPage(materialId: string): number | null {
+  try {
+    const raw = localStorage.getItem(progressKey(materialId));
+    const n = Number(raw);
+    return Number.isFinite(n) && n >= 1 ? Math.floor(n) : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeSavedPage(materialId: string, page: number): void {
+  try {
+    localStorage.setItem(progressKey(materialId), String(page));
+  } catch {
+    /* quota / private mode */
+  }
 }
 
 export function PdfViewer({
@@ -70,6 +96,8 @@ export function PdfViewer({
   const [showOutline, setShowOutline] = useState(false);
   const [offlineUi, setOfflineUi] = useState<OfflineUi>("checking");
   const [savePct, setSavePct] = useState("");
+  const [pendingSaveSize, setPendingSaveSize] = useState<number | null>(null);
+  const [offlineUsageLabel, setOfflineUsageLabel] = useState("");
   const [usingOffline, setUsingOffline] = useState(false);
 
   const sourceUrl = `/api/study-content/${materialId}`;
@@ -78,6 +106,24 @@ export function PdfViewer({
     .map((s) => (s ?? "").trim())
     .filter(Boolean)
     .join(" · ");
+
+  const refreshOfflineUsage = useCallback(async () => {
+    try {
+      const used = await totalOfflineBytes();
+      const quota = await estimateOfflineQuota();
+      if (quota) {
+        setOfflineUsageLabel(
+          `Offline library ${formatByteSize(used)} · device free ${formatByteSize(quota.remaining)}`
+        );
+      } else if (used > 0) {
+        setOfflineUsageLabel(`Offline library ${formatByteSize(used)}`);
+      } else {
+        setOfflineUsageLabel("");
+      }
+    } catch {
+      setOfflineUsageLabel("");
+    }
+  }, []);
 
   const renderPage = useCallback(
     async (doc: PdfDocument, pageNum: number, zoom: number) => {
@@ -107,6 +153,7 @@ export function PdfViewer({
       setUsingOffline(false);
       try {
         await purgeExpiredOffline();
+        await refreshOfflineUsage();
         const pdfjs = await import("pdfjs-dist");
         pdfjsRef.current = pdfjs;
         pdfjs.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
@@ -155,6 +202,22 @@ export function PdfViewer({
           }
           if (!probe.ok) throw new Error("Could not load this PDF.");
 
+          const rev =
+            probe.headers.get("etag") ||
+            probe.headers.get("content-length") ||
+            "";
+          offlineMeta = await getOfflineMeta(materialId);
+          if (
+            offlineMeta &&
+            rev &&
+            offlineMeta.contentRevision &&
+            offlineMeta.contentRevision !== rev
+          ) {
+            await removeOfflinePdf(materialId);
+            offlineMeta = null;
+            toast.message("Offline copy outdated — removed.");
+          }
+
           const expiresAt = Date.now() + ENTITLEMENT_TTL_MS;
           await touchOfflineEntitlement(materialId, expiresAt);
           offlineMeta = await getOfflineMeta(materialId);
@@ -173,8 +236,11 @@ export function PdfViewer({
         pdfRef.current?.destroy().catch(() => undefined);
         pdfRef.current = doc;
         setPageCount(doc.numPages);
-        setPage(1);
-        await renderPage(doc, 1, scale);
+        const saved = readSavedPage(materialId);
+        const startPage =
+          saved && saved >= 1 && saved <= doc.numPages ? saved : 1;
+        setPage(startPage);
+        await renderPage(doc, startPage, scale);
 
         try {
           const rawOutline = await doc.getOutline();
@@ -210,12 +276,13 @@ export function PdfViewer({
         }
 
         setLoading(false);
+        await refreshOfflineUsage();
       } catch (e) {
         setLoading(false);
         setError(e instanceof Error ? e.message : "Could not load this PDF.");
       }
     },
-    [materialId, renderPage, scale, sourceUrl]
+    [materialId, refreshOfflineUsage, renderPage, scale, sourceUrl]
   );
 
   useEffect(() => {
@@ -232,8 +299,33 @@ export function PdfViewer({
   useEffect(() => {
     const doc = pdfRef.current;
     if (!doc || loading) return;
+    writeSavedPage(materialId, page);
     void renderPage(doc, page, scale);
-  }, [page, scale, loading, renderPage]);
+  }, [page, scale, loading, materialId, renderPage]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (loading || error) return;
+      const tag = (e.target as HTMLElement | null)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA") return;
+      if (e.key === "ArrowRight" || e.key === "PageDown") {
+        e.preventDefault();
+        goPage(page + 1);
+      } else if (e.key === "ArrowLeft" || e.key === "PageUp") {
+        e.preventDefault();
+        goPage(page - 1);
+      } else if (e.key === "+" || e.key === "=") {
+        e.preventDefault();
+        setScale((s) => Math.min(3, Number((s + 0.15).toFixed(2))));
+      } else if (e.key === "-") {
+        e.preventDefault();
+        setScale((s) => Math.max(0.5, Number((s - 0.15).toFixed(2))));
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, error, page, pageCount]);
 
   const goPage = (n: number) => {
     if (pageCount <= 0) return;
@@ -289,7 +381,7 @@ export function PdfViewer({
     void node.requestFullscreen?.();
   };
 
-  const startOfflineSave = async () => {
+  const runOfflineSave = async () => {
     offlineAbortRef.current?.abort();
     const ac = new AbortController();
     offlineAbortRef.current = ac;
@@ -304,6 +396,7 @@ export function PdfViewer({
       });
       if (probe.status === 403) throw new Error("study_object_denied");
       if (!probe.ok) throw new Error("Could not authorize offline save.");
+      const total = Number(probe.headers.get("content-length") ?? "0");
       const rev =
         probe.headers.get("etag") ||
         probe.headers.get("content-length") ||
@@ -314,26 +407,65 @@ export function PdfViewer({
         contentRevision: rev,
         entitlementExpiresAt: Date.now() + ENTITLEMENT_TTL_MS,
         signal: ac.signal,
-        onProgress: ({ loaded, total }) => {
-          setSavePct(formatPct(loaded, total));
+        onProgress: ({ loaded, total: t }) => {
+          setSavePct(formatPct(loaded, t > 0 ? t : total));
         },
       });
+      setPendingSaveSize(null);
       setOfflineUi("offline_ready");
+      await refreshOfflineUsage();
       toast.success("Saved for offline reading");
     } catch (e) {
       const msg = e instanceof Error ? e.message : "offline_failed";
       if (msg === "offline_cancelled") {
         setOfflineUi("online_only");
+        setPendingSaveSize(null);
         toast.message("Offline save cancelled");
         return;
       }
       if (msg === "study_object_denied") {
         setOfflineUi("online_only");
+        setPendingSaveSize(null);
         toast.error("You do not have access to this PDF.");
         return;
       }
-      setOfflineUi("online_only");
+      setOfflineUi("save_failed");
       toast.error("Could not save for offline.");
+    }
+  };
+
+  const startOfflineSave = async () => {
+    try {
+      const probe = await fetch(sourceUrl, {
+        method: "HEAD",
+        credentials: "same-origin",
+        cache: "no-store",
+      });
+      if (probe.status === 403) {
+        toast.error("You do not have access to this PDF.");
+        return;
+      }
+      if (!probe.ok) {
+        toast.error("Could not check file size.");
+        return;
+      }
+      const total = Number(probe.headers.get("content-length") ?? "0");
+      if (!Number.isFinite(total) || total <= 0) {
+        toast.error("Could not determine file size for offline save.");
+        return;
+      }
+      const quota = await estimateOfflineQuota();
+      if (quota && total > quota.remaining) {
+        toast.error(
+          `Not enough device storage (${formatByteSize(total)} needed, ${formatByteSize(quota.remaining)} free).`
+        );
+        setOfflineUi("online_only");
+        return;
+      }
+      setPendingSaveSize(total);
+      await refreshOfflineUsage();
+    } catch {
+      toast.error("Could not prepare offline save.");
     }
   };
 
@@ -344,6 +476,8 @@ export function PdfViewer({
   const clearOffline = async () => {
     await removeOfflinePdf(materialId);
     setOfflineUi("online_only");
+    setPendingSaveSize(null);
+    await refreshOfflineUsage();
     toast.message("Removed offline copy");
   };
 
@@ -363,6 +497,8 @@ export function PdfViewer({
         return "Offline access expired — connect to update access.";
       case "offline_unavailable":
         return "Connect to the internet to read this document.";
+      case "save_failed":
+        return "Offline save failed — retry when ready.";
       default:
         return "";
     }
@@ -406,11 +542,16 @@ export function PdfViewer({
   return (
     <div
       ref={containerRef}
-      className="grid gap-3 rounded-xl border bg-card p-3"
+      className="grid gap-2 rounded-xl border bg-card p-2 sm:gap-3 sm:p-3"
       data-testid="pdf-viewer"
     >
       <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
-        <span data-testid="pdf-offline-status">{offlineLabel}</span>
+        <div className="grid gap-0.5">
+          <span data-testid="pdf-offline-status">{offlineLabel}</span>
+          {offlineUsageLabel ? (
+            <span data-testid="pdf-offline-usage">{offlineUsageLabel}</span>
+          ) : null}
+        </div>
         <div className="flex flex-wrap gap-2">
           {offlineUi === "saving" ? (
             <Button
@@ -421,6 +562,35 @@ export function PdfViewer({
             >
               Cancel save
             </Button>
+          ) : pendingSaveSize != null ? (
+            <>
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => void runOfflineSave()}
+                data-testid="pdf-offline-confirm"
+              >
+                Confirm save ({formatByteSize(pendingSaveSize)})
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                onClick={() => setPendingSaveSize(null)}
+              >
+                Cancel
+              </Button>
+            </>
+          ) : offlineUi === "save_failed" ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => void startOfflineSave()}
+              data-testid="pdf-offline-retry"
+            >
+              Retry offline save
+            </Button>
           ) : (
             <Button
               type="button"
@@ -428,6 +598,7 @@ export function PdfViewer({
               variant="outline"
               disabled={offlineUi === "checking"}
               onClick={() => void startOfflineSave()}
+              data-testid="pdf-save-offline"
             >
               Save for Offline
             </Button>
@@ -448,7 +619,7 @@ export function PdfViewer({
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
         <Button
           type="button"
           size="sm"
@@ -475,7 +646,7 @@ export function PdfViewer({
             max={pageCount || 1}
             defaultValue={page}
             key={page}
-            className="h-8 w-16"
+            className="h-8 w-14 sm:w-16"
             aria-label="Page number"
           />
           <span className="text-xs text-muted-foreground">/ {pageCount}</span>
@@ -559,7 +730,7 @@ export function PdfViewer({
 
       <p className="text-[11px] text-muted-foreground">
         In-app reader only — no public file link. Offline copies stay inside
-        MedVerse and expire when access ends.
+        MedVerse and expire when access ends. Arrow keys change pages.
       </p>
     </div>
   );

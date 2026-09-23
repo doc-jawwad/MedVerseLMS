@@ -1,0 +1,10 @@
+{
+  "Rules": [
+    {
+      "ID": "abort-incomplete-study-mpu",
+      "Status": "Enabled",
+      "Filter": { "Prefix": "study-content/" },
+      "AbortIncompleteMultipartUpload": { "DaysAfterInitiation": 7 }
+    }
+  ]
+}
