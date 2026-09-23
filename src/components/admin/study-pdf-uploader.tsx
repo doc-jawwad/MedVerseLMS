@@ -221,7 +221,9 @@ export function StudyPdfUploader({
           if (abort.signal.aborted) throw new Error("upload_cancelled");
           const start = (partNumber - 1) * partSize;
           const end = Math.min(start + partSize, file.size);
-          const blob = file.slice(start, end);
+          // Empty type so the browser does not send Content-Type (not in the
+          // UploadPart signature). file.slice() would inherit application/pdf.
+          const blob = new Blob([file.slice(start, end)], { type: "" });
           let lastErr: unknown;
           for (let attempt = 1; attempt <= PART_MAX_ATTEMPTS; attempt++) {
             if (abort.signal.aborted) throw new Error("upload_cancelled");

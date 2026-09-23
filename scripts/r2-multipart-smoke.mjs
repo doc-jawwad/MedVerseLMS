@@ -55,7 +55,7 @@ function getConfig() {
 
 function canonicalQuery(pairs) {
   return [...pairs]
-    .sort(([a], [b]) => a.localeCompare(b))
+    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
     .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
     .join("&");
 }
@@ -192,8 +192,14 @@ async function main() {
         partNumber: String(n),
         uploadId,
       });
-      const put = await fetch(url, { method: "PUT", body: chunk });
-      if (!put.ok) throw new Error(`part_${n}_failed:${put.status}`);
+      const put = await fetch(url, {
+        method: "PUT",
+        body: new Uint8Array(chunk),
+      });
+      if (!put.ok) {
+        const detail = (await put.text()).slice(0, 300);
+        throw new Error(`part_${n}_failed:${put.status}:${detail}`);
+      }
       const etag = put.headers.get("etag");
       if (!etag) throw new Error(`part_${n}_no_etag`);
       parts.push({ partNumber: n, etag });

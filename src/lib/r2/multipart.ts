@@ -18,10 +18,17 @@ function sha256Hex(value: string | Buffer): string {
   return createHash("sha256").update(value).digest("hex");
 }
 
+function awsEncode(value: string): string {
+  // RFC 3986 / AWS SigV4: encodeURIComponent then keep unreserved extras consistent.
+  return encodeURIComponent(value).replace(/[!'()*]/g, (c) =>
+    `%${c.charCodeAt(0).toString(16).toUpperCase()}`
+  );
+}
+
 function encodePath(key: string): string {
   return key
     .split("/")
-    .map((part) => encodeURIComponent(part))
+    .map((part) => awsEncode(part))
     .join("/");
 }
 
@@ -49,11 +56,10 @@ function resolveConfig(
 
 type QueryPairs = Array<[string, string]>;
 
+/** Byte-order sort — never localeCompare (would put partNumber before X-Amz-*). */
 function canonicalQuery(pairs: QueryPairs): string {
-  const sorted = [...pairs].sort(([a], [b]) => a.localeCompare(b));
-  return sorted
-    .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
-    .join("&");
+  const sorted = [...pairs].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+  return sorted.map(([k, v]) => `${awsEncode(k)}=${awsEncode(v)}`).join("&");
 }
 
 /** Query-string presign for UploadPart / single PUT with optional Content-Type. */
