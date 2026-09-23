@@ -127,6 +127,10 @@ describe("PWA cache policy", () => {
       "utf8"
     );
     assert.match(sw, new RegExp(PWA_CACHE_NAME));
+    assert.match(sw, /medverse-shell-v1/);
+    assert.match(sw, /isOfflineShellPath|\/offline/);
+    assert.match(sw, /CACHE_OFFLINE_SHELL/);
+    assert.match(sw, /pdf\.worker\.min\.mjs/);
     for (const prefix of PWA_NEVER_CACHE_PATH_PREFIXES) {
       assert.ok(sw.includes(prefix), `sw.js missing ${prefix}`);
     }
@@ -135,6 +139,15 @@ describe("PWA cache policy", () => {
     assert.match(sw, /_rsc/);
     assert.match(sw, /X-Amz-Signature/);
     assert.match(sw, /data\.type === "SKIP_WAITING"/);
-    assert.doesNotMatch(sw, /addEventListener\("install"/);
+    assert.match(sw, /addEventListener\("install"/);
+  });
+
+  it("recognizes offline shell paths", async () => {
+    const { isOfflineShellPath } = await import(
+      "../../src/lib/pwa/cache-policy.ts"
+    );
+    assert.equal(isOfflineShellPath("/offline"), true);
+    assert.equal(isOfflineShellPath("/offline/read/abc"), true);
+    assert.equal(isOfflineShellPath("/dashboard"), false);
   });
 });

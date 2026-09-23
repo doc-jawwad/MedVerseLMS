@@ -10,6 +10,8 @@ const DB_NAME = "medverse-pdf-offline-v1";
 const META_STORE = "meta";
 const DB_VERSION = 1;
 
+export type OfflineSaveStatus = "available" | "saving" | "failed";
+
 export type OfflinePdfMeta = {
   materialId: string;
   title: string;
@@ -19,6 +21,8 @@ export type OfflinePdfMeta = {
   /** Unix ms; refreshed on successful online authorize. */
   entitlementExpiresAt: number;
   version: 1;
+  /** Transient save progress for Offline Library; omit once fully available. */
+  saveStatus?: OfflineSaveStatus;
 };
 
 function openDb(): Promise<IDBDatabase> {
@@ -108,11 +112,18 @@ export async function removeOfflinePdf(materialId: string): Promise<void> {
   }
 }
 
+/**
+ * Full-file ArrayBuffer read — avoid for large PDFs. Prefer
+ * createOpfsPdfRangeTransport / readOfflinePdfRange.
+ */
 export async function readOfflinePdfBytes(
   materialId: string
 ): Promise<ArrayBuffer | null> {
   const meta = await getOfflineMeta(materialId);
   if (!meta) return null;
+  if (meta.saveStatus === "saving" || meta.saveStatus === "failed") {
+    return null;
+  }
   if (meta.entitlementExpiresAt > 0 && Date.now() > meta.entitlementExpiresAt) {
     return null;
   }
@@ -124,6 +135,129 @@ export async function readOfflinePdfBytes(
   } catch {
     return null;
   }
+}
+
+/** Mark Offline Library row as Saving… before range stream starts. */
+export async function markOfflineSavePending(options: {
+  materialId: string;
+  title: string;
+  byteSize: number;
+  contentRevision: string;
+  entitlementExpiresAt: number;
+}): Promise<void> {
+  await idbPut(META_STORE, {
+    materialId: options.materialId,
+    title: options.title,
+    byteSize: options.byteSize,
+    contentRevision: options.contentRevision,
+    cachedAt: Date.now(),
+    entitlementExpiresAt: options.entitlementExpiresAt,
+    version: 1,
+    saveStatus: "saving",
+  } satisfies OfflinePdfMeta);
+}
+
+export async function markOfflineSaveFailed(materialId: string): Promise<void> {
+  const meta = await getOfflineMeta(materialId);
+  if (!meta) return;
+  await idbPut(META_STORE, { ...meta, saveStatus: "failed" });
+}
+
+/**
+ * Read a byte range from the OPFS offline PDF via File.slice (does not load
+ * the entire file into JS memory). `endExclusive` matches PDF.js range end.
+ */
+export async function readOfflinePdfRange(
+  materialId: string,
+  begin: number,
+  endExclusive: number
+): Promise<Uint8Array | null> {
+  const meta = await getOfflineMeta(materialId);
+  if (!meta) return null;
+  if (meta.saveStatus === "saving" || meta.saveStatus === "failed") {
+    return null;
+  }
+  if (meta.entitlementExpiresAt > 0 && Date.now() > meta.entitlementExpiresAt) {
+    return null;
+  }
+  if (begin < 0 || endExclusive <= begin) return new Uint8Array(0);
+  try {
+    const root = await getOpfsRoot();
+    const handle = await root.getFileHandle(opfsName(materialId));
+    const file = await handle.getFile();
+    const end = Math.min(endExclusive, file.size);
+    const start = Math.min(begin, end);
+    const ab = await file.slice(start, end).arrayBuffer();
+    const out = new Uint8Array(ab.byteLength);
+    out.set(new Uint8Array(ab));
+    return out;
+  } catch {
+    return null;
+  }
+}
+
+export async function getOfflinePdfByteLength(
+  materialId: string
+): Promise<number | null> {
+  const meta = await getOfflineMeta(materialId);
+  if (!meta) return null;
+  if (meta.entitlementExpiresAt > 0 && Date.now() > meta.entitlementExpiresAt) {
+    return null;
+  }
+  try {
+    const root = await getOpfsRoot();
+    const handle = await root.getFileHandle(opfsName(materialId));
+    const file = await handle.getFile();
+    return file.size;
+  } catch {
+    return meta.byteSize > 0 ? meta.byteSize : null;
+  }
+}
+
+type PdfjsModule = typeof import("pdfjs-dist");
+
+/**
+ * PDF.js PDFDataRangeTransport backed by OPFS File.slice ranges.
+ */
+export async function createOpfsPdfRangeTransport(
+  pdfjs: PdfjsModule,
+  materialId: string
+): Promise<{
+  transport: InstanceType<PdfjsModule["PDFDataRangeTransport"]>;
+  meta: OfflinePdfMeta;
+  length: number;
+} | null> {
+  const meta = await getOfflineMeta(materialId);
+  if (!meta) return null;
+  if (meta.saveStatus === "saving" || meta.saveStatus === "failed") {
+    return null;
+  }
+  if (meta.entitlementExpiresAt > 0 && Date.now() > meta.entitlementExpiresAt) {
+    return null;
+  }
+  const length = (await getOfflinePdfByteLength(materialId)) ?? meta.byteSize;
+  if (!length || length <= 0) return null;
+
+  const initialLen = Math.min(65536, length);
+  const initial = await readOfflinePdfRange(materialId, 0, initialLen);
+  if (!initial) return null;
+
+  const Base = pdfjs.PDFDataRangeTransport;
+  class OpfsRangeTransport extends Base {
+    requestDataRange(begin: number, end: number) {
+      void (async () => {
+        try {
+          const chunk = await readOfflinePdfRange(materialId, begin, end);
+          this.onDataRange(begin, chunk);
+        } catch {
+          this.onDataRange(begin, null);
+        }
+      })();
+    }
+  }
+
+  const transport = new OpfsRangeTransport(length, initial);
+  return { transport, meta, length };
 }
 
 export type OfflineSaveProgress = {
@@ -222,6 +356,7 @@ export async function savePdfForOffline(options: {
     cachedAt: Date.now(),
     entitlementExpiresAt: options.entitlementExpiresAt,
     version: 1,
+    saveStatus: "available",
   };
   await idbPut(META_STORE, meta);
   return meta;

@@ -35,6 +35,9 @@ describe("protected pdf reader policy", () => {
     assert.match(src, /getDirectory/);
     assert.match(src, /entitlementExpiresAt/);
     assert.match(src, /estimateOfflineQuota/);
+    assert.match(src, /createOpfsPdfRangeTransport/);
+    assert.match(src, /readOfflinePdfRange/);
+    assert.match(src, /file\.slice/);
     assert.doesNotMatch(src, /showSaveFilePicker/);
   });
 
@@ -48,7 +51,9 @@ describe("protected pdf reader policy", () => {
     assert.match(src, /Confirm save/);
     assert.match(src, /estimateOfflineQuota/);
     assert.match(src, /mv-pdf-page:/);
-    assert.match(src, /Retry offline save/);
+    assert.match(src, /Failed — Retry/);
+    assert.match(src, /createOpfsPdfRangeTransport/);
+    assert.match(src, /requestCacheOfflineReader/);
     assert.match(src, /contentRevision/);
   });
 });

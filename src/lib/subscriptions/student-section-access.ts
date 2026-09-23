@@ -141,6 +141,12 @@ export function buildStudentShellNav(
       locked: !paid,
     },
     { href: "/tests", label: "Tests", icon: "tests", locked: false },
+    {
+      href: "/offline",
+      label: "Offline Library",
+      icon: "pastPapers",
+      locked: false,
+    },
     // /performance removed from nav — analytics merged into Dashboard.
     { href: "/contact", label: "Contact Us", icon: "contact", locked: false },
     {

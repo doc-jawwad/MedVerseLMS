@@ -11,18 +11,20 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
+  createOpfsPdfRangeTransport,
   estimateOfflineQuota,
   formatByteSize,
   getOfflineMeta,
+  markOfflineSaveFailed,
+  markOfflineSavePending,
   purgeExpiredOffline,
-  readOfflinePdfBytes,
   removeOfflinePdf,
   savePdfForOffline,
   totalOfflineBytes,
   touchOfflineEntitlement,
   type OfflinePdfMeta,
 } from "@/lib/study/offline-pdf-store";
-
+import { requestCacheOfflineReader } from "@/lib/pwa/offline-shell";
 type PdfjsLib = typeof import("pdfjs-dist");
 type PdfDocument = import("pdfjs-dist").PDFDocumentProxy;
 type PdfPage = import("pdfjs-dist").PDFPageProxy;
@@ -70,11 +72,14 @@ export function PdfViewer({
   title,
   watermarkName,
   watermarkCollege,
+  preferOfflineDefault = false,
 }: {
   materialId: string;
   title: string;
   watermarkName?: string;
   watermarkCollege?: string;
+  /** When true (Offline Library reader), prefer OPFS ranges even while online. */
+  preferOfflineDefault?: boolean;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -174,17 +179,21 @@ export function PdfViewer({
 
         if (opts.preferOffline || !navigator.onLine) {
           offlineMeta = await getOfflineMeta(materialId);
-          const bytes = offlineMeta
-            ? await readOfflinePdfBytes(materialId)
-            : null;
           if (gen !== loadGenRef.current) return;
-          if (bytes) {
-            loadingTask = pdfjs.getDocument({ data: new Uint8Array(bytes) });
-            setUsingOffline(true);
-            setOfflineUi("offline_ready");
-          } else if (!navigator.onLine) {
-            if (
-              offlineMeta &&
+          if (offlineMeta) {
+            const ranged = await createOpfsPdfRangeTransport(pdfjs, materialId);
+            if (gen !== loadGenRef.current) return;
+            if (ranged) {
+              loadingTask = pdfjs.getDocument({
+                range: ranged.transport,
+                length: ranged.length,
+                disableAutoFetch: true,
+                disableStream: true,
+                rangeChunkSize: 512 * 1024,
+              });
+              setUsingOffline(true);
+              setOfflineUi("offline_ready");
+            } else if (
               offlineMeta.entitlementExpiresAt > 0 &&
               Date.now() > offlineMeta.entitlementExpiresAt
             ) {
@@ -192,7 +201,13 @@ export function PdfViewer({
               throw new Error(
                 "Offline access expired — connect to update access."
               );
+            } else if (!navigator.onLine) {
+              setOfflineUi("offline_unavailable");
+              throw new Error(
+                "Connect to the internet to read this document."
+              );
             }
+          } else if (!navigator.onLine) {
             setOfflineUi("offline_unavailable");
             throw new Error(
               "Connect to the internet to read this document."
@@ -312,7 +327,9 @@ export function PdfViewer({
   );
 
   useEffect(() => {
-    void loadDocument({ preferOffline: !navigator.onLine });
+    void loadDocument({
+      preferOffline: preferOfflineDefault || !navigator.onLine,
+    });
     return () => {
       loadGenRef.current += 1;
       renderTaskRef.current?.cancel();
@@ -324,7 +341,7 @@ export function PdfViewer({
     };
     // Intentionally once per materialId — scale changes re-render below.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [materialId]);
+  }, [materialId, preferOfflineDefault]);
 
   useEffect(() => {
     const doc = pdfRef.current;
@@ -431,11 +448,19 @@ export function PdfViewer({
         probe.headers.get("etag") ||
         probe.headers.get("content-length") ||
         String(Date.now());
+      const expires = Date.now() + ENTITLEMENT_TTL_MS;
+      await markOfflineSavePending({
+        materialId,
+        title,
+        byteSize: total,
+        contentRevision: rev,
+        entitlementExpiresAt: expires,
+      });
       await savePdfForOffline({
         materialId,
         title,
         contentRevision: rev,
-        entitlementExpiresAt: Date.now() + ENTITLEMENT_TTL_MS,
+        entitlementExpiresAt: expires,
         signal: ac.signal,
         onProgress: ({ loaded, total: t }) => {
           setSavePct(formatPct(loaded, t > 0 ? t : total));
@@ -444,21 +469,25 @@ export function PdfViewer({
       setPendingSaveSize(null);
       setOfflineUi("offline_ready");
       await refreshOfflineUsage();
+      requestCacheOfflineReader(materialId);
       toast.success("Saved for offline reading");
     } catch (e) {
       const msg = e instanceof Error ? e.message : "offline_failed";
       if (msg === "offline_cancelled") {
+        await removeOfflinePdf(materialId).catch(() => undefined);
         setOfflineUi("online_only");
         setPendingSaveSize(null);
         toast.message("Offline save cancelled");
         return;
       }
       if (msg === "study_object_denied") {
+        await removeOfflinePdf(materialId).catch(() => undefined);
         setOfflineUi("online_only");
         setPendingSaveSize(null);
         toast.error("You do not have access to this PDF.");
         return;
       }
+      await markOfflineSaveFailed(materialId).catch(() => undefined);
       setOfflineUi("save_failed");
       toast.error(
         msg.startsWith("offline_range_failed")
@@ -522,17 +551,17 @@ export function PdfViewer({
       case "online_only":
         return "Available online";
       case "saving":
-        return `Saving for offline — ${savePct}`;
+        return `Saving… ${savePct}`;
       case "offline_ready":
         return usingOffline
           ? "Available offline (reading cached copy)"
           : "Available offline";
       case "offline_expired":
-        return "Offline access expired — connect to update access.";
+        return "Offline access expired";
       case "offline_unavailable":
         return "Connect to the internet to read this document.";
       case "save_failed":
-        return "Offline save failed — retry when ready.";
+        return "Failed — Retry";
       default:
         return "";
     }
@@ -623,7 +652,7 @@ export function PdfViewer({
               onClick={() => void startOfflineSave()}
               data-testid="pdf-offline-retry"
             >
-              Retry offline save
+              Retry
             </Button>
           ) : (
             <Button

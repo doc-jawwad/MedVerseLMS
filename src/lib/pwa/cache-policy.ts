@@ -5,7 +5,8 @@
  * Cache only hashed Next static files and public branding. Never intercept
  * HTML/RSC, PostgREST, Auth, signed R2 URLs, exam payloads, or API routes.
  */
-export const PWA_CACHE_NAME = "medverse-static-v2";
+export const PWA_CACHE_NAME = "medverse-static-v3";
+export const PWA_SHELL_CACHE_NAME = "medverse-shell-v1";
 export const PWA_SW_PATH = "/sw.js";
 
 export const PWA_CACHEABLE_PATH_PREFIXES = ["/_next/static/", "/icons/"] as const;
@@ -14,7 +15,13 @@ export const PWA_CACHEABLE_PATHS = [
   "/logo-icon.png",
   "/logo-icon-on-dark.png",
   "/logo-full.png",
+  "/pdf.worker.min.mjs",
 ] as const;
+
+/** Document navigations allowed into the offline shell cache (SW only). */
+export function isOfflineShellPath(pathname: string): boolean {
+  return pathname === "/offline" || pathname.startsWith("/offline/");
+}
 
 export const PWA_NEVER_CACHE_PATH_PREFIXES = [
   "/rest/v1",
