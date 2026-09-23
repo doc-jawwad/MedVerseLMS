@@ -4,7 +4,9 @@ Append-only records of environment validation and phase sign-offs.
 
 | Record | Scope | Status |
 |--------|--------|--------|
-| [pdf-reader-offline-staging-20260923.md](pdf-reader-offline-staging-20260923.md) | Protected PDF.js range reader + Save for Offline | **STAGING DEPLOYED** — 20MB Range reader AUTOMATED pass; large-file UI pending valid fixtures |
+| [pdf-reader-progressive-offline-staging-20260923.md](pdf-reader-progressive-offline-staging-20260923.md) | Progressive reader + offline OPFS (200/500/1GB TTFP) | **STAGING PASS** — leading-206 gate; TTFP ~7–14s; Node RSS flat; prod untouched |
+| [large-pdf-browser-upload-staging-20260923.md](large-pdf-browser-upload-staging-20260923.md) | Admin UI direct-to-R2 large PDF (500 MB + 1 GB) | **STAGING PASS** — 500 MB + 1 GB multipart; Node RSS flat ~61 MB; `/tmp` flat; no Next body; prod untouched |
+| [pdf-reader-offline-staging-20260923.md](pdf-reader-offline-staging-20260923.md) | Protected PDF.js range reader + Save for Offline | **STAGING DEPLOYED** — superseded for large progressive by pdf-reader-progressive-offline-staging-20260923 |
 | [direct-r2-pdf-upload-staging-20260923.md](direct-r2-pdf-upload-staging-20260923.md) | Direct-to-R2 multipart PDF upload (remove 25MB limit) | **STAGING DEPLOYED** — R2 smoke 5MB–1GB OK; **CORS apply pending** (bucket reports CORS not configured) |
 | [production-ps-cutover-0af0241-20260922.md](production-ps-cutover-0af0241-20260922.md) | Prof. Session production cutover (`0af0241` / DB `20260922000007`) | **PRODUCTION DEPLOYED** (with DEV-PS-001 ensure correction) |
 | [ospe-staging-rc-20260920.md](ospe-staging-rc-20260920.md) | OSPE Practice final staging RC | **READY FOR FINAL PRODUCTION RELEASE** (staging only; prod not deployed) |
