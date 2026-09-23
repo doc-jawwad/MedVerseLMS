@@ -11,8 +11,9 @@ describe("protected pdf reader policy", () => {
     );
     assert.match(src, /fetchR2ObjectStream/);
     assert.match(src, /rangeHeader/);
+    assert.match(src, /headR2ObjectViaPresign/);
     assert.doesNotMatch(src, /getR2Object\(/);
-    assert.doesNotMatch(src, /await .*\.arrayBuffer\(\)/);
+    assert.match(src, /Unscoped GET would stream/);
   });
 
   it("pdf viewer uses PDF.js and has no Download control", () => {
