@@ -4,6 +4,8 @@ Append-only records of environment validation and phase sign-offs.
 
 | Record | Scope | Status |
 |--------|--------|--------|
+| [direct-r2-pdf-upload-staging-20260923.md](direct-r2-pdf-upload-staging-20260923.md) | Direct-to-R2 multipart PDF upload (remove 25MB limit) | **STAGING DEPLOYED** — R2 smoke 5MB–1GB OK; **CORS apply pending** (bucket reports CORS not configured) |
+| [production-ps-cutover-0af0241-20260922.md](production-ps-cutover-0af0241-20260922.md) | Prof. Session production cutover (`0af0241` / DB `20260922000007`) | **PRODUCTION DEPLOYED** (with DEV-PS-001 ensure correction) |
 | [ospe-staging-rc-20260920.md](ospe-staging-rc-20260920.md) | OSPE Practice final staging RC | **READY FOR FINAL PRODUCTION RELEASE** (staging only; prod not deployed) |
 | [rc-staging-20260920.md](rc-staging-20260920.md) | Earlier integration RC (pre-OSPE) | Historical — superseded for OSPE by ospe-staging-rc |
 | [8j-staging-signoff-20260916.md](8j-staging-signoff-20260916.md) | Phase 8J on VPS staging | **STAGING VALIDATED — 8J COMPLETE** |
