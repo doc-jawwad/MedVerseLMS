@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
   addCurriculumNode,
@@ -54,6 +55,7 @@ function NodeRow({
   expanded?: boolean;
   onToggle?: () => void;
 }) {
+  const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [renaming, setRenaming] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -64,6 +66,7 @@ function NodeRow({
     <div
       className="flex flex-wrap items-center gap-2 rounded-md px-2 py-1.5 hover:bg-accent/40"
       style={{ marginLeft: level * 20 }}
+      data-testid={`curriculum-${kind}-${id}`}
     >
       {onToggle ? (
         <button
@@ -83,6 +86,10 @@ function NodeRow({
             startTransition(async () => {
               const { error } = await renameCurriculumNode(table, id, newName);
               if (error) toast.error(error);
+              else {
+                toast.success("Saved");
+                router.refresh();
+              }
               setRenaming(false);
             })
           }
@@ -92,6 +99,7 @@ function NodeRow({
             onChange={(e) => setNewName(e.target.value)}
             className="h-7"
             autoFocus
+            data-testid="curriculum-edit-name"
           />
           <Button size="sm" className="h-7" type="submit" disabled={pending}>
             Save
@@ -108,7 +116,10 @@ function NodeRow({
         </form>
       ) : (
         <>
-          <span className="min-w-0 flex-1 text-sm">
+          <span
+            className="min-w-0 flex-1 text-sm"
+            data-testid={`curriculum-name-${id}`}
+          >
             {name}
             {typeof childCount === "number" && (
               <span className="ml-2 text-xs text-muted-foreground">
@@ -122,6 +133,7 @@ function NodeRow({
               size="sm"
               variant="ghost"
               className="h-6 px-2 text-xs"
+              data-testid={`curriculum-edit-${id}`}
               onClick={() => {
                 setNewName(name);
                 setRenaming(true);
@@ -133,6 +145,7 @@ function NodeRow({
               size="sm"
               variant="ghost"
               className="h-6 px-2 text-xs text-destructive"
+              data-testid={`curriculum-delete-${id}`}
               onClick={() => setConfirmDelete(true)}
             >
               Delete
@@ -144,7 +157,9 @@ function NodeRow({
       <Dialog open={confirmDelete} onOpenChange={setConfirmDelete}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Delete {kind} “{name}”?</DialogTitle>
+            <DialogTitle>
+              Delete {kind} “{name}”?
+            </DialogTitle>
             <DialogDescription>
               This permanently deletes it and everything under it. Questions
               attached to it are also removed. This cannot be undone.
@@ -157,11 +172,15 @@ function NodeRow({
             <Button
               variant="destructive"
               disabled={pending}
+              data-testid="curriculum-delete-confirm"
               onClick={() =>
                 startTransition(async () => {
                   const { error } = await deleteCurriculumNode(table, id);
                   if (error) toast.error(error);
-                  else toast.success("Deleted");
+                  else {
+                    toast.success("Deleted");
+                    router.refresh();
+                  }
                   setConfirmDelete(false);
                 })
               }
@@ -184,6 +203,7 @@ function AddChildForm({
   parentId: string;
   level: number;
 }) {
+  const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [name, setName] = useState("");
   const kind = childKind[parentKind];
@@ -196,7 +216,10 @@ function AddChildForm({
         startTransition(async () => {
           const { error } = await addCurriculumNode(kind, parentId, name);
           if (error) toast.error(error);
-          else setName("");
+          else {
+            setName("");
+            router.refresh();
+          }
         })
       }
     >
@@ -205,6 +228,7 @@ function AddChildForm({
         onChange={(e) => setName(e.target.value)}
         placeholder={`Add ${childLabel[parentKind]}…`}
         className="h-7 w-64"
+        data-testid={`curriculum-add-${parentKind}`}
       />
       <Button
         size="sm"
@@ -230,7 +254,7 @@ export function CurriculumTree({
   const toggle = (id: string) => setOpen((o) => ({ ...o, [id]: !o[id] }));
 
   return (
-    <div className="rounded-md border p-3">
+    <div className="rounded-md border p-3" data-testid="curriculum-tree">
       {subjects.map((s) => (
         <div key={s.id}>
           <NodeRow
