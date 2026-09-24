@@ -62,7 +62,7 @@ function NodeRow({
 
   return (
     <div
-      className="group flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-accent/40"
+      className="flex flex-wrap items-center gap-2 rounded-md px-2 py-1.5 hover:bg-accent/40"
       style={{ marginLeft: level * 20 }}
     >
       {onToggle ? (
@@ -108,7 +108,7 @@ function NodeRow({
         </form>
       ) : (
         <>
-          <span className="flex-1 text-sm">
+          <span className="min-w-0 flex-1 text-sm">
             {name}
             {typeof childCount === "number" && (
               <span className="ml-2 text-xs text-muted-foreground">
@@ -117,7 +117,7 @@ function NodeRow({
               </span>
             )}
           </span>
-          <div className="hidden gap-1 group-hover:flex">
+          <div className="flex shrink-0 gap-1">
             <Button
               size="sm"
               variant="ghost"
@@ -127,7 +127,7 @@ function NodeRow({
                 setRenaming(true);
               }}
             >
-              Rename
+              Edit
             </Button>
             <Button
               size="sm"
