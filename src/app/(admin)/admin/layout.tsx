@@ -31,8 +31,9 @@ export default async function AdminLayout({
   const yearList = years ?? [];
   const selected =
     yearList.find((y) => y.id === selectedYearId) ?? yearList[0] ?? null;
-  const tools = selected ? (
+  const headerTools = selected ? (
     <ShellTools
+      layout="header"
       surface="library"
       yearId={selected.id}
       yearNumber={selected.year_number}
@@ -41,6 +42,7 @@ export default async function AdminLayout({
     />
   ) : (
     <ShellTools
+      layout="header"
       surface="library"
       yearId=""
       yearNumber={1}
@@ -65,7 +67,6 @@ export default async function AdminLayout({
         </div>
         <ShellNav items={nav} />
         <div className="mt-4 space-y-3">
-          {tools}
           <InstallMedverseApp variant="nav" />
           <form action={signOutAction}>
             <Button
@@ -87,8 +88,11 @@ export default async function AdminLayout({
           subLabel="Admin"
           signOutAction={signOutAction}
           showBottomNav={false}
-          tools={tools}
+          headerActions={headerTools}
         />
+        <header className="sticky top-0 z-20 hidden items-center justify-end border-b border-border/70 bg-[var(--student-canvas)]/90 px-6 py-2 backdrop-blur-md md:flex md:px-8">
+          {headerTools}
+        </header>
         <main className="mx-auto w-full max-w-7xl flex-1 px-4 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] md:px-8 md:py-8">
           <div className="mb-4">
             <AdminClassSelector
