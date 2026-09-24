@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -17,11 +17,13 @@ import {
   setTestProfSessionDay,
 } from "@/lib/actions/prof-session";
 import { createOneLiner } from "@/lib/actions/one-liners";
+import { DayPracticeCsvImport } from "./day-practice-csv-import";
 
 export type DayQuestionOption = {
   id: string;
   difficulty: string;
   stemPreview: string;
+  subjectName: string | null;
 };
 
 export type DayTestOption = {
@@ -46,6 +48,10 @@ export type DayFolderRow = {
   entitlement: string;
 };
 
+export type DaySubjectOption = { id: string; name: string };
+
+type PracticeMode = "select" | "csv";
+
 export function ProfSessionDayContentAdmin({
   dayId,
   dayName,
@@ -56,6 +62,7 @@ export function ProfSessionDayContentAdmin({
   subjectName,
   linkedPracticeIds,
   questions,
+  yearSubjects,
   tests,
   oneLiners,
   folders,
@@ -69,6 +76,7 @@ export function ProfSessionDayContentAdmin({
   subjectName: string;
   linkedPracticeIds: string[];
   questions: DayQuestionOption[];
+  yearSubjects: DaySubjectOption[];
   tests: DayTestOption[];
   oneLiners: DayOneLinerRow[];
   folders: DayFolderRow[];
@@ -78,12 +86,19 @@ export function ProfSessionDayContentAdmin({
   const [selectedPractice, setSelectedPractice] = useState<Set<string>>(
     () => new Set(linkedPracticeIds)
   );
+  const [practiceMode, setPracticeMode] = useState<PracticeMode>("select");
+  const [poolFilter, setPoolFilter] = useState("");
+  const [poolSelected, setPoolSelected] = useState<Set<string>>(new Set());
   const [folderName, setFolderName] = useState("");
   const [folderSlot, setFolderSlot] = useState<"guidelines" | "los">(
     "guidelines"
   );
   const [olTitle, setOlTitle] = useState("");
   const [olBody, setOlBody] = useState("");
+
+  useEffect(() => {
+    setSelectedPractice(new Set(linkedPracticeIds));
+  }, [linkedPracticeIds]);
 
   const linkedFolders = useMemo(
     () => ({
@@ -93,17 +108,67 @@ export function ProfSessionDayContentAdmin({
     [folders]
   );
 
+  const questionById = useMemo(() => {
+    const map = new Map<string, DayQuestionOption>();
+    for (const q of questions) map.set(q.id, q);
+    return map;
+  }, [questions]);
+
+  const selectedList = useMemo(
+    () =>
+      Array.from(selectedPractice)
+        .map(
+          (id) =>
+            questionById.get(id) ?? {
+              id,
+              difficulty: "?",
+              stemPreview: id,
+              subjectName: null,
+            }
+        )
+        .sort((a, b) => a.stemPreview.localeCompare(b.stemPreview)),
+    [selectedPractice, questionById]
+  );
+
+  const pool = useMemo(() => {
+    const q = poolFilter.trim().toLowerCase();
+    return questions.filter((item) => {
+      if (selectedPractice.has(item.id)) return false;
+      if (!q) return true;
+      return (
+        item.stemPreview.toLowerCase().includes(q) ||
+        (item.subjectName ?? "").toLowerCase().includes(q) ||
+        item.difficulty.toLowerCase().includes(q)
+      );
+    });
+  }, [questions, selectedPractice, poolFilter]);
+
   function refresh() {
     router.refresh();
   }
 
-  function togglePractice(id: string) {
-    setSelectedPractice((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
+  function savePracticeSet(ids: string[], successMsg: string) {
+    startTransition(async () => {
+      const { error } = await setDayPracticeQuestions(dayId, ids);
+      if (error) toast.error(error);
+      else {
+        toast.success(successMsg);
+        setSelectedPractice(new Set(ids));
+        setPoolSelected(new Set());
+        refresh();
+      }
     });
+  }
+
+  function removeFromDay(id: string) {
+    const next = Array.from(selectedPractice).filter((x) => x !== id);
+    savePracticeSet(next, "Removed from this day");
+  }
+
+  function addPoolSelection() {
+    if (poolSelected.size === 0) return;
+    const next = Array.from(new Set([...selectedPractice, ...poolSelected]));
+    savePracticeSet(next, `Added ${poolSelected.size} question(s) to this day`);
   }
 
   return (
@@ -126,7 +191,6 @@ export function ProfSessionDayContentAdmin({
         </p>
       </div>
 
-      {/* Guidelines / LoS folders */}
       <section className="grid gap-3 rounded-xl border bg-card p-4">
         <h2 className="font-heading text-lg font-semibold text-[var(--student-ink)]">
           Guidelines &amp; LoS folders
@@ -224,75 +288,173 @@ export function ProfSessionDayContentAdmin({
         )}
       </section>
 
-      {/* Practice MCQs */}
-      <section className="grid gap-3 rounded-xl border bg-card p-4">
-        <h2 className="font-heading text-lg font-semibold text-[var(--student-ink)]">
-          Practice MCQs
-        </h2>
-        <p className="text-sm text-muted-foreground">
-          Approved Question Bank items in {yearLabel} (any subject). Selected
-          set is what students practice for this day only — no duplication.
-        </p>
-        {questions.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            No approved questions in this class yet. Author questions in the
-            Question Bank for {yearLabel}, then attach them here.
+      <section
+        className="grid gap-3 rounded-xl border bg-card p-4"
+        data-testid="day-practice-mcqs"
+      >
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="font-heading text-lg font-semibold text-[var(--student-ink)]">
+            Practice MCQs
+          </h2>
+          <p
+            className="text-sm font-medium text-[var(--student-ink)]"
+            data-testid="day-practice-selected-count"
+          >
+            Selected: {selectedPractice.size}
           </p>
-        ) : (
-          <ul className="max-h-80 overflow-y-auto grid gap-2">
-            {questions.map((q) => {
-              const checked = selectedPractice.has(q.id);
-              return (
+        </div>
+        <p className="text-sm text-muted-foreground">
+          Attach approved Question Bank MCQs to <strong>this day only</strong>.
+          Select existing bank questions or import a CSV — no duplicate question
+          architecture; other days stay isolated.
+        </p>
+
+        <div className="flex flex-wrap gap-2">
+          <Button
+            type="button"
+            size="sm"
+            variant={practiceMode === "select" ? "default" : "outline"}
+            data-testid="day-practice-mode-select"
+            onClick={() => setPracticeMode("select")}
+          >
+            Select Existing MCQs
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant={practiceMode === "csv" ? "default" : "outline"}
+            data-testid="day-practice-mode-csv"
+            onClick={() => setPracticeMode("csv")}
+          >
+            CSV Import
+          </Button>
+        </div>
+
+        {selectedList.length > 0 ? (
+          <div className="grid gap-2">
+            <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+              On this day
+            </p>
+            <ul className="max-h-48 overflow-y-auto grid gap-2">
+              {selectedList.map((q) => (
                 <li
                   key={q.id}
-                  className="flex items-start gap-3 rounded-lg border px-3 py-2"
+                  className="flex flex-wrap items-start justify-between gap-2 rounded-lg border px-3 py-2"
+                  data-testid={`day-practice-selected-${q.id}`}
                 >
-                  <Checkbox
-                    checked={checked}
-                    disabled={pending}
-                    onCheckedChange={() => togglePractice(q.id)}
-                    aria-label={`Select question ${q.id}`}
-                  />
                   <div className="min-w-0 flex-1">
                     <p className="text-sm text-[var(--student-ink)]">
                       {q.stemPreview}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      {q.difficulty}
+                      {[q.subjectName, q.difficulty].filter(Boolean).join(" · ")}
                     </p>
                   </div>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    className="text-destructive"
+                    disabled={pending}
+                    data-testid={`day-practice-remove-${q.id}`}
+                    onClick={() => removeFromDay(q.id)}
+                  >
+                    Remove
+                  </Button>
                 </li>
-              );
-            })}
-          </ul>
+              ))}
+            </ul>
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            No practice MCQs on this day yet.
+          </p>
         )}
-        <div className="flex flex-wrap items-center gap-2">
-          <Button
-            type="button"
-            disabled={pending}
-            onClick={() =>
-              startTransition(async () => {
-                const { error } = await setDayPracticeQuestions(
-                  dayId,
-                  Array.from(selectedPractice)
-                );
-                if (error) toast.error(error);
-                else {
-                  toast.success("Practice set saved");
-                  refresh();
-                }
-              })
-            }
-          >
-            Save practice set ({selectedPractice.size})
-          </Button>
-          <span className="text-xs text-muted-foreground">
-            Currently linked: {linkedPracticeIds.length}
-          </span>
-        </div>
+
+        {practiceMode === "select" ? (
+          <div className="grid gap-3 border-t pt-3">
+            <div className="flex flex-wrap items-end gap-2">
+              <div className="grid min-w-[14rem] flex-1 gap-1">
+                <Label className="text-xs" htmlFor="pool-filter">
+                  Filter pool
+                </Label>
+                <Input
+                  id="pool-filter"
+                  value={poolFilter}
+                  onChange={(e) => setPoolFilter(e.target.value)}
+                  placeholder="Search stem / subject…"
+                  data-testid="day-practice-pool-filter"
+                />
+              </div>
+              <Button
+                type="button"
+                size="sm"
+                disabled={pending || poolSelected.size === 0}
+                data-testid="day-practice-add-selected"
+                onClick={addPoolSelection}
+              >
+                Add selected ({poolSelected.size})
+              </Button>
+            </div>
+            {questions.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                No approved questions in this class yet. Author questions in the
+                Question Bank for {yearLabel}, then attach them here.
+              </p>
+            ) : pool.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                No more matching questions to add (already selected or filtered
+                out).
+              </p>
+            ) : (
+              <ul className="max-h-80 overflow-y-auto grid gap-2">
+                {pool.map((q) => {
+                  const checked = poolSelected.has(q.id);
+                  return (
+                    <li
+                      key={q.id}
+                      className="flex items-start gap-3 rounded-lg border px-3 py-2"
+                    >
+                      <Checkbox
+                        checked={checked}
+                        disabled={pending}
+                        data-testid={`day-practice-tick-${q.id}`}
+                        onCheckedChange={() =>
+                          setPoolSelected((prev) => {
+                            const next = new Set(prev);
+                            if (next.has(q.id)) next.delete(q.id);
+                            else next.add(q.id);
+                            return next;
+                          })
+                        }
+                        aria-label={`Select question ${q.id}`}
+                      />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm text-[var(--student-ink)]">
+                          {q.stemPreview}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {[q.subjectName, q.difficulty]
+                            .filter(Boolean)
+                            .join(" · ")}
+                        </p>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+        ) : (
+          <DayPracticeCsvImport
+            dayId={dayId}
+            linkedPracticeIds={Array.from(selectedPractice)}
+            subjects={yearSubjects}
+            onAttached={(ids) => setSelectedPractice(new Set(ids))}
+          />
+        )}
       </section>
 
-      {/* Test MCQs */}
       <section className="grid gap-3 rounded-xl border bg-card p-4">
         <h2 className="font-heading text-lg font-semibold text-[var(--student-ink)]">
           Test MCQs
@@ -377,7 +539,6 @@ export function ProfSessionDayContentAdmin({
         )}
       </section>
 
-      {/* One-liners */}
       <section className="grid gap-3 rounded-xl border bg-card p-4">
         <h2 className="font-heading text-lg font-semibold text-[var(--student-ink)]">
           One-Liners

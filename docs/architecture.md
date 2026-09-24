@@ -202,7 +202,7 @@ Block/Subject-level (Prof. Session surface — **not** Academic Block categories
 - OSPE → Past OSPE (PDF/pictures) · Practice OSPE (existing `/practice/ospe` engine, subject-filtered) · OSPE Lectures
 - **MCQ Bank** → Admin-created **Days** only (no fake Day 1/2/3)
 
-Each Day contains exactly: Guidelines (PDF) · LoS (PDF) · Practice MCQs (CSV/manual, day-scoped question set) · Test MCQs (CSV/manual via exam `tests` linked to the day) · One-Liners (`one_liners` table + optional PDF — **not** Pearl Points).
+Each Day contains exactly: Guidelines (PDF) · LoS (PDF) · Practice MCQs (select existing Question Bank MCQs and/or CSV import on the day authoring screen — day-scoped junction only) · Test MCQs (CSV/manual via exam `tests` linked to the day) · One-Liners (`one_liners` table + optional PDF — **not** Pearl Points).
 
 Primary routes under `/academic/prof-session/...`. Legacy `/resources/...` and `/library/...` redirect into `/academic`.
 

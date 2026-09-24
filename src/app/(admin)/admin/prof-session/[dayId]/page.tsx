@@ -45,6 +45,7 @@ export default async function AdminProfSessionDayPage({
   const [
     { data: practiceIds },
     { data: questions },
+    { data: yearSubjects },
     { data: tests },
     { data: oneLiners },
     { data: folders },
@@ -53,13 +54,19 @@ export default async function AdminProfSessionDayPage({
     supabase
       .from("questions")
       .select(
-        "id, difficulty, status, subjects!inner(year_id), question_versions!questions_current_version_fk(stem)"
+        "id, difficulty, status, subjects!inner(year_id, name), question_versions!questions_current_version_fk(stem)"
       )
       .eq("subjects.year_id", yearId)
       .eq("status", "approved")
       .is("deleted_at", null)
       .order("created_at", { ascending: false })
-      .limit(200),
+      .limit(500),
+    supabase
+      .from("subjects")
+      .select("id, name")
+      .eq("year_id", yearId)
+      .order("sort_order")
+      .order("name"),
     supabase
       .from("tests")
       .select("id, title, status, subject_id, prof_session_day_id")
@@ -90,18 +97,25 @@ export default async function AdminProfSessionDayPage({
   const questionOptions: DayQuestionOption[] = ((questions ?? []) as {
     id: string;
     difficulty: string;
+    subjects: { year_id: string; name: string } | { year_id: string; name: string }[] | null;
     question_versions: { stem: string } | { stem: string }[] | null;
   }[]).map((q) => {
     const ver = Array.isArray(q.question_versions)
       ? q.question_versions[0]
       : q.question_versions;
+    const subj = Array.isArray(q.subjects) ? q.subjects[0] : q.subjects;
     const stem = (ver?.stem ?? "").trim();
     return {
       id: q.id,
       difficulty: q.difficulty,
+      subjectName: subj?.name ?? null,
       stemPreview: stem.length > 120 ? `${stem.slice(0, 117)}…` : stem || "(no stem)",
     };
   });
+
+  const subjectOptions = ((yearSubjects ?? []) as { id: string; name: string }[]).map(
+    (s) => ({ id: s.id, name: s.name })
+  );
 
   const testOptions: DayTestOption[] = ((tests ?? []) as {
     id: string;
@@ -166,6 +180,7 @@ export default async function AdminProfSessionDayPage({
         subjectName={subjectName}
         linkedPracticeIds={linkedPracticeIds}
         questions={questionOptions}
+        yearSubjects={subjectOptions}
         tests={testOptions}
         oneLiners={oneLinerOptions}
         folders={folderRows}
