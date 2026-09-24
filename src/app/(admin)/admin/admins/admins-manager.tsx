@@ -241,17 +241,17 @@ export function AdminsManager({
           onSubmit={(input) =>
             run(async () => {
               const res = await createAdminAccount(input);
-              if (res.error) return res;
+              if ("error" in res && res.error) return { error: res.error };
               if ("reusedExisting" in res && res.reusedExisting) {
                 toast.success(
                   "That email already had an account — promoted back to admin (same identity)."
                 );
-                return res;
+                return { id: res.id };
               }
               toast.success(
                 "Admin account created. Share the password out of band."
               );
-              return res;
+              return { id: "id" in res ? res.id : undefined };
             }, "")
           }
         />

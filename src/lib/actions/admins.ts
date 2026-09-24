@@ -109,14 +109,17 @@ export async function createAdminAccount(input: {
         codes: input.codes,
         makeMainAdmin: input.makeMainAdmin,
       });
-      if (reused.error) {
+      if ("error" in reused && reused.error) {
         if (reused.error === "profile not found") {
           return {
             error:
               "That email already has a login, but no LMS profile yet. Ask them to sign in once, then promote — or use Promote an existing student.",
           };
         }
-        return reused;
+        return { error: reused.error };
+      }
+      if (!("id" in reused) || !reused.id) {
+        return { error: "Could not promote the existing account." };
       }
       return { id: reused.id, reusedExisting: true as const };
     }
