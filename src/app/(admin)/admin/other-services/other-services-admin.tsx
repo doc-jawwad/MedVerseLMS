@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
   addFolder,
@@ -10,7 +11,9 @@ import {
   updateFolder,
 } from "@/lib/actions/materials";
 import { EntitlementSelect } from "@/components/admin/entitlement-select";
+import { StudyPdfUploader } from "@/components/admin/study-pdf-uploader";
 import { OpenMaterialButton } from "@/components/materials/open-material-button";
+import { MaterialOpenLink } from "@/components/study/material-open-link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -38,6 +41,11 @@ export function OtherServicesAdmin({
       <div className="grid gap-3 rounded-xl border bg-card p-4">
         <p className="text-sm font-medium text-[var(--student-ink)]">
           New service
+        </p>
+        <p className="text-xs text-muted-foreground">
+          Services default to free entitlement so students can open them without a
+          paid subscription. Change entitlement per service if needed. PDFs use the
+          protected study-content reader (not a public R2 URL).
         </p>
         <div className="grid gap-2 sm:grid-cols-2">
           <div className="grid gap-1">
@@ -76,7 +84,7 @@ export function OtherServicesAdmin({
                 null,
                 name,
                 "other_services",
-                "any_subscription",
+                "free",
                 { description: description.trim() || null }
               );
               if ("error" in created && created.error) {
@@ -121,8 +129,8 @@ export function OtherServicesAdmin({
         ))}
         {folders.length === 0 && (
           <div className="rounded-xl border border-dashed px-6 py-12 text-center text-sm text-muted-foreground">
-            No other services for this class yet. Create a service with an optional
-            Drive link.
+            No other services for this class yet. Create a service, then upload a
+            PDF or add a Drive link.
           </div>
         )}
       </div>
@@ -137,12 +145,16 @@ function ServiceCard({
   folder: FolderRow;
   materials: MaterialRow[];
 }) {
+  const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(folder.name);
   const [description, setDescription] = useState(folder.description ?? "");
   const [linkTitle, setLinkTitle] = useState(folder.name);
   const [linkUrl, setLinkUrl] = useState("");
+
+  const pdfs = materials.filter((m) => m.kind === "pdf");
+  const drives = materials.filter((m) => m.kind === "drive");
 
   return (
     <Card>
@@ -240,88 +252,154 @@ function ServiceCard({
           </Button>
         </div>
       </CardHeader>
-      <CardContent className="grid gap-3">
-        {materials.length === 0 && (
-          <p className="text-sm text-muted-foreground">No Drive link yet.</p>
-        )}
-        {materials.map((m) => (
-          <div
-            key={m.id}
-            className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-3 text-sm"
-          >
-            <div className="min-w-0">
-              <OpenMaterialButton
-                materialId={m.id}
-                className="h-auto p-0 font-medium"
+      <CardContent className="grid gap-4">
+        <div className="grid gap-2">
+          <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+            PDFs (protected reader)
+          </p>
+          {pdfs.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No PDF uploaded yet.</p>
+          ) : (
+            pdfs.map((m) => (
+              <div
+                key={m.id}
+                className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-3 text-sm"
               >
-                {m.title}
-              </OpenMaterialButton>
-              <div className="mt-1">
-                <Badge variant="secondary" className="uppercase">
-                  {m.kind}
-                </Badge>
+                <div className="min-w-0">
+                  <MaterialOpenLink
+                    materialId={m.id}
+                    kind="pdf"
+                    title={m.title}
+                    className="h-auto p-0 font-medium"
+                  />
+                  <div className="mt-1 flex flex-wrap gap-1">
+                    <Badge variant="secondary" className="uppercase">
+                      {m.kind}
+                    </Badge>
+                    <Badge
+                      variant={m.status === "published" ? "default" : "outline"}
+                    >
+                      {m.status}
+                    </Badge>
+                  </div>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-destructive"
+                  disabled={pending}
+                  onClick={() =>
+                    startTransition(async () => {
+                      if (
+                        !window.confirm(
+                          `Move “${m.title}” to the Bin? Recoverable for ~7 days.`
+                        )
+                      ) {
+                        return;
+                      }
+                      const { error } = await deleteMaterial(m.id);
+                      if (error) toast.error(error);
+                      else toast.success("Moved to Bin");
+                    })
+                  }
+                >
+                  Move to Bin
+                </Button>
               </div>
+            ))
+          )}
+          <StudyPdfUploader
+            folderId={folder.id}
+            onComplete={() => router.refresh()}
+          />
+        </div>
+
+        <div className="grid gap-2 border-t pt-3">
+          <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+            Drive links
+          </p>
+          {drives.length === 0 && (
+            <p className="text-sm text-muted-foreground">No Drive link yet.</p>
+          )}
+          {drives.map((m) => (
+            <div
+              key={m.id}
+              className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-3 text-sm"
+            >
+              <div className="min-w-0">
+                <OpenMaterialButton
+                  materialId={m.id}
+                  className="h-auto p-0 font-medium"
+                >
+                  {m.title}
+                </OpenMaterialButton>
+                <div className="mt-1">
+                  <Badge variant="secondary" className="uppercase">
+                    {m.kind}
+                  </Badge>
+                </div>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-destructive"
+                disabled={pending}
+                onClick={() =>
+                  startTransition(async () => {
+                    if (
+                      !window.confirm(
+                        `Move “${m.title}” to the Bin? Recoverable for ~7 days.`
+                      )
+                    ) {
+                      return;
+                    }
+                    const { error } = await deleteMaterial(m.id);
+                    if (error) toast.error(error);
+                    else toast.success("Moved to Bin");
+                  })
+                }
+              >
+                Move to Bin
+              </Button>
             </div>
+          ))}
+
+          <div className="flex flex-wrap items-end gap-2">
+            <Input
+              placeholder="Link title"
+              value={linkTitle}
+              onChange={(e) => setLinkTitle(e.target.value)}
+              className="w-40"
+            />
+            <Input
+              placeholder="https://drive.google.com/…"
+              value={linkUrl}
+              onChange={(e) => setLinkUrl(e.target.value)}
+              className="w-72"
+            />
             <Button
-              variant="ghost"
               size="sm"
-              className="text-destructive"
-              disabled={pending}
+              disabled={pending || !linkTitle.trim() || !linkUrl.trim()}
               onClick={() =>
                 startTransition(async () => {
-                  if (
-                    !window.confirm(
-                      `Move “${m.title}” to the Bin? Recoverable for ~7 days.`
-                    )
-                  ) {
-                    return;
-                  }
-                  const { error } = await deleteMaterial(m.id);
+                  const { error } = await addMaterial(
+                    folder.id,
+                    linkTitle,
+                    linkUrl,
+                    "",
+                    "other"
+                  );
                   if (error) toast.error(error);
-                  else toast.success("Moved to Bin");
+                  else {
+                    setLinkUrl("");
+                    toast.success("Link added");
+                  }
                 })
               }
             >
-              Move to Bin
+              Add Drive link
             </Button>
           </div>
-        ))}
-
-        <div className="flex flex-wrap items-end gap-2 border-t pt-3">
-          <Input
-            placeholder="Link title"
-            value={linkTitle}
-            onChange={(e) => setLinkTitle(e.target.value)}
-            className="w-40"
-          />
-          <Input
-            placeholder="https://drive.google.com/…"
-            value={linkUrl}
-            onChange={(e) => setLinkUrl(e.target.value)}
-            className="w-72"
-          />
-          <Button
-            size="sm"
-            disabled={pending || !linkTitle.trim() || !linkUrl.trim()}
-            onClick={() =>
-              startTransition(async () => {
-                const { error } = await addMaterial(
-                  folder.id,
-                  linkTitle,
-                  linkUrl,
-                  "",
-                  "other"
-                );
-                if (error) toast.error(error);
-                else {
-                  setLinkUrl("");
-                  toast.success("Link added");
-                }
-              })
-            }
-          >
-            Add Drive link
-          </Button>
         </div>
       </CardContent>
     </Card>

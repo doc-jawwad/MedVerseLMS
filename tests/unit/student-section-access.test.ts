@@ -42,7 +42,7 @@ describe("buildStudentShellNav", () => {
     assert.equal(byHref["/past-papers"]?.label, "Past Papers");
     assert.equal(byHref["/past-papers"]?.locked, true);
     assert.equal(byHref["/other-services"]?.label, "Other Services");
-    assert.equal(byHref["/other-services"]?.locked, true);
+    assert.equal(byHref["/other-services"]?.locked, false);
     assert.equal(byHref["/mcq-bank"], undefined);
     assert.equal(byHref["/resources"], undefined);
     assert.equal(byHref["/library"], undefined);
@@ -93,7 +93,7 @@ describe("isPaidLmsSectionPath", () => {
     assert.equal(isPaidLmsSectionPath("/mock-test"), true);
     assert.equal(isPaidLmsSectionPath("/past-papers"), true);
     assert.equal(isPaidLmsSectionPath("/past-papers/abc"), true);
-    assert.equal(isPaidLmsSectionPath("/other-services"), true);
+    assert.equal(isPaidLmsSectionPath("/other-services"), false);
     assert.equal(isPaidLmsSectionPath("/practice/ospe"), false);
     assert.equal(isPaidLmsSectionPath("/performance"), false);
     assert.equal(isPaidLmsSectionPath("/tests"), false);

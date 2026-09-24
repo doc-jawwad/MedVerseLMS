@@ -165,9 +165,10 @@ Hierarchy (frozen):
 
 **Other Services** is a first-class student shell nav item. Storage reuses `material_folders` with `library_type = 'other_services'` (one folder row = one service).
 
-- Folder `name` = service title; optional folder `description` = user-facing blurb; optional Drive `materials` row under the folder = destination link (existing `kind = 'drive'`).
-- Year-scoped like other materials (`year_id` + enrolled class). Section-locked without a live subscription; folder entitlement governs open/content.
-- Soft-delete / Bin use the existing materials lifecycle. Do not invent a marketplace or second CMS.
+- Folder `name` = service title; optional folder `description` = user-facing blurb; optional Drive `materials` row (`kind = 'drive'`) and/or protected study-content PDF materials (`kind = 'pdf'`) under the folder.
+- Year-scoped like other materials (`year_id` + enrolled class).
+- **Hub is free / unlocked:** students may open Other Services without a live paid subscription. Individual folder entitlement (`free` / `any_subscription` / plan) remains the content boundary — do not treat hub access as making every service paid, and do not globally weaken RLS.
+- Soft-delete / Bin / R2 purge use the existing materials lifecycle. Do not invent a marketplace or second CMS.
 
 ### 2c. Prof. Session (guided course under enrolled class)
 

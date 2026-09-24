@@ -54,8 +54,9 @@ export default async function AdminOtherServicesPage({
               Other Services
             </h1>
             <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-              One folder per service — title, optional description, and an optional
-              Drive link. Soft-delete sends services to the Bin.
+              One folder per service — title, optional description, protected PDF
+              upload, and/or Drive link. Hub is free for students; set entitlement
+              per service. Soft-delete sends services to the Bin.
             </p>
           </div>
           <OtherServicesAdmin

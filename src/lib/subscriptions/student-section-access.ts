@@ -29,7 +29,7 @@ export const PAID_LMS_SECTION_HREFS = [
   "/practice",
   "/mock-test",
   "/past-papers",
-  "/other-services",
+  // /other-services is free/unlocked (hub); folder entitlement remains the content boundary.
   // /performance removed — merged into Dashboard; route redirects to /dashboard.
 ] as const;
 
@@ -138,7 +138,7 @@ export function buildStudentShellNav(
       href: "/other-services",
       label: "Other Services",
       icon: "otherServices",
-      locked: !paid,
+      locked: false,
     },
     { href: "/tests", label: "Tests", icon: "tests", locked: false },
     {
