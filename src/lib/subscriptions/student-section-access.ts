@@ -29,7 +29,8 @@ export const PAID_LMS_SECTION_HREFS = [
   "/practice",
   "/mock-test",
   "/past-papers",
-  // /other-services is free/unlocked (hub); folder entitlement remains the content boundary.
+  // /other-services and /career-counseling-series are free/unlocked hubs;
+  // folder entitlement remains the content boundary.
   // /performance removed — merged into Dashboard; route redirects to /dashboard.
 ] as const;
 
@@ -140,6 +141,12 @@ export function buildStudentShellNav(
       icon: "otherServices",
       locked: false,
     },
+    {
+      href: "/career-counseling-series",
+      label: "Career Counseling Series",
+      icon: "career",
+      locked: false,
+    },
     { href: "/tests", label: "Tests", icon: "tests", locked: false },
     {
       href: "/offline",
@@ -149,12 +156,6 @@ export function buildStudentShellNav(
     },
     // /performance removed from nav — analytics merged into Dashboard.
     { href: "/contact", label: "Contact Us", icon: "contact", locked: false },
-    {
-      href: "/career-counselling",
-      label: "Career Counselling Series",
-      icon: "career",
-      locked: false,
-    },
     {
       href: "/imd-stepwise",
       label: "Get iMD & StepWise MD Subscription",

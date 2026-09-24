@@ -119,6 +119,12 @@ export const ADMIN_NAV: AdminNavDef[] = [
     anyOf: ["manage_materials"],
   },
   {
+    href: "/admin/career-counseling-series",
+    label: "Career Counseling Series",
+    icon: "career",
+    anyOf: ["manage_materials"],
+  },
+  {
     href: "/admin/pearls",
     label: "Pearl Points",
     icon: "pearlPoints",

@@ -170,6 +170,22 @@ Hierarchy (frozen):
 - **Hub is free / unlocked:** students may open Other Services without a live paid subscription. Individual folder entitlement (`free` / `any_subscription` / plan) remains the content boundary — do not treat hub access as making every service paid, and do not globally weaken RLS.
 - Soft-delete / Bin / R2 purge use the existing materials lifecycle. Do not invent a marketplace or second CMS.
 
+### 2b-iv. Career Counseling Series (top-level shell nav)
+
+**Career Counseling Series** is a first-class student shell nav item, **independent of Other Services**. Do **not** nest it under Other Services, reuse `/other-services` as its parent route, or store its folders as `library_type = 'other_services'`.
+
+Storage reuses `material_folders` / `materials` with `library_type = 'career_counseling_series'`.
+
+Hierarchy (frozen):
+
+**Career Counseling Series → Folder (root, `parent_id` null) → PDF materials**
+
+- Folders are year-scoped (`year_id` + enrolled class). Nesting under folders is out of scope for this hub (flat folders only).
+- PDFs (`materials.kind = 'pdf'`) use the protected study-content reader (`/materials/[id]/read` → `/api/study-content/...`) — never a public R2 URL.
+- **Hub is free / unlocked:** students may open Career Counseling Series without a live paid subscription. Individual folder entitlement remains the content boundary (default `free`).
+- Soft-delete / Bin / R2 purge use the existing materials lifecycle. Do not create a parallel CMS.
+- Admin surface: `/admin/career-counseling-series`. Student surface: `/career-counseling-series` (folder list) → `/career-counseling-series/[folderId]` (open folder). Legacy `/career-counselling` redirects to the student hub.
+
 ### 2c. Prof. Session (guided course under enrolled class)
 
 **Prof. Session** is a first-class student nav node. Students see **only** Blocks / Final-Year subjects for their **current enrolled class** (`enrollments.year_number`), using the same product_key map as Academic (§2d).

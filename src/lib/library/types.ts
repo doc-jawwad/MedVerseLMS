@@ -14,6 +14,7 @@ export const FOLDER_LIBRARY_TYPES = [
   "past_papers",
   "flashcards",
   "other_services",
+  "career_counseling_series",
 ] as const;
 
 export type FolderLibraryType = (typeof FOLDER_LIBRARY_TYPES)[number];
@@ -170,6 +171,11 @@ export function folderLibraryLabel(type: FolderLibraryType): {
         label: "Other Services",
         description: "Academy services and external resources.",
       };
+    case "career_counseling_series":
+      return {
+        label: "Career Counseling Series",
+        description: "Career guidance folders and protected PDFs.",
+      };
     case "flashcards":
       return {
         label: "Flashcards",
@@ -215,6 +221,8 @@ export function itemDeliveryModes(type: FolderLibraryType): Array<
       return ["pdf"];
     case "other_services":
       return ["drive"];
+    case "career_counseling_series":
+      return ["pdf"];
     default:
       return ["pdf", "drive"];
   }
@@ -228,6 +236,7 @@ export const STUDY_REVALIDATE_PATHS = [
   "/admin/ospe-stations",
   "/admin/past-papers",
   "/admin/other-services",
+  "/admin/career-counseling-series",
   "/materials",
   "/free-resources",
   "/resources",
@@ -244,4 +253,5 @@ export const STUDY_REVALIDATE_PATHS = [
   "/lectures",
   "/past-papers",
   "/other-services",
+  "/career-counseling-series",
 ] as const;

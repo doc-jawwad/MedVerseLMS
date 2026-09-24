@@ -163,6 +163,31 @@ export async function openMaterial(materialId: string) {
   return { url: data };
 }
 
+export async function updateMaterial(
+  materialId: string,
+  patch: {
+    title?: string;
+    description?: string | null;
+  }
+) {
+  if (patch.title !== undefined && !patch.title.trim()) {
+    return { error: "Title required." };
+  }
+  const supabase = await createClient();
+  const row: Record<string, unknown> = {};
+  if (patch.title !== undefined) row.title = patch.title.trim();
+  if (patch.description !== undefined) {
+    row.description = patch.description?.trim() || null;
+  }
+  if (Object.keys(row).length === 0) return {};
+  const { error } = await supabase
+    .from("materials")
+    .update(row)
+    .eq("id", materialId);
+  revalidateStudyPaths();
+  return actionRpcResult("updateMaterial", error);
+}
+
 export async function deleteMaterial(materialId: string) {
   const result = await moveContentToBin("material", materialId);
   revalidateStudyPaths();

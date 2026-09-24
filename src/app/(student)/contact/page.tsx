@@ -53,7 +53,7 @@ export default function ContactUsPage() {
 
       <div className="grid min-w-0 gap-3 sm:grid-cols-2">
         <Link
-          href="/career-counselling"
+          href="/career-counseling-series"
           className="group block min-w-0 outline-none"
         >
           <Card className="h-full border-border/80 shadow-none transition-colors group-hover:border-[var(--brand-teal)]/50 group-hover:bg-accent/40 group-focus-visible:ring-2 group-focus-visible:ring-[var(--brand-teal)]/45">
@@ -63,7 +63,7 @@ export default function ContactUsPage() {
                   className="size-4 shrink-0 text-[var(--brand-teal-ink)]"
                   aria-hidden
                 />
-                Career Counselling Series
+                Career Counseling Series
               </CardTitle>
               <CardDescription className="text-xs leading-relaxed sm:text-sm">
                 MBBS pathways, exams, and next-step guidance from MedVerse.
