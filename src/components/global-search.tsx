@@ -213,6 +213,7 @@ export function GlobalSearch({
           className
         )}
         aria-label="Search academic tree"
+        title="Search"
         data-testid="shell-search-trigger"
         onClick={() => setOpen(true)}
       >

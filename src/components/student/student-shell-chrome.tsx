@@ -58,8 +58,9 @@ export function StudentShellChrome({
     );
   }
 
-  const tools = (
+  const headerTools = (
     <ShellTools
+      layout="header"
       surface={surface}
       yearId={yearId}
       yearNumber={yearNumber}
@@ -69,7 +70,7 @@ export function StudentShellChrome({
   );
 
   return (
-      <div className="flex h-svh overflow-hidden canvas-atmosphere">
+    <div className="flex h-svh overflow-hidden canvas-atmosphere">
       <SessionWatch userId={userId} />
       <aside className="hidden h-full w-64 shrink-0 flex-col overflow-y-auto border-r border-sidebar-border bg-sidebar p-4 text-sidebar-foreground md:flex">
         <div className="mb-6">
@@ -83,7 +84,6 @@ export function StudentShellChrome({
         </div>
         <ShellNav items={nav} />
         <div className="mt-4 space-y-3">
-          {tools}
           <InstallMedverseApp variant="nav" />
           <form action={signOutAction}>
             <Button
@@ -106,9 +106,13 @@ export function StudentShellChrome({
           subLabel={subLabel}
           signOutAction={signOutAction}
           showBottomNav
-          tools={tools}
+          headerActions={headerTools}
         />
-        <main className="mx-auto w-full max-w-6xl flex-1 px-4 pt-4 pb-[calc(4.5rem+env(safe-area-inset-bottom))] md:px-8 md:pt-8 md:pb-10">
+        {/* Desktop header: brand lives in the sidebar; tools on the right */}
+        <header className="sticky top-0 z-20 hidden items-center justify-end border-b border-border/70 bg-[var(--student-canvas)]/90 px-6 py-2 backdrop-blur-md md:flex md:px-8">
+          {headerTools}
+        </header>
+        <main className="mx-auto w-full max-w-6xl flex-1 px-4 pt-4 pb-[calc(4.5rem+env(safe-area-inset-bottom))] md:px-8 md:pt-6 md:pb-10">
           {children}
         </main>
       </div>

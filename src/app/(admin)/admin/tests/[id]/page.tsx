@@ -9,6 +9,7 @@ import {
 } from "../test-prep-form";
 import { TestDraftAudienceProvider } from "../test-draft-audience-context";
 import { TestBuilderManualMcq } from "../test-builder-manual-mcq";
+import { TestBuilderCsvImport } from "../test-builder-csv-import";
 import { QuestionPoolMultiAdd } from "./question-pool-multi-add";
 import {
   AddRandomButton,
@@ -301,6 +302,8 @@ export default async function TestDetailPage({
                 yearLabel={yearLabel}
                 curriculum={curriculum}
               />
+
+              <TestBuilderCsvImport testId={id} subjects={yearSubjects} />
 
               <QuestionFilterForm
                 subjects={yearSubjects}

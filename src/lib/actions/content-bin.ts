@@ -91,6 +91,62 @@ export async function purgeContentFromBin(
   return actionRpcResult("purgeContentFromBin", error);
 }
 
+export type ContentBinBulkItem = {
+  entityType: ContentBinEntityType;
+  entityId: string;
+};
+
+/** Bulk restore — loops existing restore_content RPC (no second lifecycle). */
+export async function bulkRestoreContentFromBin(items: ContentBinBulkItem[]) {
+  const unique = dedupeBinItems(items);
+  if (unique.length === 0) return { error: "Nothing selected." };
+  const supabase = await createClient();
+  let restored = 0;
+  const failures: string[] = [];
+  for (const item of unique) {
+    const { error } = await supabase.rpc("restore_content", {
+      p_entity_type: item.entityType,
+      p_entity_id: item.entityId,
+    });
+    if (error) failures.push(`${item.entityType}:${item.entityId}`);
+    else restored += 1;
+  }
+  revalidateBinSurfaces();
+  return { restored, failed: failures.length, failures };
+}
+
+/** Bulk purge — loops existing purge_content RPC (R2 queue unchanged). */
+export async function bulkPurgeContentFromBin(items: ContentBinBulkItem[]) {
+  const unique = dedupeBinItems(items);
+  if (unique.length === 0) return { error: "Nothing selected." };
+  const supabase = await createClient();
+  let purged = 0;
+  const failures: string[] = [];
+  for (const item of unique) {
+    const { error } = await supabase.rpc("purge_content", {
+      p_entity_type: item.entityType,
+      p_entity_id: item.entityId,
+    });
+    if (error) failures.push(`${item.entityType}:${item.entityId}`);
+    else purged += 1;
+  }
+  revalidateBinSurfaces();
+  return { purged, failed: failures.length, failures };
+}
+
+function dedupeBinItems(items: ContentBinBulkItem[]): ContentBinBulkItem[] {
+  const seen = new Set<string>();
+  const out: ContentBinBulkItem[] = [];
+  for (const item of items) {
+    if (!ENTITY_TYPES.has(item.entityType) || !item.entityId) continue;
+    const key = `${item.entityType}:${item.entityId}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(item);
+  }
+  return out;
+}
+
 export async function listContentBin(
   yearId?: string | null
 ): Promise<{ items: ContentBinItem[]; error?: string }> {

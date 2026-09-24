@@ -111,6 +111,17 @@ function CreateForm({
       }}
     >
       <h2 className="text-base font-semibold">{title}</h2>
+      {mode === "create" ? (
+        <p className="text-xs text-muted-foreground">
+          If this email already has an LMS account (including a demoted admin),
+          Create reuses that same Auth/profile identity and promotes them —
+          it does not create a duplicate login.
+        </p>
+      ) : (
+        <p className="text-xs text-muted-foreground">
+          Prefer this when you know the person already has a student account.
+        </p>
+      )}
       {mode === "create" && (
         <div className="grid gap-2 sm:grid-cols-2">
           <div className="grid gap-1">
@@ -208,7 +219,7 @@ export function AdminsManager({
     startTransition(async () => {
       const res = await fn();
       if (res.error) toast.error(adminRbacErrorMessage(res.error));
-      else toast.success(ok);
+      else if (ok) toast.success(ok);
     });
   }
 
@@ -228,10 +239,20 @@ export function AdminsManager({
           mode="create"
           pending={pending}
           onSubmit={(input) =>
-            run(
-              () => createAdminAccount(input),
-              "Admin account created. Share the password out of band."
-            )
+            run(async () => {
+              const res = await createAdminAccount(input);
+              if (res.error) return res;
+              if ("reusedExisting" in res && res.reusedExisting) {
+                toast.success(
+                  "That email already had an account — promoted back to admin (same identity)."
+                );
+                return res;
+              }
+              toast.success(
+                "Admin account created. Share the password out of band."
+              );
+              return res;
+            }, "")
           }
         />
         <CreateForm
@@ -246,7 +267,7 @@ export function AdminsManager({
                   codes: input.codes,
                   makeMainAdmin: input.makeMainAdmin,
                 }),
-              "Student promoted to admin."
+              "Student promoted to admin (same Auth/profile identity)."
             )
           }
         />

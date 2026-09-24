@@ -30,9 +30,9 @@ export default function Home() {
         <h1 className="mt-3 max-w-2xl font-heading text-4xl font-semibold tracking-tight sm:text-5xl">
           MedVerse LMS
         </h1>
-        <p className="mt-4 max-w-lg text-sm leading-relaxed text-white/70 sm:text-base">
-          Online MCQ tests and practice for MBBS students — all five years, all
-          subjects.
+        <p className="mt-4 max-w-xl text-pretty text-sm leading-relaxed text-white/70 sm:text-base">
+          MedVerse LMS — Your All-in-One Medical Learning, Preparation, Testing
+          &amp; Career Support Platform.
         </p>
         <div className="mt-8 flex flex-wrap justify-center gap-3">
           <Button asChild size="lg">

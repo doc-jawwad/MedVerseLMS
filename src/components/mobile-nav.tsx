@@ -105,6 +105,7 @@ export function MobileNav({
   signOutAction,
   showBottomNav = false,
   tools,
+  headerActions,
 }: {
   /** Full list shown in the slide-out drawer. */
   navItems: NavItem[];
@@ -115,8 +116,10 @@ export function MobileNav({
   signOutAction: () => Promise<void>;
   /** Student may keep a compact bottom bar; Admin must not. */
   showBottomNav?: boolean;
-  /** Search + theme (and similar) rendered in the drawer footer. */
+  /** Optional tools in the drawer footer (e.g. admin search + theme). */
   tools?: ReactNode;
+  /** Compact controls in the mobile header (e.g. student search + theme). */
+  headerActions?: ReactNode;
 }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
@@ -124,8 +127,8 @@ export function MobileNav({
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
-      {/* Policy: hamburger LEFT, MedVerse logo RIGHT */}
-      <header className="sticky top-0 z-30 flex items-center justify-between border-b border-sidebar-border bg-sidebar px-3 py-2.5 pt-[max(0.625rem,env(safe-area-inset-top))] text-sidebar-foreground md:hidden">
+      {/* Hamburger left · brand · optional header actions right */}
+      <header className="sticky top-0 z-30 flex items-center gap-2 border-b border-sidebar-border bg-sidebar px-2 py-2.5 pt-[max(0.625rem,env(safe-area-inset-top))] text-sidebar-foreground sm:px-3 md:hidden">
         <SheetTrigger asChild>
           <Button
             variant="ghost"
@@ -136,7 +139,12 @@ export function MobileNav({
             <Menu className="size-5" />
           </Button>
         </SheetTrigger>
-        <Logo size={26} className="min-w-0" />
+        <div className="min-w-0 flex-1">
+          <Logo size={26} className="min-w-0" />
+        </div>
+        {headerActions ? (
+          <div className="flex shrink-0 items-center gap-0.5">{headerActions}</div>
+        ) : null}
       </header>
 
       <SheetContent

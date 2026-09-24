@@ -93,7 +93,38 @@ export async function createAdminAccount(input: {
     user_metadata: { full_name: fullName },
   });
   if (created.error || !created.data.user?.id) {
-    return clientActionFailed("createAdminAccount.auth", created.error, "Could not create the admin account. Please try again.");
+    // Existing Auth user (e.g. demoted admin / student): reuse identity via
+    // promote — never require a second Auth account for the same email.
+    const msg = (created.error?.message ?? "").toLowerCase();
+    const code = (created.error as { code?: string } | null)?.code ?? "";
+    const alreadyRegistered =
+      code === "email_exists" ||
+      code === "user_already_exists" ||
+      /already\s+(been\s+)?registered|already\s+exists|duplicate|email.*taken/i.test(
+        msg
+      );
+    if (alreadyRegistered) {
+      const reused = await promoteStudentToAdmin({
+        email,
+        codes: input.codes,
+        makeMainAdmin: input.makeMainAdmin,
+      });
+      if (reused.error) {
+        if (reused.error === "profile not found") {
+          return {
+            error:
+              "That email already has a login, but no LMS profile yet. Ask them to sign in once, then promote — or use Promote an existing student.",
+          };
+        }
+        return reused;
+      }
+      return { id: reused.id, reusedExisting: true as const };
+    }
+    return clientActionFailed(
+      "createAdminAccount.auth",
+      created.error,
+      "Could not create the admin account. Please try again."
+    );
   }
   const userId = created.data.user.id;
 
