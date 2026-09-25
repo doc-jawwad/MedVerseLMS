@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { requireAdmin } from "@/lib/auth/require-user";
 import { requireAdminClass } from "@/lib/admin/require-admin-class";
+import { requireAdminAnyPermission } from "@/lib/admin/require-admin-permission";
 import { yearDisplayName } from "@/lib/library/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -14,6 +15,11 @@ export default async function AdminPearlsPage({
 }: {
   searchParams: Promise<{ q?: string; year?: string; status?: string }>;
 }) {
+  const gate = await requireAdminAnyPermission(
+    ["manage_materials"],
+    "Pearl Points"
+  );
+  if (gate.denied) return gate.denied;
   const { supabase } = await requireAdmin();
   const filters = await searchParams;
 

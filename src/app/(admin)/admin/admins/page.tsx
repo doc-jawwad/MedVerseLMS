@@ -6,7 +6,7 @@ import { AdminPermissionDenied } from "@/components/admin/permission-denied";
 export const metadata = { title: "Admins — MedVerse Admin" };
 
 export default async function AdminsPage() {
-  const { supabase } = await requireAdmin();
+  const { supabase, profile } = await requireAdmin();
 
   const { data: canManageRes } = await supabase.rpc("has_permission", {
     p_code: "manage_admins",
@@ -74,6 +74,7 @@ export default async function AdminsPage() {
       <AdminsManager
         admins={admins}
         canManage={canManage}
+        canGrantMainAdmin={Boolean(profile.is_main_admin)}
         years={(yearRows ?? []).map((y) => ({
           id: y.id,
           year_number: y.year_number,

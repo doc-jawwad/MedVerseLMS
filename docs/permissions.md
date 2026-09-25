@@ -112,9 +112,10 @@ Permission codes (seeded catalog; RPCs check these names):
 - `grant_resource_access` — grants and resource-level restrictions
 - `manage_year_changes` — approve/reject class-change requests; `promote_student`
 - `edit_questions`
-- `import_questions`
+- `import_questions` — Question Bank CSV; also satisfied for day-practice CSV attach when the caller has `edit_questions` or `manage_materials` (`can_admin_import_questions()` / `import_question_batch`). Duplicate stems are skipped (not overwritten) but their existing `question_id`s are returned so Prof. Session day attach still works.
 - `publish_tests`
-- `manage_materials`
+- `manage_materials` — materials, pearls, one-liners, OSPE, Prof. Session (including day CSV import via the shared question import path above)
+- `manage_curriculum` — INSERT/UPDATE/DELETE on years/subjects/books/chapters/topics (admin SELECT of the tree remains `is_admin()` so question/test builders can resolve parents)
 - `view_analytics`
 
 An Academic/MCQ preset that has only question/test/materials/analytics codes **must fail** student, subscription, and year-change RPCs, must **not** have PostgREST `UPDATE`/`INSERT`/`DELETE` on those tables, and must **not** blanket-`SELECT` student profiles, subscriptions, applications, payment settings, year-change requests, audit logs, or other students’ notifications via PostgREST. Analytics DEFINER RPCs (`admin_platform_summary`, `test_summary`, `question_difficulty_report`, and admin access to `test_leaderboard` / `get_attempt_review`) remain gated by `view_analytics` (and/or `view_students` where names/review are needed).
@@ -125,7 +126,8 @@ Admin-management primitives (authorization in Postgres; admin UI is separate):
 
 - `grant_admin_permission(admin_id, code)` / `revoke_admin_permission(admin_id, code)` — `manage_admins`; audit-logged
 - `set_admin_role(user_id, is_admin)` — promote to `role=admin` with `is_main_admin=false` and no extra codes, or demote to student (clears permission rows). Cannot demote the last Main Admin.
-- `set_main_admin(user_id, is_main)` — `manage_admins`; target must already be `role=admin`
+- `set_main_admin(user_id, is_main)` — **caller must already be Main Admin** (and therefore passes `manage_admins` via short-circuit). Target must already be `role=admin`. A custom admin with only `manage_admins` **cannot** grant or revoke Main Admin.
+- **`is_main_admin` column protection:** `protect_profile_gated_columns` allows flipping `profiles.is_main_admin` only when (a) the bootstrap GUC is set by `bootstrap_first_main_admin`, (b) `auth.uid()` is null (service/runner), or (c) the caller **is already Main Admin**. `manage_admins` alone is **not** enough — closes direct PostgREST `UPDATE profiles` escalation. `set_admin_role` demoting a Main Admin likewise requires the caller to be Main Admin (RPC + trigger).
 - `grant_access` / `revoke_access` / `restrict_access` / `unrestrict_access` / `set_resource_entitlement` — `grant_resource_access` (replaces direct `access_grants` / `access_restrictions` / entitlement-column writes)
 - `create_subscription_plan` / `update_subscription_plan` / `activate_subscription` / `extend_subscription` / `set_subscription_end` / `deactivate_subscription` / `restore_subscription` / `assign_subscription_plan` — `manage_subscriptions`
 - `create_subscription_application` / `update_pending_subscription_application` / `allocate_payment_screenshot_object_key` / `authorize_payment_screenshot_access` / `authorize_payment_screenshot_discard` / `get_payment_instructions` — authenticated **and** `account_allows_lms()` where noted (own pending / active payment copy / orphan discard). Blocked account statuses cannot read payment instructions. Paid subscription state is independent. Admin screenshot read/discard still uses `review_subscription_applications`.
@@ -335,20 +337,21 @@ When these are decided, record the choices in this section (replace OWNER DECISI
 - `can_view_pearl` / `can_access_pearl` / `open_pearl(id)` — catalog vs content for pearl points. `open_pearl` is the only student path to `answer` / `explanation`.
 - `get_test_prep_guidelines(test_id)` / `accessible_test_prep()` — test preparation body after `can_access_test` (or `publish_tests` / `edit_questions` admin select). Not a student table column.
 - `ensure_profile()` — idempotent; profile UUID = `auth.uid()`. Inserts/updates email and full_name from JWT claims; never writes `role` / `is_main_admin`. Creates an **active** enrollment from `user_metadata.year_id` when that year exists and the student has **never** had any enrollment row (first provision only).
-- `bootstrap_first_main_admin()` — caller becomes Main Admin **only if** no Main Admin exists. One-time bootstrap; additional admins use `set_admin_role`.
+- `bootstrap_first_main_admin()` — caller becomes Main Admin **only if** no Main Admin exists. Uses a transaction advisory lock so two callers cannot race. Caller must have an active profile. One-time bootstrap while the academy has zero Main Admins; additional admins use `set_admin_role` / `set_main_admin`. Not a re-promotion path when any Main Admin row exists.
 
 These helpers stay valid on VPS PostgREST because they depend on JWT GUCs + `public` tables, not on a local `auth` schema of users.
 
 ## RLS matrix (deny-by-default; only listed access exists)
 
-Admin **SELECT** on **sensitive student/ops tables** uses `has_permission(code)` (see matrix). Content-bank / curriculum catalog SELECT may still use `is_admin()` until a dedicated curriculum permission is approved. Admin **INSERT/UPDATE/DELETE** on sensitive tables is **RPC-only** with `has_permission`. Do not keep blanket `FOR ALL USING (is_admin())` or blanket `SELECT USING (is_admin())` on enrollments, subscriptions, applications, grants, restrictions, profiles (other users), payment settings, attempts, or audit logs.
+Admin **SELECT** on **sensitive student/ops tables** uses `has_permission(code)` (see matrix). Curriculum tree **SELECT** may use `is_admin()` so builders can resolve parents; curriculum **writes** require `manage_curriculum`. Admin **INSERT/UPDATE/DELETE** on sensitive tables is **RPC-only** with `has_permission`. Do not keep blanket `FOR ALL USING (is_admin())` or blanket `SELECT USING (is_admin())` on enrollments, subscriptions, applications, grants, restrictions, profiles (other users), payment settings, attempts, or audit logs.
 
 | Table | student | admin |
 |---|---|---|
 | profiles | SELECT/UPDATE own row (role, account_status, is_main_admin protected) | SELECT own always; SELECT others if any of `view_students`, `manage_students`, `activate_students`, `restrict_students`, `manage_subscriptions`, `review_subscription_applications`, `manage_year_changes`, `manage_admins`, `grant_resource_access`. Status/role/main-admin via RPCs |
 | admin_permissions / permissions | none | `permissions` SELECT if `manage_admins`; `admin_permissions` SELECT own rows or if `manage_admins`; writes via `manage_admins` RPCs |
-| years/subjects/books/chapters/topics | SELECT current assigned year (account active); subjects/books/chapters/topics also if a live practice grant names that subject | SELECT; writes: `is_admin()` until a dedicated curriculum permission is approved (see pending owner decision). Not a student-data write. |
-| questions | no direct SELECT (RPC only) | SELECT if `edit_questions` or `import_questions`; INSERT/UPDATE/DELETE if `has_permission('edit_questions')`; create/version RPCs check the same codes |
+| years/subjects/books/chapters/topics | SELECT current assigned year (account active); subjects/books/chapters/topics also if a live practice grant names that subject | SELECT if `is_admin()`; INSERT/UPDATE/DELETE if `has_permission('manage_curriculum')`. Not a student-data write. |
+| questions | no direct SELECT (RPC only) | SELECT if `edit_questions` or `import_questions`; INSERT/UPDATE/DELETE if `has_permission('edit_questions')`; create/version RPCs check the same codes; Academic folder ownership via `admin_assign_unassigned_question_to_folder` / `admin_remove_question_from_mcq_bank_folder` / `create_question(..., p_mcq_bank_folder_id)` (`edit_questions`) |
+| mcq_bank_folders | SELECT live rows for enrolled year (`account_allows_lms` + enrollment); practice content via `get_practice_batch('mcq_bank_folder')` + `has_practice_access` on product subject | SELECT if `edit_questions`; INSERT/UPDATE/DELETE if `edit_questions`; soft-delete empty folders via bin entity `mcq_bank_folder` |
 | question_versions | no direct SELECT (RPC only); no UPDATE/DELETE for anyone | SELECT if `edit_questions` or `import_questions` (answer keys); INSERT if `has_permission('edit_questions')` |
 | enrollments | SELECT own | SELECT if `view_students` or `manage_year_changes` or `manage_subscriptions` or `grant_resource_access`; writes via year-change / promote RPCs |
 | year_change_requests | SELECT own; insert/update pending via RPC | SELECT if `manage_year_changes`; approve/reject RPC |
@@ -390,7 +393,7 @@ PostgREST on the VPS is the same trust model as today's hosted Data API: table g
 Do not guess these in migrations:
 
 1. **Pre-existing `enrollments.status` in `suspended` or `revoked`:** how to map onto `profiles.account_status` vs leave historical enrollment rows only.
-2. **Curriculum tree CRUD permission code:** years/subjects/books/chapters/topics writes stay `is_admin()` until a dedicated code is approved (not in the seeded list above).
+2. **~~Curriculum tree CRUD permission code~~** — **resolved:** `manage_curriculum` for writes; admin SELECT remains `is_admin()`.
 3. **R2 bucket name** for payment screenshots (private R2 is approved; prefix is `payment-proofs/`). Production requires dedicated `R2_PAYMENT_BUCKET` (no fallback to backup `R2_BUCKET`). Non-production may use `R2_PAYMENT_BUCKET` or `R2_BUCKET`. Study PDFs reuse that **same private objects bucket** with prefix `study-content/` — not `R2_BUCKET` (backups) and not a new Cloudflare bucket in this phase.
 4. **Application `cancelled`:** whether the student UI exposes cancel, or only admin/system uses it. The status exists; no cancel RPC/UI in this step.
 5. **R2 object retention** after reject/replace/orphan upload: **resolved for application security** — on successful **replace**, delete the previous object; on **reject**, delete the proof object (row keeps the key for audit metadata only; bytes are removed); after a successful R2 upload if create/update fails, **discard** the new object. Remaining race orphans (crash between upload and discard) are rare; do not expire the whole `payment-proofs/` prefix with a blind bucket lifecycle.

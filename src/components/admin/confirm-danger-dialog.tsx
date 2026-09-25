@@ -23,6 +23,8 @@ type ConfirmDangerDialogProps = {
   disabled?: boolean;
   onConfirm: () => Promise<{ error?: string } | void>;
   onSuccess?: () => void;
+  /** When null, caller owns success toast. Default: standard success copy. */
+  successMessage?: string | null;
 };
 
 /**
@@ -38,6 +40,7 @@ export function ConfirmDangerDialog({
   disabled,
   onConfirm,
   onSuccess,
+  successMessage,
 }: ConfirmDangerDialogProps) {
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
@@ -71,9 +74,12 @@ export function ConfirmDangerDialog({
                   toast.error(result.error);
                   return;
                 }
-                toast.success(
-                  destructive ? "Permanently deleted" : "Moved to Bin"
-                );
+                if (successMessage !== null) {
+                  toast.success(
+                    successMessage ??
+                      (destructive ? "Permanently deleted" : "Moved to Bin")
+                  );
+                }
                 setOpen(false);
                 onSuccess?.();
               })

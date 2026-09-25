@@ -120,6 +120,7 @@ export default async function StudentProfilePage({
               hasActiveClass={hasActiveClass}
               accountStatus={d.biodata.account_status}
               hasInProgressExam={d.has_in_progress_exam}
+              permissions={[...perms]}
             />
           )}
           <Button asChild variant="outline">

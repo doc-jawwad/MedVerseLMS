@@ -6,6 +6,7 @@ import {
   ADMIN_PERMISSION_CATALOG,
   type AdminPermissionCode,
 } from "@/lib/admin/admin-rbac-ui";
+import { subscriptionsNavHref } from "@/lib/admin/subscriptions-nav";
 import type { NavItem } from "@/components/mobile-nav";
 
 const ALL_CODES: readonly AdminPermissionCode[] = ADMIN_PERMISSION_CATALOG.map(
@@ -75,7 +76,7 @@ export const ADMIN_NAV: AdminNavDef[] = [
       "manage_payment_settings",
     ],
   },
-  { href: "/admin/curriculum", label: "Curriculum", icon: "curriculum" },
+  { href: "/admin/curriculum", label: "Curriculum", icon: "curriculum", anyOf: ["manage_curriculum"] },
   {
     href: "/admin/library",
     label: "Class library",
@@ -95,10 +96,16 @@ export const ADMIN_NAV: AdminNavDef[] = [
     anyOf: ["edit_questions", "import_questions"],
   },
   {
+    href: "/admin/mcq-bank",
+    label: "MCQ Bank folders",
+    icon: "questions",
+    anyOf: ["edit_questions"],
+  },
+  {
     href: "/admin/tests",
     label: "Tests",
     icon: "tests",
-    anyOf: ["publish_tests", "view_analytics"],
+    anyOf: ["publish_tests"],
   },
   {
     href: "/admin/materials",
@@ -177,5 +184,10 @@ export const ADMIN_NAV: AdminNavDef[] = [
 export function filterAdminNav(perms: Set<string>): NavItem[] {
   return ADMIN_NAV.filter(
     (item) => !item.anyOf || adminHasAny(perms, item.anyOf)
-  ).map(({ href, label, icon }) => ({ href, label, icon }));
+  ).map(({ href, label, icon }) => {
+    if (href === "/admin/subscriptions") {
+      return { href: subscriptionsNavHref(perms), label, icon };
+    }
+    return { href, label, icon };
+  });
 }

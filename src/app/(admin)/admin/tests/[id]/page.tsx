@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireAdmin } from "@/lib/auth/require-user";
-import { loadCurriculum } from "../../questions/curriculum-data";
+import { loadCurriculumFilterCascade } from "@/lib/admin/curriculum-load";
 import { TestConfigForm } from "../test-config-form";
 import {
   TestPrepGuidelinesForm,
@@ -66,13 +66,17 @@ export default async function TestDetailPage({
 
   const isDraft = test.status === "draft";
 
+  // Years + subjects are needed for config/audience (small). Full
+  // books/chapters/topics trees are NOT loaded here — draft filters use
+  // cascade slices for the current URL state; inline MCQ loads children
+  // on demand. Avoids duplicating loadCurriculum() across all years.
   const [
     { data: years },
     { data: subjects },
     { data: testQuestions },
     { data: audiences },
     checklistRes,
-    curriculum,
+    filterCurriculum,
     prepRes,
   ] = await Promise.all([
     supabase.from("years").select("id, year_number").order("year_number"),
@@ -86,7 +90,18 @@ export default async function TestDetailPage({
       .order("position"),
     supabase.from("test_audiences").select("year_id").eq("test_id", id),
     isDraft ? supabase.rpc("validate_test", { p_test_id: id }) : Promise.resolve({ data: null }),
-    loadCurriculum(supabase),
+    isDraft
+      ? loadCurriculumFilterCascade(supabase, {
+          yearId: test.year_id,
+          subjectId: filters.subject,
+          bookId: filters.book,
+          chapterId: filters.chapter,
+        })
+      : Promise.resolve({
+          books: [] as { id: string; name: string; subject_id: string }[],
+          chapters: [] as { id: string; name: string; book_id: string }[],
+          topics: [] as { id: string; name: string; chapter_id: string }[],
+        }),
     supabase.rpc("get_test_prep_guidelines", { p_test_id: id }),
   ]);
 
@@ -300,16 +315,16 @@ export default async function TestDetailPage({
                 testId={id}
                 yearId={test.year_id}
                 yearLabel={yearLabel}
-                curriculum={curriculum}
+                subjects={yearSubjects}
               />
 
               <TestBuilderCsvImport testId={id} subjects={yearSubjects} />
 
               <QuestionFilterForm
                 subjects={yearSubjects}
-                books={curriculum.books}
-                chapters={curriculum.chapters}
-                topics={curriculum.topics}
+                books={filterCurriculum.books}
+                chapters={filterCurriculum.chapters}
+                topics={filterCurriculum.topics}
                 filter={{
                   subject_id: filters.subject,
                   book_id: filters.book,

@@ -61,8 +61,8 @@ export async function createPearlPoint(input: PearlInput) {
     .select("id")
     .single();
   if (error) return actionRpcResult("createPearlPoint", error);
-  revalidatePearls();
-  redirect(`/admin/pearls/${data.id}`);
+  revalidatePearls(data.id);
+  return { id: data.id as string };
 }
 
 export async function updatePearlPoint(id: string, input: PearlInput) {

@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
+  createOnlinePdfRangeTransport,
   createOpfsPdfRangeTransport,
   estimateOfflineQuota,
   formatByteSize,
@@ -87,6 +88,7 @@ export function PdfViewer({
   const pdfjsRef = useRef<PdfjsLib | null>(null);
   const renderTaskRef = useRef<{ cancel: () => void } | null>(null);
   const offlineAbortRef = useRef<AbortController | null>(null);
+  const onlineLoadAbortRef = useRef<AbortController | null>(null);
   const loadGenRef = useRef(0);
   const loadingTaskRef = useRef<{ destroy: () => Promise<unknown> } | null>(
     null
@@ -252,14 +254,34 @@ export function PdfViewer({
           offlineMeta = await getOfflineMeta(materialId);
           setOfflineUi(offlineMeta ? "offline_ready" : "online_only");
 
-          // Range-only: avoid a competing full-body stream that can stall
-          // behind aborted connections through the Next/Caddy proxy.
+          const contentLength = Number(
+            probe.headers.get("content-length") ?? "0"
+          );
+          if (!Number.isFinite(contentLength) || contentLength <= 0) {
+            throw new Error("Could not determine PDF size.");
+          }
+
+          // Explicit Range transport — do not use pdfjs url-mode. PDF.js
+          // validateRangeRequestCapabilities() trusts Content-Length only; our
+          // coerced leading 206 (CL=64KiB) disables ranges and yields
+          // "Invalid PDF structure" on real documents.
+          onlineLoadAbortRef.current?.abort();
+          const onlineAc = new AbortController();
+          onlineLoadAbortRef.current = onlineAc;
+          const ranged = await createOnlinePdfRangeTransport(pdfjs, {
+            materialId,
+            length: contentLength,
+            signal: onlineAc.signal,
+          });
+          if (gen !== loadGenRef.current) {
+            onlineAc.abort();
+            return;
+          }
           loadingTask = pdfjs.getDocument({
-            url: sourceUrl,
-            withCredentials: true,
-            disableRange: false,
-            disableStream: true,
+            range: ranged.transport,
+            length: ranged.length,
             disableAutoFetch: true,
+            disableStream: true,
             rangeChunkSize: 512 * 1024,
           });
         }
@@ -332,6 +354,7 @@ export function PdfViewer({
     });
     return () => {
       loadGenRef.current += 1;
+      onlineLoadAbortRef.current?.abort();
       renderTaskRef.current?.cancel();
       loadingTaskRef.current?.destroy().catch(() => undefined);
       loadingTaskRef.current = null;
@@ -583,8 +606,8 @@ export function PdfViewer({
       >
         <p>Opening document…</p>
         <p className="text-xs">
-          Large files load by page range — you can read before the full file
-          arrives.
+          Large files load by page range — first pages appear before the full
+          file is transferred.
         </p>
       </div>
     );

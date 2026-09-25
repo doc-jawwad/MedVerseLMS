@@ -135,6 +135,18 @@ export function PracticeMcqSession({
         if (day?.subject_id) resolvedSubjectId = day.subject_id as string;
       }
 
+      if (!resolvedSubjectId && scope.type === "mcq_bank_folder") {
+        const { data: folder } = await supabase
+          .from("mcq_bank_folders")
+          .select("academic_product_subject_id")
+          .eq("id", scope.id)
+          .is("deleted_at", null)
+          .maybeSingle();
+        if (folder?.academic_product_subject_id) {
+          resolvedSubjectId = folder.academic_product_subject_id as string;
+        }
+      }
+
       if (resolvedSubjectId) setSubjectIds([resolvedSubjectId]);
 
       sessionIdRef.current = await startPracticeSessionRpc(

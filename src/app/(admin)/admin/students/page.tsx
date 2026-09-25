@@ -99,7 +99,7 @@ export default async function StudentsPage({
             name="q"
             placeholder="Search name or email…"
             defaultValue={q ?? ""}
-            className="w-64"
+            className="w-full min-w-0 sm:w-64"
           />
           {account && <input type="hidden" name="account" value={account} />}
           <Button type="submit" variant="secondary">
@@ -174,6 +174,7 @@ export default async function StudentsPage({
                       hasActiveClass={Boolean(live)}
                       accountStatus={p.account_status ?? "active"}
                       hasInProgressExam={inProgress.has(p.id)}
+                      permissions={[...perms]}
                     />
                   </TableCell>
                 </TableRow>

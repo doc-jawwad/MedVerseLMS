@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { requireAdmin } from "@/lib/auth/require-user";
 import { requireAdminClass } from "@/lib/admin/require-admin-class";
+import { requireAdminAnyPermission } from "@/lib/admin/require-admin-permission";
 import { yearDisplayName } from "@/lib/library/types";
 import { formatDateTime } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -29,6 +30,11 @@ export default async function AdminTestsPage({
 }: {
   searchParams: Promise<{ year?: string; type?: string }>;
 }) {
+  const gate = await requireAdminAnyPermission(
+    ["publish_tests", "edit_questions"],
+    "Tests"
+  );
+  if (gate.denied) return gate.denied;
   const { supabase } = await requireAdmin();
   const params = await searchParams;
   const typeFilter = params.type === "mock" ? "mock" : params.type === "formal" ? "formal" : null;

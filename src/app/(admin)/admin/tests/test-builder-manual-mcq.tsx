@@ -1,10 +1,10 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { createManualTestQuestion } from "@/lib/actions/tests";
-import type { CurriculumData } from "@/app/(admin)/admin/questions/question-editor";
+import { listCurriculumChildren } from "@/lib/actions/curriculum";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -20,16 +20,19 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 const KEYS = ["A", "B", "C", "D", "E"] as const;
 
+type Named = { id: string; name: string };
+
 export function TestBuilderManualMcq({
   testId,
   yearId,
   yearLabel,
-  curriculum,
+  subjects,
 }: {
   testId: string;
   yearId: string;
   yearLabel: string;
-  curriculum: CurriculumData;
+  /** Year-scoped subjects only — books/chapters/topics load on demand. */
+  subjects: { id: string; name: string; year_id: string }[];
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -38,6 +41,13 @@ export function TestBuilderManualMcq({
   const [bookId, setBookId] = useState("");
   const [chapterId, setChapterId] = useState("");
   const [topicId, setTopicId] = useState("");
+  const [books, setBooks] = useState<Named[]>([]);
+  const [chapters, setChapters] = useState<Named[]>([]);
+  const [topics, setTopics] = useState<Named[]>([]);
+  const [loadingBooks, setLoadingBooks] = useState(false);
+  const [loadingChapters, setLoadingChapters] = useState(false);
+  const [loadingTopics, setLoadingTopics] = useState(false);
+
   const [stem, setStem] = useState("");
   const [options, setOptions] = useState(["", "", "", "", ""]);
   const [correctKey, setCorrectKey] = useState("A");
@@ -47,22 +57,74 @@ export function TestBuilderManualMcq({
     "medium"
   );
 
-  const subjects = useMemo(
-    () => curriculum.subjects.filter((s) => s.year_id === yearId),
-    [curriculum.subjects, yearId]
-  );
-  const books = useMemo(
-    () => curriculum.books.filter((b) => b.subject_id === subjectId),
-    [curriculum.books, subjectId]
-  );
-  const chapters = useMemo(
-    () => curriculum.chapters.filter((c) => c.book_id === bookId),
-    [curriculum.chapters, bookId]
-  );
-  const topics = useMemo(
-    () => curriculum.topics.filter((t) => t.chapter_id === chapterId),
-    [curriculum.topics, chapterId]
-  );
+  // yearId is locked for the test; subjects prop is already year-scoped.
+  void yearId;
+
+  useEffect(() => {
+    if (!subjectId) {
+      setBooks([]);
+      return;
+    }
+    let cancelled = false;
+    setLoadingBooks(true);
+    void listCurriculumChildren("books", subjectId).then((res) => {
+      if (cancelled) return;
+      setLoadingBooks(false);
+      if (res.error) {
+        toast.error(res.error);
+        setBooks([]);
+        return;
+      }
+      setBooks(res.items);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [subjectId]);
+
+  useEffect(() => {
+    if (!bookId) {
+      setChapters([]);
+      return;
+    }
+    let cancelled = false;
+    setLoadingChapters(true);
+    void listCurriculumChildren("chapters", bookId).then((res) => {
+      if (cancelled) return;
+      setLoadingChapters(false);
+      if (res.error) {
+        toast.error(res.error);
+        setChapters([]);
+        return;
+      }
+      setChapters(res.items);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [bookId]);
+
+  useEffect(() => {
+    if (!chapterId) {
+      setTopics([]);
+      return;
+    }
+    let cancelled = false;
+    setLoadingTopics(true);
+    void listCurriculumChildren("topics", chapterId).then((res) => {
+      if (cancelled) return;
+      setLoadingTopics(false);
+      if (res.error) {
+        toast.error(res.error);
+        setTopics([]);
+        return;
+      }
+      setTopics(res.items);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [chapterId]);
 
   const filledOptions = KEYS.map((k, i) => ({
     key: k,
@@ -128,6 +190,8 @@ export function TestBuilderManualMcq({
               setBookId("");
               setChapterId("");
               setTopicId("");
+              setChapters([]);
+              setTopics([]);
             }}
           >
             <SelectTrigger>
@@ -146,15 +210,16 @@ export function TestBuilderManualMcq({
           <Label>Book</Label>
           <Select
             value={bookId || undefined}
-            disabled={!subjectId}
+            disabled={!subjectId || loadingBooks}
             onValueChange={(v) => {
               setBookId(v);
               setChapterId("");
               setTopicId("");
+              setTopics([]);
             }}
           >
             <SelectTrigger>
-              <SelectValue placeholder="Book" />
+              <SelectValue placeholder={loadingBooks ? "Loading…" : "Book"} />
             </SelectTrigger>
             <SelectContent>
               {books.map((b) => (
@@ -169,14 +234,16 @@ export function TestBuilderManualMcq({
           <Label>Chapter</Label>
           <Select
             value={chapterId || undefined}
-            disabled={!bookId}
+            disabled={!bookId || loadingChapters}
             onValueChange={(v) => {
               setChapterId(v);
               setTopicId("");
             }}
           >
             <SelectTrigger>
-              <SelectValue placeholder="Chapter" />
+              <SelectValue
+                placeholder={loadingChapters ? "Loading…" : "Chapter"}
+              />
             </SelectTrigger>
             <SelectContent>
               {chapters.map((c) => (
@@ -191,11 +258,11 @@ export function TestBuilderManualMcq({
           <Label>Topic</Label>
           <Select
             value={topicId || undefined}
-            disabled={!chapterId}
+            disabled={!chapterId || loadingTopics}
             onValueChange={setTopicId}
           >
             <SelectTrigger>
-              <SelectValue placeholder="Topic" />
+              <SelectValue placeholder={loadingTopics ? "Loading…" : "Topic"} />
             </SelectTrigger>
             <SelectContent>
               {topics.map((t) => (

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { requireAdmin } from "@/lib/auth/require-user";
 import { requireAdminClass } from "@/lib/admin/require-admin-class";
+import { requireAdminAnyPermission } from "@/lib/admin/require-admin-permission";
 import { yearDisplayName } from "@/lib/library/types";
 import {
   ProfSessionAdmin,
@@ -15,6 +16,11 @@ export default async function AdminProfSessionPage({
 }: {
   searchParams: Promise<{ year?: string; subject?: string }>;
 }) {
+  const gate = await requireAdminAnyPermission(
+    ["manage_materials"],
+    "Prof. Session"
+  );
+  if (gate.denied) return gate.denied;
   const { supabase } = await requireAdmin();
   const params = await searchParams;
 

@@ -165,11 +165,22 @@ export function studentManageMenuItems(ctx: {
   accountStatus: string;
   hasActiveClass: boolean;
   hasYearForResources: boolean;
+  /** When set, hide actions the caller cannot authorize. */
+  permissions?: ReadonlySet<string> | readonly string[] | null;
 }): ManageMenuItem[] {
+  const perms = ctx.permissions
+    ? ctx.permissions instanceof Set
+      ? ctx.permissions
+      : new Set(ctx.permissions)
+    : null;
+  const can = (code: string) => (perms ? perms.has(code) : true);
+
   const items: ManageMenuItem[] = [];
   if (isBlockedAccount(ctx.accountStatus)) {
-    items.push({ id: "restore_lms", group: "account" });
-  } else {
+    if (can("activate_students")) {
+      items.push({ id: "restore_lms", group: "account" });
+    }
+  } else if (can("restrict_students")) {
     items.push(
       { id: "restrict_lms", group: "account" },
       { id: "suspend_lms", group: "account" },
@@ -177,10 +188,10 @@ export function studentManageMenuItems(ctx: {
       { id: "revoke_lms", group: "account" }
     );
   }
-  if (ctx.hasActiveClass) {
+  if (ctx.hasActiveClass && can("manage_year_changes")) {
     items.push({ id: "promote_class", group: "class" });
   }
-  if (ctx.hasYearForResources) {
+  if (ctx.hasYearForResources && can("grant_resource_access")) {
     items.push({ id: "resource_access", group: "resources" });
   }
   return items;

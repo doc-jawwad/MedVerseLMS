@@ -74,11 +74,13 @@ function CreateForm({
   title,
   mode,
   pending,
+  canGrantMainAdmin,
   onSubmit,
 }: {
   title: string;
   mode: "create" | "promote";
   pending: boolean;
+  canGrantMainAdmin: boolean;
   onSubmit: (input: {
     email: string;
     fullName: string;
@@ -98,7 +100,7 @@ function CreateForm({
 
   return (
     <form
-      className="grid gap-3 rounded-lg border p-4"
+      className="grid min-w-0 gap-3 rounded-lg border p-4"
       onSubmit={(e) => {
         e.preventDefault();
         onSubmit({
@@ -124,7 +126,7 @@ function CreateForm({
       )}
       {mode === "create" && (
         <div className="grid gap-2 sm:grid-cols-2">
-          <div className="grid gap-1">
+          <div className="grid min-w-0 gap-1">
             <Label htmlFor={`${mode}-name`}>Full name</Label>
             <Input
               id={`${mode}-name`}
@@ -133,7 +135,7 @@ function CreateForm({
               required
             />
           </div>
-          <div className="grid gap-1">
+          <div className="grid min-w-0 gap-1">
             <Label htmlFor={`${mode}-password`}>Temporary password</Label>
             <Input
               id={`${mode}-password`}
@@ -146,7 +148,7 @@ function CreateForm({
           </div>
         </div>
       )}
-      <div className="grid gap-1">
+      <div className="grid min-w-0 gap-1">
         <Label htmlFor={`${mode}-email`}>Email</Label>
         <Input
           id={`${mode}-email`}
@@ -156,34 +158,58 @@ function CreateForm({
           required
         />
       </div>
-      <div className="flex flex-wrap gap-2">
-        {ADMIN_PRESETS.map((p) => (
+      <div className="grid gap-2">
+        <p className="text-sm font-medium">Authority</p>
+        <div className="flex flex-wrap gap-2">
+          {canGrantMainAdmin && (
+            <Button
+              type="button"
+              size="sm"
+              variant={makeMain ? "default" : "outline"}
+              onClick={() => setMakeMain(true)}
+            >
+              Full / Main Admin
+            </Button>
+          )}
           <Button
-            key={p.id}
             type="button"
             size="sm"
-            variant={preset === p.id && !makeMain ? "default" : "outline"}
+            variant={!makeMain ? "default" : "outline"}
             onClick={() => {
               setMakeMain(false);
-              setPreset(p.id);
-              if (p.id !== "custom") setCodes(codesForPreset(p.id));
+              setPreset("custom");
             }}
           >
-            {p.label}
+            Custom Permissions
           </Button>
-        ))}
-        <Button
-          type="button"
-          size="sm"
-          variant={makeMain ? "default" : "outline"}
-          onClick={() => setMakeMain((v) => !v)}
-        >
-          Main Admin
-        </Button>
+        </div>
+        {makeMain ? (
+          <p className="rounded-md border border-border/80 bg-muted/40 px-3 py-2 text-sm">
+            Full administrative access — every current and future admin job,
+            all classes, and admin management.
+          </p>
+        ) : (
+          <>
+            <div className="flex flex-wrap gap-2">
+              {ADMIN_PRESETS.map((p) => (
+                <Button
+                  key={p.id}
+                  type="button"
+                  size="sm"
+                  variant={preset === p.id ? "secondary" : "outline"}
+                  onClick={() => {
+                    setPreset(p.id);
+                    if (p.id !== "custom") setCodes(codesForPreset(p.id));
+                  }}
+                >
+                  {p.label}
+                </Button>
+              ))}
+            </div>
+            <PermissionPicker codes={codes} onChange={setCodes} />
+          </>
+        )}
       </div>
-      {!makeMain && (
-        <PermissionPicker codes={codes} onChange={setCodes} />
-      )}
       <Button type="submit" disabled={pending} className="w-fit">
         {mode === "create" ? "Create admin" : "Promote to admin"}
       </Button>
@@ -194,11 +220,13 @@ function CreateForm({
 export function AdminsManager({
   admins,
   canManage,
+  canGrantMainAdmin,
   years,
   yearIdsByAdmin,
 }: {
   admins: AdminAccountRow[];
   canManage: boolean;
+  canGrantMainAdmin: boolean;
   years: { id: string; year_number: number; name: string }[];
   yearIdsByAdmin: Record<string, string[]>;
 }) {
@@ -232,12 +260,13 @@ export function AdminsManager({
   }
 
   return (
-    <div className="grid gap-6">
+    <div className="grid min-w-0 gap-6">
       <div className="grid gap-4 lg:grid-cols-2">
         <CreateForm
           title="Create a new admin account"
           mode="create"
           pending={pending}
+          canGrantMainAdmin={canGrantMainAdmin}
           onSubmit={(input) =>
             run(async () => {
               const res = await createAdminAccount(input);
@@ -259,6 +288,7 @@ export function AdminsManager({
           title="Promote an existing student"
           mode="promote"
           pending={pending}
+          canGrantMainAdmin={canGrantMainAdmin}
           onSubmit={(input) =>
             run(
               () =>
@@ -273,6 +303,7 @@ export function AdminsManager({
         />
       </div>
 
+      <div className="min-w-0 overflow-x-auto rounded-xl border border-border/80">
       <Table>
         <TableHeader>
           <TableRow>
@@ -374,10 +405,11 @@ export function AdminsManager({
           ))}
         </TableBody>
       </Table>
+      </div>
 
       {editing && (
         <form
-          className="grid gap-3 rounded-lg border p-4"
+          className="grid min-w-0 gap-3 rounded-lg border p-4"
           onSubmit={(e) => {
             e.preventDefault();
             const id = editing.id;
@@ -398,13 +430,41 @@ export function AdminsManager({
           <h2 className="text-base font-semibold">
             Jobs for {editing.full_name || editing.email}
           </h2>
-          <label className="flex items-center gap-2 text-sm">
-            <Checkbox
-              checked={editMain}
-              onCheckedChange={(v) => setEditMain(v === true)}
-            />
-            Main Admin (all jobs, all classes)
-          </label>
+          {canGrantMainAdmin ? (
+            <div className="grid gap-2">
+              <p className="text-sm font-medium">Authority</p>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={editMain ? "default" : "outline"}
+                  onClick={() => setEditMain(true)}
+                >
+                  Full / Main Admin
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={!editMain ? "default" : "outline"}
+                  onClick={() => setEditMain(false)}
+                >
+                  Custom Permissions
+                </Button>
+              </div>
+              {editMain && (
+                <p className="rounded-md border border-border/80 bg-muted/40 px-3 py-2 text-sm">
+                  Full administrative access
+                </p>
+              )}
+            </div>
+          ) : (
+            editing.is_main_admin && (
+              <p className="text-sm text-muted-foreground">
+                This account is a Main Admin. Only a Main Admin can change Full
+                Access.
+              </p>
+            )
+          )}
           {!editMain && (
             <>
               <PermissionPicker codes={editCodes} onChange={setEditCodes} />
@@ -436,8 +496,8 @@ export function AdminsManager({
               </div>
             </>
           )}
-          <div className="flex gap-2">
-            <Button type="submit" disabled={pending}>
+          <div className="flex flex-wrap gap-2">
+            <Button type="submit" disabled={pending || (!canGrantMainAdmin && editMain && !editing.is_main_admin)}>
               Save jobs
             </Button>
             <Button

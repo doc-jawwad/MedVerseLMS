@@ -260,6 +260,110 @@ export async function createOpfsPdfRangeTransport(
   return { transport, meta, length };
 }
 
+const ONLINE_RANGE_MAX_ATTEMPTS = 3;
+
+async function fetchStudyContentRange(
+  url: string,
+  begin: number,
+  endExclusive: number,
+  signal?: AbortSignal
+): Promise<Uint8Array> {
+  // PDF.js end is exclusive; HTTP Range end is inclusive.
+  const endInclusive = Math.max(begin, endExclusive - 1);
+  let lastErr = "online_range_failed";
+  for (let attempt = 0; attempt < ONLINE_RANGE_MAX_ATTEMPTS; attempt++) {
+    if (signal?.aborted) throw new Error("online_range_aborted");
+    try {
+      const res = await fetch(url, {
+        method: "GET",
+        credentials: "same-origin",
+        cache: "no-store",
+        headers: { Range: `bytes=${begin}-${endInclusive}` },
+        signal,
+      });
+      if (res.status === 403) throw new Error("study_object_denied");
+      if (res.status !== 206 && res.status !== 200) {
+        lastErr = `online_range_failed:${res.status}`;
+        await new Promise((r) => setTimeout(r, 200 * (attempt + 1)));
+        continue;
+      }
+      const buf = new Uint8Array(await res.arrayBuffer());
+      // Copy out of the potentially pooled ArrayBuffer backing store.
+      const out = new Uint8Array(buf.byteLength);
+      out.set(buf);
+      return out;
+    } catch (e) {
+      if (e instanceof Error && e.message === "study_object_denied") throw e;
+      if (e instanceof Error && e.name === "AbortError") {
+        throw new Error("online_range_aborted");
+      }
+      lastErr = e instanceof Error ? e.message : lastErr;
+      await new Promise((r) => setTimeout(r, 200 * (attempt + 1)));
+    }
+  }
+  throw new Error(lastErr);
+}
+
+/**
+ * Online PDF.js PDFDataRangeTransport.
+ *
+ * PDF.js url-mode validateRangeRequestCapabilities() uses Content-Length only
+ * (ignores Content-Range total). Our study-content unscoped GET returns a
+ * coerced leading 206 with Content-Length=65536, so PDF.js disables ranges and
+ * treats 64 KiB as the whole file → "Invalid PDF structure" on real PDFs.
+ * Explicit Range fetches with known length avoid that path entirely.
+ */
+export async function createOnlinePdfRangeTransport(
+  pdfjs: PdfjsModule,
+  options: {
+    materialId: string;
+    length: number;
+    signal?: AbortSignal;
+  }
+): Promise<{
+  transport: InstanceType<PdfjsModule["PDFDataRangeTransport"]>;
+  length: number;
+}> {
+  const length = options.length;
+  if (!Number.isFinite(length) || length <= 0) {
+    throw new Error("online_size_unknown");
+  }
+  const url = `/api/study-content/${options.materialId}`;
+  const initialLen = Math.min(65536, length);
+  const initial = await fetchStudyContentRange(
+    url,
+    0,
+    initialLen,
+    options.signal
+  );
+
+  const Base = pdfjs.PDFDataRangeTransport;
+  class OnlineRangeTransport extends Base {
+    requestDataRange(begin: number, end: number) {
+      void (async () => {
+        try {
+          if (options.signal?.aborted) {
+            this.onDataRange(begin, null);
+            return;
+          }
+          const chunk = await fetchStudyContentRange(
+            url,
+            begin,
+            end,
+            options.signal
+          );
+          this.onDataRange(begin, chunk);
+        } catch {
+          this.onDataRange(begin, null);
+        }
+      })();
+    }
+  }
+
+  const transport = new OnlineRangeTransport(length, initial);
+  return { transport, length };
+}
+
 export type OfflineSaveProgress = {
   loaded: number;
   total: number;

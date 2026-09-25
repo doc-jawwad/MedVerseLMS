@@ -39,13 +39,38 @@ function sanitizeCodes(codes: string[]): AdminPermissionCode[] {
 
 async function requireManageAdmins() {
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return { supabase, error: "permission_denied" as const, isMainAdmin: false };
+  }
   const { data, error } = await supabase.rpc("has_permission", {
     p_code: "manage_admins",
   });
   if (error || !data) {
-    return { supabase, error: "permission_denied" as const };
+    return { supabase, error: "permission_denied" as const, isMainAdmin: false };
   }
-  return { supabase, error: null };
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("is_main_admin")
+    .eq("id", user.id)
+    .maybeSingle();
+  return {
+    supabase,
+    error: null,
+    isMainAdmin: Boolean(profile?.is_main_admin),
+  };
+}
+
+function requireMainAdminForFullAccess(
+  gate: Awaited<ReturnType<typeof requireManageAdmins>>,
+  makeMainAdmin: boolean
+) {
+  if (makeMainAdmin && !gate.isMainAdmin) {
+    return "main_admin_required" as const;
+  }
+  return null;
 }
 
 async function grantCodes(
@@ -84,6 +109,8 @@ export async function createAdminAccount(input: {
 
   const gate = await requireManageAdmins();
   if (gate.error) return { error: gate.error };
+  const mainGate = requireMainAdminForFullAccess(gate, input.makeMainAdmin);
+  if (mainGate) return { error: mainGate };
 
   const adminApi = createAdminClient();
   const created = await adminApi.auth.admin.createUser({
@@ -185,6 +212,8 @@ export async function promoteStudentToAdmin(input: {
 
   const gate = await requireManageAdmins();
   if (gate.error) return { error: gate.error };
+  const mainGate = requireMainAdminForFullAccess(gate, input.makeMainAdmin);
+  if (mainGate) return { error: mainGate };
 
   const { data: matches, error: lookupError } = await gate.supabase
     .from("profiles")
@@ -248,6 +277,12 @@ export async function setAdminPermissions(
   if (profileError) return clientActionFailed("setAdminPermissions.profile", profileError);
   if (!profile || profile.role !== "admin") {
     return { error: "target is not an admin" };
+  }
+
+  const changingMainFlag = makeMainAdmin !== Boolean(profile.is_main_admin);
+  if (changingMainFlag || makeMainAdmin) {
+    const mainGate = requireMainAdminForFullAccess(gate, true);
+    if (mainGate) return { error: mainGate };
   }
 
   if (makeMainAdmin) {

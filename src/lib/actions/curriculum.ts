@@ -5,10 +5,67 @@ import { actionRpcResult, toClientActionError } from "@/lib/errors/safe-action-e
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 
-// Admin curriculum CRUD. RLS (admin-only policies) is the real gate;
-// these actions are transport + revalidation.
+// Admin curriculum CRUD. RLS (manage_curriculum writes) is the real gate;
+// these actions are transport + UX permission check + revalidation.
 
 export type CurriculumKind = "subjects" | "books" | "chapters" | "topics";
+
+export type CurriculumChildKind = "books" | "chapters" | "topics";
+
+/** On-demand children for cascading pickers (Test Builder inline MCQ). */
+export async function listCurriculumChildren(
+  kind: CurriculumChildKind,
+  parentId: string
+): Promise<{
+  items: { id: string; name: string }[];
+  error?: string;
+}> {
+  if (!parentId) return { items: [] };
+  const supabase = await createClient();
+  const { data: isAdmin, error: adminErr } = await supabase.rpc("is_admin");
+  if (adminErr || !isAdmin) {
+    return { items: [], error: "permission_denied" };
+  }
+
+  if (kind === "books") {
+    const { data, error } = await supabase
+      .from("books")
+      .select("id, name")
+      .eq("subject_id", parentId)
+      .order("name");
+    if (error) return { items: [], error: toClientActionError(error, "curriculum") };
+    return { items: data ?? [] };
+  }
+  if (kind === "chapters") {
+    const { data, error } = await supabase
+      .from("chapters")
+      .select("id, name")
+      .eq("book_id", parentId)
+      .order("sort_order")
+      .order("name");
+    if (error) return { items: [], error: toClientActionError(error, "curriculum") };
+    return { items: data ?? [] };
+  }
+  const { data, error } = await supabase
+    .from("topics")
+    .select("id, name")
+    .eq("chapter_id", parentId)
+    .order("sort_order")
+    .order("name");
+  if (error) return { items: [], error: toClientActionError(error, "curriculum") };
+  return { items: data ?? [] };
+}
+
+async function requireCurriculumWrite() {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("has_permission", {
+    p_code: "manage_curriculum",
+  });
+  if (error || !data) {
+    return { supabase, error: "permission_denied" as const };
+  }
+  return { supabase, error: null };
+}
 
 const parentColumn: Record<CurriculumKind, string | null> = {
   subjects: "year_id",
@@ -47,9 +104,10 @@ export async function addCurriculumNode(
   const trimmed = name.trim();
   if (!trimmed) return { error: "Name is required." };
 
-  const supabase = await createClient();
+  const gate = await requireCurriculumWrite();
+  if (gate.error) return { error: gate.error };
   const col = parentColumn[kind]!;
-  const { error } = await supabase
+  const { error } = await gate.supabase
     .from(kind)
     .insert({ [col]: parentId, name: trimmed });
   revalidatePath("/admin/curriculum");
@@ -64,8 +122,9 @@ export async function renameCurriculumNode(
   const trimmed = name.trim();
   if (!trimmed) return { error: "Name is required." };
 
-  const supabase = await createClient();
-  const { error } = await supabase
+  const gate = await requireCurriculumWrite();
+  if (gate.error) return { error: gate.error };
+  const { error } = await gate.supabase
     .from(kind)
     .update({ name: trimmed })
     .eq("id", id);
@@ -74,8 +133,9 @@ export async function renameCurriculumNode(
 }
 
 export async function deleteCurriculumNode(kind: CurriculumKind, id: string) {
-  const supabase = await createClient();
-  const { error } = await supabase.from(kind).delete().eq("id", id);
+  const gate = await requireCurriculumWrite();
+  if (gate.error) return { error: gate.error };
+  const { error } = await gate.supabase.from(kind).delete().eq("id", id);
   revalidatePath("/admin/curriculum");
   return actionRpcResult("action", error);
 }

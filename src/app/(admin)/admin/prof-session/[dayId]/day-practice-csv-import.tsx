@@ -143,7 +143,7 @@ export function DayPracticeCsvImport({
       }
       if (questionIds.length === 0) {
         toast.error(
-          `No questions inserted (inserted=${inserted}, skipped=${skipped}, errors=${errors}).`
+          `No questions to attach (inserted=${inserted}, skipped=${skipped}, errors=${errors}).`
         );
         return;
       }
@@ -153,15 +153,17 @@ export function DayPracticeCsvImport({
       const attach = await setDayPracticeQuestions(dayId, merged);
       if (attach.error) {
         toast.error(
-          `Imported ${questionIds.length} question(s) to the bank, but could not attach to this day: ${attach.error}`
+          `Resolved ${questionIds.length} question(s) in the bank, but could not attach to this day: ${attach.error}`
         );
         router.refresh();
         return;
       }
       toast.success(
         `Added ${questionIds.length} CSV question(s) to this day` +
-          (skipped || errors
-            ? ` (skipped ${skipped}, row errors ${errors})`
+          (inserted || skipped
+            ? ` (new ${inserted}, already in bank ${skipped}` +
+              (errors ? `, row errors ${errors}` : "") +
+              ")"
             : "")
       );
       onAttached?.(merged);

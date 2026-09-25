@@ -14,6 +14,7 @@ export const ADMIN_PERMISSION_CATALOG = [
   { code: "import_questions", label: "Import questions" },
   { code: "publish_tests", label: "Publish tests" },
   { code: "manage_materials", label: "Manage materials" },
+  { code: "manage_curriculum", label: "Manage curriculum" },
   { code: "view_analytics", label: "View analytics" },
 ] as const;
 
@@ -37,6 +38,7 @@ export const ADMIN_PRESETS: {
       "import_questions",
       "publish_tests",
       "manage_materials",
+      "manage_curriculum",
       "view_analytics",
     ],
   },
@@ -128,6 +130,9 @@ export function adminRbacErrorMessage(raw: string | null | undefined): string {
   }
   if (/cannot demote the last Main Admin/i.test(t)) {
     return "The last Main Admin cannot be removed or demoted.";
+  }
+  if (/main_admin_required/i.test(t)) {
+    return "Only a Main Admin can grant or revoke Full / Main Admin access.";
   }
   if (/permission_denied/i.test(t) || /admin only/i.test(t)) {
     return "You do not have permission to manage admins.";

@@ -48,6 +48,8 @@ type Props = {
   hasActiveClass: boolean;
   accountStatus: string;
   hasInProgressExam: boolean;
+  /** Caller permission codes — hides unauthorized Manage menu items. */
+  permissions: string[];
 };
 
 type AccessData = {
@@ -90,6 +92,7 @@ export function StudentManageActions({
   hasActiveClass,
   accountStatus,
   hasInProgressExam,
+  permissions,
 }: Props) {
   const [pending, startTransition] = useTransition();
   const [confirm, setConfirm] = useState<ConfirmState | null>(null);
@@ -105,9 +108,14 @@ export function StudentManageActions({
         accountStatus,
         hasActiveClass,
         hasYearForResources: Boolean(yearId),
+        permissions,
       }),
-    [accountStatus, hasActiveClass, yearId]
+    [accountStatus, hasActiveClass, yearId, permissions]
   );
+
+  if (menu.length === 0) {
+    return null;
+  }
 
   async function openAccess() {
     if (!yearId) return;

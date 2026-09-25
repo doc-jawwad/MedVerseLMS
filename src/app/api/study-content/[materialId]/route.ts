@@ -65,9 +65,14 @@ export async function GET(
   }
 
   const rangeHeader = request.headers.get("range");
-  // Unscoped GET would stream the entire object through Next/Caddy and can
-  // starve PDF.js Range requests on large files. Answer with a small leading
-  // 206 so clients learn Content-Length via Content-Range and continue with Range.
+  // Unscoped GET must NOT stream the full object through Next/Caddy (starves
+  // concurrent Range readers on large PDFs). Cap to a leading probe window.
+  //
+  // NOTE: PDF.js url-mode ignores Content-Range total and uses Content-Length
+  // only — a leading 206 with CL=64KiB disables its built-in range logic.
+  // The in-app reader therefore uses an explicit PDFDataRangeTransport that
+  // always sends Range headers (see createOnlinePdfRangeTransport). This
+  // coerced 206 remains a bandwidth safety net for accidental unscoped GETs.
   const effectiveRange = rangeHeader || "bytes=0-65535";
   const upstream = await fetchR2ObjectStream({
     key,

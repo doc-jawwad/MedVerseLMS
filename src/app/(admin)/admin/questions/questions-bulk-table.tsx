@@ -3,7 +3,11 @@
 import Link from "next/link";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
-import { bulkMoveQuestionsToBin, type BulkSoftDeleteResult } from "@/lib/actions/questions";
+import {
+  bulkMoveQuestionsToBin,
+  listQuestionUsages,
+  type BulkSoftDeleteResult,
+} from "@/lib/actions/questions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -59,8 +63,31 @@ export function QuestionsBulkTable({ questions }: { questions: QuestionRow[] }) 
   function bulkBin() {
     const ids = Array.from(selected);
     if (ids.length === 0) return;
-    if (!window.confirm(`Move ${ids.length} question(s) to Bin? Recoverable for ~7 days.`)) return;
     startTransition(async () => {
+      const usageResults = await Promise.all(
+        ids.map(async (id) => {
+          const res = await listQuestionUsages(id);
+          return { id, usages: res.usages ?? [] };
+        })
+      );
+      const withUsages = usageResults.filter((r) => r.usages.length > 0);
+      let msg = `Move ${ids.length} question(s) to Bin? Recoverable for ~7 days.`;
+      if (withUsages.length > 0) {
+        const sample = withUsages
+          .slice(0, 5)
+          .map((r) => {
+            const labels = r.usages.map((u) => u.usage_label).join("; ");
+            return `• ${labels}`;
+          })
+          .join("\n");
+        const more =
+          withUsages.length > 5
+            ? `\n…and ${withUsages.length - 5} more with usages.`
+            : "";
+        msg = `${withUsages.length} of ${ids.length} selected question(s) are still linked elsewhere:\n${sample}${more}\n\nMove to Bin anyway?`;
+      }
+      if (!window.confirm(msg)) return;
+
       const res = await bulkMoveQuestionsToBin(ids);
       if ("error" in res && res.error) {
         toast.error(res.error);
@@ -69,7 +96,8 @@ export function QuestionsBulkTable({ questions }: { questions: QuestionRow[] }) 
       const r = (res as { result: BulkSoftDeleteResult }).result;
       const parts: string[] = [];
       if (r.binned > 0) parts.push(`${r.binned} moved to Bin`);
-      if (r.blocked_active_test > 0) parts.push(`${r.blocked_active_test} blocked (active test)`);
+      if (r.blocked_active_test > 0)
+        parts.push(`${r.blocked_active_test} blocked (active test)`);
       if (r.not_found > 0) parts.push(`${r.not_found} not found`);
       toast.success(parts.join(" · ") || "Done");
       setSelected(new Set());
@@ -79,7 +107,7 @@ export function QuestionsBulkTable({ questions }: { questions: QuestionRow[] }) 
   return (
     <div className="grid gap-2">
       {selected.size > 0 && (
-        <div className="flex items-center gap-3 rounded-lg border border-border/60 bg-muted/60 px-3 py-2 text-sm">
+        <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border/60 bg-muted/60 px-3 py-2 text-sm">
           <span className="font-medium">{selected.size} selected</span>
           <Button
             size="sm"
@@ -87,7 +115,7 @@ export function QuestionsBulkTable({ questions }: { questions: QuestionRow[] }) 
             disabled={pending}
             onClick={bulkBin}
           >
-            {pending ? "Moving…" : "Move to Bin"}
+            {pending ? "Checking…" : "Move to Bin"}
           </Button>
           <Button
             size="sm"
@@ -134,7 +162,10 @@ export function QuestionsBulkTable({ questions }: { questions: QuestionRow[] }) 
               const chap = q.chapters;
               const top = q.topics;
               return (
-                <TableRow key={q.id} className={selected.has(q.id) ? "bg-muted/30" : ""}>
+                <TableRow
+                  key={q.id}
+                  className={selected.has(q.id) ? "bg-muted/30" : ""}
+                >
                   <TableCell>
                     <Checkbox
                       checked={selected.has(q.id)}
@@ -151,10 +182,15 @@ export function QuestionsBulkTable({ questions }: { questions: QuestionRow[] }) 
                       {v?.stem ?? "(no version)"}
                     </Link>
                     {q.used_in_test && (
-                      <span className="text-xs text-muted-foreground"> used in test</span>
+                      <span className="text-xs text-muted-foreground">
+                        {" "}
+                        used in test
+                      </span>
                     )}
                   </TableCell>
-                  <TableCell className="hidden sm:table-cell">{subj?.name}</TableCell>
+                  <TableCell className="hidden sm:table-cell">
+                    {subj?.name}
+                  </TableCell>
                   <TableCell className="hidden text-sm text-muted-foreground md:table-cell">
                     {chap?.name} / {top?.name}
                   </TableCell>

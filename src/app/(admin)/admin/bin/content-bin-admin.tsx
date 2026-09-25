@@ -1,5 +1,6 @@
 "use client";
 
+import { APP_DISPLAY_TIMEZONE } from "@/lib/utils";
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -14,18 +15,20 @@ import {
   restoreContentFromBin,
   type ContentBinItem,
 } from "@/lib/actions/content-bin";
+import { CONTENT_BIN_PAGE_SIZE } from "@/lib/content-bin/purge-batch";
 import { ConfirmDangerDialog } from "@/components/admin/confirm-danger-dialog";
 
 function formatWhen(iso: string | null): string {
   if (!iso) return "—";
   const t = Date.parse(iso);
   if (Number.isNaN(t)) return iso;
-  return new Date(t).toLocaleString(undefined, {
+  return new Date(t).toLocaleString("en-GB", {
     year: "numeric",
     month: "short",
     day: "numeric",
     hour: "2-digit",
     minute: "2-digit",
+    timeZone: APP_DISPLAY_TIMEZONE,
   });
 }
 
@@ -35,10 +38,18 @@ function itemKey(item: ContentBinItem): string {
 
 export function ContentBinAdmin({
   yearLabel,
+  yearId,
   items,
+  totalCount,
+  page,
+  pageSize = CONTENT_BIN_PAGE_SIZE,
 }: {
   yearLabel: string;
+  yearId: string;
   items: ContentBinItem[];
+  totalCount: number;
+  page: number;
+  pageSize?: number;
 }) {
   const router = useRouter();
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -47,10 +58,30 @@ export function ContentBinAdmin({
   const allKeys = useMemo(() => items.map(itemKey), [items]);
   const allSelected =
     allKeys.length > 0 && allKeys.every((k) => selected.has(k));
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+  const safePage = Math.min(Math.max(page, 1), totalPages);
+
+  function goToPage(next: number) {
+    const params = new URLSearchParams();
+    params.set("year", yearId);
+    if (next > 1) params.set("page", String(next));
+    router.push(`/admin/bin?${params.toString()}`);
+  }
 
   function toggleAll() {
-    if (allSelected) setSelected(new Set());
-    else setSelected(new Set(allKeys));
+    if (allSelected) {
+      setSelected((prev) => {
+        const next = new Set(prev);
+        for (const k of allKeys) next.delete(k);
+        return next;
+      });
+    } else {
+      setSelected((prev) => {
+        const next = new Set(prev);
+        for (const k of allKeys) next.add(k);
+        return next;
+      });
+    }
   }
 
   function toggleOne(key: string) {
@@ -66,16 +97,33 @@ export function ContentBinAdmin({
     return items.filter((i) => selected.has(itemKey(i)));
   }
 
+  /** Include selection keys that may span pages (entityType:entityId). */
+  function selectedBulkPayload() {
+    const fromPage = selectedItems().map((i) => ({
+      entityType: i.entity_type,
+      entityId: i.entity_id,
+    }));
+    // Also include keys selected on other pages that are not in current items
+    const pageKeys = new Set(allKeys);
+    const extras: { entityType: ContentBinItem["entity_type"]; entityId: string }[] =
+      [];
+    for (const key of selected) {
+      if (pageKeys.has(key)) continue;
+      const [entityType, entityId] = key.split(":");
+      if (!entityType || !entityId) continue;
+      extras.push({
+        entityType: entityType as ContentBinItem["entity_type"],
+        entityId,
+      });
+    }
+    return [...fromPage, ...extras];
+  }
+
   function runBulkRestore() {
-    const list = selectedItems();
+    const list = selectedBulkPayload();
     if (list.length === 0) return;
     startTransition(async () => {
-      const res = await bulkRestoreContentFromBin(
-        list.map((i) => ({
-          entityType: i.entity_type,
-          entityId: i.entity_id,
-        }))
-      );
+      const res = await bulkRestoreContentFromBin(list);
       if ("error" in res && res.error) {
         toast.error(res.error);
         return;
@@ -108,7 +156,7 @@ export function ContentBinAdmin({
         </p>
       </div>
 
-      {items.length === 0 ? (
+      {totalCount === 0 ? (
         <p className="text-sm text-muted-foreground">Bin is empty for this class.</p>
       ) : (
         <div className="grid gap-3">
@@ -117,12 +165,16 @@ export function ContentBinAdmin({
               <Checkbox
                 checked={allSelected}
                 onCheckedChange={() => toggleAll()}
-                aria-label="Select all visible Bin items"
+                aria-label="Select all visible Bin items on this page"
               />
-              <span>Select all ({items.length})</span>
+              <span>
+                Select page ({items.length}
+                {totalCount > items.length ? ` of ${totalCount}` : ""})
+              </span>
             </label>
             <span className="text-xs text-muted-foreground">
               {selected.size} selected
+              {selected.size > items.length ? " (across pages)" : ""}
             </span>
             <div className="ml-auto flex flex-wrap gap-2">
               <Button
@@ -141,10 +193,12 @@ export function ContentBinAdmin({
                   <p>
                     This permanently removes the selected Bin items from the
                     database. Associated R2 objects (if any) are queued for
-                    deletion. This cannot be undone.
+                    deletion. Items blocked by test references stay in the Bin.
+                    This cannot be undone.
                   </p>
                 }
                 confirmLabel="Permanently delete selected"
+                successMessage={null}
                 trigger={
                   <Button
                     type="button"
@@ -156,14 +210,18 @@ export function ContentBinAdmin({
                   </Button>
                 }
                 onConfirm={async () => {
-                  const list = selectedItems();
-                  const res = await bulkPurgeContentFromBin(
-                    list.map((i) => ({
-                      entityType: i.entity_type,
-                      entityId: i.entity_id,
-                    }))
-                  );
+                  const list = selectedBulkPayload();
+                  const res = await bulkPurgeContentFromBin(list);
                   if ("error" in res && res.error) return { error: res.error };
+                  const r = res as Exclude<
+                    Awaited<ReturnType<typeof bulkPurgeContentFromBin>>,
+                    { error: string }
+                  >;
+                  if (r.blocked > 0 || r.failed > 0) {
+                    toast.warning(r.message);
+                  } else {
+                    toast.success(r.message);
+                  }
                   return {};
                 }}
                 onSuccess={() => {
@@ -179,6 +237,36 @@ export function ContentBinAdmin({
                 onClick={() => setSelected(new Set())}
               >
                 Clear selection
+              </Button>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+            <span>
+              Showing {(safePage - 1) * pageSize + 1}–
+              {Math.min(safePage * pageSize, totalCount)} of {totalCount}
+            </span>
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={safePage <= 1 || pending}
+                onClick={() => goToPage(safePage - 1)}
+              >
+                Previous
+              </Button>
+              <span>
+                Page {safePage} / {totalPages}
+              </span>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={safePage >= totalPages || pending}
+                onClick={() => goToPage(safePage + 1)}
+              >
+                Next
               </Button>
             </div>
           </div>
@@ -200,7 +288,7 @@ export function ContentBinAdmin({
                     />
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
-                        <p className="font-medium text-[var(--student-ink)]">
+                        <p className="font-medium text-[var(--student-ink)] break-words">
                           {item.name}
                         </p>
                         <Badge variant="secondary">

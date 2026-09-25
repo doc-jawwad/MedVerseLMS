@@ -20,6 +20,14 @@ export type QuestionMeta = {
   difficulty: "easy" | "medium" | "hard";
   tags: string[];
   status?: string;
+  /** Academic MCQ Bank folder ownership (optional). */
+  mcq_bank_folder_id?: string | null;
+};
+
+export type QuestionUsage = {
+  usage_kind: string;
+  usage_label: string;
+  ref_id: string;
 };
 
 export async function createQuestion(content: QuestionContent, meta: QuestionMeta) {
@@ -34,8 +42,10 @@ export async function createQuestion(content: QuestionContent, meta: QuestionMet
     p_difficulty: meta.difficulty,
     p_tags: meta.tags,
     p_status: meta.status ?? "draft",
+    p_mcq_bank_folder_id: meta.mcq_bank_folder_id ?? null,
   });
   revalidatePath("/admin/questions");
+  revalidatePath("/admin/mcq-bank");
   if (error) {
     return {
       error:
@@ -45,6 +55,27 @@ export async function createQuestion(content: QuestionContent, meta: QuestionMet
     };
   }
   return { id: data as string };
+}
+
+/** Where a question is used (Academic folder, Prof. Session, tests). */
+export async function listQuestionUsages(questionId: string) {
+  if (!questionId) return { error: "Question required.", usages: [] as QuestionUsage[] };
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("list_question_usages", {
+    p_question_id: questionId,
+  });
+  if (error) {
+    return {
+      error: toClientActionError(error, "listQuestionUsages"),
+      usages: [] as QuestionUsage[],
+    };
+  }
+  const usages = ((data ?? []) as QuestionUsage[]).map((u) => ({
+    usage_kind: u.usage_kind,
+    usage_label: u.usage_label,
+    ref_id: u.ref_id,
+  }));
+  return { usages };
 }
 
 // Editing content = append an immutable new version (docs/database.md).

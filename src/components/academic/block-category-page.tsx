@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { McqBankPage } from "@/components/library/mcq-bank-page";
+import { McqBankFoldersPage } from "@/components/library/mcq-bank-folders-page";
 import { PearlPointsLibraryPage } from "@/components/library/pearl-points-library-page";
 import { MaterialLibraryPage } from "@/components/library/material-library-page";
 import {
@@ -52,9 +52,9 @@ export async function BlockCategoryPage({
     : subject.subject_id;
 
   if (categoryId === "mcq_bank") {
+    if (!subjectId) notFound();
     return (
-      <McqBankPage
-        mode="resources"
+      <McqBankFoldersPage
         subjectId={subjectId}
         breadcrumbs={breadcrumbs}
         title={category.name}

@@ -42,7 +42,11 @@ Block-level Prof. Session materials use `material_folders.content_surface = 'pro
 
 Free students: locked empty Prof. Session in tree. Subscribed: published days + surface folders for enrolled year only.
 
-**Content bin (SHIPPED):** soft-delete columns `deleted_at` / `purge_after` / `deleted_by` on academic content tables; polymorphic bin RPCs; `purge_expired_bin_items` (7-day) + `r2_purge_queue` for deferred R2 object deletion. Do not hard-delete immutable exam attempts, payments, or audit logs when content is purged.
+**Content bin (SHIPPED):** soft-delete columns `deleted_at` / `purge_after` / `deleted_by` on academic content tables (including `mcq_bank_folders`); polymorphic bin RPCs; `purge_expired_bin_items` (7-day) + `r2_purge_queue` for deferred R2 object deletion. Do not hard-delete immutable exam attempts, payments, or audit logs when content is purged.
+- **List:** `list_content_bin_page(year_id, limit≤100, offset)` — server-side pagination with `total_count` (admin UI page size 50). Legacy `list_content_bin` remains for compatibility.
+- **Single purge:** `purge_content(type, id)` unchanged.
+- **Bulk purge:** `purge_content_batch(jsonb items)` — max **500** `{entity_type, entity_id}` per call; returns per-item `purged` / `blocked` / `already_gone` (retry-safe). App chunks larger selections. Question test-reference guard and R2 `enqueue_r2_purge` (unique open key) unchanged.
+- **Question hard-delete:** `question_versions` remain append-only for normal writes (UPDATE always blocked). Security-definer `purge_content` / `purge_content_batch` set LOCAL GUC `medverse.allow_question_version_purge=1` so `forbid_version_mutation` allows DELETE only for that transaction; **normal FK CASCADE stays active** (`question_versions.question_id ON DELETE CASCADE`). Do **not** use `session_replication_role=replica` here — it disables FK cascades and orphans versions. Practice answers referencing those versions are cleared before the question delete (NO ACTION FK).
 
 Hierarchy (unchanged table chain): `years` → `subjects` → `books` (subject_id, name, sort_order) → `chapters` (book_id, name, sort_order, **denormalized subject_id, year_id**) → `topics` (chapter_id, name, sort_order, **denormalized book_id, subject_id, year_id**).
 
@@ -59,7 +63,16 @@ Denormalized ids keep RLS join-free; maintained by trigger from the parent on in
 - `difficulty text check in ('easy','medium','hard')`
 - `tags text[]`, `content_hash text` (unique — normalized md5 of stem+options+correct), `stem_normalized text` (trigram index)
 - `used_in_test boolean default false` — **derived UI cache ONLY.** Authoritative truth = existence of a published `test_questions` row. Never use for security, eligibility, or historical truth. May be refreshed from test_questions at any time.
+- `mcq_bank_folder_id uuid null` → `mcq_bank_folders` — **Academic MCQ Bank placement only** (zero or one folder). Does **not** replace Question Bank taxonomy (`subject_id` remains departmental). NULL = unassigned. Setting folder→different folder via raw UPDATE is blocked; use assign/remove/create RPCs. Independent of Prof. Session day junctions and `test_questions`.
 - `created_by uuid`
+
+**mcq_bank_folders** (SHIPPED) — admin-managed folders under Academic product subjects (Blocks / Final Year clinical). Not nested. Not a second Question Bank.
+- `academic_product_subject_id` → `subjects` row with non-null `product_key`; denormalized `year_id` (trigger-maintained)
+- `name`, `sort_order`, `created_by`, soft-delete trio (`deleted_at` / `purge_after` / `deleted_by`) → Content Bin entity `mcq_bank_folder`
+- Soft-delete only when empty (no live questions with that `mcq_bank_folder_id`)
+- Seed: one renameable **Source MCQ Folder** per product subject; existing questions remain `mcq_bank_folder_id` NULL until admin classification
+- Student practice: `get_practice_batch('mcq_bank_folder', folder_id)` gated by `has_practice_access(academic_product_subject_id)`
+- Admin RPCs: create/rename/reorder/soft-delete folder; list folders/questions; `admin_assign_unassigned_question_to_folder` (NULL→folder only); `admin_remove_question_from_mcq_bank_folder`; `list_question_usages` for delete warnings
 
 Workflow: draft → review → approved → archived; any state may drop to `needs_revision`. Only `approved` questions are eligible for tests and practice.
 

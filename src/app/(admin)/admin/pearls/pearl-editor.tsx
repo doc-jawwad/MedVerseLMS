@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { yearDisplayName } from "@/lib/library/types";
 import { toast } from "sonner";
 import {
@@ -54,6 +55,7 @@ export function PearlEditor({
     status: "draft" | "published";
   };
 }) {
+  const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [prompt, setPrompt] = useState(initial?.prompt ?? "");
   const [answer, setAnswer] = useState(initial?.answer ?? "");
@@ -98,7 +100,7 @@ export function PearlEditor({
           <Label>Short explanation (optional)</Label>
           <Textarea value={explanation} onChange={(e) => setExplanation(e.target.value)} />
         </div>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid gap-3 sm:grid-cols-2">
           <div className="grid gap-2">
             <Label>Year</Label>
             {lockYear ? (
@@ -177,7 +179,11 @@ export function PearlEditor({
                   else toast.success("Saved");
                 } else {
                   const res = await createPearlPoint(build());
-                  if (res?.error) toast.error(res.error);
+                  if ("error" in res && res.error) toast.error(res.error);
+                  else if ("id" in res && res.id) {
+                    toast.success("Pearl point created");
+                    router.push(`/admin/pearls/${res.id}`);
+                  }
                 }
               })
             }

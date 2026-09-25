@@ -1,4 +1,5 @@
 import { requireAdmin } from "@/lib/auth/require-user";
+import { requireAdminAnyPermission } from "@/lib/admin/require-admin-permission";
 import { requireAdminClass } from "@/lib/admin/require-admin-class";
 import { setAdminClassAction } from "@/lib/actions/admin-class";
 import { CurriculumTree, type SubjectNode } from "./curriculum-tree";
@@ -11,6 +12,12 @@ export default async function CurriculumPage({
   searchParams: Promise<{ year?: string }>;
 }) {
   const { supabase } = await requireAdmin();
+  const gate = await requireAdminAnyPermission(
+    ["manage_curriculum"],
+    "Curriculum"
+  );
+  if (gate.denied) return gate.denied;
+
   const params = await searchParams;
 
   return requireAdminClass({

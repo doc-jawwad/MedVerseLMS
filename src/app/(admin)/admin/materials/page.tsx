@@ -1,6 +1,7 @@
 import { requireAdmin } from "@/lib/auth/require-user";
 import { MaterialsAdmin } from "./materials-admin";
 import { requireAdminClass } from "@/lib/admin/require-admin-class";
+import { requireAdminAnyPermission } from "@/lib/admin/require-admin-permission";
 import { AdminLibraryTypeTabs } from "@/components/admin/library-type-tabs";
 import {
   LIBRARY_LIST,
@@ -47,6 +48,11 @@ export default async function AdminMaterialsPage({
 }: {
   searchParams: Promise<{ year?: string; type?: string }>;
 }) {
+  const gate = await requireAdminAnyPermission(
+    ["manage_materials"],
+    "Materials"
+  );
+  if (gate.denied) return gate.denied;
   const { supabase } = await requireAdmin();
   const params = await searchParams;
   const { libraryType, activeSlug } = resolveMaterialsLibraryType(params.type);

@@ -21,6 +21,9 @@ export function practiceBatchAccessMessage(
   if (msg.includes("not_authenticated")) {
     return "Sign in to practice.";
   }
+  if (msg.includes("mcq_bank_folder_not_found")) {
+    return "This MCQ Bank folder was not found.";
+  }
   if (msg.includes("invalid scope type")) {
     return "Invalid practice scope.";
   }

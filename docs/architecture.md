@@ -130,7 +130,7 @@ Each Block (and each Final Year clinical subject) shows these student-facing chr
 
 | Category / group | Notes |
 |---|---|
-| MCQ Bank | Practice with instant feedback |
+| MCQ Bank | Practice with instant feedback — admin-managed **folders** under the Block / Final Year subject (`mcq_bank_folders`); folder chooses the question set. Question Bank taxonomy (year → departmental subject → book → chapter → topic) is unchanged and separate from Academic folder placement. |
 | Pearl Points | High-yield recall (not formal exams) |
 | Guidelines | Study guidelines / protocols |
 | **OSPE** (group) | Parent chrome only — children below |

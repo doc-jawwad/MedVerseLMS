@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { requireAdmin } from "@/lib/auth/require-user";
 import { requireAdminClass } from "@/lib/admin/require-admin-class";
+import { requireAdminAnyPermission } from "@/lib/admin/require-admin-permission";
 import { setAdminClassAction } from "@/lib/actions/admin-class";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -32,6 +33,11 @@ export default async function QuestionsPage({
     page?: string;
   }>;
 }) {
+  const gate = await requireAdminAnyPermission(
+    ["edit_questions", "import_questions"],
+    "Question Bank"
+  );
+  if (gate.denied) return gate.denied;
   const { supabase } = await requireAdmin();
   const params = await searchParams;
 

@@ -46,7 +46,7 @@ describe("protected pdf reader policy", () => {
       join("src", "components", "study", "pdf-viewer.tsx"),
       "utf8"
     );
-    assert.match(src, /disableRange:\s*false/);
+    assert.match(src, /createOnlinePdfRangeTransport/);
     assert.match(src, /disableAutoFetch:\s*true/);
     assert.match(src, /Confirm save/);
     assert.match(src, /estimateOfflineQuota/);
@@ -55,5 +55,18 @@ describe("protected pdf reader policy", () => {
     assert.match(src, /createOpfsPdfRangeTransport/);
     assert.match(src, /requestCacheOfflineReader/);
     assert.match(src, /contentRevision/);
+    // Must not use pdfjs url-mode (broken against coerced leading 206).
+    assert.doesNotMatch(src, /getDocument\(\{\s*url:\s*sourceUrl/);
+  });
+
+  it("online range transport issues explicit Range GETs with retries", () => {
+    const src = readFileSync(
+      join("src", "lib", "study", "offline-pdf-store.ts"),
+      "utf8"
+    );
+    assert.match(src, /createOnlinePdfRangeTransport/);
+    assert.match(src, /ONLINE_RANGE_MAX_ATTEMPTS/);
+    assert.match(src, /Range:\s*`bytes=\$\{begin\}-\$\{endInclusive\}`/);
+    assert.match(src, /PDFDataRangeTransport/);
   });
 });
