@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { memo, useCallback, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
@@ -9,6 +9,7 @@ import {
   deleteCurriculumNode,
   type CurriculumKind,
 } from "@/lib/actions/curriculum";
+import { treeIndentStyle } from "@/lib/admin/curriculum-indent";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -38,7 +39,7 @@ const childLabel: Record<string, string> = {
   chapter: "topic",
 };
 
-function NodeRow({
+const NodeRow = memo(function NodeRow({
   kind,
   level,
   id,
@@ -53,7 +54,7 @@ function NodeRow({
   name: string;
   childCount?: number;
   expanded?: boolean;
-  onToggle?: () => void;
+  onToggle?: (id: string) => void;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -64,137 +65,141 @@ function NodeRow({
 
   return (
     <div
-      className="flex flex-wrap items-center gap-2 rounded-md px-2 py-1.5 hover:bg-accent/40"
-      style={{ marginLeft: level * 20 }}
+      className="min-w-0 max-w-full"
+      style={treeIndentStyle(level)}
       data-testid={`curriculum-${kind}-${id}`}
     >
-      {onToggle ? (
-        <button
-          onClick={onToggle}
-          className="w-5 text-muted-foreground"
-          aria-label={expanded ? "Collapse" : "Expand"}
-        >
-          {expanded ? "▾" : "▸"}
-        </button>
-      ) : (
-        <span className="w-5" />
-      )}
-      {renaming ? (
-        <form
-          className="flex flex-1 gap-2"
-          action={() =>
-            startTransition(async () => {
-              const { error } = await renameCurriculumNode(table, id, newName);
-              if (error) toast.error(error);
-              else {
-                toast.success("Saved");
-                router.refresh();
-              }
-              setRenaming(false);
-            })
-          }
-        >
-          <Input
-            value={newName}
-            onChange={(e) => setNewName(e.target.value)}
-            className="h-7"
-            autoFocus
-            data-testid="curriculum-edit-name"
-          />
-          <Button size="sm" className="h-7" type="submit" disabled={pending}>
-            Save
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            className="h-7"
-            type="button"
-            onClick={() => setRenaming(false)}
+      <div className="flex min-w-0 flex-wrap items-center gap-2 rounded-md px-2 py-1.5 hover:bg-accent/40">
+        {onToggle ? (
+          <button
+            onClick={() => onToggle(id)}
+            className="w-5 shrink-0 text-muted-foreground"
+            aria-label={expanded ? "Collapse" : "Expand"}
           >
-            Cancel
-          </Button>
-        </form>
-      ) : (
-        <>
-          <span
-            className="min-w-0 flex-1 text-sm"
-            data-testid={`curriculum-name-${id}`}
+            {expanded ? "▾" : "▸"}
+          </button>
+        ) : (
+          <span className="w-5 shrink-0" />
+        )}
+        {renaming ? (
+          <form
+            className="flex min-w-0 flex-1 flex-wrap items-center gap-2"
+            action={() =>
+              startTransition(async () => {
+                const { error } = await renameCurriculumNode(table, id, newName);
+                if (error) toast.error(error);
+                else {
+                  toast.success("Saved");
+                  router.refresh();
+                }
+                setRenaming(false);
+              })
+            }
           >
-            {name}
-            {typeof childCount === "number" && (
-              <span className="ml-2 text-xs text-muted-foreground">
-                {childCount} {childLabel[kind]}
-                {childCount === 1 ? "" : "s"}
-              </span>
-            )}
-          </span>
-          <div className="flex shrink-0 gap-1">
-            <Button
-              size="sm"
-              variant="ghost"
-              className="h-6 px-2 text-xs"
-              data-testid={`curriculum-edit-${id}`}
-              onClick={() => {
-                setNewName(name);
-                setRenaming(true);
-              }}
-            >
-              Edit
+            <Input
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              className="h-7 min-w-0 flex-1 basis-32"
+              autoFocus
+              data-testid="curriculum-edit-name"
+            />
+            <Button size="sm" className="h-7 shrink-0" type="submit" disabled={pending}>
+              Save
             </Button>
             <Button
               size="sm"
               variant="ghost"
-              className="h-6 px-2 text-xs text-destructive"
-              data-testid={`curriculum-delete-${id}`}
-              onClick={() => setConfirmDelete(true)}
+              className="h-7 shrink-0"
+              type="button"
+              onClick={() => setRenaming(false)}
             >
-              Delete
-            </Button>
-          </div>
-        </>
-      )}
-
-      <Dialog open={confirmDelete} onOpenChange={setConfirmDelete}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
-              Delete {kind} “{name}”?
-            </DialogTitle>
-            <DialogDescription>
-              This permanently deletes it and everything under it. Questions
-              attached to it are also removed. This cannot be undone.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setConfirmDelete(false)}>
               Cancel
             </Button>
-            <Button
-              variant="destructive"
-              disabled={pending}
-              data-testid="curriculum-delete-confirm"
-              onClick={() =>
-                startTransition(async () => {
-                  const { error } = await deleteCurriculumNode(table, id);
-                  if (error) toast.error(error);
-                  else {
-                    toast.success("Deleted");
-                    router.refresh();
-                  }
-                  setConfirmDelete(false);
-                })
-              }
+          </form>
+        ) : (
+          <>
+            <span
+              className="min-w-0 flex-1 basis-32 break-words text-sm"
+              data-testid={`curriculum-name-${id}`}
             >
-              Delete
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+              {name}
+              {typeof childCount === "number" && (
+                <span className="ml-2 text-xs text-muted-foreground">
+                  {childCount} {childLabel[kind]}
+                  {childCount === 1 ? "" : "s"}
+                </span>
+              )}
+            </span>
+            <div className="flex shrink-0 gap-1">
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-6 px-2 text-xs"
+                data-testid={`curriculum-edit-${id}`}
+                onClick={() => {
+                  setNewName(name);
+                  setRenaming(true);
+                }}
+              >
+                Edit
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-6 px-2 text-xs text-destructive"
+                data-testid={`curriculum-delete-${id}`}
+                onClick={() => setConfirmDelete(true)}
+              >
+                Delete
+              </Button>
+            </div>
+          </>
+        )}
+      </div>
+
+      {confirmDelete ? (
+        <Dialog open onOpenChange={setConfirmDelete}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>
+                Delete {kind} “{name}”?
+              </DialogTitle>
+              <DialogDescription>
+                This permanently deletes it and everything under it. Questions
+                attached to it are also removed. This cannot be undone.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setConfirmDelete(false)}>
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                disabled={pending}
+                data-testid="curriculum-delete-confirm"
+                onClick={() =>
+                  startTransition(async () => {
+                    const { error } = await deleteCurriculumNode(table, id);
+                    if (error) toast.error(error);
+                    else {
+                      toast.success("Deleted");
+                      router.refresh();
+                    }
+                    setConfirmDelete(false);
+                  })
+                }
+              >
+                Delete
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      ) : null}
     </div>
   );
-}
+});
 
-function AddChildForm({
+const AddChildForm = memo(function AddChildForm({
   parentKind,
   parentId,
   level,
@@ -210,8 +215,8 @@ function AddChildForm({
 
   return (
     <form
-      className="flex items-center gap-2 py-1"
-      style={{ marginLeft: level * 20 + 28 }}
+      className="flex min-w-0 max-w-full items-center gap-2 py-1"
+      style={treeIndentStyle(level, 28)}
       action={() =>
         startTransition(async () => {
           const { error } = await addCurriculumNode(kind, parentId, name);
@@ -227,13 +232,13 @@ function AddChildForm({
         value={name}
         onChange={(e) => setName(e.target.value)}
         placeholder={`Add ${childLabel[parentKind]}…`}
-        className="h-7 w-64"
+        className="h-7 min-w-0 flex-1 basis-32"
         data-testid={`curriculum-add-${parentKind}`}
       />
       <Button
         size="sm"
         variant="secondary"
-        className="h-7"
+        className="h-7 shrink-0"
         type="submit"
         disabled={pending || !name.trim()}
       >
@@ -241,7 +246,7 @@ function AddChildForm({
       </Button>
     </form>
   );
-}
+});
 
 export function CurriculumTree({
   yearId,
@@ -251,48 +256,53 @@ export function CurriculumTree({
   subjects: SubjectNode[];
 }) {
   const [open, setOpen] = useState<Record<string, boolean>>({});
-  const toggle = (id: string) => setOpen((o) => ({ ...o, [id]: !o[id] }));
+  const toggle = useCallback((id: string) => {
+    setOpen((o) => ({ ...o, [id]: !o[id] }));
+  }, []);
 
   return (
-    <div className="rounded-md border p-3" data-testid="curriculum-tree">
+    <div
+      className="min-w-0 max-w-full overflow-x-hidden rounded-md border p-3 [--tree-indent:12px] md:[--tree-indent:20px]"
+      data-testid="curriculum-tree"
+    >
       {subjects.map((s) => (
-        <div key={s.id}>
+        <div key={s.id} className="min-w-0">
           <NodeRow
             kind="subject"
             level={0}
             id={s.id}
             name={s.name}
             childCount={s.books.length}
-            expanded={open[s.id]}
-            onToggle={() => toggle(s.id)}
+            expanded={!!open[s.id]}
+            onToggle={toggle}
           />
-          {open[s.id] && (
+          {open[s.id] ? (
             <>
               {s.books.map((b) => (
-                <div key={b.id}>
+                <div key={b.id} className="min-w-0">
                   <NodeRow
                     kind="book"
                     level={1}
                     id={b.id}
                     name={b.name}
                     childCount={b.chapters.length}
-                    expanded={open[b.id]}
-                    onToggle={() => toggle(b.id)}
+                    expanded={!!open[b.id]}
+                    onToggle={toggle}
                   />
-                  {open[b.id] && (
+                  {open[b.id] ? (
                     <>
                       {b.chapters.map((c) => (
-                        <div key={c.id}>
+                        <div key={c.id} className="min-w-0">
                           <NodeRow
                             kind="chapter"
                             level={2}
                             id={c.id}
                             name={c.name}
                             childCount={c.topics.length}
-                            expanded={open[c.id]}
-                            onToggle={() => toggle(c.id)}
+                            expanded={!!open[c.id]}
+                            onToggle={toggle}
                           />
-                          {open[c.id] && (
+                          {open[c.id] ? (
                             <>
                               {c.topics.map((t) => (
                                 <NodeRow
@@ -309,17 +319,17 @@ export function CurriculumTree({
                                 level={3}
                               />
                             </>
-                          )}
+                          ) : null}
                         </div>
                       ))}
                       <AddChildForm parentKind="book" parentId={b.id} level={2} />
                     </>
-                  )}
+                  ) : null}
                 </div>
               ))}
               <AddChildForm parentKind="subject" parentId={s.id} level={1} />
             </>
-          )}
+          ) : null}
         </div>
       ))}
       <AddChildForm parentKind="year" parentId={yearId} level={0} />
