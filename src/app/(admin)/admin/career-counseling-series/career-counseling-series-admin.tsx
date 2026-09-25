@@ -23,11 +23,9 @@ import { Textarea } from "@/components/ui/textarea";
 import type { FolderRow, MaterialRow } from "@/lib/library/folder-tree";
 
 export function CareerCounselingSeriesAdmin({
-  yearId,
   folders,
   materials,
 }: {
-  yearId: string;
   folders: FolderRow[];
   materials: MaterialRow[];
 }) {
@@ -42,9 +40,9 @@ export function CareerCounselingSeriesAdmin({
           New folder
         </p>
         <p className="text-xs text-muted-foreground">
-          Folders default to free entitlement. PDFs use the protected study-content
-          reader (not a public R2 URL). Replace a PDF by uploading a new file, then
-          moving the old one to the Bin.
+          Folders are universal (all classes). Default free entitlement. PDFs use
+          the protected study-content reader (not a public R2 URL). Replace a PDF
+          by uploading a new file, then moving the old one to the Bin.
         </p>
         <div className="grid gap-1 sm:max-w-md">
           <Label className="text-xs">Folder name</Label>
@@ -69,7 +67,7 @@ export function CareerCounselingSeriesAdmin({
           onClick={() =>
             startTransition(async () => {
               const created = await addFolder(
-                yearId,
+                null,
                 null,
                 name,
                 "career_counseling_series",
@@ -102,8 +100,8 @@ export function CareerCounselingSeriesAdmin({
         ))}
         {folders.length === 0 && (
           <div className="rounded-xl border border-dashed px-6 py-12 text-center text-sm text-muted-foreground">
-            No Career Counseling Series folders for this class yet. Create a
-            folder, then upload PDFs.
+            No Career Counseling Series folders yet. Create a folder, then upload
+            PDFs. Every class sees the same catalog.
           </div>
         )}
       </div>

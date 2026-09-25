@@ -15,7 +15,8 @@ import type { FolderRow, MaterialRow } from "@/lib/library/folder-tree";
 export const metadata = { title: "Career Counseling Series — MedVerse LMS" };
 
 export default async function CareerCounselingSeriesPage() {
-  const { supabase, enrollment } = await requireStudent();
+  // Enrollment is required for LMS access, but CCS is not filtered by class year.
+  const { supabase } = await requireStudent();
 
   const [{ data: folders }, { data: materials }, { data: accessible }] =
     await Promise.all([
@@ -25,7 +26,6 @@ export default async function CareerCounselingSeriesPage() {
           "id, name, description, year_id, subject_id, parent_id, sort_order, entitlement, library_type"
         )
         .eq("library_type", "career_counseling_series")
-        .eq("year_id", enrollment.year_id)
         .is("deleted_at", null)
         .is("parent_id", null)
         .order("sort_order")
@@ -46,8 +46,9 @@ export default async function CareerCounselingSeriesPage() {
     (accessible ?? []).map((row: { id: string }) => row.id)
   );
   const list = (folders ?? []) as FolderRow[];
+  const folderIds = new Set(list.map((f) => f.id));
   const mats = ((materials ?? []) as MaterialRow[]).filter(
-    (m) => m.status === "published"
+    (m) => m.status === "published" && folderIds.has(m.folder_id)
   );
 
   return (
@@ -55,7 +56,7 @@ export default async function CareerCounselingSeriesPage() {
       <PageHeader
         eyebrow="Study"
         title="Career Counseling Series"
-        description="Career guidance for your class. Open without a paid subscription; each folder still respects its own access setting."
+        description="Career guidance for every class. Open without a paid subscription; each folder still respects its own access setting."
       />
 
       {list.length === 0 ? (

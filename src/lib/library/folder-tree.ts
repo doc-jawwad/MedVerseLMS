@@ -4,7 +4,7 @@ export type FolderRow = {
   id: string;
   name: string;
   description: string | null;
-  year_id: string;
+  year_id: string | null;
   subject_id: string | null;
   parent_id: string | null;
   sort_order: number;

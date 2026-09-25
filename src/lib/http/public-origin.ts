@@ -32,6 +32,11 @@ function originFromConfigured(): string | null {
   }
 }
 
+/** Configured LMS origin for server actions that lack a NextRequest. */
+export function configuredPublicOrigin(): string | null {
+  return originFromConfigured();
+}
+
 export function getPublicOrigin(request: NextRequest): string {
   const configured = originFromConfigured();
   if (configured) return configured;

@@ -55,6 +55,22 @@ export function LoginForm({ next, reason }: { next?: string; reason?: string }) 
             </AlertDescription>
           </Alert>
         )}
+        {reason === "link_invalid" && (
+          <Alert className="mb-4">
+            <AlertDescription>
+              That email link is invalid or has expired. Sign in, or request a
+              new password reset.
+            </AlertDescription>
+          </Alert>
+        )}
+        {reason === "profile" && (
+          <Alert className="mb-4">
+            <AlertDescription>
+              We could not finish signing you in. Try again, or reset your
+              password if you just requested a reset link.
+            </AlertDescription>
+          </Alert>
+        )}
         <form action={action} className="grid gap-4">
           <input type="hidden" name="next" value={next ?? ""} />
           <div className="grid gap-2">

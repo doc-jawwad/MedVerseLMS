@@ -1,7 +1,8 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { updatePassword, type AuthResult } from "@/lib/actions/auth";
+import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -13,8 +14,12 @@ import {
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { PasswordInput } from "@/components/ui/password-input";
+import Link from "next/link";
+
+type Gate = "loading" | "ready" | "invalid";
 
 export function ResetPasswordForm() {
+  const [gate, setGate] = useState<Gate>("loading");
   const [state, action, pending] = useActionState<AuthResult | undefined, FormData>(
     updatePassword,
     undefined
@@ -22,6 +27,70 @@ export function ResetPasswordForm() {
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const mismatch = confirm.length > 0 && password !== confirm;
+
+  useEffect(() => {
+    let cancelled = false;
+    const supabase = createClient();
+
+    async function resolveSession() {
+      // Browser client picks up recovery hash/code from the URL when present
+      // (default Auth ConfirmationURL → /reset-password#… or ?code=).
+      const first = await supabase.auth.getSession();
+      if (cancelled) return;
+      if (first.data.session) {
+        setGate("ready");
+        return;
+      }
+      // Brief wait for detectSessionInUrl / cookie hydration after /auth/confirm.
+      await new Promise((r) => setTimeout(r, 100));
+      if (cancelled) return;
+      const second = await supabase.auth.getSession();
+      if (cancelled) return;
+      setGate(second.data.session ? "ready" : "invalid");
+    }
+
+    void resolveSession();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (gate === "loading") {
+    return (
+      <Card className="w-full border-border/80 shadow-none">
+        <CardHeader className="space-y-1.5 pb-4">
+          <CardTitle className="text-xl text-foreground">
+            Choose a new password
+          </CardTitle>
+          <CardDescription>Checking your reset link…</CardDescription>
+        </CardHeader>
+      </Card>
+    );
+  }
+
+  if (gate === "invalid") {
+    return (
+      <Card className="w-full border-border/80 shadow-none">
+        <CardHeader className="space-y-1.5 pb-4">
+          <CardTitle className="text-xl text-foreground">
+            Reset link invalid
+          </CardTitle>
+          <CardDescription>
+            This password reset link is invalid or has expired. Request a new
+            one and try again.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-3">
+          <Button asChild className="h-10">
+            <Link href="/forgot-password">Request a new link</Link>
+          </Button>
+          <Button asChild variant="outline" className="h-10">
+            <Link href="/login">Back to sign in</Link>
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card className="w-full border-border/80 shadow-none">

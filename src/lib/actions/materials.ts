@@ -22,7 +22,7 @@ function revalidateStudyPaths() {
 }
 
 export async function addFolder(
-  yearId: string,
+  yearId: string | null,
   subjectId: string | null,
   name: string,
   libraryType: string,
@@ -34,13 +34,20 @@ export async function addFolder(
   }
 ) {
   if (!name.trim()) return { error: "Folder name required." };
+  if (libraryType === "career_counseling_series") {
+    if (yearId != null) {
+      return { error: "Career Counseling Series folders are universal (no class)." };
+    }
+  } else if (!yearId) {
+    return { error: "Class year is required for this folder type." };
+  }
   const supabase = await createClient();
   // protect_resource_entitlement allows INSERT only as free; paid/plan must
   // go through set_resource_entitlement after the row exists.
   const { data: folder, error } = await supabase
     .from("material_folders")
     .insert({
-      year_id: yearId,
+      year_id: libraryType === "career_counseling_series" ? null : yearId,
       subject_id: subjectId,
       name: name.trim(),
       library_type: libraryType,

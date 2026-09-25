@@ -13,6 +13,8 @@ import {
   logServerError,
   toClientActionError,
 } from "@/lib/errors/safe-action-error";
+import { passwordRecoveryRedirectTo } from "@/lib/auth/password-recovery";
+import { configuredPublicOrigin } from "@/lib/http/public-origin";
 import { safeInternalPath } from "@/lib/http/safe-internal-path";
 
 export type AuthResult = { error?: string };
@@ -194,10 +196,15 @@ export async function requestPasswordReset(
   const email = String(formData.get("email") ?? "").trim();
   if (!email) return { error: "Enter your email." };
 
-  // The recovery.html template builds its own link (SiteURL + /auth/confirm)
-  // directly from {{ .TokenHash }}, so no redirectTo option is needed here.
+  // Custom recovery.html links to /auth/confirm?token_hash=…&type=recovery.
+  // Default Auth ConfirmationURL uses redirectTo after Cloud /auth/v1/verify
+  // (hash or code on the app origin) — land on the password update page.
   const supabase = await createClient();
-  const { error } = await supabase.auth.resetPasswordForEmail(email);
+  const origin = configuredPublicOrigin();
+  const { error } = await supabase.auth.resetPasswordForEmail(
+    email,
+    origin ? { redirectTo: passwordRecoveryRedirectTo(origin) } : undefined
+  );
   // Never reveal whether the email exists — same response either way.
   if (error && !error.message.toLowerCase().includes("rate limit")) {
     logServerError("requestPasswordReset", error.message);

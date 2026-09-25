@@ -18,7 +18,8 @@ export default async function CareerCounselingSeriesFolderPage({
   params: Promise<{ folderId: string }>;
 }) {
   const { folderId } = await params;
-  const { supabase, enrollment } = await requireStudent();
+  // Enrollment required for LMS; folder is not filtered by enrolled class year.
+  const { supabase } = await requireStudent();
 
   const { data: folder } = await supabase
     .from("material_folders")
@@ -27,7 +28,6 @@ export default async function CareerCounselingSeriesFolderPage({
     )
     .eq("id", folderId)
     .eq("library_type", "career_counseling_series")
-    .eq("year_id", enrollment.year_id)
     .is("deleted_at", null)
     .is("parent_id", null)
     .maybeSingle();

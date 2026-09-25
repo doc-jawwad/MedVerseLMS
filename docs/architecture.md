@@ -180,11 +180,12 @@ Hierarchy (frozen):
 
 **Career Counseling Series → Folder (root, `parent_id` null) → PDF materials**
 
-- Folders are year-scoped (`year_id` + enrolled class). Nesting under folders is out of scope for this hub (flat folders only).
+- **Universal (not class-scoped):** CCS folders store `year_id` **null**. Catalog visibility does **not** depend on the student’s enrolled class, subscription year, Block/Final-Year subject, or class-specific entitlement. Any active LMS student (any valid class) sees the same hub. Do **not** apply Other Services / Past Papers year filters here.
+- Nesting under folders is out of scope for this hub (flat folders only; `parent_id` null).
 - PDFs (`materials.kind = 'pdf'`) use the protected study-content reader (`/materials/[id]/read` → `/api/study-content/...`) — never a public R2 URL.
-- **Hub is free / unlocked:** students may open Career Counseling Series without a live paid subscription. Individual folder entitlement remains the content boundary (default `free`).
+- **Hub is free / unlocked:** students may open Career Counseling Series without a live paid subscription and without selecting a particular academic class first. Individual folder entitlement (`free` / `any_subscription` / plan) remains the content boundary (default `free`).
 - Soft-delete / Bin / R2 purge use the existing materials lifecycle. Do not create a parallel CMS.
-- Admin surface: `/admin/career-counseling-series`. Student surface: `/career-counseling-series` (folder list) → `/career-counseling-series/[folderId]` (open folder). Legacy `/career-counselling` redirects to the student hub.
+- Admin surface: `/admin/career-counseling-series` (no class picker — one academy-wide catalog). Student surface: `/career-counseling-series` (folder list) → `/career-counseling-series/[folderId]` (open folder). Legacy `/career-counselling` redirects to the student hub.
 
 ### 2c. Prof. Session (guided course under enrolled class)
 
