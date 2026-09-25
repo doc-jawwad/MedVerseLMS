@@ -1,7 +1,6 @@
 import type {
   ClassLockState,
   LeaderboardSafeIdentity,
-  StudentProfile,
   YearOption,
 } from "@/lib/profile/types";
 import type {
@@ -108,23 +107,4 @@ export function student360SectionsForPermissions(
   }
 
   return sections;
-}
-
-export function profileFromAdminBiodata(
-  studentId: string,
-  biodata: AdminStudentDetail["biodata"]
-): StudentProfile {
-  return {
-    id: studentId,
-    full_name: biodata.full_name,
-    email: biodata.email,
-    contact_number: biodata.contact_number,
-    college_name: biodata.college_name,
-    avatar_object_key: biodata.avatar_object_key,
-    avatar_url: biodata.avatar_url,
-    current_year_id: null,
-    current_year_name: null,
-    current_year_number: null,
-    enrollment_status: null,
-  };
 }

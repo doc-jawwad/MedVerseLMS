@@ -2,9 +2,22 @@
 
 import { use } from "react";
 import Link from "next/link";
-import { PdfViewer } from "@/components/study/pdf-viewer";
+import dynamic from "next/dynamic";
 import { getOfflineMeta } from "@/lib/study/offline-pdf-store";
 import { useEffect, useState } from "react";
+
+const PdfViewer = dynamic(
+  () =>
+    import("@/components/study/pdf-viewer").then((m) => ({
+      default: m.PdfViewer,
+    })),
+  {
+    ssr: false,
+    loading: () => (
+      <p className="text-sm text-muted-foreground">Loading PDF reader…</p>
+    ),
+  }
+);
 
 export default function OfflineReadPage({
   params,

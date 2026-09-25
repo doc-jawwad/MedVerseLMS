@@ -1,7 +1,6 @@
 "use client";
 
 import { useRef, useState } from "react";
-import Papa from "papaparse";
 import { toast } from "sonner";
 import {
   createOneLinerImportBatch,
@@ -39,12 +38,13 @@ export function ImportOneLinersClient({ yearId }: { yearId: string }) {
   const [busy, setBusy] = useState(false);
   const [report, setReport] = useState<ReportRow[] | null>(null);
 
-  function handleFile(file: File) {
+  async function handleFile(file: File) {
     setReport(null);
     setRows([]);
     setHeaderErrors([]);
     setFilename(file.name);
 
+    const Papa = (await import("papaparse")).default;
     Papa.parse<Record<string, string>>(file, {
       header: true,
       skipEmptyLines: true,

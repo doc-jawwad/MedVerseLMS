@@ -6,7 +6,6 @@ import { createClient } from "@/lib/supabase/server";
 import type { ContentBinEntityType } from "@/lib/content-bin/labels";
 import {
   moveContentToBin,
-  restoreContentFromBin,
 } from "@/lib/actions/content-bin";
 
 function revalidateProfSession() {
@@ -82,12 +81,6 @@ export async function softDeleteProfSessionDay(dayId: string) {
     "prof_session_day" satisfies ContentBinEntityType,
     dayId
   );
-  revalidateProfSession();
-  return result;
-}
-
-export async function restoreProfSessionDay(dayId: string) {
-  const result = await restoreContentFromBin("prof_session_day", dayId);
   revalidateProfSession();
   return result;
 }

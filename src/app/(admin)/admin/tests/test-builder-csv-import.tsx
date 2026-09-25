@@ -2,7 +2,6 @@
 
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import Papa from "papaparse";
 import { toast } from "sonner";
 import {
   createImportBatch,
@@ -49,12 +48,13 @@ export function TestBuilderCsvImport({
     errorCount: number;
   } | null>(null);
 
-  function onFile(file: File | null) {
+  async function onFile(file: File | null) {
     if (!file) return;
     if (!subjectId) {
       toast.error("Select a subject for the CSV rows.");
       return;
     }
+    const Papa = (await import("papaparse")).default;
     Papa.parse<Record<string, string>>(file, {
       header: true,
       skipEmptyLines: true,

@@ -388,6 +388,3 @@ export function PracticeMcqSession({
     </PracticeSessionChrome>
   );
 }
-
-/** @deprecated Prefer PracticeMcqSession — kept as alias for route imports. */
-export { PracticeMcqSession as PracticeSession };

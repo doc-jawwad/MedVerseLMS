@@ -19,17 +19,6 @@ export async function allocateStudyObjectKey() {
   return { key: data };
 }
 
-/**
- * @deprecated PDF binaries must not transit Next.js. Use
- * `beginStudyPdfUpload` / `completeStudyPdfUpload` (direct-to-R2).
- */
-export async function addPdfMaterial(_formData: FormData) {
-  return {
-    error:
-      "PDF upload must use direct-to-R2. Refresh the admin page and try again.",
-  };
-}
-
 export async function addGuidelineMaterial(input: {
   folderId: string;
   title: string;
@@ -61,35 +50,6 @@ export async function addGuidelineMaterial(input: {
   return actionRpcResult("addGuidelineMaterial", error);
 }
 
-export async function updateGuidelineMaterial(input: {
-  materialId: string;
-  title: string;
-  description?: string;
-  bodyText: string;
-  referenceText?: string;
-  status?: "draft" | "published";
-}) {
-  if (!input.title.trim() || !input.bodyText.trim()) {
-    return { error: "Title and guideline text are required." };
-  }
-  const supabase = await createClient();
-  const { error } = await supabase
-    .from("materials")
-    .update({
-      title: input.title.trim(),
-      description: (input.description ?? "").trim(),
-      body_text: input.bodyText,
-      reference_text: (input.referenceText ?? "").trim(),
-      status: input.status,
-    })
-    .eq("id", input.materialId)
-    .eq("kind", "guideline");
-  revalidateStudy();
-  revalidatePath(`/materials/${input.materialId}/read`);
-  revalidatePath(`/admin/materials/${input.materialId}`);
-  return actionRpcResult("updateGuidelineMaterial", error);
-}
-
 export async function setMaterialStatus(
   materialId: string,
   status: "draft" | "published"
@@ -101,22 +61,4 @@ export async function setMaterialStatus(
     .eq("id", materialId);
   revalidateStudy();
   return actionRpcResult("setMaterialStatus", error);
-}
-
-export async function openStudyItem(materialId: string) {
-  const supabase = await createClient();
-  const { data, error } = await supabase.rpc("open_study_item", {
-    p_material_id: materialId,
-  });
-  if (error) return actionRpcResult("openStudyItem", error);
-  return { item: data as Record<string, unknown> };
-}
-
-export async function getMaterialForAdmin(materialId: string) {
-  const supabase = await createClient();
-  const { data, error } = await supabase.rpc("get_material_for_admin", {
-    p_material_id: materialId,
-  });
-  if (error) return actionRpcResult("getMaterialForAdmin", error);
-  return { item: data as Record<string, unknown> };
 }

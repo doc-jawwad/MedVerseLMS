@@ -308,21 +308,3 @@ export async function getPaymentScreenshotReadUrl(applicationId: string) {
   }
   return { url: signed.url, expiresSeconds: 300 };
 }
-
-export async function getPaymentScreenshotWriteUrl(applicationId: string) {
-  const supabase = await createClient();
-  const { data: key, error } = await supabase.rpc(
-    "authorize_payment_screenshot_access",
-    {
-      p_application_id: applicationId,
-      p_purpose: "write",
-    }
-  );
-  if (error) return clientActionFailed("getPaymentScreenshotWriteUrl", error);
-  if (typeof key !== "string") return { error: "screenshot_access_denied" };
-  const signed = presignR2Object({ method: "PUT", key });
-  if ("error" in signed) {
-    return clientActionFailed("getPaymentScreenshotWriteUrl.sign", signed.error);
-  }
-  return { url: signed.url, objectKey: key, expiresSeconds: 300 };
-}

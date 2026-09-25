@@ -3,7 +3,6 @@ import {
   PROF_SESSION_MCQ_BANK_SLUG,
   PROF_SESSION_SLUG,
   findCategoryById,
-  findCategoryBySlug,
   findProfSessionCategoryBySlug,
 } from "./product-structure.ts";
 
@@ -26,10 +25,6 @@ export function categorySlugFromId(id: string): string {
   return findCategoryById(id)?.slug ?? id.replaceAll("_", "-");
 }
 
-export function parseCategorySlug(slug: string) {
-  return findCategoryBySlug(slug)?.id ?? null;
-}
-
 export function isKnownDaySlotSlug(slug: string): boolean {
   return (
     slug === "guidelines" ||
@@ -42,10 +37,6 @@ export function isKnownDaySlotSlug(slug: string): boolean {
 
 export function yearHref(yearNumber: number): string {
   return `${ACADEMIC_BASE_PATH}/year/${yearNumber}`;
-}
-
-export function classHref(_surface?: AcademicTreeSurface): string {
-  return ACADEMIC_BASE_PATH;
 }
 
 export function blockHref(
@@ -157,10 +148,4 @@ export function searchHref(
   const trimmed = q.trim();
   const base = `${ACADEMIC_BASE_PATH}/search`;
   return trimmed ? `${base}?q=${encodeURIComponent(trimmed)}` : base;
-}
-
-/** True when pathname is under Prof. Session (paid section). */
-export function isProfSessionPath(pathname: string): boolean {
-  const base = profSessionHref();
-  return pathname === base || pathname.startsWith(`${base}/`);
 }

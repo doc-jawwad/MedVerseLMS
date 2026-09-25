@@ -12,7 +12,6 @@ import {
   testAudienceFromEntitlement,
 } from "../../src/lib/study/test-audience.ts";
 import { countdownParts, sortByOpensAtAsc } from "../../src/lib/study/upcoming.ts";
-import { orderPearlIds, pearlProgress } from "../../src/lib/study/pearl-order.ts";
 import { isStudyPdfFile } from "../../src/lib/study/upload-rules.ts";
 
 const config: R2Config = {
@@ -62,15 +61,6 @@ describe("study content helpers", () => {
     assert.match(html, /&lt;script&gt;/);
     assert.doesNotMatch(html, /<script>/);
     assert.match(html, /<strong>two<\/strong>/);
-  });
-
-  it("orders pearls sequentially or shuffled without dropping ids", () => {
-    const ids = ["a", "b", "c"];
-    assert.deepEqual(orderPearlIds(ids, false), ids);
-    const shuffled = orderPearlIds(ids, true);
-    assert.equal(shuffled.length, 3);
-    assert.ok(ids.every((id) => shuffled.includes(id)));
-    assert.equal(pearlProgress(0, 3), "1 of 3");
   });
 
   it("rejects non-PDF uploads", () => {

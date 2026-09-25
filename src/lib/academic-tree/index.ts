@@ -48,11 +48,9 @@ export {
 } from "./product-structure.ts";
 
 export {
-  buildDefaultProfSessionDays,
   buildStructuralAcademicTree,
   findCategoryInSubject,
   findDayFolder,
-  findFolderBySlug,
   findProfSubjectInTree,
   findSubjectInTree,
   structuralAcademicTreeAdapter,
@@ -72,14 +70,11 @@ export {
   blockHref,
   categoryHref,
   categorySlugFromId,
-  classHref,
   dayHref,
   daySlotHref,
   folderHref,
   isKnownDaySlotSlug,
   isProfSessionCategorySlug,
-  isProfSessionPath,
-  parseCategorySlug,
   profSessionCategoryHref,
   profSessionHref,
   profSessionSubjectHref,

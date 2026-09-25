@@ -2,8 +2,6 @@
 
 import Link from "next/link";
 import { useMemo, useRef, useState } from "react";
-import Papa from "papaparse";
-import * as XLSX from "xlsx";
 import { toast } from "sonner";
 import {
   createImportBatch,
@@ -107,7 +105,8 @@ export function ImportClient({
     invalidRows.length === 0 &&
     Boolean(subjectId);
 
-  function downloadTemplate() {
+  async function downloadTemplate() {
+    const Papa = (await import("papaparse")).default;
     const csv = Papa.unparse(buildQuestionCsvTemplateMatrix());
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
     const a = document.createElement("a");
@@ -142,6 +141,7 @@ export function ImportClient({
 
     let records: Record<string, string>[] = [];
     if (lower.endsWith(".csv")) {
+      const Papa = (await import("papaparse")).default;
       const text = await file.text();
       const parsed = Papa.parse<Record<string, string>>(text, {
         header: true,
@@ -154,6 +154,7 @@ export function ImportClient({
       }
       records = parsed.data;
     } else if (lower.endsWith(".xlsx") || lower.endsWith(".xls")) {
+      const XLSX = await import("xlsx");
       const buf = await file.arrayBuffer();
       const wb = XLSX.read(buf);
       const sheet = wb.Sheets[wb.SheetNames[0]];
