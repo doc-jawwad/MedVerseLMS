@@ -365,6 +365,10 @@ begin
 end;
 $$;
 
+drop function if exists public.admin_list_mcq_bank_folders(uuid);
+
+drop function if exists public.admin_list_mcq_bank_folders(uuid);
+
 create or replace function public.admin_list_mcq_bank_folders(p_product_subject_id uuid)
 returns table (
   folder_id uuid,
