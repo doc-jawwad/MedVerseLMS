@@ -1,0 +1,78 @@
+/* Minimal PDF.js text-layer styles for selectable overlays (Apache-2.0 Mozilla). */
+.textLayer {
+  position: absolute;
+  text-align: initial;
+  inset: 0;
+  overflow: clip;
+  opacity: 1;
+  line-height: 1;
+  -webkit-text-size-adjust: none;
+  text-size-adjust: none;
+  forced-color-adjust: none;
+  transform-origin: 0 0;
+  caret-color: CanvasText;
+  z-index: 1;
+}
+
+.textLayer :is(span, br) {
+  color: transparent;
+  position: absolute;
+  white-space: pre;
+  cursor: text;
+  transform-origin: 0% 0%;
+}
+
+.textLayer ::selection {
+  background: rgb(0 0 255 / 0.25);
+}
+
+.textLayer .endOfContent {
+  display: block;
+  position: absolute;
+  inset: 100% 0 0;
+  z-index: 0;
+  cursor: default;
+  user-select: none;
+}
+
+.textLayer.selecting .endOfContent {
+  top: 0;
+}
+
+.pdf-highlight-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.pdf-highlight-mark {
+  position: absolute;
+  pointer-events: auto;
+  cursor: pointer;
+  border-radius: 2px;
+  mix-blend-mode: multiply;
+  opacity: 0.45;
+}
+
+.pdf-page-stage {
+  position: relative;
+  margin-inline: auto;
+  background: white;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.08);
+}
+
+.pdf-viewer-scroll {
+  touch-action: pan-x pan-y;
+}
+
+.pdf-viewer-scroll.pinching {
+  touch-action: none;
+}
+
+.pdf-viewer-fs-close {
+  position: fixed;
+  top: 0.75rem;
+  right: 0.75rem;
+  z-index: 50;
+}

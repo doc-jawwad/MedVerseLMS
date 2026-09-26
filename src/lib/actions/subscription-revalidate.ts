@@ -15,6 +15,7 @@ export function revalidateAdminSubscriptionPaths() {
   revalidatePath("/tests", "layout");
   revalidatePath("/materials");
   revalidatePath("/free-resources");
+  revalidatePath("/one-liner");
   revalidatePath("/pearl-points");
   revalidatePath("/guidelines");
   revalidatePath("/profile");

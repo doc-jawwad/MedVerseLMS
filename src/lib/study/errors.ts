@@ -1,5 +1,6 @@
 const MESSAGES: Record<string, string> = {
-  pearl_access_denied: "You do not have access to this pearl point.",
+  pearl_access_denied: "You do not have access to this One Liner.",
+  pearl_object_denied: "You do not have access to this One Liner PDF.",
   ospe_access_denied: "You do not have access to this OSPE station.",
   ospe_object_denied: "You do not have access to this station image.",
   material_access_denied: "You do not have access to this resource.",

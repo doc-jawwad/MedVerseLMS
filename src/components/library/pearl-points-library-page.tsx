@@ -32,8 +32,8 @@ export async function PearlPointsLibraryPage({
   if (mode === "full" && !studentHasPaidLmsSections(hasLiveAccess)) {
     return (
       <SectionLock
-        title="Pearl Points"
-        description="The full Pearl Points library unlocks with a live subscription. Free recall points stay under Resources."
+        title="One Liner"
+        description="The full One Liner library unlocks with a live subscription. Free recall items stay under Resources."
       />
     );
   }
@@ -43,7 +43,7 @@ export async function PearlPointsLibraryPage({
       supabase
         .from("pearl_points")
         .select(
-          "id, prompt, year_id, subject_id, chapter_id, topic_id, entitlement, subjects(name)"
+          "id, prompt, year_id, subject_id, chapter_id, topic_id, entitlement, has_source_pdf, subjects(name)"
         )
         .eq("status", "published")
         .order("sort_order")
@@ -65,6 +65,9 @@ export async function PearlPointsLibraryPage({
       topic_id: p.topic_id,
       entitlement: p.entitlement as string,
       accessible: allowed.has(p.id),
+      has_source_pdf: Boolean(
+        (p as { has_source_pdf?: boolean }).has_source_pdf
+      ),
       subject_name:
         (p.subjects as unknown as { name: string } | null)?.name ?? null,
     }))
@@ -89,14 +92,14 @@ export async function PearlPointsLibraryPage({
         : (subjects ?? []);
 
   const pageTitle =
-    title ?? (mode === "free" ? "Free Pearl Points" : "Pearl Points");
+    title ?? (mode === "free" ? "Free One Liners" : "One Liner");
   const pageDescription =
     description ??
     (mode === "free"
-      ? "Admin-selected free recall points for your class. The full set is a separate section."
+      ? "Admin-selected free recall items for your class. The full set is a separate section."
       : "High-yield one-liners for rapid recall. Reveal the answer when you are ready — this is not an exam.");
   const defaultBack =
-    mode === "free" ? "/free-resources/pearl-points" : "/pearl-points";
+    mode === "free" ? "/free-resources/one-liner" : "/one-liner";
 
   return (
     <StudentPage width="narrow">
@@ -119,10 +122,10 @@ export async function PearlPointsLibraryPage({
         <EmptyState
           title={
             mode === "free"
-              ? "No free pearl points yet"
-              : "No pearl points for your year yet"
+              ? "No free One Liners yet"
+              : "No One Liners for your year yet"
           }
-          description="When your academy publishes recall points you can use, they appear here."
+          description="When your academy publishes recall items you can use, they appear here."
         />
       ) : (
         <PearlPracticeSession

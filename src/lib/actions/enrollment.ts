@@ -154,6 +154,7 @@ export async function setResourceEntitlement(
   revalidatePath("/practice");
   revalidatePath("/practice/ospe");
   revalidatePath("/tests");
+  revalidatePath("/one-liner");
   revalidatePath("/pearl-points");
   revalidatePath("/free-resources");
   return actionRpcResult("action", error);

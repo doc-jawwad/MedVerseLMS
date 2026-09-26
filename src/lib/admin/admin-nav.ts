@@ -133,7 +133,7 @@ export const ADMIN_NAV: AdminNavDef[] = [
   },
   {
     href: "/admin/pearls",
-    label: "Pearl Points",
+    label: "One Liners",
     icon: "pearlPoints",
     anyOf: ["manage_materials"],
   },
@@ -157,7 +157,7 @@ export const ADMIN_NAV: AdminNavDef[] = [
   },
   {
     href: "/admin/one-liners",
-    label: "One-liners",
+    label: "Prof. Session One-Liners",
     icon: "pearlPoints",
     anyOf: ["manage_materials"],
   },

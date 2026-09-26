@@ -9,6 +9,7 @@ import {
   deleteCurriculumNode,
   type CurriculumKind,
 } from "@/lib/actions/curriculum";
+import { curriculumErrorMessage } from "@/lib/curriculum/errors";
 import { treeIndentStyle } from "@/lib/admin/curriculum-indent";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -165,8 +166,9 @@ const NodeRow = memo(function NodeRow({
                 Delete {kind} “{name}”?
               </DialogTitle>
               <DialogDescription>
-                This permanently deletes it and everything under it. Questions
-                attached to it are also removed. This cannot be undone.
+                Deletes this {kind} only when it is empty — no child items and
+                no questions (including Content Bin). Remove children first,
+                then move or purge questions. This cannot be undone.
               </DialogDescription>
             </DialogHeader>
             <DialogFooter>
@@ -180,7 +182,7 @@ const NodeRow = memo(function NodeRow({
                 onClick={() =>
                   startTransition(async () => {
                     const { error } = await deleteCurriculumNode(table, id);
-                    if (error) toast.error(error);
+                    if (error) toast.error(curriculumErrorMessage(error));
                     else {
                       toast.success("Deleted");
                       router.refresh();

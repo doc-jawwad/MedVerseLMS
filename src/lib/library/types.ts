@@ -57,12 +57,12 @@ export const LIBRARY_META: Record<StudentLibraryType, LibraryMeta> = {
   },
   pearl_points: {
     id: "pearl_points",
-    slug: "pearl-points",
-    label: "Pearl Points",
-    href: "/pearl-points",
-    freeHref: "/free-resources/pearl-points",
+    slug: "one-liner",
+    label: "One Liner",
+    href: "/one-liner",
+    freeHref: "/free-resources/one-liner",
     icon: "pearlPoints",
-    description: "High-yield recall points. Not scored exams.",
+    description: "High-yield recall. Reveal the answer when ready — not a scored exam.",
     folderType: null,
   },
   guidelines: {
@@ -192,6 +192,8 @@ export function folderLibraryLabel(type: FolderLibraryType): {
 }
 
 export function parseLibrarySlug(slug: string): StudentLibraryType | null {
+  // Legacy Pearl Points slug kept so old free-resource bookmarks still resolve.
+  if (slug === "pearl-points") return "pearl_points";
   const found = LIBRARY_LIST.find((m) => m.slug === slug);
   return found?.id ?? null;
 }
@@ -219,6 +221,9 @@ export function itemDeliveryModes(type: FolderLibraryType): Array<
       return ["drive"];
     case "past_papers":
       return ["pdf"];
+    case "syllabus":
+    case "notes":
+      return ["pdf"];
     case "other_services":
       return ["drive"];
     case "career_counseling_series":
@@ -243,6 +248,7 @@ export const STUDY_REVALIDATE_PATHS = [
   "/library",
   "/academic",
   "/mcq-bank",
+  "/one-liner",
   "/pearl-points",
   "/practice/ospe",
   "/guidelines",

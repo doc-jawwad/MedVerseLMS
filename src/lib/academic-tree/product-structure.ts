@@ -71,8 +71,9 @@ export type BlockCategoryDef = {
 };
 
 /**
- * Student Block chrome leaf categories (Notes omitted — storage-only).
+ * Student Block chrome leaf categories (Notes + Syllabus included).
  * OSPE Material / Lectures also appear under the OSPE chrome group with Practice.
+ * Order matches Academic subject page chrome (OSPE group is separate in UI).
  */
 export const BLOCK_CATEGORIES: readonly BlockCategoryDef[] = [
   {
@@ -83,27 +84,15 @@ export const BLOCK_CATEGORIES: readonly BlockCategoryDef[] = [
   },
   {
     id: "pearl_points",
-    name: "Pearl Points",
-    slug: "pearl-points",
-    description: "High-yield recall points. Not scored exams.",
+    name: "One Liner",
+    slug: "one-liner",
+    description: "High-yield recall. Reveal the answer when ready — not a scored exam.",
   },
   {
     id: "guidelines",
     name: "Guidelines",
     slug: "guidelines",
     description: "Study guidelines and protocols.",
-  },
-  {
-    id: "ospe_material",
-    name: "OSPE Material",
-    slug: "ospe-material",
-    description: "OSPE PDFs and station packs.",
-  },
-  {
-    id: "ospe_lectures",
-    name: "OSPE Lectures",
-    slug: "ospe-lectures",
-    description: "OSPE lecture videos and recordings.",
   },
   {
     id: "books",
@@ -117,20 +106,37 @@ export const BLOCK_CATEGORIES: readonly BlockCategoryDef[] = [
     slug: "lectures",
     description: "Lecture videos and recordings.",
   },
+  {
+    id: "notes",
+    name: "Notes",
+    slug: "notes",
+    description: "Class notes and concise write-ups.",
+  },
+  {
+    id: "syllabus",
+    name: "Syllabus",
+    slug: "syllabus",
+    description: "Subject syllabus PDFs.",
+  },
+  {
+    id: "ospe_material",
+    name: "OSPE Material",
+    slug: "ospe-material",
+    description: "OSPE PDFs and station packs.",
+  },
+  {
+    id: "ospe_lectures",
+    name: "OSPE Lectures",
+    slug: "ospe-lectures",
+    description: "OSPE lecture videos and recordings.",
+  },
 ] as const;
 
-/** Storage / deep-link only — not shown in student Block chrome. */
-export const NOTES_CATEGORY: BlockCategoryDef = {
-  id: "notes",
-  name: "Notes",
-  slug: "notes",
-  description: "Class notes and concise write-ups.",
-};
+/** @deprecated Prefer BLOCK_CATEGORIES — Notes is now chrome, not storage-only. */
+export const NOTES_CATEGORY: BlockCategoryDef =
+  BLOCK_CATEGORIES.find((c) => c.id === "notes")!;
 
-export const ALL_BLOCK_CATEGORIES: readonly BlockCategoryDef[] = [
-  ...BLOCK_CATEGORIES,
-  NOTES_CATEGORY,
-];
+export const ALL_BLOCK_CATEGORIES: readonly BlockCategoryDef[] = BLOCK_CATEGORIES;
 
 /** Category ids folded under the Block OSPE chrome group. */
 export const OSPE_GROUP_CATEGORY_IDS = [
@@ -224,7 +230,7 @@ export const TEST_DAY_SLOTS: readonly TestDaySlotDef[] = [
     id: "one_liners",
     name: "One-Liners",
     slug: "one-liners",
-    description: "Day-scoped one-liners (not Pearl Points).",
+    description: "Day-scoped statements for this Prof. Session day (separate from Block One Liner).",
   },
 ] as const;
 

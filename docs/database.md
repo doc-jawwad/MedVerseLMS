@@ -52,6 +52,8 @@ Hierarchy (unchanged table chain): `years` → `subjects` → `books` (subject_i
 
 `books` / `chapters` / `topics` remain **authoring taxonomy** for the Question Bank (CSV import), not student library folder trees.
 
+**Admin curriculum delete (SHIPPED):** `admin_delete_curriculum_node(kind, id)` — empty-node only (same protective pattern as empty MCQ Bank folder soft-delete). Refuses parents that still have taxonomy children, nodes that still have questions (including soft-deleted Bin rows — FK remains until `purge_content`), product subjects (`product_key` not null), and subjects still linked to tests / materials / MCQ folders / OSPE / Prof. Session / pearls / one-liners. Does **not** subtree-wipe and does **not** hard-delete questions via curriculum DELETE (that path hits immutable `question_versions`; questions leave via Content Bin + purge). Requires `manage_curriculum` + year scope.
+
 Denormalized ids keep RLS join-free; maintained by trigger from the parent on insert/update.
 
 ## Question bank
@@ -69,9 +71,11 @@ Denormalized ids keep RLS join-free; maintained by trigger from the parent on in
 **mcq_bank_folders** (SHIPPED) — admin-managed folders under Academic product subjects (Blocks / Final Year clinical). Not nested. Not a second Question Bank.
 - `academic_product_subject_id` → `subjects` row with non-null `product_key`; denormalized `year_id` (trigger-maintained)
 - `name`, `sort_order`, `created_by`, soft-delete trio (`deleted_at` / `purge_after` / `deleted_by`) → Content Bin entity `mcq_bank_folder`
-- Soft-delete only when empty (no live questions with that `mcq_bank_folder_id`)
+- `material_folder_id` → private `material_folders` row with `library_type = 'mcq_bank'` (PDF store for this folder; not a student library nav). Created/synced by `ensure_mcq_bank_material_folder` on create/rename; soft-deleted with the folder when empty
+- Soft-delete only when empty (no live questions with that `mcq_bank_folder_id`, and no live materials on the linked material folder)
 - Seed: one renameable **Source MCQ Folder** per product subject; existing questions remain `mcq_bank_folder_id` NULL until admin classification
-- Student practice: `get_practice_batch('mcq_bank_folder', folder_id)` gated by `has_practice_access(academic_product_subject_id)`
+- Student path: folder hub (PDFs + Start practice) then `get_practice_batch('mcq_bank_folder', folder_id)` gated by `has_practice_access(academic_product_subject_id)`. PDF open uses existing `authorize_study_object` / reader; `can_access_material_folder` for `mcq_bank` uses `has_practice_access(subject_id)`
+- CSV: `import_question_batch(..., p_mcq_bank_folder_id)` places new/unassigned questions in the open folder; book/chapter/topic remain Question Bank taxonomy
 - Admin RPCs: create/rename/reorder/soft-delete folder; list folders/questions; `admin_assign_unassigned_question_to_folder` (NULL→folder only); `admin_remove_question_from_mcq_bank_folder`; `list_question_usages` for delete warnings
 
 Workflow: draft → review → approved → archived; any state may drop to `needs_revision`. Only `approved` questions are eligible for tests and practice.
@@ -206,7 +210,7 @@ Practice list RPCs return catalog rows with a lock flag; start/fetch RPCs enforc
 
 ## Materials
 
-**material_folders** — `name`, optional `description` (used by Other Services / Career Counseling Series blurbs; nullable elsewhere), `year_id` (required for all library types **except** `career_counseling_series`, where `year_id` **must be null** — universal hub), `subject_id null`, `sort_order`, `parent_id` (nullable, same-year cycle-guarded nesting; CCS forbids nesting — `parent_id` null), `library_type` in (`guidelines`,`los`,`ospe_material`,`ospe_lectures`,`ospe_past`,`books`,`notes`,`lectures`,`syllabus`,`schedule`,`past_papers`,`flashcards`,`other_services`,`career_counseling_series`), `content_surface` `academic|prof_session` (default `academic`), optional `prof_session_day_id` + `day_slot_key` for day-scoped Guidelines/LoS. Plus entitlement columns. **Notes remains its own storage `library_type`**. Student Academic Block chrome omits Notes; Prof. Session Block chrome includes Notes when `content_surface = 'prof_session'`. **Past Papers** (`past_papers`), **Other Services** (`other_services`), and **Career Counseling Series** (`career_counseling_series`) are top-level shell hubs — not Block chrome categories — see [architecture.md](architecture.md) §2b-ii / §2b-iii / §2b-iv. Career Counseling Series is **universal** (not year/enrollment-scoped) and is **not** an Other Services folder. Delivery `materials.kind` is **not** that category. Flashcards stays empty/placeholder with no card table.
+**material_folders** — `name`, optional `description` (used by Other Services / Career Counseling Series blurbs; nullable elsewhere), `year_id` (required for all library types **except** `career_counseling_series`, where `year_id` **must be null** — universal hub), `subject_id null`, `sort_order`, `parent_id` (nullable, same-year cycle-guarded nesting; CCS forbids nesting — `parent_id` null), `library_type` in (`guidelines`,`los`,`ospe_material`,`ospe_lectures`,`ospe_past`,`books`,`notes`,`lectures`,`syllabus`,`schedule`,`past_papers`,`flashcards`,`other_services`,`career_counseling_series`,`mcq_bank`), `content_surface` `academic|prof_session` (default `academic`), optional `prof_session_day_id` + `day_slot_key` for day-scoped Guidelines/LoS. Plus entitlement columns. **`mcq_bank`** is the private PDF store linked from `mcq_bank_folders.material_folder_id` — not a separate student library category. **Notes remains its own storage `library_type`**. Student Academic Block / Final Year subject chrome includes Notes and Syllabus when `content_surface = 'academic'` (folder `subject_id` scoped to the product subject). Prof. Session Block chrome includes Notes (and Syllabus) when `content_surface = 'prof_session'`. Do not mix the two surfaces in one folder row. **Past Papers** (`past_papers`), **Other Services** (`other_services`), and **Career Counseling Series** (`career_counseling_series`) are top-level shell hubs — not Block chrome categories — see [architecture.md](architecture.md) §2b-ii / §2b-iii / §2b-iv. Career Counseling Series is **universal** (not year/enrollment-scoped) and is **not** an Other Services folder. Delivery `materials.kind` is **not** that category. Flashcards stays empty/placeholder with no card table.
 
 **materials** — `folder_id`, `title`, `description`, `file_type text`, `kind text check in ('drive','pdf','guideline') default 'drive'`, `status text check in ('draft','published') default 'published'` (existing Drive rows backfilled published), optional `chapter_id` / `topic_id` / `reference_text`, plus kind-specific payload:
 - `drive` — `drive_url` https-only (YouTube or Google Drive / other https). No R2 key / body. Students open via `open_material` (never catalog SELECT of the URL).
@@ -219,9 +223,21 @@ Practice list RPCs return catalog rows with a lock flag; start/fetch RPCs enforc
 
 Student catalog SELECT must **not** expose `drive_url`, `body_text`, or R2 keys. Table-level `SELECT` is revoked and re-granted on metadata columns only. Students see **published** items in folders they `can_view`. `open_material(id)` returns a Drive URL only for `kind = 'drive'` after student entitlement or `manage_materials`. `open_study_item(id)` returns guideline body (or PDF catalog metadata without the object key) after the same folder content check. `authorize_study_object(id)` returns the R2 key for Next.js to sign; students must not obtain PDF bytes without that path.
 
-## Pearl points
+## PDF reader highlights
 
-**pearl_points** — high-yield one-line recall items. **Not** Question Bank MCQs (`questions` / `question_versions` stay 4–5 option scored items). Columns: `prompt`, `answer`, `explanation` (optional), `year_id`, `subject_id`, optional `chapter_id` / `topic_id`, `status` `draft|published`, entitlement columns, `sort_order`, `created_by`. Student catalog SELECT excludes `answer` / `explanation`. `open_pearl(id)` returns the reveal payload after `can_access_pearl`. `can_view_pearl` is published + active year enrollment + `account_allows_lms`. Content uses `resource_content_allowed` with kind `pearl_point` (grant overlay for this kind is not stored on `access_grants` yet).
+**pdf_highlights** — private per-student text highlights on a PDF `materials` row. Columns: `student_id`, `material_id`, `page_number`, `rects` (JSON array of `{x1,y1,x2,y2}` in **PDF user space** — stable across zoom/rotation), `selected_text` (≤4000), `color`. RLS: own-row SELECT/INSERT/UPDATE/DELETE; INSERT/UPDATE also require `can_annotate_pdf(material_id)` (published live PDF + `can_access_material_folder`, or `manage_materials`). Not visible to other students. Do not store highlights only in browser storage.
+
+## One Liner (canonical student surface)
+
+**Store:** `pearl_points` (table name retained for migrations / entitlements / bin entity `pearl_point`). Student Block chrome and library label this **One Liner**. Do **not** present a parallel “Pearl Points” student category.
+
+**pearl_points** — high-yield recall items. **Not** Question Bank MCQs (`questions` / `question_versions` stay 4–5 option scored items). Columns: `prompt`, `answer`, `explanation` (optional), `year_id`, `subject_id`, optional `chapter_id` / `topic_id`, `status` `draft|published`, entitlement columns, `sort_order`, `created_by`, optional private PDF (`r2_object_key` under `study-content/`, `r2_content_type` `application/pdf`, `r2_byte_size`, generated `has_source_pdf`). Student catalog SELECT excludes `answer` / `explanation` / R2 keys (includes `has_source_pdf`). `open_pearl(id)` returns the reveal payload after `can_access_pearl`. PDF bytes: `authorize_pearl_object` + Next.js private stream (`/api/pearls/[id]`). `can_view_pearl` is published + active year enrollment + `account_allows_lms`. Content uses `resource_content_allowed` with kind `pearl_point` (grant overlay for this kind is not stored on `access_grants` yet).
+
+**Prof. Session day One-Liners** remain on table `one_liners` (day-scoped title/body; no Block chrome duplicate). Do not drop or silently merge into `pearl_points`.
+
+## Pearl points (legacy name)
+
+See **One Liner** above — same table.
 
 ## OSPE Practice stations
 

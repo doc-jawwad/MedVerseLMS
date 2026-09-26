@@ -135,7 +135,11 @@ export async function renameCurriculumNode(
 export async function deleteCurriculumNode(kind: CurriculumKind, id: string) {
   const gate = await requireCurriculumWrite();
   if (gate.error) return { error: gate.error };
-  const { error } = await gate.supabase.from(kind).delete().eq("id", id);
+  // Empty-node only — see admin_delete_curriculum_node (no subtree/question wipe).
+  const { error } = await gate.supabase.rpc("admin_delete_curriculum_node", {
+    p_kind: kind,
+    p_id: id,
+  });
   revalidatePath("/admin/curriculum");
-  return actionRpcResult("action", error);
+  return actionRpcResult("deleteCurriculumNode", error);
 }

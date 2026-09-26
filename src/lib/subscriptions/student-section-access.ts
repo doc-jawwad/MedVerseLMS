@@ -18,6 +18,7 @@ export const PAID_LMS_SECTION_HREFS = [
   "/academic/prof-session",
   "/library",
   "/mcq-bank",
+  "/one-liner",
   "/pearl-points",
   "/guidelines",
   "/ospe-material",

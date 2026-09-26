@@ -156,7 +156,7 @@ async function ProfSessionOneLinersSlot({
       <AcademicBreadcrumbs crumbs={breadcrumbs} />
       <PageHeader
         title={title}
-        description="Day-scoped one-liners (not Pearl Points)."
+        description="Day-scoped statements for this day (separate from Block One Liner)."
         actions={
           <Link
             href={backHref}

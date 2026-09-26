@@ -42,14 +42,13 @@ describe("academic tree search scope", () => {
     const categoryHits = searchAcademicTreeNames({ query: "MCQ Bank", tree });
     assert.ok(categoryHits.some((h) => h.kind === "category"));
     const notesHits = searchAcademicTreeNames({ query: "Notes", tree });
-    assert.equal(
-      notesHits.filter(
+    assert.ok(
+      notesHits.some(
         (h) =>
           h.kind === "category" &&
           !h.path_labels.includes("Prof. Session")
-      ).length,
-      0,
-      "Notes omitted from student Academic Block chrome"
+      ),
+      "Notes included in student Academic Block chrome"
     );
     assert.ok(
       notesHits.some(
@@ -73,8 +72,19 @@ describe("academic tree search scope", () => {
   it("does not return day slots or invent stem/PDF hits", () => {
     const syllabus = searchAcademicTreeNames({ query: "Syllabus", tree });
     assert.ok(
-      syllabus.every((h) => h.path_labels.includes("Prof. Session")),
-      "Syllabus is Prof. Session chrome, not Academic Block or day slots"
+      syllabus.some(
+        (h) =>
+          h.kind === "category" &&
+          !h.path_labels.includes("Prof. Session")
+      ),
+      "Syllabus included in Academic Block chrome"
+    );
+    assert.ok(
+      syllabus.some(
+        (h) =>
+          h.kind === "category" && h.path_labels.includes("Prof. Session")
+      ),
+      "Syllabus also under Prof. Session subject chrome"
     );
     assert.equal(
       syllabus.filter((h) => h.kind === "day" || h.kind === "day_slot").length,

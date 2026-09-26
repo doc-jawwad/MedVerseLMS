@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { PearlEditor } from "../pearl-editor";
 import { EntitlementSelect } from "@/components/admin/entitlement-select";
 
-export const metadata = { title: "Edit Pearl Point — MedVerse Admin" };
+export const metadata = { title: "Edit One Liner — MedVerse Admin" };
 
 export default async function EditPearlPage({
   params,
@@ -29,20 +29,41 @@ export default async function EditPearlPage({
     topic_id: string | null;
     status: "draft" | "published";
     entitlement: string;
+    has_source_pdf?: boolean;
+    r2_byte_size?: number | null;
   };
 
-  const [{ data: years }, { data: subjects }, { data: chapters }, { data: topics }] = await Promise.all([
+  const [
+    { data: years },
+    { data: subjects },
+    { data: chapters },
+    { data: topics },
+  ] = await Promise.all([
     supabase.from("years").select("id, year_number, name").order("year_number"),
     supabase.from("subjects").select("id, name, year_id").order("name"),
-    supabase.from("chapters").select("id, name, subject_id").order("sort_order").order("name"),
-    supabase.from("topics").select("id, name, chapter_id").order("sort_order").order("name"),
+    supabase
+      .from("chapters")
+      .select("id, name, subject_id")
+      .order("sort_order")
+      .order("name"),
+    supabase
+      .from("topics")
+      .select("id, name, chapter_id")
+      .order("sort_order")
+      .order("name"),
   ]);
 
   return (
     <div className="grid gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="font-heading text-2xl font-semibold text-[var(--student-ink)]">Edit Pearl Point</h1>
-        <EntitlementSelect kind="pearl_point" id={pearl.id} value={pearl.entitlement} />
+        <h1 className="font-heading text-2xl font-semibold text-[var(--student-ink)]">
+          Edit One Liner
+        </h1>
+        <EntitlementSelect
+          kind="pearl_point"
+          id={pearl.id}
+          value={pearl.entitlement}
+        />
       </div>
       <PearlEditor
         years={years ?? []}
@@ -50,6 +71,8 @@ export default async function EditPearlPage({
         chapters={chapters ?? []}
         topics={topics ?? []}
         pearlId={pearl.id}
+        hasSourcePdf={Boolean(pearl.has_source_pdf)}
+        sourcePdfBytes={pearl.r2_byte_size ?? null}
         initial={{
           prompt: pearl.prompt,
           answer: pearl.answer,

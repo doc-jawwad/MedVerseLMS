@@ -19,6 +19,7 @@ const MATERIAL_CATEGORIES = new Set<BlockCategoryId>([
   "books",
   "notes",
   "lectures",
+  "syllabus",
 ]);
 
 /**
@@ -59,6 +60,7 @@ export async function BlockCategoryPage({
         breadcrumbs={breadcrumbs}
         title={category.name}
         backHref={backHref}
+        blockSlug={subject.product_key}
       />
     );
   }

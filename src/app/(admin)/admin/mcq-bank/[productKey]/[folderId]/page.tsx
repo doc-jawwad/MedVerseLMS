@@ -3,6 +3,7 @@ import { requireAdmin } from "@/lib/auth/require-user";
 import { requireAdminClass } from "@/lib/admin/require-admin-class";
 import {
   McqBankFolderQuestions,
+  type FolderMaterialRow,
   type FolderQuestionRow,
 } from "../../mcq-bank-folder-questions";
 
@@ -36,9 +37,9 @@ export default async function AdminMcqBankFolderPage({
 
       if (!subject?.id) notFound();
 
-      const { data: folder } = await supabase
+      let { data: folder } = await supabase
         .from("mcq_bank_folders")
-        .select("id, name, academic_product_subject_id, year_id")
+        .select("id, name, academic_product_subject_id, year_id, material_folder_id")
         .eq("id", folderId)
         .is("deleted_at", null)
         .maybeSingle();
@@ -51,14 +52,37 @@ export default async function AdminMcqBankFolderPage({
         notFound();
       }
 
-      const { data: rows, error } = await supabase.rpc(
-        "admin_list_folder_questions",
-        {
+      if (!folder.material_folder_id) {
+        await supabase.rpc("ensure_mcq_bank_material_folder", {
+          p_mcq_folder_id: folderId,
+        });
+        const refreshed = await supabase
+          .from("mcq_bank_folders")
+          .select(
+            "id, name, academic_product_subject_id, year_id, material_folder_id"
+          )
+          .eq("id", folderId)
+          .is("deleted_at", null)
+          .maybeSingle();
+        folder = refreshed.data ?? folder;
+      }
+
+      const [{ data: rows, error }, materialsRes] = await Promise.all([
+        supabase.rpc("admin_list_folder_questions", {
           p_folder_id: folderId,
           p_limit: PAGE_SIZE,
           p_offset: page * PAGE_SIZE,
-        }
-      );
+        }),
+        folder.material_folder_id
+          ? supabase
+              .from("materials")
+              .select("id, title, description, kind, status")
+              .eq("folder_id", folder.material_folder_id)
+              .is("deleted_at", null)
+              .order("sort_order")
+              .order("title")
+          : Promise.resolve({ data: [] as FolderMaterialRow[], error: null }),
+      ]);
 
       if (error) {
         return (
@@ -87,6 +111,16 @@ export default async function AdminMcqBankFolderPage({
         topic_name: r.topic_name,
       }));
 
+      const materials: FolderMaterialRow[] = (materialsRes.data ?? []).map(
+        (m) => ({
+          id: m.id,
+          title: m.title,
+          description: m.description ?? "",
+          kind: m.kind,
+          status: m.status,
+        })
+      );
+
       const totalCount =
         list.length > 0 ? Number(list[0]!.total_count ?? 0) : 0;
 
@@ -97,6 +131,8 @@ export default async function AdminMcqBankFolderPage({
           folderId={folderId}
           folderName={folder.name}
           subjectName={subject.name}
+          materialFolderId={folder.material_folder_id}
+          materials={materials}
           questions={questions}
           totalCount={totalCount}
           page={page}

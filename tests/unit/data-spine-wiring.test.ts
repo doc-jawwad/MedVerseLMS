@@ -93,7 +93,17 @@ describe("Data Spine academic tree mapping", () => {
     assert.ok(medicine);
     assert.equal(medicine!.locked, true);
     assert.equal(medicine!.categories.length, BLOCK_CATEGORIES.length);
-    assert.ok(!medicine!.categories.some((c) => c.id === "notes"));
+    assert.ok(
+      medicine!.categories.some((c) => c.id === "notes"),
+      "Notes is Academic subject chrome"
+    );
+    assert.ok(
+      medicine!.categories.some((c) => c.id === "syllabus"),
+      "Syllabus is Academic subject chrome"
+    );
+    const notes = medicine!.categories.find((c) => c.id === "notes");
+    assert.equal(notes?.folders.length, 1);
+    assert.equal(notes?.folders[0]?.name, "Day 1");
     assert.ok(
       medicine!.categories.some((c) => c.id === "ospe_material"),
       "legacy ospe remaps to ospe_material"

@@ -13,6 +13,7 @@ import { StudentPage } from "@/components/student/student-page";
 import { EmptyState } from "@/components/student/empty-state";
 import { AcademicBreadcrumbs } from "@/components/academic/academic-breadcrumbs";
 import type { BreadcrumbCrumb } from "@/lib/academic-tree";
+import { folderHref } from "@/lib/academic-tree";
 
 type FolderRow = {
   id: string;
@@ -30,12 +31,15 @@ export async function McqBankFoldersPage({
   title,
   description,
   backHref,
+  blockSlug,
 }: {
   subjectId: string;
   breadcrumbs?: BreadcrumbCrumb[];
   title?: string;
   description?: string;
   backHref?: string;
+  /** Product key for folder detail URLs. */
+  blockSlug: string;
 }) {
   const { supabase } = await requireStudent();
 
@@ -55,8 +59,7 @@ export async function McqBankFoldersPage({
 
   const pageTitle = title ?? "MCQ Bank";
   const pageDescription =
-    description ??
-    "Practice folders for this Block. Open a folder to start a practice session.";
+    description ?? "Open a folder for study PDFs and practice MCQs.";
 
   return (
     <StudentPage>
@@ -119,16 +122,13 @@ export async function McqBankFoldersPage({
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {folders.map((f) => (
-            <Link
-              key={f.id}
-              href={`/practice/session?scope=mcq_bank_folder&id=${encodeURIComponent(f.id)}&name=${encodeURIComponent(f.name)}`}
-            >
+            <Link key={f.id} href={folderHref(blockSlug, "mcq-bank", f.id)}>
               <Card className="h-full shadow-none transition-colors hover:bg-accent/40">
                 <CardHeader>
                   <CardTitle className="text-lg text-[var(--student-ink)]">
                     {f.name}
                   </CardTitle>
-                  <CardDescription>Start practice</CardDescription>
+                  <CardDescription>Open folder</CardDescription>
                 </CardHeader>
               </Card>
             </Link>

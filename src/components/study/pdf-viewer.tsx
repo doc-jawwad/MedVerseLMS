@@ -6,6 +6,8 @@ import {
   useRef,
   useState,
   type FormEvent,
+  type PointerEvent as ReactPointerEvent,
+  type TouchEvent as ReactTouchEvent,
 } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -26,11 +28,25 @@ import {
   type OfflinePdfMeta,
 } from "@/lib/study/offline-pdf-store";
 import { requestCacheOfflineReader } from "@/lib/pwa/offline-shell";
+import {
+  clientRectsToPdfRects,
+  createPdfHighlight,
+  deletePdfHighlight,
+  listPdfHighlights,
+  pdfRectsToViewportBoxes,
+  type PdfHighlightRow,
+} from "@/lib/study/pdf-highlights";
+import "@/styles/pdf-text-layer.css";
+
 type PdfjsLib = typeof import("pdfjs-dist");
 type PdfDocument = import("pdfjs-dist").PDFDocumentProxy;
 type PdfPage = import("pdfjs-dist").PDFPageProxy;
+type PdfViewport = ReturnType<PdfPage["getViewport"]>;
 
 const ENTITLEMENT_TTL_MS = 24 * 60 * 60 * 1000;
+const MIN_SCALE = 0.5;
+const MAX_SCALE = 4;
+const SCALE_STEP = 0.15;
 
 type OfflineUi =
   | "checking"
@@ -83,9 +99,14 @@ export function PdfViewer({
   preferOfflineDefault?: boolean;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const textLayerRef = useRef<HTMLDivElement>(null);
+  const highlightLayerRef = useRef<HTMLDivElement>(null);
+  const pageStageRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const pdfRef = useRef<PdfDocument | null>(null);
   const pdfjsRef = useRef<PdfjsLib | null>(null);
+  const viewportRef = useRef<PdfViewport | null>(null);
+  const textLayerTaskRef = useRef<{ cancel: () => void } | null>(null);
   const renderTaskRef = useRef<{ cancel: () => void } | null>(null);
   const offlineAbortRef = useRef<AbortController | null>(null);
   const onlineLoadAbortRef = useRef<AbortController | null>(null);
@@ -93,6 +114,10 @@ export function PdfViewer({
   const loadingTaskRef = useRef<{ destroy: () => Promise<unknown> } | null>(
     null
   );
+  const pinchRef = useRef<{
+    startDistance: number;
+    startScale: number;
+  } | null>(null);
 
   const [page, setPage] = useState(1);
   const [pageCount, setPageCount] = useState(0);
@@ -110,6 +135,14 @@ export function PdfViewer({
   const [pendingSaveSize, setPendingSaveSize] = useState<number | null>(null);
   const [offlineUsageLabel, setOfflineUsageLabel] = useState("");
   const [usingOffline, setUsingOffline] = useState(false);
+  const [highlights, setHighlights] = useState<PdfHighlightRow[]>([]);
+  const highlightsRef = useRef<PdfHighlightRow[]>([]);
+  highlightsRef.current = highlights;
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [pendingHighlight, setPendingHighlight] = useState<{
+    rects: ReturnType<typeof clientRectsToPdfRects>;
+    text: string;
+  } | null>(null);
 
   const sourceUrl = `/api/study-content/${materialId}`;
 
@@ -136,25 +169,95 @@ export function PdfViewer({
     }
   }, []);
 
+  const paintHighlights = useCallback(
+    (viewport: PdfViewport, pageNum: number, rows: PdfHighlightRow[]) => {
+      const layer = highlightLayerRef.current;
+      if (!layer) return;
+      layer.replaceChildren();
+      const pageRows = rows.filter((h) => h.page_number === pageNum);
+      for (const row of pageRows) {
+        const boxes = pdfRectsToViewportBoxes(viewport, row.rects);
+        for (const box of boxes) {
+          const mark = document.createElement("button");
+          mark.type = "button";
+          mark.className = "pdf-highlight-mark";
+          mark.style.left = `${box.left}px`;
+          mark.style.top = `${box.top}px`;
+          mark.style.width = `${box.width}px`;
+          mark.style.height = `${box.height}px`;
+          mark.style.background = row.color || "#fde047";
+          mark.title = "Remove highlight";
+          mark.setAttribute("data-testid", "pdf-highlight-mark");
+          mark.setAttribute("data-highlight-id", row.id);
+          mark.addEventListener("click", (ev) => {
+            ev.preventDefault();
+            ev.stopPropagation();
+            void (async () => {
+              try {
+                await deletePdfHighlight(row.id);
+                setHighlights((prev) => prev.filter((h) => h.id !== row.id));
+                toast.message("Highlight removed");
+              } catch {
+                toast.error("Could not remove highlight.");
+              }
+            })();
+          });
+          layer.appendChild(mark);
+        }
+      }
+    },
+    []
+  );
+
   const renderPage = useCallback(
     async (doc: PdfDocument, pageNum: number, zoom: number) => {
       const canvas = canvasRef.current;
-      if (!canvas) return;
+      const textLayerEl = textLayerRef.current;
+      const stage = pageStageRef.current;
+      const pdfjs = pdfjsRef.current;
+      if (!canvas || !textLayerEl || !stage || !pdfjs) return;
+
       renderTaskRef.current?.cancel();
+      textLayerTaskRef.current?.cancel();
+      textLayerEl.replaceChildren();
+      setPendingHighlight(null);
+
       const pdfPage: PdfPage = await doc.getPage(pageNum);
       const viewport = pdfPage.getViewport({ scale: zoom });
+      viewportRef.current = viewport;
+
+      const outputScale = Math.min(window.devicePixelRatio || 1, 2);
+      canvas.width = Math.floor(viewport.width * outputScale);
+      canvas.height = Math.floor(viewport.height * outputScale);
+      canvas.style.width = `${Math.floor(viewport.width)}px`;
+      canvas.style.height = `${Math.floor(viewport.height)}px`;
+      stage.style.width = `${Math.floor(viewport.width)}px`;
+      stage.style.height = `${Math.floor(viewport.height)}px`;
+
       const ctx = canvas.getContext("2d");
       if (!ctx) return;
-      canvas.width = Math.floor(viewport.width);
-      canvas.height = Math.floor(viewport.height);
+      ctx.setTransform(outputScale, 0, 0, outputScale, 0, 0);
+
       const task = pdfPage.render({
         canvasContext: ctx,
         viewport,
       });
       renderTaskRef.current = task;
       await task.promise;
+
+      textLayerEl.style.width = `${Math.floor(viewport.width)}px`;
+      textLayerEl.style.height = `${Math.floor(viewport.height)}px`;
+      const textLayer = new pdfjs.TextLayer({
+        textContentSource: pdfPage.streamTextContent(),
+        container: textLayerEl,
+        viewport,
+      });
+      textLayerTaskRef.current = textLayer;
+      await textLayer.render();
+
+      paintHighlights(viewport, pageNum, highlightsRef.current);
     },
-    []
+    [paintHighlights]
   );
 
   const loadDocument = useCallback(
@@ -358,6 +461,8 @@ export function PdfViewer({
       renderTaskRef.current?.cancel();
       loadingTaskRef.current?.destroy().catch(() => undefined);
       loadingTaskRef.current = null;
+      textLayerTaskRef.current?.cancel();
+      textLayerTaskRef.current = null;
       pdfRef.current?.destroy().catch(() => undefined);
       pdfRef.current = null;
       // Do NOT abort Save-for-Offline here — document reloads must not
@@ -373,6 +478,40 @@ export function PdfViewer({
       offlineAbortRef.current?.abort();
     };
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const rows = await listPdfHighlights(materialId);
+        if (!cancelled) {
+          setHighlights(rows);
+          highlightsRef.current = rows;
+        }
+      } catch {
+        /* table may be missing before mig; reader still works */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [materialId]);
+
+  useEffect(() => {
+    const onFs = () => {
+      const node = containerRef.current;
+      setIsFullscreen(Boolean(node && document.fullscreenElement === node));
+    };
+    document.addEventListener("fullscreenchange", onFs);
+    return () => document.removeEventListener("fullscreenchange", onFs);
+  }, []);
+
+  // Re-paint overlays when highlights change without full page re-render.
+  useEffect(() => {
+    const vp = viewportRef.current;
+    if (!vp || loading) return;
+    paintHighlights(vp, page, highlights);
+  }, [highlights, page, loading, paintHighlights]);
 
   useEffect(() => {
     const doc = pdfRef.current;
@@ -394,10 +533,12 @@ export function PdfViewer({
         goPage(page - 1);
       } else if (e.key === "+" || e.key === "=") {
         e.preventDefault();
-        setScale((s) => Math.min(3, Number((s + 0.15).toFixed(2))));
+        setScale((s) => Math.min(MAX_SCALE, Number((s + SCALE_STEP).toFixed(2))));
       } else if (e.key === "-") {
         e.preventDefault();
-        setScale((s) => Math.max(0.5, Number((s - 0.15).toFixed(2))));
+        setScale((s) => Math.max(MIN_SCALE, Number((s - SCALE_STEP).toFixed(2))));
+      } else if (e.key === "Escape" && document.fullscreenElement) {
+        void document.exitFullscreen?.();
       }
     };
     window.addEventListener("keydown", onKey);
@@ -456,7 +597,116 @@ export function PdfViewer({
   const fullscreen = () => {
     const node = containerRef.current;
     if (!node) return;
-    void node.requestFullscreen?.();
+    if (document.fullscreenElement === node) {
+      void document.exitFullscreen?.();
+      return;
+    }
+    void node.requestFullscreen?.().catch(() => {
+      toast.message(
+        "Fullscreen is not available in this browser. Rotate the device or use zoom instead."
+      );
+    });
+  };
+
+  const exitFullscreen = () => {
+    if (document.fullscreenElement) {
+      void document.exitFullscreen?.();
+    }
+  };
+
+  const touchDistance = (touches: ArrayLike<{ clientX: number; clientY: number }>) => {
+    if (touches.length < 2) return 0;
+    const a = touches[0];
+    const b = touches[1];
+    const dx = a.clientX - b.clientX;
+    const dy = a.clientY - b.clientY;
+    return Math.hypot(dx, dy);
+  };
+
+  const onPinchStart = (e: ReactTouchEvent<HTMLDivElement>) => {
+    if (e.touches.length !== 2) {
+      pinchRef.current = null;
+      return;
+    }
+    // Two-finger pinch: prevent page scroll while zooming.
+    e.preventDefault();
+    pinchRef.current = {
+      startDistance: touchDistance(e.touches),
+      startScale: scale,
+    };
+  };
+
+  const onPinchMove = (e: ReactTouchEvent<HTMLDivElement>) => {
+    if (!pinchRef.current || e.touches.length !== 2) return;
+    e.preventDefault();
+    const dist = touchDistance(e.touches);
+    if (pinchRef.current.startDistance < 8) return;
+    const next = pinchRef.current.startScale * (dist / pinchRef.current.startDistance);
+    const clamped = Math.min(MAX_SCALE, Math.max(MIN_SCALE, Number(next.toFixed(2))));
+    setScale(clamped);
+  };
+
+  const onPinchEnd = () => {
+    pinchRef.current = null;
+  };
+
+  const captureSelectionForHighlight = () => {
+    const viewport = viewportRef.current;
+    const stage = pageStageRef.current;
+    const textLayer = textLayerRef.current;
+    if (!viewport || !stage || !textLayer) {
+      setPendingHighlight(null);
+      return;
+    }
+    const sel = window.getSelection();
+    if (!sel || sel.isCollapsed || sel.rangeCount === 0) {
+      setPendingHighlight(null);
+      return;
+    }
+    const range = sel.getRangeAt(0);
+    if (
+      !textLayer.contains(range.commonAncestorContainer) &&
+      range.commonAncestorContainer !== textLayer
+    ) {
+      setPendingHighlight(null);
+      return;
+    }
+    const text = sel.toString().replace(/\s+/g, " ").trim();
+    if (!text) {
+      setPendingHighlight(null);
+      return;
+    }
+    const clientRects = range.getClientRects();
+    const rects = clientRectsToPdfRects(viewport, stage, clientRects);
+    if (rects.length === 0) {
+      setPendingHighlight(null);
+      return;
+    }
+    setPendingHighlight({ rects, text });
+  };
+
+  const savePendingHighlight = async () => {
+    if (!pendingHighlight) return;
+    try {
+      const row = await createPdfHighlight({
+        materialId,
+        pageNumber: page,
+        rects: pendingHighlight.rects,
+        selectedText: pendingHighlight.text,
+      });
+      setHighlights((prev) => [...prev, row]);
+      setPendingHighlight(null);
+      window.getSelection()?.removeAllRanges();
+      toast.success("Highlight saved");
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Could not save highlight.";
+      toast.error(msg === "Empty highlight" ? "Select text first." : "Could not save highlight.");
+    }
+  };
+
+  const onTextPointerUp = (_e: ReactPointerEvent<HTMLDivElement>) => {
+    // Defer so the selection is finalized after the pointerup.
+    window.setTimeout(() => captureSelectionForHighlight(), 0);
   };
 
   const runOfflineSave = async () => {
@@ -636,9 +886,30 @@ export function PdfViewer({
   return (
     <div
       ref={containerRef}
-      className="grid gap-2 rounded-xl border bg-card p-2 sm:gap-3 sm:p-3"
+      className={
+        isFullscreen
+          ? "fixed inset-0 z-50 flex flex-col bg-neutral-950"
+          : "grid gap-2 rounded-xl border bg-card p-2 sm:gap-3 sm:p-3"
+      }
       data-testid="pdf-viewer"
+      data-fullscreen={isFullscreen ? "true" : "false"}
     >
+      {isFullscreen ? (
+        <Button
+          type="button"
+          size="icon"
+          variant="secondary"
+          className="pdf-viewer-fs-close h-9 w-9 rounded-full shadow"
+          onClick={exitFullscreen}
+          aria-label="Exit fullscreen"
+          data-testid="pdf-fullscreen-close"
+        >
+          ×
+        </Button>
+      ) : null}
+
+      {!isFullscreen ? (
+        <>
       <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
         <div className="grid gap-0.5">
           <span data-testid="pdf-offline-status">{offlineLabel}</span>
@@ -720,7 +991,13 @@ export function PdfViewer({
               </Button>
             </>
           )}
-          <Button type="button" size="sm" variant="outline" onClick={fullscreen}>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={fullscreen}
+            data-testid="pdf-fullscreen"
+          >
             Fullscreen
           </Button>
         </div>
@@ -765,7 +1042,11 @@ export function PdfViewer({
           type="button"
           size="sm"
           variant="outline"
-          onClick={() => setScale((s) => Math.max(0.5, Number((s - 0.15).toFixed(2))))}
+          onClick={() =>
+            setScale((s) =>
+              Math.max(MIN_SCALE, Number((s - SCALE_STEP).toFixed(2)))
+            )
+          }
         >
           Zoom −
         </Button>
@@ -773,7 +1054,11 @@ export function PdfViewer({
           type="button"
           size="sm"
           variant="outline"
-          onClick={() => setScale((s) => Math.min(3, Number((s + 0.15).toFixed(2))))}
+          onClick={() =>
+            setScale((s) =>
+              Math.min(MAX_SCALE, Number((s + SCALE_STEP).toFixed(2)))
+            )
+          }
         >
           Zoom +
         </Button>
@@ -823,22 +1108,82 @@ export function PdfViewer({
         </div>
       )}
 
-      <div className="relative overflow-auto rounded border bg-neutral-100">
-        <canvas ref={canvasRef} className="mx-auto block max-w-full" />
-        {watermarkLine ? (
-          <div
-            className="pointer-events-none absolute inset-x-0 bottom-3 text-center text-[11px] font-medium tracking-wide text-black/25 select-none"
-            aria-hidden
+      {pendingHighlight ? (
+        <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-muted/40 px-2 py-1.5">
+          <span className="max-w-[min(100%,28rem)] truncate text-xs text-muted-foreground">
+            Highlight: “{pendingHighlight.text.slice(0, 80)}
+            {pendingHighlight.text.length > 80 ? "…" : ""}”
+          </span>
+          <Button
+            type="button"
+            size="sm"
+            onClick={() => void savePendingHighlight()}
+            data-testid="pdf-highlight-save"
           >
-            {watermarkLine}
-          </div>
-        ) : null}
+            Save highlight
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            onClick={() => {
+              setPendingHighlight(null);
+              window.getSelection()?.removeAllRanges();
+            }}
+          >
+            Cancel
+          </Button>
+        </div>
+      ) : null}
+        </>
+      ) : null}
+
+      <div
+        className={
+          isFullscreen
+            ? "pdf-viewer-scroll relative min-h-0 flex-1 overflow-auto bg-neutral-900"
+            : "pdf-viewer-scroll relative overflow-auto rounded border bg-neutral-100"
+        }
+        onTouchStart={onPinchStart}
+        onTouchMove={onPinchMove}
+        onTouchEnd={onPinchEnd}
+        onTouchCancel={onPinchEnd}
+      >
+        <div
+          ref={pageStageRef}
+          className="pdf-page-stage"
+          data-testid="pdf-page-stage"
+        >
+          <canvas ref={canvasRef} className="block" />
+          <div
+            ref={textLayerRef}
+            className="textLayer"
+            data-testid="pdf-text-layer"
+            onPointerUp={onTextPointerUp}
+          />
+          <div
+            ref={highlightLayerRef}
+            className="pdf-highlight-layer"
+            data-testid="pdf-highlight-layer"
+          />
+          {watermarkLine ? (
+            <div
+              className="pointer-events-none absolute inset-x-0 bottom-3 z-[3] text-center text-[11px] font-medium tracking-wide text-black/25 select-none"
+              aria-hidden
+            >
+              {watermarkLine}
+            </div>
+          ) : null}
+        </div>
       </div>
 
-      <p className="text-[11px] text-muted-foreground">
-        In-app reader only — no public file link. Offline copies stay inside
-        MedVerse and expire when access ends. Arrow keys change pages.
-      </p>
+      {!isFullscreen ? (
+        <p className="text-[11px] text-muted-foreground">
+          In-app reader only — no public file link. Select text to highlight
+          (saved to your account). Pinch to zoom on touch devices. Offline
+          copies stay inside MedVerse and expire when access ends.
+        </p>
+      ) : null}
     </div>
   );
 }

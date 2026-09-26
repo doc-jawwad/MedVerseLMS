@@ -191,7 +191,7 @@ export function BlockHomeView({
       <AcademicBreadcrumbs crumbs={crumbs} />
       <PageHeader
         title={subject.name}
-        description="Study categories for this Block. OSPE Material, Lectures, and Practice sit under OSPE. Prof. Session lives separately in the sidebar."
+        description="Study categories for this Block or Final Year subject. Notes and Syllabus use the secure PDF reader. OSPE Material, Lectures, and Practice sit under OSPE. Prof. Session lives separately in the sidebar."
       />
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {flatCategories.map((category) => (

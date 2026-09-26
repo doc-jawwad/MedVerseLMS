@@ -1,6 +1,6 @@
 -- Academic MCQ Bank folders: isolation, ownership, remove, usages, practice batch.
 begin;
-select plan(21);
+select plan(24);
 
 select test_helpers.as_runner();
 select * into temp curriculum from test_helpers.make_curriculum();
@@ -365,6 +365,77 @@ select throws_ok(
   'P0001',
   'folder_not_empty',
   'soft-delete folder refuses when questions still assigned'
+);
+
+-- N: each live folder has a linked mcq_bank material folder for PDFs
+select test_helpers.as_runner();
+select ok(
+  exists (
+    select 1
+    from public.mcq_bank_folders f
+    join public.material_folders mf on mf.id = f.material_folder_id
+    where f.id = (select id from t_f1)
+      and mf.library_type = 'mcq_bank'
+      and mf.subject_id = f.academic_product_subject_id
+      and mf.deleted_at is null
+  ),
+  'N: Block 1 folder linked to mcq_bank material_folder for PDFs'
+);
+
+-- O: folder-scoped CSV import places question in folder
+select test_helpers.as_user((select id from t_admin));
+with ins as (
+  insert into public.import_batches (filename, total_rows, created_by)
+  values ('mcq-folder-import.csv', 1, (select id from t_admin))
+  returning id
+)
+select id into temp t_batch from ins;
+grant select on t_batch to authenticated;
+
+select public.import_question_batch(
+  (select id from t_batch),
+  jsonb_build_array(
+    jsonb_build_object(
+      'row_number', 1,
+      'subject_id', (select id from t_anatomy),
+      'book', 'MCQ Fold Book',
+      'chapter', 'MCQ Fold Ch',
+      'topic', 'MCQ Fold Topic',
+      'stem', 'Folder import stem unique ' || gen_random_uuid()::text,
+      'options', jsonb_build_array(
+        jsonb_build_object('key', 'A', 'text', 'one'),
+        jsonb_build_object('key', 'B', 'text', 'two'),
+        jsonb_build_object('key', 'C', 'text', 'three'),
+        jsonb_build_object('key', 'D', 'text', 'four')
+      ),
+      'correct_key', 'A',
+      'explanation', '',
+      'reference', '',
+      'difficulty', 'medium',
+      'tags', '[]'::jsonb,
+      'status', 'approved'
+    )
+  ),
+  true,
+  (select id from t_f2)
+) as result into temp t_folder_import;
+grant select on t_folder_import to authenticated;
+
+select test_helpers.as_runner();
+select is(
+  (select (result ->> 'inserted')::int from t_folder_import),
+  1,
+  'O: folder import inserts one row'
+);
+
+select is(
+  (
+    select q.mcq_bank_folder_id
+    from public.questions q
+    where q.id = ((select result -> 'question_ids' ->> 0)::uuid)
+  ),
+  (select id from t_f2),
+  'O: imported question belongs to Folder B (t_f2)'
 );
 
 select * from finish();

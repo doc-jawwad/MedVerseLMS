@@ -1,7 +1,6 @@
-import { PearlPointsLibraryPage } from "@/components/library/pearl-points-library-page";
+import { redirect } from "next/navigation";
 
-export const metadata = { title: "Pearl Points — MedVerse LMS" };
-
-export default function PearlPointsPage() {
-  return <PearlPointsLibraryPage mode="full" />;
+/** Legacy Pearl Points hub — canonical student surface is One Liner. */
+export default function LegacyPearlPointsRedirect() {
+  redirect("/one-liner");
 }

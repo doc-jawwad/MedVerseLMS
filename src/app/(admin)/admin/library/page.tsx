@@ -93,7 +93,7 @@ export default async function AdminLibraryPage({
               <Card className="h-full shadow-none transition-colors hover:bg-accent/40">
                 <CardHeader>
                   <CardTitle className="text-lg text-[var(--student-ink)]">
-                    Pearl Points
+                    One Liner
                   </CardTitle>
                   <CardDescription>
                     Recall items for this class. Access policy marks free vs paid.

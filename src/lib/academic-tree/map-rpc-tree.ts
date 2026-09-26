@@ -297,7 +297,7 @@ function emptyChromeCategories(locked: boolean): AcademicTreeCategory[] {
   }));
 }
 
-/** Keep only student Block chrome categories (Notes omitted). */
+/** Keep student Block chrome categories (includes Notes + Syllabus). */
 function ensureChromeCategories(
   categories: AcademicTreeCategory[]
 ): AcademicTreeCategory[] {
@@ -307,8 +307,12 @@ function ensureChromeCategories(
     if (existing) {
       return {
         ...existing,
-        name: existing.name || def.name,
-        placeholder: existing.placeholder ?? def.placeholder,
+        name: def.name,
+        // Chrome defs are authoritative for placeholder; RPC historically
+        // marked Notes as placeholder=true before Academic Notes shipped.
+        placeholder: def.placeholder,
+        folders: existing.folders,
+        locked: existing.locked,
       };
     }
     return {
@@ -430,10 +434,11 @@ function categoryIdFromLibraryType(
       return "notes";
     case "lectures":
       return "lectures";
+    case "syllabus":
+      return "syllabus";
     case "test":
     case "past_papers":
     case "flashcards":
-    case "syllabus":
     case "schedule":
     case "los":
     case "ospe_past":

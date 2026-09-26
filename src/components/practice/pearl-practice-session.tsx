@@ -24,18 +24,19 @@ export type PearlCatalogItem = {
   chapter_id: string | null;
   topic_id: string | null;
   accessible: boolean;
+  has_source_pdf?: boolean;
   subject_name?: string | null;
 };
 
 /**
- * Pearl Points / one-liners — same progress interaction as Practice MCQ.
- * Content from pearl_points + open_pearl; progress via Data Spine store.
+ * Canonical One Liner practice — content from pearl_points + open_pearl.
+ * Progress via Data Spine store (same interaction as Practice MCQ).
  */
 export function PearlPracticeSession({
   items,
   subjects,
   studentId,
-  backHref = "/pearl-points",
+  backHref = "/one-liner",
 }: {
   items: PearlCatalogItem[];
   subjects: { id: string; name: string }[];
@@ -49,6 +50,7 @@ export function PearlPracticeSession({
   const [payload, setPayload] = useState<{
     answer: string;
     explanation: string;
+    has_source_pdf: boolean;
   } | null>(null);
   const [pending, startTransition] = useTransition();
   const sessionIdRef = useRef<string | null>(null);
@@ -114,6 +116,7 @@ export function PearlPracticeSession({
       setPayload({
         answer: String(pearl?.answer ?? ""),
         explanation: String(pearl?.explanation ?? ""),
+        has_source_pdf: Boolean(pearl?.has_source_pdf),
       });
       setRevealed(true);
       await deck.markDoneAndRecord(null);
@@ -142,10 +145,10 @@ export function PearlPracticeSession({
   if (deck.ended && deck.report) {
     return (
       <PracticeSessionReportCard
-        title="Pearl Points"
+        title="One Liner"
         report={deck.report}
         backHref={backHref}
-        backLabel="Back to Pearl Points"
+        backLabel="Back to One Liner"
         variant="pearl"
       />
     );
@@ -153,7 +156,7 @@ export function PearlPracticeSession({
 
   if (!deck.hydrated) {
     return (
-      <p className="text-sm text-muted-foreground">Loading pearl deck…</p>
+      <p className="text-sm text-muted-foreground">Loading One Liner deck…</p>
     );
   }
 
@@ -187,8 +190,8 @@ export function PearlPracticeSession({
       </div>
 
       <PracticeSessionChrome
-        eyebrow="Pearl Points"
-        title="One-liners"
+        eyebrow="One Liner"
+        title="Recall"
         positionLabel={positionLabel}
         elapsedMs={deck.timeTakenMs}
         completionPercent={deck.completion}
@@ -260,6 +263,17 @@ export function PearlPracticeSession({
                   <p className="mt-2 text-sm text-muted-foreground">
                     {payload.explanation}
                   </p>
+                ) : null}
+                {payload.has_source_pdf ? (
+                  <a
+                    href={`/api/pearls/${currentMeta.id}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-3 inline-flex text-sm font-medium text-[var(--brand-teal-ink)] underline-offset-4 hover:underline"
+                    data-testid="pearl-source-pdf-link"
+                  >
+                    Open source PDF
+                  </a>
                 ) : null}
               </div>
             )}

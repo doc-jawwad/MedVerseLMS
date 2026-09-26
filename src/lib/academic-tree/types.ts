@@ -26,8 +26,9 @@ export type BlockProductKey =
   | "pediatrics";
 
 /**
- * Block category ids. Student chrome omits `notes` (storage/deep-link only).
- * See BLOCK_CATEGORIES / NOTES_CATEGORY in product-structure.
+ * Block category ids shown in student Academic Block / Final Year chrome.
+ * OSPE Material / Lectures also appear under the OSPE chrome group.
+ * See BLOCK_CATEGORIES in product-structure.
  */
 export type BlockCategoryId =
   | "mcq_bank"
@@ -37,7 +38,8 @@ export type BlockCategoryId =
   | "ospe_lectures"
   | "books"
   | "notes"
-  | "lectures";
+  | "lectures"
+  | "syllabus";
 
 /**
  * Prof. Session Block/Subject chrome (content_surface = prof_session).

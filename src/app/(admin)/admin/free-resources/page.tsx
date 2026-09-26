@@ -90,7 +90,7 @@ export default async function AdminFreeResourcesPage({
             <Card className="shadow-none">
               <CardHeader>
                 <CardTitle className="text-base text-[var(--student-ink)]">
-                  Pearl Points
+                  One Liner
                 </CardTitle>
                 <p className="text-sm text-muted-foreground">
                   Set entitlement to Free for the curated subset. Publish so students can open them.

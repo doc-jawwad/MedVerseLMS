@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { EntitlementSelect } from "@/components/admin/entitlement-select";
 
-export const metadata = { title: "Pearl Points — MedVerse Admin" };
+export const metadata = { title: "One Liners — MedVerse Admin" };
 
 export default async function AdminPearlsPage({
   searchParams,
@@ -17,7 +17,7 @@ export default async function AdminPearlsPage({
 }) {
   const gate = await requireAdminAnyPermission(
     ["manage_materials"],
-    "Pearl Points"
+    "One Liners"
   );
   if (gate.denied) return gate.denied;
   const { supabase } = await requireAdmin();
@@ -53,16 +53,22 @@ export default async function AdminPearlsPage({
                 Content
               </p>
               <h1 className="font-heading text-2xl font-semibold text-[var(--student-ink)]">
-                Pearl Points
+                One Liners
               </h1>
               <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-                {yearDisplayName(year)} — high-yield recall points for this class.
-                These are not Question Bank MCQs and are not scored.
+                {yearDisplayName(year)} — high-yield recall for this class.
+                Prompt / answer / optional explanation and PDF. Not Question Bank
+                MCQs and not scored.
               </p>
             </div>
-            <Button asChild>
-              <Link href="/admin/pearls/new">Add Pearl Point</Link>
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button asChild variant="outline">
+                <Link href="/admin/pearls/import">CSV Import</Link>
+              </Button>
+              <Button asChild>
+                <Link href="/admin/pearls/new">Add One Liner</Link>
+              </Button>
+            </div>
           </div>
 
           <form className="flex flex-wrap gap-2" action="/admin/pearls">

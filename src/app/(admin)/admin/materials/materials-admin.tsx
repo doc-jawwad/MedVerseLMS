@@ -7,6 +7,7 @@ import {
   deleteFolder,
   addMaterial,
   deleteMaterial,
+  updateMaterial,
 } from "@/lib/actions/materials";
 import {
   addGuidelineMaterial,
@@ -82,19 +83,25 @@ export function MaterialsAdmin({
   );
   const meta = folderLibraryLabel(libraryType);
   const modes = itemDeliveryModes(libraryType);
+  const requireSubject =
+    libraryType === "notes" || libraryType === "syllabus";
 
   return (
     <div className="grid gap-6">
       <div className="flex flex-wrap items-end gap-2 rounded-xl border bg-card p-4">
         <div className="grid gap-1">
-          <Label className="text-xs">Subject (optional)</Label>
+          <Label className="text-xs">
+            {requireSubject ? "Subject (required)" : "Subject (optional)"}
+          </Label>
           <Select
             value={subjectId || "none"}
             onValueChange={(v) => setSubjectId(v === "none" ? "" : v)}
           >
             <SelectTrigger className="w-48"><SelectValue /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="none">— General —</SelectItem>
+              {!requireSubject ? (
+                <SelectItem value="none">— General —</SelectItem>
+              ) : null}
               {yearSubjects.map((s) => (
                 <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
               ))}
@@ -108,9 +115,18 @@ export function MaterialsAdmin({
           className="w-64"
         />
         <Button
-          disabled={pending || !folderName.trim() || !yearId}
+          disabled={
+            pending ||
+            !folderName.trim() ||
+            !yearId ||
+            (requireSubject && !subjectId)
+          }
           onClick={() =>
             startTransition(async () => {
+              if (requireSubject && !subjectId) {
+                toast.error("Subject is required for Notes and Syllabus.");
+                return;
+              }
               const result = await addFolder(
                 yearId,
                 subjectId || null,
@@ -236,68 +252,147 @@ function FolderCard({
 
 function MaterialRow({ material }: { material: Material }) {
   const [pending, startTransition] = useTransition();
+  const [editing, setEditing] = useState(false);
+  const [replacing, setReplacing] = useState(false);
+  const [title, setTitle] = useState(material.title);
+  const [description, setDescription] = useState(material.description ?? "");
+
   return (
-    <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-3 text-sm">
-      <div className="min-w-0">
-        {material.kind === "drive" ? (
-          <OpenMaterialButton materialId={material.id} className="h-auto p-0 font-medium">
-            {material.title}
-          </OpenMaterialButton>
-        ) : (
-          <MaterialOpenLink
-            materialId={material.id}
-            kind={material.kind}
-            title={material.title}
-          />
-        )}
-        <div className="mt-1 flex flex-wrap gap-1">
-          <Badge variant="secondary" className="uppercase">{material.kind}</Badge>
-          <Badge variant={material.status === "published" ? "default" : "outline"}>
-            {material.status}
-          </Badge>
+    <div className="grid gap-3 rounded-md border p-3 text-sm">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="min-w-0 flex-1">
+          {editing ? (
+            <div className="grid gap-2">
+              <Input value={title} onChange={(e) => setTitle(e.target.value)} />
+              <Textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                className="min-h-14"
+                placeholder="Details (optional)"
+              />
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  size="sm"
+                  disabled={pending || !title.trim()}
+                  onClick={() =>
+                    startTransition(async () => {
+                      const { error } = await updateMaterial(material.id, {
+                        title,
+                        description: description.trim() || null,
+                      });
+                      if (error) toast.error(error);
+                      else {
+                        toast.success("Details updated");
+                        setEditing(false);
+                      }
+                    })
+                  }
+                >
+                  Save
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => {
+                    setTitle(material.title);
+                    setDescription(material.description ?? "");
+                    setEditing(false);
+                  }}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <>
+              {material.kind === "drive" ? (
+                <OpenMaterialButton materialId={material.id} className="h-auto p-0 font-medium">
+                  {material.title}
+                </OpenMaterialButton>
+              ) : (
+                <MaterialOpenLink
+                  materialId={material.id}
+                  kind={material.kind}
+                  title={material.title}
+                />
+              )}
+              <div className="mt-1 flex flex-wrap gap-1">
+                <Badge variant="secondary" className="uppercase">{material.kind}</Badge>
+                <Badge variant={material.status === "published" ? "default" : "outline"}>
+                  {material.status}
+                </Badge>
+              </div>
+              {material.description ? (
+                <p className="text-xs text-muted-foreground">{material.description}</p>
+              ) : null}
+            </>
+          )}
         </div>
-        {material.description && (
-          <p className="text-xs text-muted-foreground">{material.description}</p>
-        )}
-      </div>
-      <div className="flex flex-wrap gap-2">
-        <Button
-          variant="outline"
-          size="sm"
-          disabled={pending}
-          onClick={() =>
-            startTransition(async () => {
-              const next = material.status === "published" ? "draft" : "published";
-              const { error } = await setMaterialStatus(material.id, next);
-              if (error) toast.error(error);
-            })
-          }
-        >
-          {material.status === "published" ? "Unpublish" : "Publish"}
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="text-destructive"
-          disabled={pending}
-          onClick={() =>
-            startTransition(async () => {
-              if (
-                !window.confirm(
-                  `Move “${material.title}” to the Bin? Recoverable for ~7 days. R2 files are kept until permanent purge.`
-                )
-              ) {
-                return;
+        {!editing ? (
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" variant="outline" onClick={() => setEditing(true)}>
+              Edit details
+            </Button>
+            {material.kind === "pdf" ? (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setReplacing((v) => !v)}
+              >
+                {replacing ? "Cancel replace" : "Replace PDF"}
+              </Button>
+            ) : null}
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={pending}
+              onClick={() =>
+                startTransition(async () => {
+                  const next = material.status === "published" ? "draft" : "published";
+                  const { error } = await setMaterialStatus(material.id, next);
+                  if (error) toast.error(error);
+                })
               }
-              const { error } = await deleteMaterial(material.id);
-              if (error) toast.error(error);
-              else toast.success("Moved to Bin");
-            })
-          }
-        >
-          Move to Bin
-        </Button>
+            >
+              {material.status === "published" ? "Unpublish" : "Publish"}
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-destructive"
+              disabled={pending}
+              onClick={() =>
+                startTransition(async () => {
+                  if (
+                    !window.confirm(
+                      `Move “${material.title}” to the Bin? Recoverable for ~7 days. R2 files are kept until permanent purge.`
+                    )
+                  ) {
+                    return;
+                  }
+                  const { error } = await deleteMaterial(material.id);
+                  if (error) toast.error(error);
+                  else toast.success("Moved to Bin");
+                })
+              }
+            >
+              Move to Bin
+            </Button>
+          </div>
+        ) : null}
       </div>
+      {replacing && material.kind === "pdf" ? (
+        <div className="grid gap-2 border-t pt-3">
+          <p className="text-xs text-muted-foreground">
+            Upload the replacement PDF into this folder, then move the old file
+            above to the Bin when the new upload succeeds.
+          </p>
+          <StudyPdfUploader
+            folderId={material.folder_id}
+            onComplete={() => setReplacing(false)}
+          />
+        </div>
+      ) : null}
     </div>
   );
 }

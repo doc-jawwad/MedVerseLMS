@@ -64,12 +64,22 @@ type Phase = "upload" | "preview" | "done";
 export function ImportClient({
   subjects,
   recentBatches,
+  mcqBankFolderId,
+  folderLabel,
+  lockedSubjectId,
+  returnHref,
 }: {
   subjects: { id: string; label: string }[];
   recentBatches: Batch[];
+  /** When set, imported questions are placed in this Academic MCQ Bank folder. */
+  mcqBankFolderId?: string;
+  folderLabel?: string;
+  /** Pre-select / lock departmental subject (CSV taxonomy under this subject). */
+  lockedSubjectId?: string;
+  returnHref?: string;
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
-  const [subjectId, setSubjectId] = useState("");
+  const [subjectId, setSubjectId] = useState(lockedSubjectId ?? "");
   const [status, setStatus] = useState("draft");
   const [createMissing, setCreateMissing] = useState(true);
   const [filename, setFilename] = useState("");
@@ -208,7 +218,12 @@ export function ImportClient({
         toImportPayloadRow(r.raw, r.row_number, subjectId, status)
       );
 
-      const res = await importChunk(batchId, payload, createMissing);
+      const res = await importChunk(
+        batchId,
+        payload,
+        createMissing,
+        mcqBankFolderId
+      );
       if ("error" in res && res.error) throw new Error(res.error);
       if (!("result" in res) || !res.result) throw new Error("Import failed");
 
@@ -248,6 +263,26 @@ export function ImportClient({
 
   return (
     <div className="grid gap-6">
+      {mcqBankFolderId ? (
+        <div className="rounded-xl border bg-card px-4 py-3 text-sm">
+          <p className="font-medium text-[var(--student-ink)]">
+            Importing into MCQ Bank folder
+            {folderLabel ? `: ${folderLabel}` : ""}
+          </p>
+          <p className="mt-1 text-muted-foreground">
+            New questions are placed in this folder automatically. Book /
+            chapter / topic in the CSV remain Question Bank taxonomy metadata.
+          </p>
+          {returnHref ? (
+            <Link
+              href={returnHref}
+              className="mt-2 inline-block text-[var(--brand-teal-ink)] underline-offset-4 hover:underline"
+            >
+              Back to folder
+            </Link>
+          ) : null}
+        </div>
+      ) : null}
       <Card>
         <CardHeader>
           <CardTitle>1. Template &amp; ChatGPT prompt</CardTitle>
@@ -293,7 +328,11 @@ export function ImportClient({
           <div className="grid gap-4 sm:grid-cols-3">
             <div className="grid gap-2">
               <Label>Target subject</Label>
-              <Select value={subjectId || undefined} onValueChange={setSubjectId}>
+              <Select
+                value={subjectId || undefined}
+                onValueChange={setSubjectId}
+                disabled={Boolean(lockedSubjectId)}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Choose subject" />
                 </SelectTrigger>
@@ -305,6 +344,12 @@ export function ImportClient({
                   ))}
                 </SelectContent>
               </Select>
+              {lockedSubjectId ? (
+                <p className="text-xs text-muted-foreground">
+                  Locked for this folder import. Pick a departmental subject that
+                  matches the CSV book/chapter/topic names.
+                </p>
+              ) : null}
             </div>
             <div className="grid gap-2">
               <Label>Import as</Label>

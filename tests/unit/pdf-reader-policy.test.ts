@@ -55,6 +55,8 @@ describe("protected pdf reader policy", () => {
     assert.match(src, /createOpfsPdfRangeTransport/);
     assert.match(src, /requestCacheOfflineReader/);
     assert.match(src, /contentRevision/);
+    assert.match(src, /TextLayer/);
+    assert.match(src, /pdf-text-layer/);
     // Must not use pdfjs url-mode (broken against coerced leading 206).
     assert.doesNotMatch(src, /getDocument\(\{\s*url:\s*sourceUrl/);
   });

@@ -130,17 +130,19 @@ Each Block (and each Final Year clinical subject) shows these student-facing chr
 
 | Category / group | Notes |
 |---|---|
-| MCQ Bank | Practice with instant feedback — admin-managed **folders** under the Block / Final Year subject (`mcq_bank_folders`); folder chooses the question set. Question Bank taxonomy (year → departmental subject → book → chapter → topic) is unchanged and separate from Academic folder placement. |
-| Pearl Points | High-yield recall (not formal exams) |
+| MCQ Bank | Practice with instant feedback — admin-managed **folders** under the Block / Final Year subject (`mcq_bank_folders`); each folder is the container for its PDFs (`material_folders.library_type = mcq_bank`) and MCQs (`questions.mcq_bank_folder_id`). Question Bank taxonomy (year → departmental subject → book → chapter → topic) remains internal metadata for authoring/search — not a competing student navigation. |
+| One Liner | High-yield recall (not formal exams). Store remains `pearl_points`; student chrome label is One Liner. |
 | Guidelines | Study guidelines / protocols |
+| Books | Reference texts |
+| Lectures | Lecture videos / recordings |
+| Notes | Class notes — PDFs via existing `material_folders.library_type = 'notes'` + protected study-content reader (`content_surface = 'academic'`, folder `subject_id` = Block / Final Year subject) |
+| Syllabus | Subject syllabus PDFs — same materials model with `library_type = 'syllabus'` and `content_surface = 'academic'` (distinct from Prof. Session syllabus folders, which use `content_surface = 'prof_session'`) |
 | **OSPE** (group) | Parent chrome only — children below |
 | → OSPE Material | OSPE PDFs and station packs |
 | → OSPE Lectures | OSPE lecture media |
 | → OSPE Practice | Links to the existing global `/practice/ospe` surface (not a Block-scoped content store) |
-| Books | Reference texts |
-| Lectures | Lecture videos / recordings |
 
-**Notes** is **not** shown in student Block chrome. Storage may still use `material_folders.library_type = 'notes'` and admin materials tooling; legacy `/notes` stays unlisted in global nav. Do **not** fold Notes rows into Books.
+**Notes** and **Syllabus** reuse the existing materials lifecycle (folders → `materials.kind = 'pdf'` → `/materials/[id]/read` → `/api/study-content/...`). Do **not** fold Notes into Books. Do **not** create a second PDF store. Legacy `/notes` may remain as a deep link; primary entry is Block / Final Year subject chrome.
 
 **OSPE Practice** is **not** a top-level shell nav item; students reach it from the Block OSPE group (or deep link).
 
@@ -215,7 +217,7 @@ Shell nav and Academic home show **only the student’s current enrolled class**
 
 ### 3. Notes
 
-**Notes** remains a distinct **storage** `library_type` (not folded into Books or Past Papers). Preserve `material_folders.library_type` / category identity for Notes in admin and DB. Student **Academic** Block chrome **omits** Notes (§2b). Student **Prof. Session** Block/Subject chrome **includes** Notes (`content_surface = 'prof_session'`).
+**Notes** remains a distinct **storage** `library_type` (not folded into Books or Past Papers). Preserve `material_folders.library_type` / category identity for Notes in admin and DB. Student **Academic** Block / Final Year subject chrome **includes** Notes (`content_surface = 'academic'`, §2b). Student **Prof. Session** Block/Subject chrome also **includes** Notes (`content_surface = 'prof_session'`). The two surfaces do not share folder rows — filter by `content_surface`.
 
 ### 4. Leaderboards (presentation; ranking source unchanged)
 
@@ -292,7 +294,7 @@ Ranking must be **coalesced** before a 1,500-submit event — hosting does not r
 
 **Payment screenshots (now):** private Cloudflare R2 object keys on `subscription_applications` (`payment-proofs/{tenant_id}/{student_id}/{uuid}`); short-lived signed upload/download; never a public URL. Same R2 platform as backups — not a new infrastructure category. **Production requires `R2_PAYMENT_BUCKET`** (dedicated payment bucket; never falls back to the backup `R2_BUCKET`). Non-production may use `R2_PAYMENT_BUCKET` or, as a convenience, `R2_BUCKET` for a shared private bucket.
 
-**Study materials:** `materials.kind` is `drive` (Google Drive URL), `pdf` (private R2 object), or `guideline` (text body). Existing Drive rows stay `kind = 'drive'`. Student catalog SELECT must not leak `drive_url`, `body_text`, or R2 object keys; open via entitlement-checked RPCs. PDFs use the **same private objects bucket** as payment proofs (`R2_PAYMENT_BUCKET` in production; non-production may share `R2_BUCKET`) with prefix `study-content/`. **Upload:** authenticated admin begins an HMAC-sealed upload session; the browser uploads bytes **direct to R2** via short-lived presigned PUT (small files) or multipart UploadPart URLs (large files). Next.js never buffers the PDF body. After R2 completion the server HEAD + range-reads magic bytes (`%PDF-`), then inserts the `materials` row. **Read:** `GET /api/study-content/[materialId]` re-checks `authorize_study_object`, then **streams** R2 bytes (including HTTP `Range` / `206`) without buffering the whole object in Node. Students use an in-app **PDF.js** reader (range/chunk loading, no native Download toolbar). Temporary R2 URLs and credentials never reach the browser. **Offline:** explicit “Save for Offline” stores the file in origin-private OPFS + IndexedDB metadata with entitlement expiry — not the user Downloads folder; not absolute DRM. Cover/thumbnail keys follow the same prefix (covers still go through a small Server Action body ≤2MB). **No artificial PDF size cap** — ceiling is R2 platform limits. **No new Cloudflare bucket** for this phase. Incomplete multipart uploads should be aborted on cancel; configure R2 AbortIncompleteMultipartUpload lifecycle as a safety net.
+**Study materials:** `materials.kind` is `drive` (Google Drive URL), `pdf` (private R2 object), or `guideline` (text body). Existing Drive rows stay `kind = 'drive'`. Student catalog SELECT must not leak `drive_url`, `body_text`, or R2 object keys; open via entitlement-checked RPCs. PDFs use the **same private objects bucket** as payment proofs (`R2_PAYMENT_BUCKET` in production; non-production may share `R2_BUCKET`) with prefix `study-content/`. **Upload:** authenticated admin begins an HMAC-sealed upload session; the browser uploads bytes **direct to R2** via short-lived presigned PUT (small files) or multipart UploadPart URLs (large files). Next.js never buffers the PDF body. After R2 completion the server HEAD + range-reads magic bytes (`%PDF-`), then inserts the `materials` row. **Read:** `GET /api/study-content/[materialId]` re-checks `authorize_study_object`, then **streams** R2 bytes (including HTTP `Range` / `206`) without buffering the whole object in Node. Students use an in-app **PDF.js** reader (range/chunk loading, text layer for selection, private `pdf_highlights` persistence, pinch zoom, true fullscreen chrome hide via Fullscreen API — browser/system chrome cannot be removed). Temporary R2 URLs and credentials never reach the browser. **Offline:** explicit “Save for Offline” stores the file in origin-private OPFS + IndexedDB metadata with entitlement expiry — not the user Downloads folder; not absolute DRM. Cover/thumbnail keys follow the same prefix (covers still go through a small Server Action body ≤2MB). **No artificial PDF size cap** — ceiling is R2 platform limits. **No new Cloudflare bucket** for this phase. Incomplete multipart uploads should be aborted on cancel; configure R2 AbortIncompleteMultipartUpload lifecycle as a safety net.
 
 **Pearl points:** lightweight recall items in `pearl_points` (not `question_versions`). Same entitlement columns as tests/folders. Answers are RPC-only.
 

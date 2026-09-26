@@ -2,7 +2,7 @@ import { requireAdmin } from "@/lib/auth/require-user";
 import { requireAdminClass } from "@/lib/admin/require-admin-class";
 import { PearlEditor } from "../pearl-editor";
 
-export const metadata = { title: "New Pearl Point — MedVerse Admin" };
+export const metadata = { title: "New One Liner — MedVerse Admin" };
 
 export default async function NewPearlPage({
   searchParams,
@@ -38,7 +38,7 @@ export default async function NewPearlPage({
       return (
         <div className="grid gap-4">
           <h1 className="font-heading text-2xl font-semibold text-[var(--student-ink)]">
-            Add Pearl Point
+            Add One Liner
           </h1>
           <PearlEditor
             years={years ?? []}

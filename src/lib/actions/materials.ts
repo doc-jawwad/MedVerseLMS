@@ -41,6 +41,14 @@ export async function addFolder(
   } else if (!yearId) {
     return { error: "Class year is required for this folder type." };
   }
+  if (
+    (libraryType === "notes" || libraryType === "syllabus") &&
+    !subjectId
+  ) {
+    return {
+      error: "Subject is required for Notes and Syllabus folders.",
+    };
+  }
   const supabase = await createClient();
   // protect_resource_entitlement allows INSERT only as free; paid/plan must
   // go through set_resource_entitlement after the row exists.
@@ -51,6 +59,9 @@ export async function addFolder(
       subject_id: subjectId,
       name: name.trim(),
       library_type: libraryType,
+      // Materials admin is the academic library surface. Prof. Session folders
+      // are created via prof-session actions with content_surface='prof_session'.
+      content_surface: "academic",
       entitlement: "free",
       parent_id: opts?.parentId || null,
       description: opts?.description?.trim() || null,
