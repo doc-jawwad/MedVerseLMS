@@ -140,6 +140,9 @@ begin
     return v_row.material_folder_id;
   end if;
 
+  -- Insert as free only: protect_resource_entitlement blocks non-free INSERT
+  -- outside set_resource_entitlement(). Student PDF open for mcq_bank is gated
+  -- by has_practice_access(subject_id) in can_access_material_folder, not folder entitlement.
   insert into public.material_folders (
     year_id,
     subject_id,
@@ -156,7 +159,7 @@ begin
     v_row.sort_order,
     'mcq_bank',
     'academic',
-    'any_subscription'
+    'free'
   )
   returning id into v_mf;
 
