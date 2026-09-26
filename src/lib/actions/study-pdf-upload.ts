@@ -96,7 +96,8 @@ export async function beginStudyPdfUpload(input: {
   const { supabase, user } = gate;
 
   const { data: key, error: allocError } = await supabase.rpc(
-    "allocate_study_object_key"
+    "allocate_study_object_key",
+    { p_folder_id: input.folderId }
   );
   if (allocError) return actionRpcResult("beginStudyPdfUpload.alloc", allocError);
   if (typeof key !== "string" || !key) return { error: "study_object_denied" };
@@ -320,7 +321,8 @@ export async function completeStudyPdfUpload(input: {
         return { error: coverErr };
       }
       const { data: cKey, error: cAlloc } = await supabase.rpc(
-        "allocate_study_object_key"
+        "allocate_study_object_key",
+        { p_folder_id: session.folderId }
       );
       if (cAlloc || typeof cKey !== "string") {
         await cleanupFailedUpload(supabase, session);

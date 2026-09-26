@@ -51,11 +51,13 @@ export default async function AdminMcqBankProductPage({
           name: string;
           sort_order: number;
           question_count: number | string;
+          pdf_count?: number | string;
         }) => ({
           folder_id: row.folder_id,
           name: row.name,
           sort_order: Number(row.sort_order ?? 0),
           question_count: Number(row.question_count ?? 0),
+          pdf_count: Number(row.pdf_count ?? 0),
         })
       );
 

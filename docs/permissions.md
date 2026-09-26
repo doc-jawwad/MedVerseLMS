@@ -111,10 +111,10 @@ Permission codes (seeded catalog; RPCs check these names):
 - `manage_payment_settings`
 - `grant_resource_access` — grants and resource-level restrictions
 - `manage_year_changes` — approve/reject class-change requests; `promote_student`
-- `edit_questions`
+- `edit_questions` — Question Bank mutations; Academic MCQ Bank folders/questions; also may insert/update materials in `library_type = mcq_bank` shadow folders and allocate/discard study-content keys for those folders via `allocate_study_object_key(folder_id)` / `can_admin_manage_mcq_bank_material_folder` (does **not** grant general `manage_materials`)
 - `import_questions` — Question Bank CSV; also satisfied for day-practice CSV attach when the caller has `edit_questions` or `manage_materials` (`can_admin_import_questions()` / `import_question_batch`). Duplicate stems are skipped (not overwritten) but their existing `question_id`s are returned so Prof. Session day attach still works.
 - `publish_tests`
-- `manage_materials` — materials, pearls, one-liners, OSPE, Prof. Session (including day CSV import via the shared question import path above)
+- `manage_materials` — materials, pearls, one-liners, OSPE, Prof. Session (including day CSV import via the shared question import path above); `allocate_study_object_key()` with null folder remains this permission only
 - `manage_curriculum` — INSERT/UPDATE on years/subjects/books/chapters/topics; empty-node DELETE via `admin_delete_curriculum_node` (refuses non-empty parents, nodes with questions incl. Bin, product subjects, and subjects with linked content). Admin SELECT of the tree remains `is_admin()` so question/test builders can resolve parents
 - `view_analytics`
 
@@ -368,8 +368,8 @@ Admin **SELECT** on **sensitive student/ops tables** uses `has_permission(code)`
 | test_attempts | SELECT own; **no INSERT/UPDATE/DELETE** (RPC only) | SELECT if `view_students` or `view_analytics` or `publish_tests`; invalidate RPC |
 | attempt_answers | **none** (RPC only — `save_answer` / scoring / `get_attempt_review`). Direct student SELECT is forbidden so post-expiry review cannot be bypassed | SELECT if `view_students` or `view_analytics` |
 | practice_seen / practice_answers | via RPC; SELECT own | SELECT if `view_students` or `view_analytics` |
-| material_folders | SELECT catalog for assigned year / grants; **`career_counseling_series`** is universal (`year_id` null) — any `account_allows_lms` student may SELECT (folder entitlement still gates content via `can_access_material_folder`) | SELECT/writes if `has_permission('manage_materials')`; CCS not assigned-class scoped |
-| materials | SELECT published metadata **without** `drive_url` / `body_text` / R2 keys; Drive via `open_material`; guidelines via `open_study_item`; PDF bytes via signed Next.js path after `authorize_study_object` | SELECT metadata if `manage_materials` (secrets via `get_material_for_admin` / `open_material` / `authorize_study_object`); writes if `has_permission('manage_materials')` |
+| material_folders | SELECT catalog for assigned year / grants; **`career_counseling_series`** is universal (`year_id` null) — any `account_allows_lms` student may SELECT (folder entitlement still gates content via `can_access_material_folder`) | SELECT/writes if `has_permission('manage_materials')`; `edit_questions` may SELECT/UPDATE live `mcq_bank` shadow folders in assigned class; CCS not assigned-class scoped |
+| materials | SELECT published metadata **without** `drive_url` / `body_text` / R2 keys; Drive via `open_material`; guidelines via `open_study_item`; PDF bytes via signed Next.js path after `authorize_study_object` | SELECT metadata if `manage_materials` or `can_admin_manage_mcq_bank_material_folder(folder_id)`; writes if `manage_materials`, or `edit_questions` on `mcq_bank` folders; secrets via `get_material_for_admin` / `open_material` / `authorize_study_object` |
 | pearl_points | SELECT published metadata **without** `answer` / `explanation`; reveal via `open_pearl` | SELECT/writes if `has_permission('manage_materials')`; answers via `get_pearl_for_admin` or `open_pearl` |
 | ospe_stations | SELECT published metadata **without** `answer` / R2 columns / `created_by`; image via `authorize_ospe_station_object` then private Next.js stream; reveal via `open_ospe_station` | SELECT/writes if `manage_materials` **and** `admin_can_access_year(year_id)`; secrets via `get_ospe_station_for_admin` / `authorize_ospe_station_object` / `open_ospe_station` |
 | rank_dirty_queue | none | none (SECURITY DEFINER RPCs only) |

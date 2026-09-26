@@ -16,12 +16,18 @@ import {
   ConfirmDangerDialog,
   purgeDateHint,
 } from "@/components/admin/confirm-danger-dialog";
+import {
+  isMcqBankFolderEmptyForDelete,
+  mcqBankFolderContentSummary,
+  mcqBankFolderDeleteBlockedReason,
+} from "@/lib/admin/mcq-bank-folder-ui";
 
 export type McqBankFolderRow = {
   folder_id: string;
   name: string;
   sort_order: number;
   question_count: number;
+  pdf_count: number;
 };
 
 export function McqBankFoldersAdmin({
@@ -65,8 +71,9 @@ export function McqBankFoldersAdmin({
           Manage folders
         </h1>
         <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-          Folders hold Academic MCQ Bank questions for this product subject.
-          Empty folders can be moved to the Bin.
+          Folders hold Academic MCQ Bank questions and study PDFs for this
+          product subject. Empty folders (no questions and no live PDFs) can be
+          moved to the Bin.
         </p>
         <div className="mt-3 flex flex-wrap gap-3 text-sm">
           <Link
@@ -108,6 +115,7 @@ export function McqBankFoldersAdmin({
                   name: name.trim(),
                   sort_order: prev.length,
                   question_count: 0,
+                  pdf_count: 0,
                 },
               ]);
             }
@@ -180,9 +188,13 @@ export function McqBankFoldersAdmin({
                   }}
                 />
                 <p className="text-xs text-muted-foreground">
-                  {folder.question_count} question
-                  {folder.question_count === 1 ? "" : "s"}
+                  {mcqBankFolderContentSummary(folder)}
                 </p>
+                {!isMcqBankFolderEmptyForDelete(folder) ? (
+                  <p className="text-xs text-muted-foreground">
+                    {mcqBankFolderDeleteBlockedReason(folder)}
+                  </p>
+                ) : null}
               </div>
               <div className="flex flex-wrap gap-2">
                 <Button asChild type="button" size="sm" variant="secondary">
@@ -226,24 +238,26 @@ export function McqBankFoldersAdmin({
                     <>
                       <p>
                         “{folder.name}” will be moved to the Bin if it has no
-                        questions. It stays until about{" "}
+                        questions and no live PDFs. It stays until about{" "}
                         <strong>{purgeDateHint()}</strong>.
                       </p>
                       <p className="mt-2">
-                        Folders with questions cannot be deleted — remove
-                        questions first.
+                        Folders with questions or PDFs cannot be deleted — remove
+                        that content first.
                       </p>
                     </>
                   }
                   confirmLabel="Move to Bin"
-                  disabled={folder.question_count > 0}
+                  disabled={!isMcqBankFolderEmptyForDelete(folder)}
                   trigger={
                     <Button
                       type="button"
                       size="sm"
                       variant="ghost"
                       className="text-destructive"
-                      disabled={pending || folder.question_count > 0}
+                      disabled={
+                        pending || !isMcqBankFolderEmptyForDelete(folder)
+                      }
                     >
                       Delete
                     </Button>

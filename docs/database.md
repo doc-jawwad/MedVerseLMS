@@ -72,7 +72,8 @@ Denormalized ids keep RLS join-free; maintained by trigger from the parent on in
 - `academic_product_subject_id` → `subjects` row with non-null `product_key`; denormalized `year_id` (trigger-maintained)
 - `name`, `sort_order`, `created_by`, soft-delete trio (`deleted_at` / `purge_after` / `deleted_by`) → Content Bin entity `mcq_bank_folder`
 - `material_folder_id` → private `material_folders` row with `library_type = 'mcq_bank'` (PDF store for this folder; not a student library nav). Created/synced by `ensure_mcq_bank_material_folder` on create/rename; soft-deleted with the folder when empty
-- Soft-delete only when empty (no live questions with that `mcq_bank_folder_id`, and no live materials on the linked material folder)
+- Soft-delete only when empty (no live questions with that `mcq_bank_folder_id`, and no live materials on the linked material folder). Admin list returns `question_count` + `pdf_count`; UI must honor both before offering delete.
+- PDF upload: `allocate_study_object_key(p_folder_id)` — null folder still requires `manage_materials`; with an `mcq_bank` material folder, `edit_questions` + assigned-class year may allocate (`can_admin_manage_mcq_bank_material_folder`). Does not open general materials admin.
 - Seed: one renameable **Source MCQ Folder** per product subject; existing questions remain `mcq_bank_folder_id` NULL until admin classification
 - Student path: folder hub (PDFs + Start practice) then `get_practice_batch('mcq_bank_folder', folder_id)` gated by `has_practice_access(academic_product_subject_id)`. PDF open uses existing `authorize_study_object` / reader; `can_access_material_folder` for `mcq_bank` uses `has_practice_access(subject_id)`
 - CSV: `import_question_batch(..., p_mcq_bank_folder_id)` places new/unassigned questions in the open folder; book/chapter/topic remain Question Bank taxonomy
