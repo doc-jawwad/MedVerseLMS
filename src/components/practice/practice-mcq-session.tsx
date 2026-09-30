@@ -16,6 +16,7 @@ import type {
   PracticeAnswerFeedback,
   PracticeMcqContent,
 } from "@/lib/practice/content";
+import { progressSubjectIdsFromPracticeBatch } from "@/lib/practice/progress-subject-ids";
 import { practiceBatchAccessMessage } from "@/lib/practice/scope";
 import type { PracticeScope } from "@/lib/practice/types";
 
@@ -27,7 +28,8 @@ type RpcQuestion = {
   stem: string;
   options: { key: string; text: string }[] | string;
   difficulty: string;
-  subject_id?: string;
+  /** Departmental questions.subject_id — canonical practice_progress key. */
+  subject_id?: string | null;
 };
 
 function parseOptions(
@@ -104,7 +106,8 @@ export function PracticeMcqSession({
         setError(practiceBatchAccessMessage(rpcError.message));
         return;
       }
-      const rows = ((data ?? []) as RpcQuestion[]).map(toContent);
+      const rawRows = (data ?? []) as RpcQuestion[];
+      const rows = rawRows.map(toContent);
       const seen = new Set<string>();
       const unique: PracticeMcqContent[] = [];
       for (const row of rows) {
@@ -114,28 +117,34 @@ export function PracticeMcqSession({
       }
       setContents(unique);
 
-      let resolvedSubjectId: string | null =
-        scope.type === "subject" ? scope.id : null;
+      // Progress hydration must use questions.subject_id (returned on the batch).
+      // Do not use mcq_bank product subject — writes store departmental subject_id.
+      let progressSubjectIds =
+        scope.type === "subject"
+          ? [scope.id]
+          : progressSubjectIdsFromPracticeBatch(rawRows);
 
-      if (!resolvedSubjectId && unique[0]) {
-        const { data: q } = await supabase
-          .from("questions")
-          .select("subject_id")
-          .eq("id", unique[0].itemId)
-          .maybeSingle();
-        if (q?.subject_id) resolvedSubjectId = q.subject_id as string;
-      }
-
-      if (!resolvedSubjectId && scope.type === "prof_session_day") {
+      if (progressSubjectIds.length === 0 && scope.type === "prof_session_day") {
         const { data: day } = await supabase
           .from("prof_session_days")
           .select("subject_id")
           .eq("id", scope.id)
           .maybeSingle();
-        if (day?.subject_id) resolvedSubjectId = day.subject_id as string;
+        if (day?.subject_id) {
+          progressSubjectIds = [day.subject_id as string];
+        }
       }
 
-      if (!resolvedSubjectId && scope.type === "mcq_bank_folder") {
+      setSubjectIds(progressSubjectIds);
+
+      let sessionSubjectId: string | null =
+        scope.type === "subject"
+          ? scope.id
+          : progressSubjectIds[0] ?? null;
+
+      // Folder practice sessions may be attributed to the product subject for
+      // session summaries; progress store still uses departmental ids above.
+      if (scope.type === "mcq_bank_folder") {
         const { data: folder } = await supabase
           .from("mcq_bank_folders")
           .select("academic_product_subject_id")
@@ -143,15 +152,13 @@ export function PracticeMcqSession({
           .is("deleted_at", null)
           .maybeSingle();
         if (folder?.academic_product_subject_id) {
-          resolvedSubjectId = folder.academic_product_subject_id as string;
+          sessionSubjectId = folder.academic_product_subject_id as string;
         }
       }
 
-      if (resolvedSubjectId) setSubjectIds([resolvedSubjectId]);
-
       sessionIdRef.current = await startPracticeSessionRpc(
         supabase,
-        resolvedSubjectId
+        sessionSubjectId
       );
     })();
   }, [supabase, scope.type, scope.id]);

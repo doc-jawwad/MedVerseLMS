@@ -195,6 +195,8 @@ Student-facing **Free / Both / Paid / Neither** audience in the test form maps o
 ## Practice
 
 **subjects** carry the same entitlement columns as tests/folders (Main Admin configures each subject/Block; existing subjects backfilled `free`).
+**practice_progress** — Done/Marked cursor keyed by `(student_id, item_kind, item_id)`. For MCQs (`item_kind = question`), denormalized `subject_id` is always **`questions.subject_id`** (departmental Question Bank taxonomy) — not `mcq_bank_folders.academic_product_subject_id`. `get_practice_batch` returns that same `subject_id` so folder practice can hydrate via `get_practice_progress` without a student `questions` SELECT. Folder practice entitlement remains on the product subject; progress identity stays departmental so Question Bank and MCQ Bank folder practice share one progress row per question.
+
 **practice_seen** — `student_id`, `question_id`, `cycle int default 1`, `last_seen_at`. Unique (student_id, question_id). Current “served / cycle” cursor — **not** the frozen Done/Marked product model.
 **practice_answers** — `student_id`, `question_version_id`, `selected_key`, `is_correct bool`, `answered_at`, denormalized `subject_id, chapter_id, topic_id`. Append-only accuracy/history log. Resetting Done must **not** delete this history.
 Practice list RPCs return catalog rows with a lock flag; start/fetch RPCs enforce entitlement (deny > grant > plan/subscription > free).
