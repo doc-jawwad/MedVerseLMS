@@ -17,6 +17,23 @@ select test_helpers.make_limited_admin('YC Academic', array['publish_tests']) as
 
 select id as id into temp t_year2
   from public.years where year_number = 2;
+
+grant select on curriculum, t_student, t_other, t_admin, t_year_mgr, t_academic, t_year2
+  to anon, authenticated;
+
+-- Year manager must be assigned to from + destination years.
+select test_helpers.as_user((select id from t_admin));
+select public.set_admin_year_assignments(
+  (select id from t_year_mgr),
+  array[
+    (select year_id from curriculum),
+    (select id from t_year2),
+    (select id from public.years where year_number = 3 limit 1),
+    (select id from public.years where year_number = 4 limit 1),
+    (select id from public.years where year_number = 5 limit 1)
+  ]
+);
+select test_helpers.as_runner();
 select id as id into temp t_year3
   from public.years where year_number = 3;
 select id as id into temp t_year4

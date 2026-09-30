@@ -16,7 +16,7 @@ Conventions: every table has `id uuid primary key default gen_random_uuid()`, `t
 
 **admin_permissions** — `admin_id` → `profiles`, `permission_code` → `permissions`. Unique `(admin_id, permission_code)`. RLS: no student access; writes only via `manage_admins` RPCs (`grant_admin_permission` / `revoke_admin_permission`). Main Admin is authorized even with zero rows (`has_permission` short-circuits). Promote/demote: `set_admin_role`, `set_main_admin` (last Main Admin cannot be removed).
 
-**Assigned-class scope (SPEC FREEZE):** limited admins also require a **separate** admin↔year assignment relationship (product name: assigned classes; table name TBD at migration time — e.g. `admin_year_assignments`). Unique `(admin_id, year_id)`. **Main Admin** sees all classes without assignment rows. Limited Admin authorization = **both** an assigned class **and** the relevant `admin_permissions` code. Permission codes remain independent of class scope. Cookie/UI year selectors are UX only and are not authorization. **Not yet migrated** — product law frozen; do not invent RLS shortcuts in app code ahead of the migration.
+**Assigned-class scope (SPEC FREEZE):** limited admins also require a **separate** admin↔year assignment relationship (`admin_year_assignments`). Unique `(admin_id, year_id)`. **Main Admin** sees all classes without assignment rows. Limited Admin authorization = **both** an assigned class **and** the relevant `admin_permissions` code. Permission codes remain independent of class scope. Cookie/UI year selectors are UX only and are not authorization. **Shipped** for curriculum/materials/MCQ and for subscription plans/subscriptions/applications (RLS + mutate RPCs use `admin_can_access_year` / `require_admin_year_scope`).
 
 ## Curriculum
 

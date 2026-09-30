@@ -28,6 +28,16 @@ grant select on curriculum, t_student, t_other, t_admin, t_manager,
   t_reviewer, t_academic, t_year2
   to anon, authenticated;
 
+select test_helpers.as_user((select id from t_admin));
+select public.set_admin_year_assignments(
+  (select id from t_manager),
+  array[(select year_id from curriculum), (select id from t_year2)]
+);
+select public.set_admin_year_assignments(
+  (select id from t_reviewer),
+  array[(select year_id from curriculum), (select id from t_year2)]
+);
+
 -- Activate payment settings so applications can be created.
 select test_helpers.as_user((select id from t_admin));
 select public.upsert_payment_settings(
@@ -216,7 +226,11 @@ do $$
 declare
   v_subj uuid;
 begin
-  select id into v_subj from public.subjects where product_key is not null limit 1;
+  select id into v_subj
+  from public.subjects
+  where product_key is not null
+    and year_id = (select year_id from curriculum)
+  limit 1;
   if v_subj is not null then
     perform public.set_block_free_access(v_subj, true);
     perform public.set_block_free_access(v_subj, false);

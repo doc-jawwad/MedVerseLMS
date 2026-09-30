@@ -146,17 +146,31 @@ export default async function SubscriptionPage() {
     (view.kind === "pending" && view.pending);
 
   const applyMode = view.pending ? "edit" : "create";
-  const years = yearsRes.ok ? yearsRes.data : [];
-  const plans = (plansRes.data ?? []).map((p) => ({
-    id: p.id,
-    name: p.name,
-    description: p.description,
-    duration_days: p.duration_days,
-    price: p.price,
-    is_complimentary: p.is_complimentary,
-    year_id: p.year_id as string,
-  }));
+  // Purchase class must match active enrollment — RPC rejects other years.
+  const years = (yearsRes.ok ? yearsRes.data : []).filter(
+    (y) => !enrollment?.year_id || y.id === enrollment.year_id
+  );
+  // Complimentary plans are admin-assigned; students apply paid plans only.
+  const plans = (plansRes.data ?? [])
+    .filter((p) => !p.is_complimentary)
+    .map((p) => ({
+      id: p.id,
+      name: p.name,
+      description: p.description,
+      duration_days: p.duration_days,
+      price: p.price,
+      is_complimentary: p.is_complimentary,
+      year_id: p.year_id as string,
+    }));
   const notifications = notifsRes.data ?? [];
+  if (notifications.length > 0) {
+    const ids = notifications.map((n) => n.id);
+    await supabase
+      .from("student_notifications")
+      .update({ read_at: new Date().toISOString() })
+      .in("id", ids)
+      .eq("student_id", userId);
+  }
   const pendingPlanId =
     (appsRes.data ?? []).find((a) => a.status === "pending")?.plan_id ?? null;
 
@@ -359,13 +373,9 @@ export default async function SubscriptionPage() {
                       </p>
                     </div>
                     <div className="text-right">
-                      {plan.is_complimentary ? (
-                        <Badge variant="secondary">Complimentary</Badge>
-                      ) : (
-                        <p className="font-semibold">
-                          {Number(plan.price).toLocaleString()} PKR
-                        </p>
-                      )}
+                      <p className="font-semibold">
+                        {Number(plan.price).toLocaleString()} PKR
+                      </p>
                     </div>
                   </div>
                 );

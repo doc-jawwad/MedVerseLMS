@@ -17,6 +17,16 @@ select test_helpers.make_limited_admin('Sub Manager', array['manage_subscription
 select test_helpers.make_limited_admin('Sub Academic', array['publish_tests']) as id
   into temp t_academic;
 
+grant select on curriculum, t_student, t_other, t_grantee, t_admin, t_manager, t_academic
+  to anon, authenticated;
+
+-- Limited subscription managers require assigned-class year scope.
+select test_helpers.as_user((select id from t_admin));
+select public.set_admin_year_assignments(
+  (select id from t_manager),
+  array[(select year_id from curriculum)]
+);
+
 select test_helpers.make_published_test(
   (select topic_id from curriculum), (select year_id from curriculum), 2
 ) as id into temp t_free;

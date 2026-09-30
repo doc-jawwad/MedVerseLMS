@@ -31,6 +31,10 @@ const MESSAGES: Record<string, string> = {
   subject_not_found: "That subject was not found.",
   subject_has_no_product_key: "Block access can only be toggled for Block/Final Year subjects.",
   year_access_denied: "You are not enrolled in that class.",
+  year_scope_denied: "You do not have access to that class.",
+  destination_plan_unavailable:
+    "No active destination-class plan is available for this switch.",
+  subscription_not_deactivated: "That subscription is not deactivated.",
 };
 
 export function adminSubscriptionErrorMessage(

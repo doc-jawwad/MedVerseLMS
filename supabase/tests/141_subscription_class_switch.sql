@@ -24,6 +24,17 @@ select test_helpers.make_admin('SCS Admin') as id into temp t_admin;
 select test_helpers.make_limited_admin('SCS Sub Mgr', array['manage_subscriptions']) as id
   into temp t_sub_mgr;
 
+grant select on curriculum, t_y1, t_y2, t_student, t_pref_student, t_fail_student,
+  t_promote_student, t_admin, t_sub_mgr
+  to anon, authenticated;
+
+select test_helpers.as_user((select id from t_admin));
+select public.set_admin_year_assignments(
+  (select id from t_sub_mgr),
+  array[(select id from t_y1), (select id from t_y2)]
+);
+select test_helpers.as_runner();
+
 -- Destination / source class plans (deterministic preference coverage).
 insert into public.subscription_plans (
   name, description, duration_days, is_complimentary, is_active, sort_order, year_id, price

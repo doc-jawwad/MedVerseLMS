@@ -10,6 +10,7 @@ select test_helpers.make_limited_admin(
   'F4 Full Review',
   array['review_subscription_applications', 'manage_subscriptions', 'manage_payment_settings']
 ) as id into temp t_full;
+select test_helpers.make_admin('F4 Main') as id into temp t_main;
 
 select id as id into temp t_std
   from public.subscription_plans
@@ -17,7 +18,13 @@ select id as id into temp t_std
   order by sort_order, name
   limit 1;
 
-grant select on curriculum, t_student, t_full, t_std to anon, authenticated;
+grant select on curriculum, t_student, t_full, t_std, t_main to anon, authenticated;
+
+select test_helpers.as_user((select id from t_main));
+select public.set_admin_year_assignments(
+  (select id from t_full),
+  array[(select year_id from curriculum)]
+);
 
 select test_helpers.as_user((select id from t_full));
 select public.upsert_payment_settings(

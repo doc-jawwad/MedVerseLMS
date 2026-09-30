@@ -357,10 +357,10 @@ Admin **SELECT** on **sensitive student/ops tables** uses `has_permission(code)`
 | enrollments | SELECT own | SELECT if `view_students` or `manage_year_changes` or `manage_subscriptions` or `grant_resource_access`; writes via year-change / promote RPCs |
 | year_change_requests | SELECT own; insert/update pending via RPC | SELECT if `manage_year_changes`; approve/reject RPC |
 | access_grants / access_restrictions | SELECT own | SELECT if `grant_resource_access` or `view_students`; grant/revoke RPCs |
-| subscription_plans | SELECT active plans | SELECT if `manage_subscriptions` or `review_subscription_applications` (students still see `is_active` plans) |
+| subscription_plans | SELECT active plans for enrolled year | SELECT if (`manage_subscriptions` or `review_subscription_applications`) **and** `admin_can_access_year(year_id)`; create/update RPCs require the same year scope |
 | payment_settings | current payment copy via RPC | SELECT if `manage_payment_settings` or `manage_system_settings`; writes via payment RPCs |
-| subscriptions | SELECT own | SELECT if `manage_subscriptions`; activate/extend RPCs |
-| subscription_applications | SELECT own; create/edit pending via RPC | SELECT if `review_subscription_applications`; review RPCs |
+| subscriptions | SELECT own | SELECT if `manage_subscriptions` **and** `admin_can_access_year(year_id)`; activate/extend/deactivate/restore/assign RPCs require year scope; `activate_subscription` also rejects `plan_year_mismatch` |
+| subscription_applications | SELECT own; create/edit pending via RPC | SELECT if `review_subscription_applications` **and** `admin_can_access_year(year_id)`; approve/reject/screenshot-read RPCs require year scope |
 | student_notifications | SELECT/UPDATE own (read_at) | SELECT if `view_students` or `manage_subscriptions` |
 | test_audiences | SELECT via viewable tests | SELECT if `publish_tests` or `edit_questions`; writes if `has_permission('publish_tests')` |
 | tests | SELECT where `can_view_test(id)` (locked paid still listed). Owned historical **result** must not depend on this policy ([access-eligibility-analytics.md](access-eligibility-analytics.md) §15) | SELECT if `publish_tests` or `edit_questions`; INSERT/UPDATE/DELETE if `has_permission('publish_tests')`; publish/kill-switch RPCs check the same code |

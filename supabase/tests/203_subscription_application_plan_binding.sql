@@ -25,6 +25,12 @@ select id as id into temp t_year2
 grant select on curriculum, t_student, t_admin, t_pay, t_manager, t_year2
   to anon, authenticated;
 
+select test_helpers.as_user((select id from t_admin));
+select public.set_admin_year_assignments(
+  (select id from t_manager),
+  array[(select year_id from curriculum), (select id from t_year2)]
+);
+
 -- Payment settings must be active for application RPCs that students use.
 select test_helpers.as_user((select id from t_pay));
 select public.upsert_payment_settings(

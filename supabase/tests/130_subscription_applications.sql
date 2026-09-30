@@ -33,6 +33,21 @@ grant select on curriculum, t_student, t_other, t_admin, t_reviewer, t_manager,
   t_full, t_academic, t_pay, t_std
   to anon, authenticated;
 
+-- Review / manage limited admins need assigned-class year scope.
+select test_helpers.as_user((select id from t_admin));
+select public.set_admin_year_assignments(
+  (select id from t_reviewer),
+  array[(select year_id from curriculum)]
+);
+select public.set_admin_year_assignments(
+  (select id from t_manager),
+  array[(select year_id from curriculum)]
+);
+select public.set_admin_year_assignments(
+  (select id from t_full),
+  array[(select year_id from curriculum)]
+);
+
 -- The VPS staging database can have a real active singleton. Isolate this
 -- transaction-scoped fixture through the approved RPC; ROLLBACK restores it.
 select test_helpers.as_user((select id from t_pay));
