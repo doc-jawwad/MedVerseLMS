@@ -19,6 +19,7 @@ import type {
 import { progressSubjectIdsFromPracticeBatch } from "@/lib/practice/progress-subject-ids";
 import { practiceBatchAccessMessage } from "@/lib/practice/scope";
 import type { PracticeScope } from "@/lib/practice/types";
+import { FolderPracticeCompleteGate } from "@/components/practice/folder-practice-complete-gate";
 
 const BATCH_SIZE = 50;
 
@@ -261,6 +262,15 @@ export function PracticeMcqSession({
   }
 
   if (itemIds.length === 0) {
+    if (scope.type === "mcq_bank_folder") {
+      return (
+        <FolderPracticeCompleteGate
+          folderId={scope.id}
+          folderName={scope.title}
+          backHref={backHref}
+        />
+      );
+    }
     return (
       <div className="mx-auto grid w-full max-w-2xl gap-4">
         <p className="text-muted-foreground">No questions available here yet.</p>

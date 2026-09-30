@@ -14,11 +14,18 @@ import { EmptyState } from "@/components/student/empty-state";
 import { AcademicBreadcrumbs } from "@/components/academic/academic-breadcrumbs";
 import type { BreadcrumbCrumb } from "@/lib/academic-tree";
 import { folderHref } from "@/lib/academic-tree";
+import { McqFolderProgressRing } from "@/components/library/mcq-folder-progress-ring";
+import { normalizeFolderPracticeProgress } from "@/lib/practice/mcq-bank-folder-progress";
 
-type FolderRow = {
-  id: string;
+type FolderProgressRow = {
+  folder_id: string;
   name: string;
   sort_order: number;
+  total: number | string;
+  done: number | string;
+  remaining: number | string;
+  percent_complete: number | string;
+  complete: boolean;
 };
 
 /**
@@ -43,19 +50,58 @@ export async function McqBankFoldersPage({
 }) {
   const { supabase } = await requireStudent();
 
-  const [{ data: granted }, { data: folderRows }] = await Promise.all([
-    supabase.rpc("has_practice_access", { p_subject_id: subjectId }),
-    supabase
+  const { data: granted } = await supabase.rpc("has_practice_access", {
+    p_subject_id: subjectId,
+  });
+  const accessible = granted === true;
+
+  let folders: Array<{
+    id: string;
+    name: string;
+    sort_order: number;
+    done: number;
+    total: number;
+  }> = [];
+
+  if (accessible) {
+    const { data } = await supabase.rpc(
+      "list_mcq_bank_folder_practice_progress",
+      { p_product_subject_id: subjectId }
+    );
+    folders = ((data ?? []) as FolderProgressRow[]).map((f) => {
+      const p = normalizeFolderPracticeProgress(
+        {
+          folder_id: f.folder_id,
+          total: f.total,
+          done: f.done,
+          remaining: f.remaining,
+          percent_complete: f.percent_complete,
+          complete: f.complete,
+        },
+        f.folder_id
+      );
+      return {
+        id: f.folder_id,
+        name: f.name,
+        sort_order: f.sort_order,
+        done: p.done,
+        total: p.total,
+      };
+    });
+  } else {
+    const { data: folderRows } = await supabase
       .from("mcq_bank_folders")
       .select("id, name, sort_order")
       .eq("academic_product_subject_id", subjectId)
       .is("deleted_at", null)
       .order("sort_order")
-      .order("name"),
-  ]);
-
-  const accessible = granted === true;
-  const folders = (folderRows ?? []) as FolderRow[];
+      .order("name");
+    folders = ((folderRows ?? []) as Array<{
+      id: string;
+      name: string;
+      sort_order: number;
+    }>).map((f) => ({ ...f, done: 0, total: 0 }));
+  }
 
   const pageTitle = title ?? "MCQ Bank";
   const pageDescription =
@@ -124,11 +170,25 @@ export async function McqBankFoldersPage({
           {folders.map((f) => (
             <Link key={f.id} href={folderHref(blockSlug, "mcq-bank", f.id)}>
               <Card className="h-full shadow-none transition-colors hover:bg-accent/40">
-                <CardHeader>
-                  <CardTitle className="text-lg text-[var(--student-ink)]">
-                    {f.name}
-                  </CardTitle>
-                  <CardDescription>Open folder</CardDescription>
+                <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0">
+                  <div className="min-w-0">
+                    <CardTitle className="text-lg text-[var(--student-ink)]">
+                      {f.name}
+                    </CardTitle>
+                    <CardDescription className="mt-1">
+                      {f.total === 0
+                        ? "Open folder"
+                        : `${f.done} of ${f.total} complete`}
+                    </CardDescription>
+                  </div>
+                  {f.total > 0 ? (
+                    <McqFolderProgressRing
+                      done={f.done}
+                      total={f.total}
+                      size={52}
+                      className="shrink-0"
+                    />
+                  ) : null}
                 </CardHeader>
               </Card>
             </Link>

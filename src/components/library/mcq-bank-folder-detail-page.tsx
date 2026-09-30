@@ -7,7 +7,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { MaterialOpenLink } from "@/components/study/material-open-link";
 import { ResourceLockNotice } from "@/components/subscription/resource-lock-notice";
 import { PageHeader } from "@/components/student/page-header";
@@ -15,6 +14,8 @@ import { StudentPage } from "@/components/student/student-page";
 import { EmptyState } from "@/components/student/empty-state";
 import { AcademicBreadcrumbs } from "@/components/academic/academic-breadcrumbs";
 import type { BreadcrumbCrumb } from "@/lib/academic-tree";
+import { McqFolderPracticePanel } from "@/components/library/mcq-folder-practice-panel";
+import { normalizeFolderPracticeProgress } from "@/lib/practice/mcq-bank-folder-progress";
 
 type MaterialRow = {
   id: string;
@@ -75,6 +76,21 @@ export async function McqBankFolderDetailPage({
       .order("sort_order")
       .order("title");
     materials = (data ?? []) as MaterialRow[];
+  }
+
+  let progress = normalizeFolderPracticeProgress(
+    { total: 0, done: 0, remaining: 0, percent_complete: 0, complete: false },
+    folder.id
+  );
+  if (accessible) {
+    const { data: prog } = await supabase.rpc(
+      "get_mcq_bank_folder_practice_progress",
+      { p_folder_id: folder.id }
+    );
+    progress = normalizeFolderPracticeProgress(
+      (prog ?? {}) as Record<string, unknown>,
+      folder.id
+    );
   }
 
   const hasPdfs = materials.length > 0;
@@ -155,18 +171,16 @@ export async function McqBankFolderDetailPage({
                   Folder practice
                 </CardTitle>
                 <CardDescription>
-                  Practice with instant feedback. Only this folder&apos;s
-                  approved MCQs.
+                  Instant feedback. Unfinished MCQs are served first. Progress
+                  is yours alone.
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <Button asChild>
-                  <Link
-                    href={`/practice/session?scope=mcq_bank_folder&id=${encodeURIComponent(folder.id)}&name=${encodeURIComponent(folder.name)}`}
-                  >
-                    Start practice
-                  </Link>
-                </Button>
+                <McqFolderPracticePanel
+                  folderId={folder.id}
+                  folderName={folder.name}
+                  progress={progress}
+                />
               </CardContent>
             </Card>
           </section>
