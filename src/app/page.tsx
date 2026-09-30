@@ -52,7 +52,7 @@ export default async function Home() {
           </Button>
         </div>
         <BrandCredit
-          tone="highlight-on-dark"
+          tone="auth"
           className="mt-6"
         />
       </main>
