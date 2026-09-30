@@ -20,8 +20,20 @@ import { progressSubjectIdsFromPracticeBatch } from "@/lib/practice/progress-sub
 import { practiceBatchAccessMessage } from "@/lib/practice/scope";
 import type { PracticeScope } from "@/lib/practice/types";
 import { FolderPracticeCompleteGate } from "@/components/practice/folder-practice-complete-gate";
+import {
+  folderRoundCompleteHint,
+  isMcqBankFolderPracticeScope,
+  MCQ_FOLDER_PRACTICE_BATCH_SIZE,
+  practiceSessionMeterLabel,
+  practiceSessionPositionLabel,
+  practiceSetEmptyCopy,
+} from "@/lib/practice/session-labels";
+import {
+  normalizeFolderPracticeProgress,
+  type McqBankFolderPracticeProgress,
+} from "@/lib/practice/mcq-bank-folder-progress";
 
-const BATCH_SIZE = 50;
+const BATCH_SIZE = MCQ_FOLDER_PRACTICE_BATCH_SIZE;
 
 type RpcQuestion = {
   question_id: string;
@@ -90,7 +102,18 @@ export function PracticeMcqSession({
   const [selected, setSelected] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<PracticeAnswerFeedback | null>(null);
   const [checking, setChecking] = useState(false);
+  const [folderProgress, setFolderProgress] =
+    useState<McqBankFolderPracticeProgress | null>(null);
+  const [startedWithItems, setStartedWithItems] = useState(false);
   const loadStarted = useRef(false);
+  /** Incorrect MCQs cleared by a correct answer — drop after feedback, on Next. */
+  const [pendingIncorrectDropId, setPendingIncorrectDropId] = useState<
+    string | null
+  >(null);
+
+  const isFavoritesScope = scope.type === "mcq_bank_folder_favorites";
+  const isIncorrectScope = scope.type === "mcq_bank_folder_incorrect";
+  const isFolderBatchScope = isMcqBankFolderPracticeScope(scope.type);
 
   useEffect(() => {
     if (loadStarted.current) return;
@@ -117,6 +140,22 @@ export function PracticeMcqSession({
         unique.push(row);
       }
       setContents(unique);
+      setStartedWithItems(unique.length > 0);
+
+      if (scope.type === "mcq_bank_folder") {
+        const { data: prog } = await supabase.rpc(
+          "get_mcq_bank_folder_practice_progress",
+          { p_folder_id: scope.id }
+        );
+        if (prog) {
+          setFolderProgress(
+            normalizeFolderPracticeProgress(
+              prog as Record<string, unknown>,
+              scope.id
+            )
+          );
+        }
+      }
 
       // Progress hydration must use questions.subject_id (returned on the batch).
       // Do not use mcq_bank product subject — writes store departmental subject_id.
@@ -145,11 +184,7 @@ export function PracticeMcqSession({
 
       // Folder practice sessions may be attributed to the product subject for
       // session summaries; progress store still uses departmental ids above.
-      if (
-        scope.type === "mcq_bank_folder" ||
-        scope.type === "mcq_bank_folder_favorites" ||
-        scope.type === "mcq_bank_folder_incorrect"
-      ) {
+      if (isFolderBatchScope) {
         const { data: folder } = await supabase
           .from("mcq_bank_folders")
           .select("academic_product_subject_id")
@@ -166,7 +201,7 @@ export function PracticeMcqSession({
         sessionSubjectId
       );
     })();
-  }, [supabase, scope.type, scope.id]);
+  }, [supabase, scope.type, scope.id, isFolderBatchScope]);
 
   const itemIds = useMemo(() => contents.map((c) => c.itemId), [contents]);
   const contentById = useMemo(() => {
@@ -185,9 +220,6 @@ export function PracticeMcqSession({
   const currentContent = deck.current
     ? contentById.get(deck.current.itemId) ?? null
     : null;
-
-  const isFavoritesScope = scope.type === "mcq_bank_folder_favorites";
-  const isIncorrectScope = scope.type === "mcq_bank_folder_incorrect";
 
   useEffect(() => {
     setSelected(null);
@@ -218,6 +250,21 @@ export function PracticeMcqSession({
     }
   }, [deck, supabase]);
 
+  const flushPendingIncorrectDrop = useCallback(() => {
+    if (!pendingIncorrectDropId) return false;
+    const dropId = pendingIncorrectDropId;
+    setPendingIncorrectDropId(null);
+    setContents((prev) => prev.filter((c) => c.itemId !== dropId));
+    setSelected(null);
+    setFeedback(null);
+    return true;
+  }, [pendingIncorrectDropId]);
+
+  const goNext = useCallback(() => {
+    if (flushPendingIncorrectDrop()) return;
+    deck.go("next");
+  }, [deck, flushPendingIncorrectDrop]);
+
   const checkAnswer = useCallback(async () => {
     if (!currentContent || !selected || !deck.current) return;
     setChecking(true);
@@ -247,12 +294,10 @@ export function PracticeMcqSession({
     };
     setFeedback(fb);
     await deck.markDoneAndRecord(fb.isCorrect);
-    // Correct answer during Incorrect practice clears the Incorrect cursor
-    // server-side; drop it from this deck so completion is natural.
+    // Defer deck removal until Next so feedback stays visible.
+    // Favorite flag is independent — submit_practice_answer only toggles incorrect.
     if (isIncorrectScope && fb.isCorrect && currentContent.itemId) {
-      setContents((prev) =>
-        prev.filter((c) => c.itemId !== currentContent.itemId)
-      );
+      setPendingIncorrectDropId(currentContent.itemId);
     }
   }, [currentContent, selected, deck, supabase, isIncorrectScope]);
 
@@ -296,15 +341,21 @@ export function PracticeMcqSession({
       );
     }
     if (isFavoritesScope) {
+      const copy = practiceSetEmptyCopy({
+        mode: "favorites",
+        clearedThisSession: startedWithItems,
+      });
       return (
         <div
           className="mx-auto grid w-full max-w-2xl gap-4"
-          data-testid="favorites-practice-empty"
+          data-testid={copy.testId}
         >
-          <p className="text-muted-foreground">
-            No favorited MCQs in this folder yet. Favorite questions during
-            practice, then return here.
-          </p>
+          <div>
+            <h1 className="font-heading text-xl font-semibold text-[var(--student-ink)]">
+              {copy.title}
+            </h1>
+            <p className="mt-2 text-muted-foreground">{copy.body}</p>
+          </div>
           <Button asChild variant="outline" className="w-fit">
             <Link href={backHref}>Back to folder</Link>
           </Button>
@@ -312,15 +363,21 @@ export function PracticeMcqSession({
       );
     }
     if (isIncorrectScope) {
+      const copy = practiceSetEmptyCopy({
+        mode: "incorrect",
+        clearedThisSession: startedWithItems,
+      });
       return (
         <div
           className="mx-auto grid w-full max-w-2xl gap-4"
-          data-testid="incorrect-practice-empty"
+          data-testid={copy.testId}
         >
-          <p className="text-muted-foreground">
-            No incorrect MCQs in this folder. Wrong answers during practice
-            appear here until you get them right.
-          </p>
+          <div>
+            <h1 className="font-heading text-xl font-semibold text-[var(--student-ink)]">
+              {copy.title}
+            </h1>
+            <p className="mt-2 text-muted-foreground">{copy.body}</p>
+          </div>
           <Button asChild variant="outline" className="w-fit">
             <Link href={backHref}>Back to folder</Link>
           </Button>
@@ -337,16 +394,33 @@ export function PracticeMcqSession({
     );
   }
 
-  const positionLabel =
-    deck.filtered.length === 0
-      ? "No items in this filter"
-      : `${deck.index + 1} of ${deck.filtered.length}`;
+  const positionLabel = practiceSessionPositionLabel({
+    index: deck.index,
+    filteredLength: deck.filtered.length,
+    scopeType: scope.type,
+  });
 
   const eyebrow = isFavoritesScope
     ? "Practice Favorites"
     : isIncorrectScope
       ? "Practice Incorrect"
       : "Practice MCQ";
+
+  const roundComplete =
+    scope.type === "mcq_bank_folder" &&
+    deck.counts.remaining === 0 &&
+    deck.counts.done > 0 &&
+    deck.counts.done === deck.counts.all;
+  const remainingAfterRound =
+    folderProgress == null
+      ? null
+      : Math.max(0, folderProgress.remaining - deck.counts.done);
+  const roundHint = roundComplete
+    ? folderRoundCompleteHint({
+        folderRemaining: remainingAfterRound,
+        loadedCount: itemIds.length,
+      })
+    : null;
 
   return (
     <PracticeSessionChrome
@@ -355,21 +429,40 @@ export function PracticeMcqSession({
       positionLabel={positionLabel}
       elapsedMs={deck.timeTakenMs}
       completionPercent={deck.completion}
+      completionLabel={practiceSessionMeterLabel(scope.type)}
       filter={deck.filter}
       counts={deck.counts}
       onFilterChange={deck.changeFilter}
       marked={deck.current?.marked ?? false}
       onToggleMark={() => void toggleFavorite()}
       onResetDone={() => void deck.resetDone()}
+      hideResetDone={isFolderBatchScope}
       onEnd={endAndReport}
       canGoPrev={deck.index > 0}
-      canGoNext={deck.index < deck.filtered.length - 1}
+      canGoNext={
+        deck.index < deck.filtered.length - 1 || Boolean(pendingIncorrectDropId)
+      }
       onPrev={() => deck.go("previous")}
-      onNext={() => deck.go("next")}
+      onNext={goNext}
     >
+      {roundHint ? (
+        <div
+          className="mb-4 rounded-2xl border border-[var(--brand-teal)]/25 bg-[var(--brand-teal)]/8 p-4 text-sm text-[var(--student-ink)]"
+          data-testid="folder-round-complete-hint"
+        >
+          <p className="font-semibold">This round is done</p>
+          <p className="mt-1 text-muted-foreground">{roundHint}</p>
+          <Button asChild variant="outline" size="sm" className="mt-3 w-fit">
+            <Link href={backHref}>Back to folder</Link>
+          </Button>
+        </div>
+      ) : null}
       {!deck.current || !currentContent ? (
         <div className="rounded-3xl border border-dashed border-[var(--student-ink)]/15 p-8 text-center text-sm text-muted-foreground">
-          Nothing matches this filter. Try All or Remaining, or reset Done items.
+          Nothing matches this filter. Try All or Remaining
+          {isFolderBatchScope
+            ? ", or return to the folder when this round is finished."
+            : ", or reset Done items."}
         </div>
       ) : (
         <article className="surface-card grid gap-4 rounded-3xl border border-border/80 p-4 shadow-none sm:p-6">
@@ -380,6 +473,14 @@ export function PracticeMcqSession({
             {deck.current.state === "done" && (
               <span className="rounded-full bg-[var(--brand-teal)]/15 px-2.5 py-1 font-semibold text-[var(--brand-teal-ink)]">
                 Done
+              </span>
+            )}
+            {deck.current.marked && (
+              <span
+                className="rounded-full bg-[var(--student-ink)]/10 px-2.5 py-1 font-semibold text-[var(--student-ink)]"
+                data-testid="practice-favorite-badge"
+              >
+                Favorite
               </span>
             )}
           </div>
@@ -453,12 +554,11 @@ export function PracticeMcqSession({
                 {checking ? "Checking…" : "Check answer"}
               </Button>
             ) : (
-              <Button
-                type="button"
-                onClick={() => deck.go("next")}
-                disabled={deck.index >= deck.filtered.length - 1}
-              >
-                Next question
+              <Button type="button" onClick={goNext}>
+                {pendingIncorrectDropId ||
+                deck.index >= deck.filtered.length - 1
+                  ? "Continue"
+                  : "Next question"}
               </Button>
             )}
           </div>

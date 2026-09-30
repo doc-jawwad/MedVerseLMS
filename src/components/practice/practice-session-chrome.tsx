@@ -15,12 +15,14 @@ export function PracticeSessionChrome({
   positionLabel,
   elapsedMs,
   completionPercent,
+  completionLabel = "Session progress",
   filter,
   counts,
   onFilterChange,
   marked,
   onToggleMark,
   onResetDone,
+  hideResetDone = false,
   onEnd,
   canGoPrev,
   canGoNext,
@@ -34,12 +36,15 @@ export function PracticeSessionChrome({
   positionLabel: string;
   elapsedMs: number;
   completionPercent: number;
+  completionLabel?: string;
   filter: PracticeFilter;
   counts: PracticeFilterCounts;
   onFilterChange: (f: PracticeFilter) => void;
   marked: boolean;
   onToggleMark: () => void;
   onResetDone: () => void;
+  /** Folder practice uses folder Restart — subject-wide Reset Done is unsafe here. */
+  hideResetDone?: boolean;
   onEnd: () => void;
   canGoPrev: boolean;
   canGoNext: boolean;
@@ -60,11 +65,19 @@ export function PracticeSessionChrome({
               {title}
             </h1>
             <div className="brand-rule mt-2" aria-hidden />
-            <p className="mt-1.5 text-sm text-muted-foreground">{positionLabel}</p>
+            <p
+              className="mt-1.5 text-sm text-muted-foreground"
+              data-testid="practice-position-label"
+            >
+              {positionLabel}
+            </p>
           </div>
           <PracticeTimer elapsedMs={elapsedMs} />
         </div>
-        <PracticeCompletionMeter percent={completionPercent} />
+        <PracticeCompletionMeter
+          percent={completionPercent}
+          label={completionLabel}
+        />
         <PracticeFilterBar
           value={filter}
           counts={counts}
@@ -80,16 +93,18 @@ export function PracticeSessionChrome({
           >
             {marked ? "Unfavorite" : "Favorite"}
           </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant="ghost"
-            onClick={onResetDone}
-            disabled={counts.done === 0}
-            data-testid="practice-reset-done"
-          >
-            Reset Done
-          </Button>
+          {!hideResetDone ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              onClick={onResetDone}
+              disabled={counts.done === 0}
+              data-testid="practice-reset-done"
+            >
+              Reset Done
+            </Button>
+          ) : null}
           {shuffleControl}
           <Button
             type="button"

@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { McqFolderProgressRing } from "@/components/library/mcq-folder-progress-ring";
 import { restartMcqBankFolderPractice } from "@/lib/actions/mcq-bank-folder-practice";
 import type { McqBankFolderPracticeProgress } from "@/lib/practice/mcq-bank-folder-progress";
+import { MCQ_FOLDER_PRACTICE_BATCH_SIZE } from "@/lib/practice/session-labels";
 
 export function McqFolderPracticePanel({
   folderId,
@@ -125,8 +126,10 @@ export function McqFolderPracticePanel({
               {progress.done} of {progress.total} complete
             </p>
             <p className="text-sm text-muted-foreground">
-              {progress.remaining} remaining · practice serves unfinished MCQs
-              first
+              {progress.remaining} remaining
+              {progress.remaining > MCQ_FOLDER_PRACTICE_BATCH_SIZE
+                ? ` · practice loads up to ${MCQ_FOLDER_PRACTICE_BATCH_SIZE} unfinished MCQs per round`
+                : " · practice serves unfinished MCQs first"}
             </p>
           </div>
         </div>
