@@ -66,7 +66,7 @@ export default async function SubscriptionPage() {
       supabase
         .from("subscription_applications")
         .select(
-          "id, status, amount, currency, created_at, review_note, reviewed_at"
+          "id, status, amount, currency, created_at, review_note, reviewed_at, plan_id, year_id"
         )
         .eq("student_id", userId)
         .order("created_at", { ascending: false }),
@@ -75,7 +75,9 @@ export default async function SubscriptionPage() {
       // RLS automatically filters to the student's enrolled year.
       supabase
         .from("subscription_plans")
-        .select("id, name, description, duration_days, price, is_complimentary, sort_order")
+        .select(
+          "id, name, description, duration_days, price, is_complimentary, sort_order, year_id"
+        )
         .eq("is_active", true)
         .order("sort_order")
         .order("name"),
@@ -145,8 +147,18 @@ export default async function SubscriptionPage() {
 
   const applyMode = view.pending ? "edit" : "create";
   const years = yearsRes.ok ? yearsRes.data : [];
-  const plans = plansRes.data ?? [];
+  const plans = (plansRes.data ?? []).map((p) => ({
+    id: p.id,
+    name: p.name,
+    description: p.description,
+    duration_days: p.duration_days,
+    price: p.price,
+    is_complimentary: p.is_complimentary,
+    year_id: p.year_id as string,
+  }));
   const notifications = notifsRes.data ?? [];
+  const pendingPlanId =
+    (appsRes.data ?? []).find((a) => a.status === "pending")?.plan_id ?? null;
 
   // Compute PKT-aware remaining days for active subscription.
   const activeSub = view.active;
@@ -387,6 +399,8 @@ export default async function SubscriptionPage() {
               currency={view.pending?.currency ?? "PKR"}
               years={years}
               defaultYearId={enrollment.year_id}
+              plans={plans}
+              initialPlanId={pendingPlanId}
             />
           </CardContent>
         </Card>

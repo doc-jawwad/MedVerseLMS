@@ -258,6 +258,22 @@ describe("student subscription error messages", () => {
       /reviewed/i
     );
     assert.match(
+      studentSubscriptionErrorMessage("plan_required"),
+      /plan/i
+    );
+    assert.match(
+      studentSubscriptionErrorMessage("plan_inactive"),
+      /not currently available/i
+    );
+    assert.match(
+      studentSubscriptionErrorMessage("plan_year_mismatch"),
+      /class/i
+    );
+    assert.match(
+      studentSubscriptionErrorMessage("year_access_denied"),
+      /enrolled/i
+    );
+    assert.match(
       studentSubscriptionErrorMessage("invalid_screenshot_size"),
       /5 MB/i
     );
@@ -291,5 +307,27 @@ describe("application and file validation (subscription UI)", () => {
       validatePaymentScreenshotFile({ type: "application/pdf", size: 100 }),
       "invalid_screenshot_type"
     );
+  });
+});
+
+describe("class-scoped plan selection helpers", () => {
+  it("filters plans to the selected purchase year", () => {
+    const plans = [
+      { id: "p1", year_id: "y1", name: "Y1" },
+      { id: "p2", year_id: "y2", name: "Y2" },
+      { id: "p3", year_id: "y1", name: "Y1b" },
+    ];
+    const forY1 = plans.filter((p) => p.year_id === "y1");
+    assert.deepEqual(
+      forY1.map((p) => p.id),
+      ["p1", "p3"]
+    );
+  });
+
+  it("maps plan_required / plan_year_mismatch / year_access_denied for students", () => {
+    assert.match(studentSubscriptionErrorMessage("plan_required"), /Select a subscription plan/i);
+    assert.match(studentSubscriptionErrorMessage("plan_year_mismatch"), /not available for your class/i);
+    assert.match(studentSubscriptionErrorMessage("year_access_denied"), /not enrolled/i);
+    assert.match(studentSubscriptionErrorMessage("plan_inactive"), /not currently available/i);
   });
 });

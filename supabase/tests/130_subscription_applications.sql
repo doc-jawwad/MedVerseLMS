@@ -1,7 +1,7 @@
 -- Step 8F subscription applications, payment settings, screenshot key authz.
 
 begin;
-select plan(49);
+select plan(50);
 
 select test_helpers.as_runner();
 select * into temp curriculum from test_helpers.make_curriculum();
@@ -166,16 +166,27 @@ select ok(
 
 select throws_ok(
   format(
-    'select public.create_subscription_application(0, %L)',
-    (select key from t_key)
+    'select public.create_subscription_application(0, %L, %L)',
+    (select key from t_key),
+    (select id from t_std)
   ),
   'invalid_amount',
   '7 payment amount must be greater than zero'
 );
 
+select throws_ok(
+  format(
+    'select public.create_subscription_application(1500, %L)',
+    (select key from t_key)
+  ),
+  'plan_required',
+  '1c omitted plan_id is rejected (no single-global-plan auto-resolve)'
+);
+
 select public.create_subscription_application(
   1500,
-  (select key from t_key)
+  (select key from t_key),
+  (select id from t_std)
 ) as id into temp t_app;
 grant select on t_app to anon, authenticated;
 
@@ -192,7 +203,7 @@ select is(
 select is(
   (select plan_id from public.subscription_applications where id = (select id from t_app)),
   (select id from t_std),
-  '1c omitted plan_id resolves to the current active plan'
+  '1d explicit plan_id is stored on the application'
 );
 
 ------------------------------------------------------------------
@@ -203,8 +214,9 @@ select public.allocate_payment_screenshot_object_key() as key into temp t_key2;
 grant select on t_key2 to anon, authenticated;
 select throws_ok(
   format(
-    'select public.create_subscription_application(2000, %L)',
-    (select key from t_key2)
+    'select public.create_subscription_application(2000, %L, %L)',
+    (select key from t_key2),
+    (select id from t_std)
   ),
   'application_already_pending',
   '2 student cannot create a second pending application'
@@ -400,8 +412,9 @@ select ok(
 select test_helpers.as_user((select id from t_student));
 select throws_ok(
   format(
-    'select public.create_subscription_application(100, %L)',
-    'https://cdn.example/proof.png'
+    'select public.create_subscription_application(100, %L, %L)',
+    'https://cdn.example/proof.png',
+    (select id from t_std)
   ),
   'invalid_screenshot_object_key',
   '8c public URL is rejected as a screenshot object key'

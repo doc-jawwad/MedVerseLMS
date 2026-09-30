@@ -55,7 +55,7 @@ Second level = `subjects.id` (product Blocks after future mapping).
 ### Updated behavior
 - `create_year_change_request` rejected when lock=`free` (`use_self_change_class`)
 - `approve_year_change_request` / `promote_student` sync live `subscriptions.year_id`
-- `create_subscription_application` / `update_pending_*` accept `p_year_id`
+- `create_subscription_application` / `update_pending_*` accept `p_year_id` and require an explicit class-scoped `p_plan_id` (no single-global-plan auto-resolve; enrollment + year match enforced)
 - `activate_subscription` / `approve_subscription_application` set/sync purchase class + enrollment
 - BEFORE INSERT triggers default `subscriptions.year_id` / `subscription_applications.year_id` from active enrollment when omitted (compat for older insert paths)
 - `self_change_class` does **not** call admin-only `log_audit` (student self-serve path)

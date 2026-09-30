@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
@@ -37,6 +37,16 @@ export type PaymentInstructions = {
   currency?: string | null;
 } | null;
 
+export type ApplyPlanOption = {
+  id: string;
+  name: string;
+  description: string | null;
+  duration_days: number;
+  price: number | string;
+  is_complimentary: boolean;
+  year_id: string;
+};
+
 function formatBytes(size: number): string {
   if (size < 1024) return `${size} B`;
   if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
@@ -68,6 +78,8 @@ export function SubscriptionApplyForm({
   currency = "PKR",
   years,
   defaultYearId,
+  plans,
+  initialPlanId,
 }: {
   instructions: PaymentInstructions;
   instructionsError?: string | null;
@@ -77,6 +89,8 @@ export function SubscriptionApplyForm({
   currency?: string;
   years: YearOption[];
   defaultYearId: string | null;
+  plans: ApplyPlanOption[];
+  initialPlanId?: string | null;
 }) {
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
@@ -95,6 +109,24 @@ export function SubscriptionApplyForm({
   );
   const [purchaseConfirmed, setPurchaseConfirmed] = useState(false);
 
+  const plansForYear = useMemo(
+    () => plans.filter((p) => p.year_id === purchaseYearId),
+    [plans, purchaseYearId]
+  );
+
+  const [planId, setPlanId] = useState(() => {
+    if (
+      initialPlanId &&
+      plans.some((p) => p.id === initialPlanId && p.year_id === (defaultYearId ?? years[0]?.id))
+    ) {
+      return initialPlanId;
+    }
+    const forDefault = plans.filter(
+      (p) => p.year_id === (defaultYearId ?? years[0]?.id ?? "")
+    );
+    return forDefault[0]?.id ?? "";
+  });
+
   const displayCurrency =
     (instructions?.currency && instructions.currency.trim()) ||
     currency ||
@@ -102,6 +134,19 @@ export function SubscriptionApplyForm({
 
   const purchaseYearName =
     years.find((y) => y.id === purchaseYearId)?.name ?? "your class";
+
+  const selectedPlan = plansForYear.find((p) => p.id === planId) ?? null;
+
+  function onYearChange(nextYearId: string) {
+    setPurchaseYearId(nextYearId);
+    setPurchaseConfirmed(false);
+    const nextPlans = plans.filter((p) => p.year_id === nextYearId);
+    setPlanId((current) =>
+      nextPlans.some((p) => p.id === current)
+        ? current
+        : (nextPlans[0]?.id ?? "")
+    );
+  }
 
   function onFileChange(next: File | null) {
     setFile(next);
@@ -127,6 +172,10 @@ export function SubscriptionApplyForm({
     }
     if (!purchaseYearId) {
       setFormError("Select the class this subscription is for.");
+      return;
+    }
+    if (!planId || !selectedPlan) {
+      setFormError(studentSubscriptionErrorMessage("plan_required"));
       return;
     }
     if (!purchaseConfirmed) {
@@ -185,6 +234,7 @@ export function SubscriptionApplyForm({
             applicationId: pendingApplicationId,
             amount: parsedAmount,
             screenshotObjectKey: objectKey ?? null,
+            planId,
             currency: displayCurrency,
             yearId: purchaseYearId,
           });
@@ -210,6 +260,7 @@ export function SubscriptionApplyForm({
           const result = await createSubscriptionApplication({
             amount: parsedAmount,
             screenshotObjectKey: objectKey,
+            planId,
             currency: displayCurrency,
             yearId: purchaseYearId,
           });
@@ -262,10 +313,7 @@ export function SubscriptionApplyForm({
             className="h-9 w-full rounded-md border bg-transparent px-3 text-sm"
             value={purchaseYearId}
             disabled={busy || years.length === 0}
-            onChange={(e) => {
-              setPurchaseYearId(e.target.value);
-              setPurchaseConfirmed(false);
-            }}
+            onChange={(e) => onYearChange(e.target.value)}
           >
             {years.map((y) => (
               <option key={y.id} value={y.id}>
@@ -273,6 +321,37 @@ export function SubscriptionApplyForm({
               </option>
             ))}
           </select>
+        </div>
+        <div className="grid gap-2">
+          <Label htmlFor="purchase-plan">Subscription plan</Label>
+          <select
+            id="purchase-plan"
+            className="h-9 w-full rounded-md border bg-transparent px-3 text-sm"
+            value={planId}
+            disabled={busy || plansForYear.length === 0}
+            onChange={(e) => setPlanId(e.target.value)}
+          >
+            {plansForYear.length === 0 ? (
+              <option value="">No plans for this class</option>
+            ) : (
+              plansForYear.map((p) => {
+                const months = Math.round(p.duration_days / 30);
+                const priceLabel = p.is_complimentary
+                  ? "Complimentary"
+                  : `${Number(p.price).toLocaleString()} PKR`;
+                return (
+                  <option key={p.id} value={p.id}>
+                    {p.name} — {priceLabel} · {months} mo
+                  </option>
+                );
+              })
+            )}
+          </select>
+          {selectedPlan?.description ? (
+            <p className="text-xs text-muted-foreground">
+              {selectedPlan.description}
+            </p>
+          ) : null}
         </div>
         <label className="flex items-start gap-3 text-sm">
           <Checkbox
@@ -342,6 +421,10 @@ export function SubscriptionApplyForm({
             onChange={(e) => setAmount(e.target.value)}
             placeholder="e.g. 5000"
           />
+          <p className="text-xs text-muted-foreground">
+            Enter the amount you transferred. Admin review uses this figure —
+            it is not auto-filled from the plan price.
+          </p>
         </div>
 
         <div className="grid gap-2">

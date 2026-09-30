@@ -111,8 +111,8 @@ Status transitions are now enforced at the database level (`protect_question_sta
 
 ## Subscriptions & applications
 
-**subscription_plans** — `name`, `description`, `duration_days int`, `is_complimentary boolean not null default false`, `is_active boolean not null default true`, sort order.
-- Schema supports multiple plans. Product starts with **one** plan (plus optional complimentary plan(s)). Complimentary access is a plan (and/or grants), **not** a flag on `profiles`.
+**subscription_plans** — `name`, `description`, `duration_days int`, `is_complimentary boolean not null default false`, `is_active boolean not null default true`, sort order, **`year_id` (required; class-scoped)**, **`price` (advertised PKR display; not the application amount)**.
+- Schema supports multiple plans per class. Complimentary access is a plan (and/or grants), **not** a flag on `profiles`. Students SELECT only active plans for their enrolled year(s).
 
 **subscriptions** — `student_id`, `plan_id`, `status check in ('active','expired','deactivated')`, `starts_at timestamptz not null`, `ends_at timestamptz not null`, `grace_days int not null default 0 check (grace_days in (0,1,2))`, `paid_access_mode text not null default 'all_entitled' check in ('all_entitled','grants_only')`, `application_id uuid null`, `activated_by`, `activated_at`, `deactivated_by`, `deactivated_at`.
 - **Purchased class (SPEC FREEZE):** `year_id` (FK → `years`) stores the class locked for the live subscription. Live access locks the student’s enrollment to this class. **Not yet necessarily present in every deployed schema** — additive column + backfill are a future migration dependency; product law is frozen here.
@@ -122,10 +122,11 @@ Status transitions are now enforced at the database level (`protect_question_sta
 - `paid_access_mode = grants_only`: paid (`any_subscription` / `plan`) resources require a live grant; free entitlement still applies. `all_entitled` is the default overlay.
 - Students SELECT own rows only. Writes via admin RPCs (`manage_subscriptions`).
 
-**subscription_applications** — `student_id`, `plan_id` (nullable until the single initial plan is implied/filled by RPC), `amount numeric not null check (amount > 0)`, `currency text not null default 'PKR'`, `screenshot_object_key text not null`, `status check in ('pending','approved','rejected','cancelled')`, `reviewed_by`, `reviewed_at`, `review_note`.
+**subscription_applications** — `student_id`, `plan_id` (**required** on create/update via RPC — student must select an active class-scoped plan; no single-global-plan auto-resolve), `amount numeric not null check (amount > 0)` (student-submitted / reviewed transfer amount — **not** silently replaced by `subscription_plans.price`), `currency text not null default 'PKR'`, `screenshot_object_key text not null`, `status check in ('pending','approved','rejected','cancelled')`, `reviewed_by`, `reviewed_at`, `review_note`.
 - **Selected purchase class (SPEC FREEZE):** `year_id` (FK → `years`) stored at application submit. While `pending`, that class lock applies to the student. On **approve**, the purchased class is copied onto `subscriptions.year_id` (and enrollment aligned). Additive column is a future migration dependency; product law is frozen here.
+- **Plan binding:** `create_subscription_application` / `update_pending_subscription_application` require a valid active `plan_id` with `plan.year_id = application.year_id`, and the student must have an active enrollment in that year. Cross-year / inactive / unenrolled bindings raise (`plan_required` / `plan_not_found` / `plan_inactive` / `plan_year_mismatch` / `year_access_denied`).
 - Partial unique `(student_id) WHERE status = 'pending'` — no simultaneous pending applications.
-- While `pending`, the student may edit/resubmit **that row** (amount, screenshot) via RPC.
+- While `pending`, the student may edit/resubmit **that row** (amount, screenshot, plan) via RPC.
 - `approved` is terminal and creates/activates/extends a subscription. `rejected` is terminal; student may insert a **new** application.
 - Screenshot bytes live in **private Cloudflare R2**; the table stores only the object key (`payment-proofs/{tenant_id}/{student_id}/{uuid}`). Never a public URL. Admin review uses a short-lived signed GET after `authorize_payment_screenshot_access` (`review_subscription_applications`). On **replace**, the previous object is deleted after a successful update. On **reject**, the object is deleted after a successful reject (private proofs are not retained in R2). Failed attach after upload discards the new object only when `authorize_payment_screenshot_discard` allows it (orphan keys; never a key still attached to any application status).
 - Currency default is **PKR** (owner decision). Copied from `payment_settings.currency` when the student omits it.

@@ -122,13 +122,17 @@ export async function upsertPaymentSettings(input: {
 export async function createSubscriptionApplication(input: {
   amount: number;
   screenshotObjectKey: string;
-  planId?: string | null;
+  /** Required class-scoped plan — validated server-side against year + enrollment. */
+  planId: string;
   currency?: string | null;
   /** Purchased class — Data Spine subscription_applications.year_id. */
   yearId?: string | null;
 }): Promise<{ error: string } | { id: string }> {
   const amountError = validatePaymentAmount(input.amount);
   if (amountError) return { error: amountError };
+  if (!input.planId?.trim()) {
+    return { error: "plan_required" };
+  }
   if (!isPrivatePaymentScreenshotKey(input.screenshotObjectKey)) {
     return { error: "invalid_screenshot_object_key" };
   }
@@ -140,7 +144,7 @@ export async function createSubscriptionApplication(input: {
   const { data, error } = await supabase.rpc("create_subscription_application", {
     p_amount: input.amount,
     p_screenshot_object_key: input.screenshotObjectKey,
-    p_plan_id: input.planId ?? null,
+    p_plan_id: input.planId,
     p_currency: input.currency ?? null,
     p_year_id: input.yearId ?? null,
   });
@@ -156,6 +160,7 @@ export async function updatePendingSubscriptionApplication(input: {
   applicationId: string;
   amount?: number | null;
   screenshotObjectKey?: string | null;
+  /** When set, rebinds the pending application to this class-scoped plan. */
   planId?: string | null;
   currency?: string | null;
   yearId?: string | null;
@@ -163,6 +168,9 @@ export async function updatePendingSubscriptionApplication(input: {
   if (input.amount != null) {
     const amountError = validatePaymentAmount(input.amount);
     if (amountError) return { error: amountError };
+  }
+  if (input.planId != null && !input.planId.trim()) {
+    return { error: "plan_required" };
   }
   if (
     input.screenshotObjectKey &&

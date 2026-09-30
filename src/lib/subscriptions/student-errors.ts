@@ -24,9 +24,13 @@ const MESSAGES: Record<string, string> = {
     "That payment screenshot cannot be discarded.",
   r2_not_configured:
     "Payment screenshot uploads are temporarily unavailable. Contact your academy admin.",
+  plan_required: "Select a subscription plan for your class before submitting.",
   plan_not_found: "No active subscription plan is available right now.",
+  plan_inactive: "That subscription plan is not currently available.",
   year_access_denied: "You are not enrolled in that class.",
   plan_year_mismatch: "That plan is not available for your class.",
+  invalid_year: "Select a valid class for this subscription.",
+  no_active_enrollment: "You need an active class enrollment before applying.",
   network_error:
     "Network error. Check your connection and try again.",
 };
