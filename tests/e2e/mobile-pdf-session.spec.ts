@@ -48,9 +48,10 @@ test.describe("mobile session + pdf reader", () => {
     browser,
   }) => {
     const e2e = loadE2EEnv();
+    // Prefer a free Notes PDF (year 1) so free staging student can open it.
     const materialId =
       process.env.E2E_PDF_MATERIAL_ID ||
-      "3d642c22-0eef-43fb-b463-1e58a11f3e1e";
+      "a59b5f29-28d0-4e2f-84ee-7a3aac1aad54";
 
     const context = await browser.newContext({
       viewport: { width: 390, height: 844 },
@@ -64,42 +65,59 @@ test.describe("mobile session + pdf reader", () => {
     });
     await expect(page.getByTestId("pdf-page-stage")).toBeVisible();
 
-    // Reveal chrome if auto-hidden.
+    // Reveal chrome if auto-hidden (tap mid-page; avoid overlay hit-box).
     const chrome = page.locator('[data-testid="pdf-viewer"]');
-    if ((await chrome.getAttribute("data-chrome")) === "hidden") {
-      await page.getByTestId("pdf-page-stage").click({ position: { x: 20, y: 20 } });
+    async function ensureChrome() {
+      if ((await chrome.getAttribute("data-chrome")) === "hidden") {
+        const box = await page.getByTestId("pdf-page-stage").boundingBox();
+        if (box) {
+          await page.mouse.click(
+            box.x + box.width / 2,
+            box.y + Math.min(box.height / 2, 120)
+          );
+        }
+      }
+      await expect(page.getByTestId("pdf-prev")).toBeVisible({ timeout: 5_000 });
     }
-    await expect(page.getByTestId("pdf-prev")).toBeVisible();
+    await ensureChrome();
     await expect(page.getByTestId("pdf-next")).toBeVisible();
     await expect(page.getByTestId("pdf-fit-width")).toBeVisible();
 
     await page.getByTestId("pdf-fit-width").click();
-    await page.getByTestId("pdf-page-input").fill("15");
+
+    const indicator = page.getByTestId("pdf-page-indicator");
+    await expect(indicator).toContainText("/");
+    const totalText = (await indicator.textContent()) || "/ 1";
+    const total = Math.max(1, Number(totalText.replace(/[^\d]/g, "")) || 1);
+    const targetPage = Math.min(15, total);
+
+    await page.getByTestId("pdf-page-input").fill(String(targetPage));
     await page.getByTestId("pdf-page-input").press("Enter");
-    await expect(page.getByTestId("pdf-page-indicator")).toContainText("/ ");
+    await expect(page.getByTestId("pdf-page-input")).toHaveValue(
+      String(targetPage),
+      { timeout: 15_000 }
+    );
 
     // Fullscreen still exposes nav (not close-only).
+    await ensureChrome();
     await page.getByTestId("pdf-fullscreen").click();
     await page.waitForTimeout(500);
-    if ((await chrome.getAttribute("data-chrome")) === "hidden") {
-      await page.getByTestId("pdf-page-stage").click({ position: { x: 20, y: 20 } });
-    }
+    await ensureChrome();
     await expect(page.getByTestId("pdf-next")).toBeVisible();
     await expect(page.getByTestId("pdf-fullscreen-close")).toBeVisible();
     await page.getByTestId("pdf-fullscreen-close").click();
 
-    // Leave and reopen — resume near page 15 (server or localStorage).
+    // Leave and reopen — resume at saved page (server or localStorage).
     await page.goto("/dashboard");
     await page.goto(`/materials/${materialId}/read`);
     await expect(page.getByTestId("pdf-viewer")).toBeVisible({
       timeout: 120_000,
     });
-    if ((await chrome.getAttribute("data-chrome")) === "hidden") {
-      await page.getByTestId("pdf-page-stage").click({ position: { x: 20, y: 20 } });
-    }
-    await expect(page.getByTestId("pdf-page-input")).toHaveValue("15", {
-      timeout: 30_000,
-    });
+    await ensureChrome();
+    await expect(page.getByTestId("pdf-page-input")).toHaveValue(
+      String(targetPage),
+      { timeout: 30_000 }
+    );
 
     // Landscape smoke
     await page.setViewportSize({ width: 844, height: 390 });
@@ -108,6 +126,7 @@ test.describe("mobile session + pdf reader", () => {
     // Desktop regression viewport
     await page.setViewportSize({ width: 1280, height: 800 });
     await expect(page.getByTestId("pdf-viewer")).toBeVisible();
+    await ensureChrome();
     await expect(page.getByTestId("pdf-next")).toBeVisible();
 
     void e2e;

@@ -1047,13 +1047,18 @@ export function PdfViewer({
       <div
         className={
           chromeVisible
-            ? "pdf-viewer-chrome pointer-events-none absolute inset-x-0 top-0 z-20 opacity-100 transition-opacity"
+            ? "pdf-viewer-chrome absolute inset-x-0 top-0 z-20 opacity-100 transition-opacity"
             : "pdf-viewer-chrome pointer-events-none absolute inset-x-0 top-0 z-20 opacity-0 transition-opacity"
         }
         aria-hidden={!chromeVisible}
       >
-        <div className="pointer-events-auto flex items-center gap-1 bg-neutral-950/75 px-2 py-1.5 text-white backdrop-blur-sm pdf-safe-top">
-          <Button
+        <div
+          className={
+            chromeVisible
+              ? "pointer-events-auto flex items-center gap-1 bg-neutral-950/75 px-2 py-1.5 text-white backdrop-blur-sm pdf-safe-top"
+              : "pointer-events-none flex items-center gap-1 bg-neutral-950/75 px-2 py-1.5 text-white backdrop-blur-sm pdf-safe-top"
+          }
+        >          <Button
             type="button"
             size="sm"
             variant="ghost"
@@ -1204,7 +1209,7 @@ export function PdfViewer({
           </div>
         </div>
 
-        {showMore ? (
+        {showMore && chromeVisible ? (
           <div className="pointer-events-auto max-h-[40vh] overflow-auto border-t border-white/10 bg-neutral-950/90 px-2 py-2 text-white backdrop-blur-sm">
             <p className="mb-2 text-[11px] text-white/70" data-testid="pdf-offline-status">
               {offlineLabel}
