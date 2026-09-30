@@ -260,7 +260,7 @@ Subscription **application** stores the selected purchase class. Subscription **
 
 ### 9. Practice (product law; separate from exams)
 
-Filters / states: **All / Remaining / Done / Favorites** (`practice_progress.marked`); favorite/unfavorite; Done → Remaining reset; percentage completion; forward practice timer; practice report. **No** reuse of `test_attempts` for practice. Schema for practice progress is a future migration concern — see [database.md](database.md); do not invent attempt states.
+Filters / states: **All / Remaining / Done / Favorites** (`practice_progress.marked`); **Incorrect** set (`practice_progress.incorrect`, maintained by `submit_practice_answer`); Practice Incorrect mode (`mcq_bank_folder_incorrect`); favorite/unfavorite; Done → Remaining reset; percentage completion; forward practice timer; practice report. **No** reuse of `test_attempts` for practice. Schema for practice progress is a future migration concern — see [database.md](database.md); do not invent attempt states.
 
 ### 10. Flashcards
 

@@ -22,6 +22,7 @@ export function McqFolderPracticePanel({
   const [pending, startTransition] = useTransition();
   const sessionHref = `/practice/session?scope=mcq_bank_folder&id=${encodeURIComponent(folderId)}&name=${encodeURIComponent(folderName)}`;
   const favoritesHref = `/practice/session?scope=mcq_bank_folder_favorites&id=${encodeURIComponent(folderId)}&name=${encodeURIComponent(`${folderName} · Favorites`)}`;
+  const incorrectHref = `/practice/session?scope=mcq_bank_folder_incorrect&id=${encodeURIComponent(folderId)}&name=${encodeURIComponent(`${folderName} · Incorrect`)}`;
 
   function restartAndStart() {
     startTransition(async () => {
@@ -60,6 +61,30 @@ export function McqFolderPracticePanel({
       </p>
     );
 
+  const incorrectAction =
+    progress.incorrect > 0 ? (
+      <Button asChild variant="outline" data-testid="mcq-folder-practice-incorrect">
+        <Link href={incorrectHref}>
+          Practice Incorrect ({progress.incorrect})
+        </Link>
+      </Button>
+    ) : (
+      <p
+        className="text-sm text-muted-foreground"
+        data-testid="mcq-folder-incorrect-empty"
+      >
+        No incorrect MCQs. Wrong answers during practice appear here until you
+        get them right.
+      </p>
+    );
+
+  const setActions = (
+    <div className="grid gap-3 sm:grid-cols-2">
+      <div>{favoritesAction}</div>
+      <div>{incorrectAction}</div>
+    </div>
+  );
+
   if (progress.complete) {
     return (
       <div className="grid gap-4">
@@ -85,7 +110,7 @@ export function McqFolderPracticePanel({
             {pending ? "Restarting…" : "Restart Practice"}
           </Button>
         </div>
-        <div className="border-t pt-4">{favoritesAction}</div>
+        <div className="border-t pt-4">{setActions}</div>
       </div>
     );
   }
@@ -109,7 +134,7 @@ export function McqFolderPracticePanel({
           <Link href={sessionHref}>Start practice</Link>
         </Button>
       </div>
-      <div className="border-t pt-4">{favoritesAction}</div>
+      <div className="border-t pt-4">{setActions}</div>
     </div>
   );
 }

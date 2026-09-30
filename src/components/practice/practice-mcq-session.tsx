@@ -147,7 +147,8 @@ export function PracticeMcqSession({
       // session summaries; progress store still uses departmental ids above.
       if (
         scope.type === "mcq_bank_folder" ||
-        scope.type === "mcq_bank_folder_favorites"
+        scope.type === "mcq_bank_folder_favorites" ||
+        scope.type === "mcq_bank_folder_incorrect"
       ) {
         const { data: folder } = await supabase
           .from("mcq_bank_folders")
@@ -186,6 +187,7 @@ export function PracticeMcqSession({
     : null;
 
   const isFavoritesScope = scope.type === "mcq_bank_folder_favorites";
+  const isIncorrectScope = scope.type === "mcq_bank_folder_incorrect";
 
   useEffect(() => {
     setSelected(null);
@@ -245,7 +247,14 @@ export function PracticeMcqSession({
     };
     setFeedback(fb);
     await deck.markDoneAndRecord(fb.isCorrect);
-  }, [currentContent, selected, deck, supabase]);
+    // Correct answer during Incorrect practice clears the Incorrect cursor
+    // server-side; drop it from this deck so completion is natural.
+    if (isIncorrectScope && fb.isCorrect && currentContent.itemId) {
+      setContents((prev) =>
+        prev.filter((c) => c.itemId !== currentContent.itemId)
+      );
+    }
+  }, [currentContent, selected, deck, supabase, isIncorrectScope]);
 
   if (error) {
     return (
@@ -302,6 +311,22 @@ export function PracticeMcqSession({
         </div>
       );
     }
+    if (isIncorrectScope) {
+      return (
+        <div
+          className="mx-auto grid w-full max-w-2xl gap-4"
+          data-testid="incorrect-practice-empty"
+        >
+          <p className="text-muted-foreground">
+            No incorrect MCQs in this folder. Wrong answers during practice
+            appear here until you get them right.
+          </p>
+          <Button asChild variant="outline" className="w-fit">
+            <Link href={backHref}>Back to folder</Link>
+          </Button>
+        </div>
+      );
+    }
     return (
       <div className="mx-auto grid w-full max-w-2xl gap-4">
         <p className="text-muted-foreground">No questions available here yet.</p>
@@ -317,9 +342,15 @@ export function PracticeMcqSession({
       ? "No items in this filter"
       : `${deck.index + 1} of ${deck.filtered.length}`;
 
+  const eyebrow = isFavoritesScope
+    ? "Practice Favorites"
+    : isIncorrectScope
+      ? "Practice Incorrect"
+      : "Practice MCQ";
+
   return (
     <PracticeSessionChrome
-      eyebrow={isFavoritesScope ? "Practice Favorites" : "Practice MCQ"}
+      eyebrow={eyebrow}
       title={scope.title}
       positionLabel={positionLabel}
       elapsedMs={deck.timeTakenMs}

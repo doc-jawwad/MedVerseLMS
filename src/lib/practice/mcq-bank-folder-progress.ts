@@ -9,6 +9,8 @@ export type McqBankFolderPracticeProgress = {
   complete: boolean;
   /** Caller-scoped Favorites count (practice_progress.marked). */
   favorites: number;
+  /** Caller-scoped Incorrect count (practice_progress.incorrect). */
+  incorrect: number;
 };
 
 export function normalizeFolderPracticeProgress(
@@ -19,6 +21,7 @@ export function normalizeFolderPracticeProgress(
   const done = Math.max(0, Math.min(total, Number(raw?.done ?? 0) || 0));
   const remaining = Math.max(0, total - done);
   const favorites = Math.max(0, Number(raw?.favorites ?? 0) || 0);
+  const incorrect = Math.max(0, Number(raw?.incorrect ?? 0) || 0);
   const percent =
     typeof raw?.percent_complete === "number"
       ? Math.max(0, Math.min(100, Math.round(raw.percent_complete)))
@@ -31,6 +34,7 @@ export function normalizeFolderPracticeProgress(
     percent_complete: percent,
     complete: total > 0 && done >= total,
     favorites,
+    incorrect,
   };
 }
 

@@ -86,6 +86,7 @@ export async function McqBankFolderDetailPage({
       percent_complete: 0,
       complete: false,
       favorites: 0,
+      incorrect: 0,
     },
     folder.id
   );

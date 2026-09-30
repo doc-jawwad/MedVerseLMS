@@ -213,7 +213,7 @@ For an **active** student, evaluate:
 
 Locked paid items remain **listed** with a lock where the tree shows them. Secrets (Drive URL, signed URL, question payload, `correct_key`) must not ride on catalog SELECT. Content RPCs (`start_attempt` new starts, practice fetch, `open_material`, `get_attempt_review` items, future signed book/video URL) enforce entitlement. Owned score/result summary is not a content start.
 
-**Practice:** Main Admin configures **each subject/Block** as free / subscription / plan. Do not hard-code practice as always free or always paid. Practice product filters (All / Remaining / Done / Favorites, reset, %, timer, report) are SPEC FREEZE in [architecture.md](architecture.md) / [database.md](database.md) — separate from exams; no `test_attempts` reuse.
+**Practice:** Main Admin configures **each subject/Block** as free / subscription / plan. Do not hard-code practice as always free or always paid. Practice product filters (All / Remaining / Done / Favorites, Incorrect set, reset, %, timer, report) are SPEC FREEZE in [architecture.md](architecture.md) / [database.md](database.md) — separate from exams; no `test_attempts` reuse. Favorites (`marked`) and Incorrect (`incorrect`) are historical cursors only — never entitlement; practice/list paths use `can_access_mcq_bank_folder_practice`.
 
 **Notes** remains its own library category (SPEC FREEZE).
 

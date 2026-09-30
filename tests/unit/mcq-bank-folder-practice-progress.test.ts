@@ -16,6 +16,7 @@ describe("mcq bank folder practice progress helpers", () => {
     assert.equal(z.total, 10);
     assert.equal(z.percent_complete, 0);
     assert.equal(z.favorites, 0);
+    assert.equal(z.incorrect, 0);
 
     const mid = normalizeFolderPracticeProgress({
       folder_id: "f1",
@@ -25,10 +26,12 @@ describe("mcq bank folder practice progress helpers", () => {
       percent_complete: 50,
       complete: false,
       favorites: 2,
+      incorrect: 3,
     });
     assert.equal(mid.percent_complete, 50);
     assert.equal(mid.complete, false);
     assert.equal(mid.favorites, 2);
+    assert.equal(mid.incorrect, 3);
 
     const full = normalizeFolderPracticeProgress({
       total: 10,

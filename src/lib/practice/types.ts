@@ -53,7 +53,8 @@ export type PracticeScopeType =
   | "topic"
   | "prof_session_day"
   | "mcq_bank_folder"
-  | "mcq_bank_folder_favorites";
+  | "mcq_bank_folder_favorites"
+  | "mcq_bank_folder_incorrect";
 
 export const PRACTICE_SCOPE_TYPES = [
   "subject",
@@ -63,6 +64,7 @@ export const PRACTICE_SCOPE_TYPES = [
   "prof_session_day",
   "mcq_bank_folder",
   "mcq_bank_folder_favorites",
+  "mcq_bank_folder_incorrect",
 ] as const satisfies readonly PracticeScopeType[];
 
 export function isPracticeScopeType(value: string): value is PracticeScopeType {
