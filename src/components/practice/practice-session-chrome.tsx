@@ -76,9 +76,9 @@ export function PracticeSessionChrome({
             size="sm"
             variant={marked ? "default" : "outline"}
             onClick={onToggleMark}
-            data-testid="practice-toggle-mark"
+            data-testid="practice-toggle-favorite"
           >
-            {marked ? "Marked" : "Mark"}
+            {marked ? "Unfavorite" : "Favorite"}
           </Button>
           <Button
             type="button"

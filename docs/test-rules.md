@@ -79,5 +79,5 @@ Catalog vs content are separate ([permissions.md](permissions.md)):
 
 - Existing exam state machine, freeze-at-publish, kill switch, and attempt states in this document and [exam-state-machine.md](exam-state-machine.md) remain **frozen**.
 - **Test MCQ** remains a formal timed test on `tests` + attempt RPCs.
-- Practice remains a **separate** product surface (All / Remaining / Done / Marked, mark/unmark, Done→Remaining reset, % completion, forward timer, practice report) — see [architecture.md](architecture.md) / [database.md](database.md). Practice must **not** reuse `test_attempts`.
+- Practice remains a **separate** product surface (All / Remaining / Done / Favorites, favorite/unfavorite, Done→Remaining reset, % completion, forward timer, practice report) — see [architecture.md](architecture.md) / [database.md](database.md). Practice must **not** reuse `test_attempts`.
 - **`rank_test`** remains the only ranking source for Dashboard Top 3 and Analytics Top 20 ([access-eligibility-analytics.md](access-eligibility-analytics.md)).

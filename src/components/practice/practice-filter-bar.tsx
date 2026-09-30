@@ -7,7 +7,7 @@ const FILTERS: { id: PracticeFilter; label: string }[] = [
   { id: "all", label: "All" },
   { id: "remaining", label: "Remaining" },
   { id: "done", label: "Done" },
-  { id: "marked", label: "Marked" },
+  { id: "marked", label: "Favorites" },
 ];
 
 export function PracticeFilterBar({

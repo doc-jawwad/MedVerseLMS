@@ -196,18 +196,19 @@ Student-facing **Free / Both / Paid / Neither** audience in the test form maps o
 ## Practice
 
 **subjects** carry the same entitlement columns as tests/folders (Main Admin configures each subject/Block; existing subjects backfilled `free`).
-**practice_progress** — Done/Marked cursor keyed by `(student_id, item_kind, item_id)`. For MCQs (`item_kind = question`), denormalized `subject_id` is always **`questions.subject_id`** (departmental Question Bank taxonomy) — not `mcq_bank_folders.academic_product_subject_id`. `get_practice_batch` returns that same `subject_id` so folder practice can hydrate via `get_practice_progress` without a student `questions` SELECT. Folder practice entitlement remains on the product subject; progress identity stays departmental so Question Bank and MCQ Bank folder practice share one progress row per question.
-- **Folder hub progress:** `get_mcq_bank_folder_practice_progress(folder_id)` / `list_mcq_bank_folder_practice_progress(product_subject_id)` return caller-scoped `done` / `total` / `remaining` / `percent_complete` / `complete` from approved live folder questions + the caller’s `practice_progress.state = 'done'` rows (not a second progress system).
+**practice_progress** — Done/Favorites cursor keyed by `(student_id, item_kind, item_id)`. Column `marked` is the canonical **Favorites** flag (product: Favorite / Unfavorite); independent of `state` (`remaining`|`done`), `practice_answers`, `practice_seen`, and session history. For MCQs (`item_kind = question`), denormalized `subject_id` is always **`questions.subject_id`** (departmental Question Bank taxonomy) — not `mcq_bank_folders.academic_product_subject_id`. `get_practice_batch` returns that same `subject_id` so folder practice can hydrate via `get_practice_progress` without a student `questions` SELECT. Folder practice entitlement remains on the product subject; progress identity stays departmental so Question Bank and MCQ Bank folder practice share one progress row per question.
+- **Folder hub progress:** `get_mcq_bank_folder_practice_progress(folder_id)` / `list_mcq_bank_folder_practice_progress(product_subject_id)` return caller-scoped `done` / `total` / `remaining` / `percent_complete` / `complete` from approved live folder questions + the caller’s `practice_progress.state = 'done'` rows (not a second progress system). Single-folder progress also returns `favorites` (caller’s `marked = true` count in that folder).
 - **Undone-first:** for `scope = mcq_bank_folder`, `get_practice_batch` serves only questions with no progress row or `state = remaining`, ordered by `practice_seen.cycle` then `random()`. Completed MCQs are not mixed in while undone remain. When the folder is 100% done, the batch is empty (no silent re-round).
-- **Explicit Restart:** `reset_mcq_bank_folder_practice(folder_id)` sets `done → remaining` for the caller’s questions **in that folder only**. Preserves `marked`, `practice_answers`, `practice_seen`, and session history (same retention law as subject `reset_practice_done_to_remaining`).
+- **Favorites practice:** for `scope = mcq_bank_folder_favorites`, `get_practice_batch` serves only currently favorited (`marked = true`) approved questions in that folder (done and remaining), same cycle/random ordering. Empty when the caller has zero favorites. Unfavoriting removes the MCQ from the Favorites set without resetting Done or deleting answers.
+- **Explicit Restart:** `reset_mcq_bank_folder_practice(folder_id)` sets `done → remaining` for the caller’s questions **in that folder only**. Preserves `marked` (Favorites), `practice_answers`, `practice_seen`, and session history (same retention law as subject `reset_practice_done_to_remaining`).
 
-**practice_seen** — `student_id`, `question_id`, `cycle int default 1`, `last_seen_at`. Unique (student_id, question_id). Current “served / cycle” cursor — **not** the frozen Done/Marked product model.
+**practice_seen** — `student_id`, `question_id`, `cycle int default 1`, `last_seen_at`. Unique (student_id, question_id). Current “served / cycle” cursor — **not** the frozen Done/Favorites product model.
 **practice_answers** — `student_id`, `question_version_id`, `selected_key`, `is_correct bool`, `answered_at`, denormalized `subject_id, chapter_id, topic_id`. Append-only accuracy/history log. Resetting Done must **not** delete this history.
 Practice list RPCs return catalog rows with a lock flag; start/fetch RPCs enforce entitlement (deny > grant > plan/subscription > free).
 
 **Practice product law (SPEC FREEZE)** — separate from formal exams; **never** reuse `test_attempts`:
-- Filters / states: **All / Remaining / Done / Marked**
-- Mark / unmark
+- Filters / states: **All / Remaining / Done / Favorites** (`marked` column)
+- Favorite / Unfavorite (`set_practice_item_marked`)
 - Done → Remaining reset
 - Percentage completion
 - Forward practice timer

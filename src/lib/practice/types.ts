@@ -5,6 +5,10 @@ export type PracticeItemKind = "mcq" | "pearl" | "ospe";
 /** Per-item product state. Default when no row exists is remaining. */
 export type PracticeItemState = "remaining" | "done";
 
+/**
+ * Deck filters. `marked` is the Favorites product filter
+ * (DB column practice_progress.marked).
+ */
 export type PracticeFilter = "all" | "remaining" | "done" | "marked";
 
 export type PracticeProgressRecord = {
@@ -12,6 +16,7 @@ export type PracticeProgressRecord = {
   itemKind: PracticeItemKind;
   itemId: string;
   state: PracticeItemState;
+  /** Favorites flag — maps to practice_progress.marked. */
   marked: boolean;
   updatedAt: string;
 };
@@ -20,6 +25,7 @@ export type PracticeDeckItem = {
   itemId: string;
   itemKind: PracticeItemKind;
   state: PracticeItemState;
+  /** Favorites flag — maps to practice_progress.marked. */
   marked: boolean;
 };
 
@@ -46,7 +52,8 @@ export type PracticeScopeType =
   | "chapter"
   | "topic"
   | "prof_session_day"
-  | "mcq_bank_folder";
+  | "mcq_bank_folder"
+  | "mcq_bank_folder_favorites";
 
 export const PRACTICE_SCOPE_TYPES = [
   "subject",
@@ -55,6 +62,7 @@ export const PRACTICE_SCOPE_TYPES = [
   "topic",
   "prof_session_day",
   "mcq_bank_folder",
+  "mcq_bank_folder_favorites",
 ] as const satisfies readonly PracticeScopeType[];
 
 export function isPracticeScopeType(value: string): value is PracticeScopeType {

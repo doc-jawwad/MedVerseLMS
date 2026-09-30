@@ -123,16 +123,38 @@ describe("practice filters", () => {
   });
 });
 
-describe("practice marking", () => {
-  it("toggles marked boolean", () => {
-    const once = toggleItemMarked(item("a"));
+describe("practice favorites (marked)", () => {
+  it("toggles Favorites boolean without changing Done", () => {
+    const once = toggleItemMarked(item("a", "done"));
     assert.equal(once.marked, true);
-    assert.equal(toggleItemMarked(once).marked, false);
+    assert.equal(once.state, "done");
+    const off = toggleItemMarked(once);
+    assert.equal(off.marked, false);
+    assert.equal(off.state, "done");
   });
 
-  it("setItemMarked is explicit", () => {
+  it("setItemMarked is explicit and independent of state", () => {
     assert.equal(setItemMarked(item("a"), true).marked, true);
-    assert.equal(setItemMarked(item("a", "done", true), false).marked, false);
+    const unfavDone = setItemMarked(item("a", "done", true), false);
+    assert.equal(unfavDone.marked, false);
+    assert.equal(unfavDone.state, "done");
+  });
+
+  it("favorite + done and not-favorite + remaining coexist in filters", () => {
+    const deck = [
+      item("a", "done", true),
+      item("b", "remaining", false),
+      item("c", "remaining", true),
+    ];
+    assert.deepEqual(
+      filterDeck(deck, "marked").map((i) => i.itemId),
+      ["a", "c"]
+    );
+    assert.deepEqual(
+      filterDeck(deck, "done").map((i) => i.itemId),
+      ["a"]
+    );
+    assert.equal(markItemDone(setItemMarked(item("b"), true)).marked, true);
   });
 });
 

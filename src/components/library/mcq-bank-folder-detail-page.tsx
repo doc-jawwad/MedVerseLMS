@@ -79,7 +79,14 @@ export async function McqBankFolderDetailPage({
   }
 
   let progress = normalizeFolderPracticeProgress(
-    { total: 0, done: 0, remaining: 0, percent_complete: 0, complete: false },
+    {
+      total: 0,
+      done: 0,
+      remaining: 0,
+      percent_complete: 0,
+      complete: false,
+      favorites: 0,
+    },
     folder.id
   );
   if (accessible) {

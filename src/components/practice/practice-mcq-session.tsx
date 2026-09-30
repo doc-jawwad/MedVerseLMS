@@ -145,7 +145,10 @@ export function PracticeMcqSession({
 
       // Folder practice sessions may be attributed to the product subject for
       // session summaries; progress store still uses departmental ids above.
-      if (scope.type === "mcq_bank_folder") {
+      if (
+        scope.type === "mcq_bank_folder" ||
+        scope.type === "mcq_bank_folder_favorites"
+      ) {
         const { data: folder } = await supabase
           .from("mcq_bank_folders")
           .select("academic_product_subject_id")
@@ -182,10 +185,22 @@ export function PracticeMcqSession({
     ? contentById.get(deck.current.itemId) ?? null
     : null;
 
+  const isFavoritesScope = scope.type === "mcq_bank_folder_favorites";
+
   useEffect(() => {
     setSelected(null);
     setFeedback(null);
   }, [deck.current?.itemId]);
+
+  const toggleFavorite = useCallback(async () => {
+    const itemId = deck.current?.itemId;
+    const wasFavorite = deck.current?.marked ?? false;
+    await deck.toggleMark();
+    // Unfavoriting during Favorites practice drops the MCQ from this deck.
+    if (isFavoritesScope && wasFavorite && itemId) {
+      setContents((prev) => prev.filter((c) => c.itemId !== itemId));
+    }
+  }, [deck, isFavoritesScope]);
 
   const endAndReport = useCallback(() => {
     const taken = deck.timeTakenMs;
@@ -271,6 +286,22 @@ export function PracticeMcqSession({
         />
       );
     }
+    if (isFavoritesScope) {
+      return (
+        <div
+          className="mx-auto grid w-full max-w-2xl gap-4"
+          data-testid="favorites-practice-empty"
+        >
+          <p className="text-muted-foreground">
+            No favorited MCQs in this folder yet. Favorite questions during
+            practice, then return here.
+          </p>
+          <Button asChild variant="outline" className="w-fit">
+            <Link href={backHref}>Back to folder</Link>
+          </Button>
+        </div>
+      );
+    }
     return (
       <div className="mx-auto grid w-full max-w-2xl gap-4">
         <p className="text-muted-foreground">No questions available here yet.</p>
@@ -288,7 +319,7 @@ export function PracticeMcqSession({
 
   return (
     <PracticeSessionChrome
-      eyebrow="Practice MCQ"
+      eyebrow={isFavoritesScope ? "Practice Favorites" : "Practice MCQ"}
       title={scope.title}
       positionLabel={positionLabel}
       elapsedMs={deck.timeTakenMs}
@@ -297,7 +328,7 @@ export function PracticeMcqSession({
       counts={deck.counts}
       onFilterChange={deck.changeFilter}
       marked={deck.current?.marked ?? false}
-      onToggleMark={() => void deck.toggleMark()}
+      onToggleMark={() => void toggleFavorite()}
       onResetDone={() => void deck.resetDone()}
       onEnd={endAndReport}
       canGoPrev={deck.index > 0}
