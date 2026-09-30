@@ -100,13 +100,13 @@ Status transitions are now enforced at the database level (`protect_question_sta
   - **Free** student (no live subscription and no pending subscription application): may change class **freely** (self-serve RPC; still one live enrollment).
   - **Pending** subscription application: class is **locked** while the application is pending.
   - **Live / active** subscription: class is **locked** to `subscriptions.year_id` (purchased class). Further change only via admin-mediated paths below, which must keep subscription class in sync.
-- `promote_student(student_id)`: sets active row `expired`, inserts active row for year+1. Audit-logged. Requires `manage_year_changes`. When a live subscription exists, keep `subscriptions.year_id` aligned with the new enrollment.
+- `promote_student(student_id)`: sets active row `expired`, inserts active row for year+1. Audit-logged. Requires `manage_year_changes`. When a live subscription exists, keep `subscriptions.year_id` and `subscriptions.plan_id` aligned with the new enrollment (remap `plan_id` to an active destination-year plan; preserve `starts_at`/`ends_at`). Fail with `destination_plan_unavailable` before mutating enrollment if no active destination plan exists.
 - **Migration:** existing `status = 'pending'` rows are **auto-activated**. Enrollment `pending` is not used going forward. Pre-existing `suspended`/`revoked` enrollment rows: mapping onto `profiles.account_status` is a **pending owner decision**.
 
 **year_change_requests** — `student_id`, `from_year_id`, `to_year_id` (any year), `status check in ('pending','approved','rejected')`, `reason text`, `reviewed_by`, `reviewed_at`, `review_note text`.
 - Partial unique: `(student_id) WHERE status = 'pending'`.
 - **Product role (SPEC FREEZE):** used for **subscribed** (class-locked) students who need an admin-approved class change — not the free-student self-serve path. Student creates/updates only own `pending` row via RPC (`create_year_change_request` / `update_pending_year_change_request`). Requires `account_allows_lms()`.
-- Approve (`manage_year_changes`): expire current live enrollment, insert `active` for `to_year_id`, audit; keep live `subscriptions.year_id` in sync with the new class. Does **not** change `profiles.account_status`.
+- Approve (`manage_year_changes`): expire current live enrollment, insert `active` for `to_year_id`, audit; keep live `subscriptions.year_id` and `subscriptions.plan_id` in sync with the new class (remap `plan_id` to an active destination-year plan preferring the same `is_complimentary`, then `sort_order`/`name`; preserve `starts_at`/`ends_at`). Fail with `destination_plan_unavailable` before mutating enrollment if no active destination plan exists. Does **not** change `profiles.account_status`.
 - Reject (`manage_year_changes`): terminal for that row; student may submit a new request.
 
 ## Subscriptions & applications
@@ -120,7 +120,7 @@ Status transitions are now enforced at the database level (`protect_question_sta
 - Live entitlement: `status = 'active' AND now() < ends_at + grace_days` (server clock). `expire_due_subscriptions()` sets `expired` when `now() >= ends_at + grace_days`. Access helpers do **not** wait for that UPDATE.
 - Renewal while still live (including grace): **update the existing active row** `ends_at := ends_at + duration` (from **existing end**, not `now()`). Do not insert a second active row. New period when none live: insert a new `active` row with `starts_at = now()`, `ends_at` from duration or admin dates; previous expired/deactivated rows remain history. Admin mutations write `audit_logs`.
 - `paid_access_mode = grants_only`: paid (`any_subscription` / `plan`) resources require a live grant; free entitlement still applies. `all_entitled` is the default overlay.
-- Students SELECT own rows only. Writes via admin RPCs (`manage_subscriptions`).
+- Students SELECT own rows only. Writes via admin RPCs (`manage_subscriptions`). `assign_subscription_plan` may only assign an active plan whose `year_id` equals the subscription’s `year_id` (`plan_year_mismatch` otherwise).
 
 **subscription_applications** — `student_id`, `plan_id` (**required** on create/update via RPC — student must select an active class-scoped plan; no single-global-plan auto-resolve), `amount numeric not null check (amount > 0)` (student-submitted / reviewed transfer amount — **not** silently replaced by `subscription_plans.price`), `currency text not null default 'PKR'`, `screenshot_object_key text not null`, `status check in ('pending','approved','rejected','cancelled')`, `reviewed_by`, `reviewed_at`, `review_note`.
 - **Selected purchase class (SPEC FREEZE):** `year_id` (FK → `years`) stored at application submit. While `pending`, that class lock applies to the student. On **approve**, the purchased class is copied onto `subscriptions.year_id` (and enrollment aligned). Additive column is a future migration dependency; product law is frozen here.

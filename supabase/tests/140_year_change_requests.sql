@@ -27,6 +27,26 @@ select id into temp t_plan
   order by sort_order, name
   limit 1;
 
+-- Destination-year plans required so approve can remap plan_id coherently.
+insert into public.subscription_plans (
+  name, description, duration_days, is_complimentary, is_active, sort_order, year_id, price
+)
+select
+  'YC Dest Plan Y' || y.year_number,
+  'fixture',
+  365,
+  false,
+  true,
+  0,
+  y.id,
+  600
+from public.years y
+where y.year_number in (2, 3, 4)
+  and not exists (
+    select 1 from public.subscription_plans sp
+    where sp.year_id = y.id and sp.is_active
+  );
+
 -- SPEC FREEZE: year_change_requests is the locked (subscribed) path.
 -- Give both students a live subscription so create_year_change_request is allowed.
 insert into public.subscriptions (

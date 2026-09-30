@@ -40,6 +40,26 @@ select
   0,
   'all_entitled';
 
+-- Destination years need active plans so approve can remap plan_id.
+insert into public.subscription_plans (
+  name, description, duration_days, is_complimentary, is_active, sort_order, year_id, price
+)
+select
+  'YI Dest Plan Y' || y.year_number,
+  'fixture',
+  365,
+  false,
+  true,
+  0,
+  y.id,
+  600
+from public.years y
+where y.year_number in (3, 4)
+  and not exists (
+    select 1 from public.subscription_plans sp
+    where sp.year_id = y.id and sp.is_active
+  );
+
 insert into public.subjects (year_id, name)
 values
   ((select id from t_y3), 'YI_Y3_subj'),

@@ -192,6 +192,27 @@ select ok(
 ------------------------------------------------------------------
 -- 5) Year change does not block own historical result
 ------------------------------------------------------------------
+-- Destination year needs an active plan so promote can remap plan_id.
+select test_helpers.as_runner();
+insert into public.subscription_plans (
+  name, description, duration_days, is_complimentary, is_active, sort_order, year_id, price
+)
+select
+  '8JB Promote Dest',
+  'fixture',
+  365,
+  false,
+  true,
+  0,
+  y.id,
+  600
+from public.years y
+where y.year_number = 2
+  and not exists (
+    select 1 from public.subscription_plans sp
+    where sp.year_id = y.id and sp.is_active and sp.is_complimentary = false
+  );
+
 select test_helpers.as_user((select id from t_admin));
 select public.promote_student((select id from t_student));
 

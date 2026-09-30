@@ -153,11 +153,11 @@ Previous classes: `expired` (promotion, approved year change, or free self-serve
 |---|---|
 | Free (no live subscription, no pending application) | Self-serve; student may change class **freely**. |
 | Pending subscription application | Class **locked** while pending. Application stores selected purchase class (`subscription_applications.year_id`) and the explicit class-scoped `plan_id` (must match that year; student must be enrolled). |
-| Live / active subscription | Class **locked** to `subscriptions.year_id`. Change only via admin-mediated `year_change_requests` / `promote_student`, keeping subscription class in sync. |
+| Live / active subscription | Class **locked** to `subscriptions.year_id`. Change only via admin-mediated `year_change_requests` / `promote_student`, keeping subscription class and `plan_id` in sync with the destination year. |
 
-`promote_student(student_id)` remains: expire current, insert `active` for year+1, audit-logged. Requires `manage_year_changes`. Align live `subscriptions.year_id` when present.
+`promote_student(student_id)` remains: expire current, insert `active` for year+1, audit-logged. Requires `manage_year_changes`. Align live `subscriptions.year_id` and `subscriptions.plan_id` when present (same destination-plan remap as year-change approve).
 
-**Year-change requests:** for **subscribed / class-locked** students needing admin approval (`create_year_change_request` / `update_pending_year_change_request`). One pending request per student. Admin approves or rejects (`approve_year_change_request` / `reject_year_change_request`, permission `manage_year_changes`). Approve expires the current class row and inserts `active` for the requested year without changing `account_status`; keep `subscriptions.year_id` in sync. Students never write `enrollments` directly.
+**Year-change requests:** for **subscribed / class-locked** students needing admin approval (`create_year_change_request` / `update_pending_year_change_request`). One pending request per student. Admin approves or rejects (`approve_year_change_request` / `reject_year_change_request`, permission `manage_year_changes`). Approve expires the current class row and inserts `active` for the requested year without changing `account_status`; keep `subscriptions.year_id` and `subscriptions.plan_id` in sync (remap plan to an active destination-year plan; preserve the subscription window). Students never write `enrollments` directly.
 
 **Migration:** existing `enrollments.status = 'pending'` rows are **auto-activated** (LMS-approval model retired).
 
