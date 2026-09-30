@@ -35,6 +35,11 @@ test.describe("pdf range reader staging", () => {
     await expect(page.getByTestId("pdf-viewer")).toBeVisible({
       timeout: 120_000,
     });
+    // Offline status lives under the compact "More" overflow on the mobile-first chrome.
+    const more = page.getByTestId("pdf-more");
+    if (await more.isVisible()) {
+      await more.click();
+    }
     await expect(page.getByTestId("pdf-offline-status")).toContainText(
       /Available online|Available offline/i
     );
@@ -45,7 +50,7 @@ test.describe("pdf range reader staging", () => {
       page.getByRole("button", { name: /Download PDF/i })
     ).toHaveCount(0);
 
-    const next = page.getByRole("button", { name: "Next" });
+    const next = page.getByTestId("pdf-next");
     if (await next.isEnabled()) {
       await next.click();
       await page.waitForTimeout(1000);
