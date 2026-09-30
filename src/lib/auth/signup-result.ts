@@ -15,6 +15,8 @@ export type SignUpUserLike = {
 export type SignUpErrorLike = {
   message?: string | null;
   code?: string | null;
+  /** HTTP status when present on AuthApiError (e.g. 429). */
+  status?: number | null;
 } | null;
 
 export type SignUpOutcome =
@@ -22,6 +24,36 @@ export type SignUpOutcome =
   | { outcome: "existing_verified" }
   | { outcome: "needs_verification" }
   | { outcome: "session" };
+
+/**
+ * Strip user-identifying / secret-looking substrings from Auth error text
+ * before it hits server logs. Keeps the surrounding diagnostic wording.
+ */
+export function sanitizeAuthErrorMessageForLog(message: string): string {
+  return message
+    .replace(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi, "[email]")
+    // Compact JWT-shaped tokens if Auth ever echoes one in a message.
+    .replace(
+      /\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/g,
+      "[token]"
+    )
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
+/**
+ * Compact Auth failure detail for server logs only.
+ * Includes code / status / sanitized message — never raw emails, passwords, or tokens.
+ */
+export function formatSignUpAuthErrorForLog(error: SignUpErrorLike): string {
+  if (!error) return "(no error)";
+  const parts: string[] = [];
+  if (error.code) parts.push(`code=${error.code}`);
+  if (typeof error.status === "number") parts.push(`status=${error.status}`);
+  const message = sanitizeAuthErrorMessageForLog((error.message ?? "").trim());
+  if (message) parts.push(message);
+  return parts.length > 0 ? parts.join(" ") : "(empty Auth error)";
+}
 
 export function isExplicitUserAlreadyRegistered(
   error: SignUpErrorLike

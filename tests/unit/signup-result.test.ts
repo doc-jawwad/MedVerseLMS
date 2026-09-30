@@ -2,8 +2,66 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   classifySignUpResult,
+  formatSignUpAuthErrorForLog,
   isExplicitUserAlreadyRegistered,
+  sanitizeAuthErrorMessageForLog,
 } from "../../src/lib/auth/signup-result.ts";
+
+describe("sanitizeAuthErrorMessageForLog", () => {
+  it("redacts email addresses", () => {
+    assert.equal(
+      sanitizeAuthErrorMessageForLog(
+        "Unable to send to student@college.edu.pk — try again"
+      ),
+      "Unable to send to [email] — try again"
+    );
+  });
+
+  it("redacts JWT-shaped tokens", () => {
+    assert.equal(
+      sanitizeAuthErrorMessageForLog(
+        "bad token eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.signature leftover"
+      ),
+      "bad token [token] leftover"
+    );
+  });
+});
+
+describe("formatSignUpAuthErrorForLog", () => {
+  it("joins code, status, and message without fabricating fields", () => {
+    assert.equal(
+      formatSignUpAuthErrorForLog({
+        code: "over_email_send_rate_limit",
+        status: 429,
+        message: "email rate limit exceeded",
+      }),
+      "code=over_email_send_rate_limit status=429 email rate limit exceeded"
+    );
+  });
+
+  it("handles message-only Auth errors", () => {
+    assert.equal(
+      formatSignUpAuthErrorForLog({ message: "Signup requires a valid password" }),
+      "Signup requires a valid password"
+    );
+  });
+
+  it("redacts emails embedded in Auth messages", () => {
+    assert.equal(
+      formatSignUpAuthErrorForLog({
+        code: "unexpected_failure",
+        status: 500,
+        message: "Could not deliver mail to alice@example.com",
+      }),
+      "code=unexpected_failure status=500 Could not deliver mail to [email]"
+    );
+  });
+
+  it("handles null / empty Auth errors", () => {
+    assert.equal(formatSignUpAuthErrorForLog(null), "(no error)");
+    assert.equal(formatSignUpAuthErrorForLog({}), "(empty Auth error)");
+  });
+});
 
 describe("isExplicitUserAlreadyRegistered", () => {
   it("matches code and message variants", () => {

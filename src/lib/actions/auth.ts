@@ -2,7 +2,10 @@
 
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { classifySignUpResult } from "@/lib/auth/signup-result";
+import {
+  classifySignUpResult,
+  formatSignUpAuthErrorForLog,
+} from "@/lib/auth/signup-result";
 import { isBlockedAccountStatus } from "@/lib/auth/account-status";
 import {
   clearVerifyEmailCookie,
@@ -71,6 +74,11 @@ export async function signUp(
       },
     },
   });
+
+  // Observability only — client-facing classification stays sanitized below.
+  if (error) {
+    logServerError("signUp", formatSignUpAuthErrorForLog(error));
+  }
 
   const classified = classifySignUpResult({
     user: data.user,
