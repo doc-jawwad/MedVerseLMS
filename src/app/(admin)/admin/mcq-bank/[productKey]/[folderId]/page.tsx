@@ -5,6 +5,7 @@ import {
   McqBankFolderQuestions,
   type FolderMaterialRow,
   type FolderQuestionRow,
+  type SiblingFolderOption,
 } from "../../mcq-bank-folder-questions";
 
 export const metadata = { title: "MCQ Bank folder — MedVerse Admin" };
@@ -67,22 +68,26 @@ export default async function AdminMcqBankFolderPage({
         folder = refreshed.data ?? folder;
       }
 
-      const [{ data: rows, error }, materialsRes] = await Promise.all([
-        supabase.rpc("admin_list_folder_questions", {
-          p_folder_id: folderId,
-          p_limit: PAGE_SIZE,
-          p_offset: page * PAGE_SIZE,
-        }),
-        folder.material_folder_id
-          ? supabase
-              .from("materials")
-              .select("id, title, description, kind, status")
-              .eq("folder_id", folder.material_folder_id)
-              .is("deleted_at", null)
-              .order("sort_order")
-              .order("title")
-          : Promise.resolve({ data: [] as FolderMaterialRow[], error: null }),
-      ]);
+      const [{ data: rows, error }, materialsRes, siblingsRes] =
+        await Promise.all([
+          supabase.rpc("admin_list_folder_questions", {
+            p_folder_id: folderId,
+            p_limit: PAGE_SIZE,
+            p_offset: page * PAGE_SIZE,
+          }),
+          folder.material_folder_id
+            ? supabase
+                .from("materials")
+                .select("id, title, description, kind, status")
+                .eq("folder_id", folder.material_folder_id)
+                .is("deleted_at", null)
+                .order("sort_order")
+                .order("title")
+            : Promise.resolve({ data: [] as FolderMaterialRow[], error: null }),
+          supabase.rpc("admin_list_mcq_bank_folders", {
+            p_product_subject_id: subject.id,
+          }),
+        ]);
 
       if (error) {
         return (
@@ -121,6 +126,16 @@ export default async function AdminMcqBankFolderPage({
         })
       );
 
+      const siblingFolders: SiblingFolderOption[] = (
+        (siblingsRes.data ?? []) as Array<{
+          folder_id: string;
+          name: string;
+        }>
+      ).map((f) => ({
+        folder_id: f.folder_id,
+        name: f.name,
+      }));
+
       const totalCount =
         list.length > 0 ? Number(list[0]!.total_count ?? 0) : 0;
 
@@ -134,6 +149,7 @@ export default async function AdminMcqBankFolderPage({
           materialFolderId={folder.material_folder_id}
           materials={materials}
           questions={questions}
+          siblingFolders={siblingFolders}
           totalCount={totalCount}
           page={page}
           pageSize={PAGE_SIZE}

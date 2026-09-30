@@ -37,6 +37,20 @@ describe("content bin mcq_bank_folder label", () => {
   });
 });
 
+describe("mcq bank folder bulk UX constants", () => {
+  it("keeps folder delete empty contract distinct from question soft-delete", () => {
+    // Remove-from-folder is unassign; Move-to-Bin is soft-delete — UI must not collapse.
+    assert.equal(
+      isMcqBankFolderEmptyForDelete({ question_count: 0, pdf_count: 0 }),
+      true
+    );
+    assert.equal(
+      mcqBankFolderDeleteBlockedReason({ question_count: 5, pdf_count: 0 }),
+      "Remove 5 questions first."
+    );
+  });
+});
+
 describe("mcq bank folder delete UI contract", () => {
   it("allows delete only when questions and PDFs are both zero", () => {
     assert.equal(
