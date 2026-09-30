@@ -1,0 +1,12 @@
+[Unit]
+Description=MedVerse LMS staging R2 purge queue every 5 minutes
+Documentation=file:///opt/medverse-staging/current/docs/deployment.md
+
+[Timer]
+OnCalendar=*-*-* *:0/5:00
+AccuracySec=30s
+Persistent=true
+Unit=medverse-staging-r2-purge.service
+
+[Install]
+WantedBy=timers.target

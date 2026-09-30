@@ -12,6 +12,7 @@ select test_helpers.make_question((select topic_id from curriculum)) as id into 
 
 -- Deletable soft-deleted question with 2 versions + practice answer
 select test_helpers.make_question((select topic_id from curriculum)) as id into temp t_purge;
+grant select on curriculum, t_admin, t_keep, t_purge to anon, authenticated;
 select test_helpers.as_user((select id from t_admin));
 select public.create_question_version(
   (select id from t_purge),
@@ -44,17 +45,24 @@ where id = (select id from t_purge);
 
 -- Test-referenced soft-deleted question (must block)
 select test_helpers.make_question((select topic_id from curriculum)) as id into temp t_blocked;
-insert into public.tests (
-  title, year_id, status, opens_at, closes_at, duration_minutes, min_questions
-) values (
-  'Bin purge block test',
-  (select year_id from curriculum),
-  'draft',
-  now() + interval '1 day',
-  now() + interval '2 days',
-  30,
-  1
-) returning id into temp t_test;
+grant select on t_blocked to anon, authenticated;
+
+with ins as (
+  insert into public.tests (
+    title, year_id, status, opens_at, closes_at, duration_minutes, min_questions
+  ) values (
+    'Bin purge block test',
+    (select year_id from curriculum),
+    'draft',
+    now() + interval '1 day',
+    now() + interval '2 days',
+    30,
+    1
+  )
+  returning id
+)
+select id into temp t_test from ins;
+grant select on t_test to anon, authenticated;
 insert into public.test_questions (test_id, question_id, question_version_id, position)
 select
   (select id from t_test),
@@ -109,6 +117,7 @@ select ok(
 -- Batch path: purge one, block test-referenced
 ------------------------------------------------------------------
 select test_helpers.make_question((select topic_id from curriculum)) as id into temp t_batch;
+grant select on t_batch to anon, authenticated;
 update public.questions
 set deleted_at = now(), purge_after = now() + interval '7 days', deleted_by = (select id from t_admin)
 where id = (select id from t_batch);
