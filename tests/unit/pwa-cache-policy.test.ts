@@ -140,6 +140,11 @@ describe("PWA cache policy", () => {
     assert.match(sw, /X-Amz-Signature/);
     assert.match(sw, /data\.type === "SKIP_WAITING"/);
     assert.match(sw, /addEventListener\("install"/);
+    const installBlock = sw.slice(
+      sw.indexOf('addEventListener("install"'),
+      sw.indexOf('addEventListener("activate"')
+    );
+    assert.doesNotMatch(installBlock, /self\.skipWaiting\s*\(/);
   });
 
   it("recognizes offline shell paths", async () => {

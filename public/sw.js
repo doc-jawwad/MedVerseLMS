@@ -31,6 +31,8 @@ const EXAM_PREVIEW = /\/tests\/[^/]+\/preview(?:\/|$)/;
 const PRECACHE_SHELL = ["/offline", "/pdf.worker.min.mjs"];
 
 self.addEventListener("install", (event) => {
+  // Do NOT call skipWaiting() here — stay in waiting until the app posts
+  // SKIP_WAITING (user tapped "Update now"). Auto-activate races the banner.
   event.waitUntil(
     (async () => {
       const cache = await caches.open(SHELL_CACHE);
@@ -43,7 +45,6 @@ self.addEventListener("install", (event) => {
             .catch(() => undefined)
         )
       );
-      self.skipWaiting();
     })()
   );
 });

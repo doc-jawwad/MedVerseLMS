@@ -46,17 +46,26 @@ describe("protected pdf reader policy", () => {
       join("src", "components", "study", "pdf-viewer.tsx"),
       "utf8"
     );
+    const progress = readFileSync(
+      join("src", "lib", "study", "pdf-reading-progress.ts"),
+      "utf8"
+    );
     assert.match(src, /createOnlinePdfRangeTransport/);
     assert.match(src, /disableAutoFetch:\s*true/);
     assert.match(src, /Confirm save/);
     assert.match(src, /estimateOfflineQuota/);
-    assert.match(src, /mv-pdf-page:/);
+    assert.match(src, /loadPdfReadingPage/);
+    assert.match(src, /createDebouncedPageSaver/);
+    assert.match(src, /fitWidthScale/);
+    assert.match(src, /classList\.(add|remove)\("pinching"\)/);
     assert.match(src, /Failed — Retry/);
     assert.match(src, /createOpfsPdfRangeTransport/);
     assert.match(src, /requestCacheOfflineReader/);
     assert.match(src, /contentRevision/);
     assert.match(src, /TextLayer/);
     assert.match(src, /pdf-text-layer/);
+    assert.match(progress, /mv-pdf-page:/);
+    assert.match(progress, /pdf_reading_progress/);
     // Must not use pdfjs url-mode (broken against coerced leading 206).
     assert.doesNotMatch(src, /getDocument\(\{\s*url:\s*sourceUrl/);
   });

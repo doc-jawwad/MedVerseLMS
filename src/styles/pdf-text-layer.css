@@ -64,15 +64,50 @@
 
 .pdf-viewer-scroll {
   touch-action: pan-x pan-y;
+  -webkit-overflow-scrolling: touch;
 }
 
 .pdf-viewer-scroll.pinching {
   touch-action: none;
+  overflow: hidden;
 }
 
-.pdf-viewer-fs-close {
-  position: fixed;
-  top: 0.75rem;
-  right: 0.75rem;
-  z-index: 50;
+.pdf-viewer-root {
+  /* Fill the student reading surface on phones */
+  width: 100%;
+}
+
+.pdf-viewer-root--fs {
+  padding: env(safe-area-inset-top) env(safe-area-inset-right)
+    env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+
+.pdf-safe-top {
+  padding-top: max(0.35rem, env(safe-area-inset-top));
+}
+
+.pdf-safe-bottom {
+  padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
+}
+
+.pdf-viewer-chrome {
+  /* Keep chrome from eating the whole viewport */
+  max-height: 55%;
+}
+
+/* Mobile reading route: full-bleed reader without article margins */
+@media (max-width: 767px) {
+  .pdf-read-page {
+    margin-inline: 0 !important;
+    max-width: none !important;
+    width: 100%;
+    gap: 0.5rem;
+  }
+
+  .pdf-read-page .pdf-viewer-root {
+    min-height: calc(100dvh - 7.5rem - env(safe-area-inset-bottom));
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+  }
 }

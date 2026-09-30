@@ -6,10 +6,12 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
 import { usePathname } from "next/navigation";
+import { applyServiceWorkerUpdate } from "@/lib/pwa/apply-update";
 import { PWA_SW_PATH } from "@/lib/pwa/cache-policy";
 import {
   detectInstallPlatform,
@@ -56,6 +58,7 @@ export function PwaRuntimeProvider({ children }: { children: ReactNode }) {
     null
   );
   const [waiting, setWaiting] = useState<ServiceWorker | null>(null);
+  const registrationRef = useRef<ServiceWorkerRegistration | null>(null);
   const [examActive, setExamActive] = useState(false);
 
   useEffect(() => {
@@ -111,17 +114,17 @@ export function PwaRuntimeProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!("serviceWorker" in navigator)) return;
-    let registration: ServiceWorkerRegistration | undefined;
     let cancelled = false;
 
     function track(reg: ServiceWorkerRegistration) {
-      registration = reg;
+      registrationRef.current = reg;
       if (reg.waiting) setWaiting(reg.waiting);
       reg.addEventListener("updatefound", () => {
         const worker = reg.installing;
         if (!worker) return;
         worker.addEventListener("statechange", () => {
           if (worker.state === "installed" && navigator.serviceWorker.controller) {
+            // Prefer the real waiting worker (install no longer auto-skipWaiting).
             setWaiting(reg.waiting ?? worker);
           }
         });
@@ -140,11 +143,13 @@ export function PwaRuntimeProvider({ children }: { children: ReactNode }) {
       });
 
     const onVisible = () => {
-      if (document.visibilityState === "visible") void registration?.update();
+      if (document.visibilityState === "visible") {
+        void registrationRef.current?.update();
+      }
     };
     document.addEventListener("visibilitychange", onVisible);
     const interval = window.setInterval(() => {
-      void registration?.update();
+      void registrationRef.current?.update();
     }, 60 * 60 * 1000);
 
     return () => {
@@ -168,18 +173,31 @@ export function PwaRuntimeProvider({ children }: { children: ReactNode }) {
   }, [deferred]);
 
   const applyUpdate = useCallback(() => {
-    const worker = waiting;
-    if (!worker) {
-      window.location.reload();
-      return;
-    }
-    let reloading = false;
-    navigator.serviceWorker.addEventListener("controllerchange", () => {
-      if (reloading) return;
-      reloading = true;
-      window.location.reload();
+    const reg = registrationRef.current;
+    const worker = reg?.waiting ?? waiting;
+    setWaiting(null);
+    applyServiceWorkerUpdate({
+      getWaiting: () => worker ?? reg?.waiting ?? null,
+      postSkipWaiting: (sw) => {
+        sw.postMessage({ type: "SKIP_WAITING" });
+      },
+      addControllerChangeListener: (handler) => {
+        navigator.serviceWorker.addEventListener("controllerchange", handler);
+      },
+      removeControllerChangeListener: (handler) => {
+        navigator.serviceWorker.removeEventListener(
+          "controllerchange",
+          handler
+        );
+      },
+      reload: () => {
+        window.location.reload();
+      },
+      fallbackMs: 1500,
+      schedule: (fn, ms) =>
+        setTimeout(fn, ms) as unknown as ReturnType<typeof setTimeout>,
+      clearSchedule: (id) => clearTimeout(id as unknown as number),
     });
-    worker.postMessage({ type: "SKIP_WAITING" });
   }, [waiting]);
 
   const examChrome = isExamLikePath(pathname) || examActive;

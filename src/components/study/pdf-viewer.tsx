@@ -36,6 +36,19 @@ import {
   pdfRectsToViewportBoxes,
   type PdfHighlightRow,
 } from "@/lib/study/pdf-highlights";
+import { clampPage } from "@/lib/study/pdf-page-clamp";
+import {
+  createDebouncedPageSaver,
+  loadPdfReadingPage,
+} from "@/lib/study/pdf-reading-progress";
+import { fitWidthScale } from "@/lib/study/pdf-fit-width";
+import {
+  CHROME_IDLE_MS,
+  MAX_SCALE,
+  MIN_SCALE,
+  PROGRESS_SAVE_MS,
+  SCALE_STEP,
+} from "@/lib/study/pdf-viewer-constants";
 import "@/styles/pdf-text-layer.css";
 
 type PdfjsLib = typeof import("pdfjs-dist");
@@ -44,9 +57,6 @@ type PdfPage = import("pdfjs-dist").PDFPageProxy;
 type PdfViewport = ReturnType<PdfPage["getViewport"]>;
 
 const ENTITLEMENT_TTL_MS = 24 * 60 * 60 * 1000;
-const MIN_SCALE = 0.5;
-const MAX_SCALE = 4;
-const SCALE_STEP = 0.15;
 
 type OfflineUi =
   | "checking"
@@ -62,25 +72,14 @@ function formatPct(loaded: number, total: number): string {
   return `${Math.min(100, Math.round((loaded / total) * 100))}%`;
 }
 
-function progressKey(materialId: string): string {
-  return `mv-pdf-page:${materialId}`;
-}
-
-function readSavedPage(materialId: string): number | null {
+function canUseOrientationLock(): boolean {
   try {
-    const raw = localStorage.getItem(progressKey(materialId));
-    const n = Number(raw);
-    return Number.isFinite(n) && n >= 1 ? Math.floor(n) : null;
+    const orientation = screen.orientation as ScreenOrientation & {
+      lock?: (orientation: string) => Promise<void>;
+    };
+    return typeof orientation?.lock === "function";
   } catch {
-    return null;
-  }
-}
-
-function writeSavedPage(materialId: string, page: number): void {
-  try {
-    localStorage.setItem(progressKey(materialId), String(page));
-  } catch {
-    /* quota / private mode */
+    return false;
   }
 }
 
@@ -103,6 +102,7 @@ export function PdfViewer({
   const highlightLayerRef = useRef<HTMLDivElement>(null);
   const pageStageRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
   const pdfRef = useRef<PdfDocument | null>(null);
   const pdfjsRef = useRef<PdfjsLib | null>(null);
   const viewportRef = useRef<PdfViewport | null>(null);
@@ -118,10 +118,15 @@ export function PdfViewer({
     startDistance: number;
     startScale: number;
   } | null>(null);
+  const chromeIdleRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pageSaverRef = useRef<ReturnType<typeof createDebouncedPageSaver> | null>(
+    null
+  );
+  const fittedOnceRef = useRef(false);
 
   const [page, setPage] = useState(1);
   const [pageCount, setPageCount] = useState(0);
-  const [scale, setScale] = useState(1.15);
+  const [scale, setScale] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -130,6 +135,7 @@ export function PdfViewer({
     Array<{ title: string; pageNumber: number }>
   >([]);
   const [showOutline, setShowOutline] = useState(false);
+  const [showMore, setShowMore] = useState(false);
   const [offlineUi, setOfflineUi] = useState<OfflineUi>("checking");
   const [savePct, setSavePct] = useState("");
   const [pendingSaveSize, setPendingSaveSize] = useState<number | null>(null);
@@ -139,6 +145,8 @@ export function PdfViewer({
   const highlightsRef = useRef<PdfHighlightRow[]>([]);
   highlightsRef.current = highlights;
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [chromeVisible, setChromeVisible] = useState(true);
+  const [orientationLockSupported, setOrientationLockSupported] = useState(false);
   const [pendingHighlight, setPendingHighlight] = useState<{
     rects: ReturnType<typeof clientRectsToPdfRects>;
     text: string;
@@ -399,11 +407,25 @@ export function PdfViewer({
         pdfRef.current?.destroy().catch(() => undefined);
         pdfRef.current = doc;
         setPageCount(doc.numPages);
-        const saved = readSavedPage(materialId);
-        const startPage =
-          saved && saved >= 1 && saved <= doc.numPages ? saved : 1;
+        const saved = await loadPdfReadingPage(materialId);
+        if (gen !== loadGenRef.current) return;
+        const startPage = clampPage(saved ?? 1, doc.numPages);
+
+        let nextScale = scale;
+        try {
+          const first = await doc.getPage(startPage);
+          const base = first.getViewport({ scale: 1 });
+          const scrollEl = scrollRef.current ?? containerRef.current;
+          const width = scrollEl?.clientWidth ?? window.innerWidth;
+          nextScale = fitWidthScale(width, base.width, 8);
+          setScale(nextScale);
+          fittedOnceRef.current = true;
+        } catch {
+          /* keep current scale */
+        }
+
         setPage(startPage);
-        await renderPage(doc, startPage, scale);
+        await renderPage(doc, startPage, nextScale);
         if (gen !== loadGenRef.current) return;
 
         try {
@@ -506,6 +528,69 @@ export function PdfViewer({
     return () => document.removeEventListener("fullscreenchange", onFs);
   }, []);
 
+  useEffect(() => {
+    pageSaverRef.current = createDebouncedPageSaver(materialId, PROGRESS_SAVE_MS);
+    fittedOnceRef.current = false;
+    return () => {
+      pageSaverRef.current?.flush();
+      pageSaverRef.current?.cancel();
+      pageSaverRef.current = null;
+    };
+  }, [materialId]);
+
+  useEffect(() => {
+    setOrientationLockSupported(canUseOrientationLock());
+  }, []);
+
+  const bumpChrome = useCallback(() => {
+    setChromeVisible(true);
+    if (chromeIdleRef.current) clearTimeout(chromeIdleRef.current);
+    chromeIdleRef.current = setTimeout(() => {
+      setChromeVisible(false);
+      setShowMore(false);
+    }, CHROME_IDLE_MS);
+  }, []);
+
+  useEffect(() => {
+    bumpChrome();
+    return () => {
+      if (chromeIdleRef.current) clearTimeout(chromeIdleRef.current);
+    };
+  }, [bumpChrome, page, isFullscreen]);
+
+  const fitToWidth = useCallback(async () => {
+    const doc = pdfRef.current;
+    if (!doc) return;
+    try {
+      const pdfPage = await doc.getPage(page);
+      const base = pdfPage.getViewport({ scale: 1 });
+      const scrollEl = scrollRef.current ?? containerRef.current;
+      const width = scrollEl?.clientWidth ?? window.innerWidth;
+      setScale(fitWidthScale(width, base.width, 8));
+      bumpChrome();
+    } catch {
+      /* ignore */
+    }
+  }, [bumpChrome, page]);
+
+  const toggleOrientationLock = useCallback(async () => {
+    if (!canUseOrientationLock()) return;
+    try {
+      const orientation = screen.orientation as ScreenOrientation & {
+        lock: (orientation: string) => Promise<void>;
+      };
+      const type = orientation.type;
+      if (type.startsWith("landscape")) {
+        await orientation.lock("portrait");
+      } else {
+        await orientation.lock("landscape");
+      }
+      bumpChrome();
+    } catch {
+      toast.message("Orientation lock is not available on this device.");
+    }
+  }, [bumpChrome]);
+
   // Re-paint overlays when highlights change without full page re-render.
   useEffect(() => {
     const vp = viewportRef.current;
@@ -516,7 +601,7 @@ export function PdfViewer({
   useEffect(() => {
     const doc = pdfRef.current;
     if (!doc || loading) return;
-    writeSavedPage(materialId, page);
+    pageSaverRef.current?.save(page);
     void renderPage(doc, page, scale);
   }, [page, scale, loading, materialId, renderPage]);
 
@@ -548,7 +633,8 @@ export function PdfViewer({
 
   const goPage = (n: number) => {
     if (pageCount <= 0) return;
-    setPage(Math.min(pageCount, Math.max(1, n)));
+    setPage(clampPage(n, pageCount));
+    bumpChrome();
   };
 
   const onJump = (e: FormEvent<HTMLFormElement>) => {
@@ -626,10 +712,12 @@ export function PdfViewer({
   const onPinchStart = (e: ReactTouchEvent<HTMLDivElement>) => {
     if (e.touches.length !== 2) {
       pinchRef.current = null;
+      scrollRef.current?.classList.remove("pinching");
       return;
     }
     // Two-finger pinch: prevent page scroll while zooming.
     e.preventDefault();
+    scrollRef.current?.classList.add("pinching");
     pinchRef.current = {
       startDistance: touchDistance(e.touches),
       startScale: scale,
@@ -648,6 +736,25 @@ export function PdfViewer({
 
   const onPinchEnd = () => {
     pinchRef.current = null;
+    scrollRef.current?.classList.remove("pinching");
+  };
+
+  const onStagePointerUp = (e: ReactPointerEvent<HTMLDivElement>) => {
+    // Only toggle chrome for taps on the document stage (not chrome overlays).
+    const target = e.target as HTMLElement | null;
+    if (!target?.closest?.("[data-testid='pdf-page-stage']")) return;
+    // Ignore taps that end a text selection (highlight flow handles those).
+    const sel = window.getSelection();
+    if (sel && !sel.isCollapsed) return;
+    if (target.closest?.(".pdf-highlight-mark")) return;
+    setChromeVisible((v) => !v);
+    if (chromeIdleRef.current) clearTimeout(chromeIdleRef.current);
+    if (!chromeVisible) {
+      chromeIdleRef.current = setTimeout(() => {
+        setChromeVisible(false);
+        setShowMore(false);
+      }, CHROME_IDLE_MS);
+    }
   };
 
   const captureSelectionForHighlight = () => {
@@ -888,266 +995,25 @@ export function PdfViewer({
       ref={containerRef}
       className={
         isFullscreen
-          ? "fixed inset-0 z-50 flex flex-col bg-neutral-950"
-          : "grid gap-2 rounded-xl border bg-card p-2 sm:gap-3 sm:p-3"
+          ? "pdf-viewer-root pdf-viewer-root--fs fixed inset-0 z-50 flex flex-col bg-neutral-950"
+          : "pdf-viewer-root relative flex min-h-[70vh] flex-col overflow-hidden rounded-xl border bg-card md:min-h-[75vh]"
       }
       data-testid="pdf-viewer"
       data-fullscreen={isFullscreen ? "true" : "false"}
+      data-chrome={chromeVisible ? "visible" : "hidden"}
     >
-      {isFullscreen ? (
-        <Button
-          type="button"
-          size="icon"
-          variant="secondary"
-          className="pdf-viewer-fs-close h-9 w-9 rounded-full shadow"
-          onClick={exitFullscreen}
-          aria-label="Exit fullscreen"
-          data-testid="pdf-fullscreen-close"
-        >
-          ×
-        </Button>
-      ) : null}
-
-      {!isFullscreen ? (
-        <>
-      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
-        <div className="grid gap-0.5">
-          <span data-testid="pdf-offline-status">{offlineLabel}</span>
-          {offlineUsageLabel ? (
-            <span data-testid="pdf-offline-usage">{offlineUsageLabel}</span>
-          ) : null}
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {offlineUi === "saving" ? (
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              onClick={cancelOfflineSave}
-            >
-              Cancel save
-            </Button>
-          ) : pendingSaveSize != null ? (
-            <>
-              <Button
-                type="button"
-                size="sm"
-                onClick={() => void runOfflineSave()}
-                data-testid="pdf-offline-confirm"
-              >
-                Confirm save ({formatByteSize(pendingSaveSize)})
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant="ghost"
-                onClick={() => setPendingSaveSize(null)}
-              >
-                Cancel
-              </Button>
-            </>
-          ) : offlineUi === "save_failed" ? (
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              onClick={() => void startOfflineSave()}
-              data-testid="pdf-offline-retry"
-            >
-              Retry
-            </Button>
-          ) : (
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              disabled={offlineUi === "checking"}
-              onClick={() => void startOfflineSave()}
-              data-testid="pdf-save-offline"
-            >
-              Save for Offline
-            </Button>
-          )}
-          {offlineUi === "offline_ready" && (
-            <>
-              {!usingOffline && (
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  onClick={() => void loadDocument({ preferOffline: true })}
-                  data-testid="pdf-open-offline"
-                >
-                  Open offline copy
-                </Button>
-              )}
-              <Button
-                type="button"
-                size="sm"
-                variant="ghost"
-                onClick={() => void clearOffline()}
-              >
-                Remove offline
-              </Button>
-            </>
-          )}
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            onClick={fullscreen}
-            data-testid="pdf-fullscreen"
-          >
-            Fullscreen
-          </Button>
-        </div>
-      </div>
-
-      <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          disabled={page <= 1}
-          onClick={() => goPage(page - 1)}
-        >
-          Previous
-        </Button>
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          disabled={page >= pageCount}
-          onClick={() => goPage(page + 1)}
-        >
-          Next
-        </Button>
-        <form className="flex items-center gap-1" onSubmit={onJump}>
-          <Input
-            name="page"
-            type="number"
-            min={1}
-            max={pageCount || 1}
-            defaultValue={page}
-            key={page}
-            className="h-8 w-14 sm:w-16"
-            aria-label="Page number"
-          />
-          <span className="text-xs text-muted-foreground">/ {pageCount}</span>
-          <Button type="submit" size="sm" variant="ghost">
-            Go
-          </Button>
-        </form>
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          onClick={() =>
-            setScale((s) =>
-              Math.max(MIN_SCALE, Number((s - SCALE_STEP).toFixed(2)))
-            )
-          }
-        >
-          Zoom −
-        </Button>
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          onClick={() =>
-            setScale((s) =>
-              Math.min(MAX_SCALE, Number((s + SCALE_STEP).toFixed(2)))
-            )
-          }
-        >
-          Zoom +
-        </Button>
-        <span className="text-xs text-muted-foreground">
-          {Math.round(scale * 100)}%
-        </span>
-        {outline.length > 0 && (
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            onClick={() => setShowOutline((v) => !v)}
-          >
-            Outline
-          </Button>
-        )}
-      </div>
-
-      <form className="flex flex-wrap items-center gap-2" onSubmit={onSearch}>
-        <Input
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Search in document"
-          className="h-8 max-w-xs"
-        />
-        <Button type="submit" size="sm" variant="outline">
-          Search
-        </Button>
-        {searchStatus ? (
-          <span className="text-xs text-muted-foreground">{searchStatus}</span>
-        ) : null}
-      </form>
-
-      {showOutline && outline.length > 0 && (
-        <div className="max-h-40 overflow-auto rounded border bg-muted/30 p-2 text-sm">
-          {outline.map((item, idx) => (
-            <button
-              key={`${item.pageNumber}-${idx}`}
-              type="button"
-              className="block w-full truncate px-1 py-0.5 text-left hover:bg-muted"
-              onClick={() => goPage(item.pageNumber)}
-            >
-              {item.title}{" "}
-              <span className="text-muted-foreground">p.{item.pageNumber}</span>
-            </button>
-          ))}
-        </div>
-      )}
-
-      {pendingHighlight ? (
-        <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-muted/40 px-2 py-1.5">
-          <span className="max-w-[min(100%,28rem)] truncate text-xs text-muted-foreground">
-            Highlight: “{pendingHighlight.text.slice(0, 80)}
-            {pendingHighlight.text.length > 80 ? "…" : ""}”
-          </span>
-          <Button
-            type="button"
-            size="sm"
-            onClick={() => void savePendingHighlight()}
-            data-testid="pdf-highlight-save"
-          >
-            Save highlight
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant="ghost"
-            onClick={() => {
-              setPendingHighlight(null);
-              window.getSelection()?.removeAllRanges();
-            }}
-          >
-            Cancel
-          </Button>
-        </div>
-      ) : null}
-        </>
-      ) : null}
-
       <div
+        ref={scrollRef}
         className={
           isFullscreen
             ? "pdf-viewer-scroll relative min-h-0 flex-1 overflow-auto bg-neutral-900"
-            : "pdf-viewer-scroll relative overflow-auto rounded border bg-neutral-100"
+            : "pdf-viewer-scroll relative min-h-0 flex-1 overflow-auto bg-neutral-100"
         }
         onTouchStart={onPinchStart}
         onTouchMove={onPinchMove}
         onTouchEnd={onPinchEnd}
         onTouchCancel={onPinchEnd}
+        onPointerUp={onStagePointerUp}
       >
         <div
           ref={pageStageRef}
@@ -1177,12 +1043,321 @@ export function PdfViewer({
         </div>
       </div>
 
-      {!isFullscreen ? (
-        <p className="text-[11px] text-muted-foreground">
-          In-app reader only — no public file link. Select text to highlight
-          (saved to your account). Pinch to zoom on touch devices. Offline
-          copies stay inside MedVerse and expire when access ends.
-        </p>
+      {/* Compact overlay chrome — auto-hides while reading */}
+      <div
+        className={
+          chromeVisible
+            ? "pdf-viewer-chrome pointer-events-none absolute inset-x-0 top-0 z-20 opacity-100 transition-opacity"
+            : "pdf-viewer-chrome pointer-events-none absolute inset-x-0 top-0 z-20 opacity-0 transition-opacity"
+        }
+        aria-hidden={!chromeVisible}
+      >
+        <div className="pointer-events-auto flex items-center gap-1 bg-neutral-950/75 px-2 py-1.5 text-white backdrop-blur-sm pdf-safe-top">
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            className="h-9 min-w-9 px-2 text-white hover:bg-white/15 hover:text-white"
+            disabled={page <= 1}
+            onClick={() => goPage(page - 1)}
+            aria-label="Previous page"
+            data-testid="pdf-prev"
+          >
+            ‹
+          </Button>
+          <form
+            className="flex items-center gap-1"
+            onSubmit={(e) => {
+              bumpChrome();
+              onJump(e);
+            }}
+          >
+            <Input
+              name="page"
+              type="number"
+              min={1}
+              max={pageCount || 1}
+              defaultValue={page}
+              key={page}
+              className="h-8 w-12 border-white/20 bg-white/10 text-center text-white sm:w-14"
+              aria-label="Page number"
+              data-testid="pdf-page-input"
+              onFocus={bumpChrome}
+            />
+            <span className="text-xs text-white/80" data-testid="pdf-page-indicator">
+              / {pageCount}
+            </span>
+          </form>
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            className="h-9 min-w-9 px-2 text-white hover:bg-white/15 hover:text-white"
+            disabled={page >= pageCount}
+            onClick={() => goPage(page + 1)}
+            aria-label="Next page"
+            data-testid="pdf-next"
+          >
+            ›
+          </Button>
+          <div className="ml-auto flex items-center gap-0.5">
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              className="h-9 px-2 text-xs text-white hover:bg-white/15 hover:text-white"
+              onClick={() => {
+                setScale((s) =>
+                  Math.max(MIN_SCALE, Number((s - SCALE_STEP).toFixed(2)))
+                );
+                bumpChrome();
+              }}
+              aria-label="Zoom out"
+              data-testid="pdf-zoom-out"
+            >
+              −
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              className="h-9 px-2 text-xs text-white hover:bg-white/15 hover:text-white"
+              onClick={() => void fitToWidth()}
+              aria-label="Fit width"
+              data-testid="pdf-fit-width"
+            >
+              Fit
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              className="h-9 px-2 text-xs text-white hover:bg-white/15 hover:text-white"
+              onClick={() => {
+                setScale((s) =>
+                  Math.min(MAX_SCALE, Number((s + SCALE_STEP).toFixed(2)))
+                );
+                bumpChrome();
+              }}
+              aria-label="Zoom in"
+              data-testid="pdf-zoom-in"
+            >
+              +
+            </Button>
+            <span className="hidden text-[10px] text-white/70 sm:inline">
+              {Math.round(scale * 100)}%
+            </span>
+            {orientationLockSupported ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                className="h-9 px-2 text-xs text-white hover:bg-white/15 hover:text-white"
+                onClick={() => void toggleOrientationLock()}
+                aria-label="Toggle orientation lock"
+                data-testid="pdf-orientation"
+              >
+                Rotate
+              </Button>
+            ) : null}
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              className="h-9 px-2 text-xs text-white hover:bg-white/15 hover:text-white"
+              onClick={() => {
+                setShowMore((v) => !v);
+                bumpChrome();
+              }}
+              aria-label="More controls"
+              data-testid="pdf-more"
+            >
+              More
+            </Button>
+            {isFullscreen ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                className="h-9 px-2 text-white hover:bg-white/15 hover:text-white"
+                onClick={exitFullscreen}
+                aria-label="Exit fullscreen"
+                data-testid="pdf-fullscreen-close"
+              >
+                Exit
+              </Button>
+            ) : (
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                className="h-9 px-2 text-xs text-white hover:bg-white/15 hover:text-white"
+                onClick={() => {
+                  fullscreen();
+                  bumpChrome();
+                }}
+                data-testid="pdf-fullscreen"
+              >
+                Full
+              </Button>
+            )}
+          </div>
+        </div>
+
+        {showMore ? (
+          <div className="pointer-events-auto max-h-[40vh] overflow-auto border-t border-white/10 bg-neutral-950/90 px-2 py-2 text-white backdrop-blur-sm">
+            <p className="mb-2 text-[11px] text-white/70" data-testid="pdf-offline-status">
+              {offlineLabel}
+              {offlineUsageLabel ? ` · ${offlineUsageLabel}` : ""}
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {offlineUi === "saving" ? (
+                <Button type="button" size="sm" variant="secondary" onClick={cancelOfflineSave}>
+                  Cancel save
+                </Button>
+              ) : pendingSaveSize != null ? (
+                <>
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={() => void runOfflineSave()}
+                    data-testid="pdf-offline-confirm"
+                  >
+                    Confirm save ({formatByteSize(pendingSaveSize)})
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    className="text-white"
+                    onClick={() => setPendingSaveSize(null)}
+                  >
+                    Cancel
+                  </Button>
+                </>
+              ) : offlineUi === "save_failed" ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => void startOfflineSave()}
+                  data-testid="pdf-offline-retry"
+                >
+                  Retry
+                </Button>
+              ) : (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  disabled={offlineUi === "checking"}
+                  onClick={() => void startOfflineSave()}
+                  data-testid="pdf-save-offline"
+                >
+                  Save for Offline
+                </Button>
+              )}
+              {offlineUi === "offline_ready" && (
+                <>
+                  {!usingOffline && (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => void loadDocument({ preferOffline: true })}
+                      data-testid="pdf-open-offline"
+                    >
+                      Open offline copy
+                    </Button>
+                  )}
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    className="text-white"
+                    onClick={() => void clearOffline()}
+                  >
+                    Remove offline
+                  </Button>
+                </>
+              )}
+              {outline.length > 0 && (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => setShowOutline((v) => !v)}
+                >
+                  Outline
+                </Button>
+              )}
+            </div>
+            <form
+              className="mt-2 flex flex-wrap items-center gap-2"
+              onSubmit={(e) => {
+                bumpChrome();
+                void onSearch(e);
+              }}
+            >
+              <Input
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search in document"
+                className="h-8 max-w-xs border-white/20 bg-white/10 text-white"
+              />
+              <Button type="submit" size="sm" variant="secondary">
+                Search
+              </Button>
+              {searchStatus ? (
+                <span className="text-xs text-white/70">{searchStatus}</span>
+              ) : null}
+            </form>
+            {showOutline && outline.length > 0 && (
+              <div className="mt-2 max-h-32 overflow-auto rounded border border-white/10 bg-black/30 p-2 text-sm">
+                {outline.map((item, idx) => (
+                  <button
+                    key={`${item.pageNumber}-${idx}`}
+                    type="button"
+                    className="block w-full truncate px-1 py-0.5 text-left hover:bg-white/10"
+                    onClick={() => goPage(item.pageNumber)}
+                  >
+                    {item.title}{" "}
+                    <span className="text-white/50">p.{item.pageNumber}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : null}
+      </div>
+
+      {pendingHighlight ? (
+        <div className="pointer-events-auto absolute inset-x-0 bottom-0 z-30 flex flex-wrap items-center gap-2 bg-neutral-950/85 px-3 py-2 text-white backdrop-blur-sm pdf-safe-bottom">
+          <span className="min-w-0 flex-1 truncate text-xs text-white/80">
+            Highlight: “{pendingHighlight.text.slice(0, 80)}
+            {pendingHighlight.text.length > 80 ? "…" : ""}”
+          </span>
+          <Button
+            type="button"
+            size="sm"
+            onClick={() => void savePendingHighlight()}
+            data-testid="pdf-highlight-save"
+          >
+            Save highlight
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            className="text-white"
+            onClick={() => {
+              setPendingHighlight(null);
+              window.getSelection()?.removeAllRanges();
+            }}
+          >
+            Cancel
+          </Button>
+        </div>
       ) : null}
     </div>
   );

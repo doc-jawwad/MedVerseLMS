@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { RegisterForm } from "./register-form";
 import { AuthShell } from "@/components/student/auth-shell";
+import { redirectIfAuthenticated } from "@/lib/auth/redirect-if-authenticated";
 
 export const metadata = { title: "Register — MedVerse LMS" };
 
@@ -36,6 +37,7 @@ async function loadYears(): Promise<Year[]> {
 }
 
 export default async function RegisterPage() {
+  await redirectIfAuthenticated();
   const years = await loadYears();
 
   return (

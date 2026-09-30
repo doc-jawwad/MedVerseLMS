@@ -1,8 +1,12 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/logo";
+import { BrandCredit } from "@/components/brand-credit";
+import { redirectIfAuthenticated } from "@/lib/auth/redirect-if-authenticated";
 
-export default function Home() {
+export default async function Home() {
+  await redirectIfAuthenticated();
+
   return (
     <div className="relative flex min-h-svh flex-col overflow-hidden bg-[var(--brand-navy)] text-white">
       <div
@@ -47,6 +51,10 @@ export default function Home() {
             <Link href="/register">Register</Link>
           </Button>
         </div>
+        <BrandCredit
+          tone="highlight-on-dark"
+          className="mt-6"
+        />
       </main>
     </div>
   );

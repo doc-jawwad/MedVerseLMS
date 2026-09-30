@@ -247,6 +247,8 @@ Student catalog SELECT must **not** expose `drive_url`, `body_text`, or R2 keys.
 
 **pdf_highlights** — private per-student text highlights on a PDF `materials` row. Columns: `student_id`, `material_id`, `page_number`, `rects` (JSON array of `{x1,y1,x2,y2}` in **PDF user space** — stable across zoom/rotation), `selected_text` (≤4000), `color`. RLS: own-row SELECT/INSERT/UPDATE/DELETE; INSERT/UPDATE also require `can_annotate_pdf(material_id)` (published live PDF + `can_access_material_folder`, or `manage_materials`). Not visible to other students. Do not store highlights only in browser storage.
 
+**pdf_reading_progress** — private per-student last-read page on a PDF `materials` row. Columns: `student_id`, `material_id`, `page_number` (≥1), unique `(student_id, material_id)`. Not an event log — client debounced upserts only. RLS: own-row SELECT/INSERT/UPDATE/DELETE; INSERT/UPDATE require `can_annotate_pdf(material_id)` (same entitlement gate as highlights). Browser localStorage may cache optimistically; the server row is authoritative when available.
+
 ## One Liner (canonical student surface)
 
 **Product model:** One Liner → admin-created **Folder** → PDF document(s) → MedVerse PDF reader + `pdf_highlights`.

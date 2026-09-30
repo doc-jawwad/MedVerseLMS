@@ -55,13 +55,18 @@ export default async function StudyReadPage({
     has_pdf: boolean;
   };
 
+  const isPdf = item.kind === "pdf" && item.has_pdf;
+
   return (
-    <StudentPage width="article">
+    <StudentPage
+      width={isPdf ? "default" : "article"}
+      className={isPdf ? "pdf-read-page max-w-none gap-3 md:max-w-6xl" : undefined}
+    >
       <PageHeader
         title={item.title}
-        description={item.description || undefined}
+        description={isPdf ? undefined : item.description || undefined}
       />
-      {item.reference_text ? (
+      {item.reference_text && !isPdf ? (
         <p className="text-sm text-muted-foreground">Reference: {item.reference_text}</p>
       ) : null}
       {item.kind === "guideline" && (
@@ -71,7 +76,7 @@ export default async function StudyReadPage({
           </CardContent>
         </Card>
       )}
-      {item.kind === "pdf" && item.has_pdf && (
+      {isPdf && (
         <PdfViewer
           materialId={id}
           title={item.title}

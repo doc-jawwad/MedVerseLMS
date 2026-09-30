@@ -43,7 +43,7 @@ describe("pdf highlight geometry", () => {
 });
 
 describe("pdf reader ux wiring", () => {
-  it("keeps range transport and adds text-layer highlights + pinch + chrome-free fullscreen", () => {
+  it("keeps range transport and mobile overlay chrome with pinch + highlights", () => {
     const viewer = fs.readFileSync(
       path.join(root, "src/components/study/pdf-viewer.tsx"),
       "utf8"
@@ -57,6 +57,10 @@ describe("pdf reader ux wiring", () => {
     assert.match(viewer, /onTouchStart=\{onPinchStart\}/);
     assert.match(viewer, /pdf-fullscreen-close/);
     assert.match(viewer, /data-fullscreen/);
+    assert.match(viewer, /pdf-prev/);
+    assert.match(viewer, /pdf-next/);
+    assert.match(viewer, /chromeVisible/);
+    assert.match(viewer, /classList\.add\("pinching"\)/);
     assert.doesNotMatch(viewer, /localStorage\.setItem\([^)]*highlight/i);
 
     const mig = fs.readFileSync(
@@ -69,5 +73,15 @@ describe("pdf reader ux wiring", () => {
     assert.match(mig, /create table public\.pdf_highlights/);
     assert.match(mig, /can_annotate_pdf/);
     assert.match(mig, /student_id = \(select auth\.uid\(\)\)/);
+
+    const progressMig = fs.readFileSync(
+      path.join(
+        root,
+        "supabase/migrations/20261001030000_pdf_reading_progress.sql"
+      ),
+      "utf8"
+    );
+    assert.match(progressMig, /create table public\.pdf_reading_progress/);
+    assert.match(progressMig, /can_annotate_pdf/);
   });
 });
