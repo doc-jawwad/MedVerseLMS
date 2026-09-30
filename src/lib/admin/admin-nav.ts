@@ -132,8 +132,14 @@ export const ADMIN_NAV: AdminNavDef[] = [
     anyOf: ["manage_materials"],
   },
   {
+    href: "/admin/materials?type=one-liner",
+    label: "One Liner",
+    icon: "pearlPoints",
+    anyOf: ["manage_materials"],
+  },
+  {
     href: "/admin/pearls",
-    label: "One Liners",
+    label: "Legacy Pearl Points",
     icon: "pearlPoints",
     anyOf: ["manage_materials"],
   },

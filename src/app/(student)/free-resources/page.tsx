@@ -32,8 +32,6 @@ export default async function FreeResourcesPage() {
     { data: folders },
     { data: materials },
     { data: accessibleFolders },
-    { data: pearls },
-    { data: accessiblePearls },
     { data: grants },
   ] = await Promise.all([
     supabase.rpc("practice_subjects"),
@@ -44,11 +42,6 @@ export default async function FreeResourcesPage() {
       .order("name"),
     supabase.from("materials").select("folder_id, updated_at"),
     supabase.rpc("accessible_folder_ids"),
-    supabase
-      .from("pearl_points")
-      .select("id, subject_id, entitlement, updated_at")
-      .eq("status", "published"),
-    supabase.rpc("accessible_pearl_ids"),
     supabase
       .from("access_grants")
       .select("grant_type, subject_id, folder_id")
@@ -90,15 +83,6 @@ export default async function FreeResourcesPage() {
     ),
     grantedFolderIds,
     materials: materials ?? [],
-    pearls: (pearls ?? []) as {
-      id: string;
-      subject_id: string;
-      entitlement: string;
-      updated_at?: string | null;
-    }[],
-    accessiblePearlIds: (accessiblePearls ?? []).map(
-      (row: { id: string }) => row.id
-    ),
   });
 
   return (
@@ -122,7 +106,7 @@ export default async function FreeResourcesPage() {
       {categories.length === 0 ? (
         <EmptyState
           title="No free resources for your class yet"
-          description="When your academy publishes free MCQs, pearl points, or materials, those categories appear here. Empty categories are hidden."
+          description="When your academy publishes free MCQs or materials, those categories appear here. Empty categories are hidden."
         />
       ) : (
         <div className="grid gap-3 sm:grid-cols-2">

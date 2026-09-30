@@ -42,12 +42,17 @@ export async function addFolder(
     return { error: "Class year is required for this folder type." };
   }
   if (
-    (libraryType === "notes" || libraryType === "syllabus") &&
+    (libraryType === "notes" ||
+      libraryType === "syllabus" ||
+      libraryType === "one_liner") &&
     !subjectId
   ) {
     return {
-      error: "Subject is required for Notes and Syllabus folders.",
+      error: "Subject is required for Notes, Syllabus, and One Liner folders.",
     };
+  }
+  if (libraryType === "one_liner" && opts?.parentId) {
+    return { error: "One Liner does not support nested folders yet." };
   }
   const supabase = await createClient();
   // protect_resource_entitlement allows INSERT only as free; paid/plan must

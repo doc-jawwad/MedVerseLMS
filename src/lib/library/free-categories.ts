@@ -2,7 +2,6 @@ import { belongsOnFreeResources } from "./free-surface.ts";
 import {
   LIBRARY_META,
   STUDENT_LIBRARY_TYPES,
-  type FolderLibraryType,
   type StudentLibraryType,
 } from "./types.ts";
 
@@ -65,12 +64,12 @@ export function buildFreeResourceCategories(input: {
   accessibleFolderIds: readonly string[];
   grantedFolderIds?: readonly string[];
   materials: readonly FreeMaterialRow[];
-  pearls: readonly FreePearlRow[];
-  accessiblePearlIds: readonly string[];
+  /** @deprecated Legacy pearl_points Q&A — ignored; One Liner uses material folders. */
+  pearls?: readonly FreePearlRow[];
+  accessiblePearlIds?: readonly string[];
 }): FreeCategoryCard[] {
   const accessibleFolders = new Set(input.accessibleFolderIds);
   const grantedFolders = new Set(input.grantedFolderIds ?? []);
-  const accessiblePearls = new Set(input.accessiblePearlIds);
   const materialsByFolder = new Map<string, FreeMaterialRow[]>();
   for (const m of input.materials) {
     const list = materialsByFolder.get(m.folder_id) ?? [];
@@ -105,29 +104,8 @@ export function buildFreeResourceCategories(input: {
       continue;
     }
 
-    if (id === "pearl_points") {
-      const pearls = input.pearls.filter((p) =>
-        belongsOnFreeResources({
-          entitlement: p.entitlement,
-          accessible: accessiblePearls.has(p.id),
-        })
-      );
-      if (pearls.length === 0) continue;
-      const subjects = new Set(pearls.map((p) => p.subject_id));
-      cards.push({
-        id,
-        slug: meta.slug,
-        label: meta.label,
-        href: meta.freeHref,
-        description: meta.description,
-        itemCount: pearls.length,
-        subjectCount: subjects.size,
-        latestUpdate: maxIso(pearls.map((p) => p.updated_at)),
-      });
-      continue;
-    }
-
-    const folderType = meta.folderType as FolderLibraryType;
+    if (!meta.folderType) continue;
+    const folderType = meta.folderType;
     const folders = input.folders.filter(
       (f) =>
         f.library_type === folderType &&

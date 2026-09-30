@@ -1,7 +1,7 @@
-import { PearlPointsLibraryPage } from "@/components/library/pearl-points-library-page";
+import { MaterialLibraryPage } from "@/components/library/material-library-page";
 
 export const metadata = { title: "One Liner — MedVerse LMS" };
 
 export default function OneLinerPage() {
-  return <PearlPointsLibraryPage mode="full" />;
+  return <MaterialLibraryPage libraryType="one_liner" mode="full" />;
 }

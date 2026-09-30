@@ -89,14 +89,14 @@ export default async function AdminLibraryPage({
             </Link>
           )}
           {canMaterials && (
-            <Link href={`/admin/pearls?year=${year.id}`}>
+            <Link href={`/admin/materials?year=${year.id}&type=one-liner`}>
               <Card className="h-full shadow-none transition-colors hover:bg-accent/40">
                 <CardHeader>
                   <CardTitle className="text-lg text-[var(--student-ink)]">
                     One Liner
                   </CardTitle>
                   <CardDescription>
-                    Recall items for this class. Access policy marks free vs paid.
+                    PDF folders for this class. Access policy marks free vs paid.
                   </CardDescription>
                 </CardHeader>
               </Card>

@@ -1,6 +1,5 @@
 import { notFound } from "next/navigation";
 import { McqBankFoldersPage } from "@/components/library/mcq-bank-folders-page";
-import { PearlPointsLibraryPage } from "@/components/library/pearl-points-library-page";
 import { MaterialLibraryPage } from "@/components/library/material-library-page";
 import {
   blockHref,
@@ -13,6 +12,7 @@ import {
 import type { FolderLibraryType } from "@/lib/library/types";
 
 const MATERIAL_CATEGORIES = new Set<BlockCategoryId>([
+  "one_liner",
   "guidelines",
   "ospe_material",
   "ospe_lectures",
@@ -61,18 +61,6 @@ export async function BlockCategoryPage({
         title={category.name}
         backHref={backHref}
         blockSlug={subject.product_key}
-      />
-    );
-  }
-
-  if (categoryId === "pearl_points") {
-    return (
-      <PearlPointsLibraryPage
-        mode="resources"
-        subjectId={subjectId}
-        breadcrumbs={breadcrumbs}
-        title={category.name}
-        backHref={backHref}
       />
     );
   }

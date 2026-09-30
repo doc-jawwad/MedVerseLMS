@@ -112,35 +112,43 @@ describe("buildFreeResourceCategories", () => {
           entitlement: "any_subscription",
           updated_at: "2026-09-04T00:00:00Z",
         },
+        {
+          id: "f-one-liner",
+          library_type: "one_liner",
+          subject_id: "s1",
+          entitlement: "free",
+          updated_at: "2026-09-08T00:00:00Z",
+        },
+        {
+          id: "f-one-liner-paid",
+          library_type: "one_liner",
+          subject_id: "s2",
+          entitlement: "any_subscription",
+          updated_at: "2026-09-09T00:00:00Z",
+        },
       ],
-      accessibleFolderIds: ["f-guide", "f-notes", "f-books", "f-paid-grant"],
+      accessibleFolderIds: [
+        "f-guide",
+        "f-notes",
+        "f-books",
+        "f-paid-grant",
+        "f-one-liner",
+        "f-one-liner-paid",
+      ],
       grantedFolderIds: ["f-paid-grant"],
       materials: [
         { folder_id: "f-guide", updated_at: "2026-09-10T00:00:00Z" },
         { folder_id: "f-guide", updated_at: "2026-09-11T00:00:00Z" },
         { folder_id: "f-books", updated_at: "2026-09-12T00:00:00Z" },
         { folder_id: "f-paid-grant", updated_at: "2026-09-13T00:00:00Z" },
+        { folder_id: "f-one-liner", updated_at: "2026-09-08T00:00:00Z" },
+        { folder_id: "f-one-liner-paid", updated_at: "2026-09-09T00:00:00Z" },
       ],
-      pearls: [
-        {
-          id: "p1",
-          subject_id: "s1",
-          entitlement: "free",
-          updated_at: "2026-09-08T00:00:00Z",
-        },
-        {
-          id: "p-paid",
-          subject_id: "s2",
-          entitlement: "any_subscription",
-          updated_at: "2026-09-09T00:00:00Z",
-        },
-      ],
-      accessiblePearlIds: ["p1", "p-paid"],
     });
 
     assert.deepEqual(
       cards.map((c) => c.id),
-      ["mcq_bank", "pearl_points", "guidelines", "lectures"]
+      ["mcq_bank", "one_liner", "guidelines", "lectures"]
     );
     assert.equal(cards[0]?.itemCount, 25); // free 20 + granted paid 5
     assert.equal(cards[0]?.subjectCount, 2);

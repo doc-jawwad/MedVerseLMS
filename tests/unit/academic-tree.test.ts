@@ -49,7 +49,7 @@ describe("product structure freeze", () => {
     const ids = BLOCK_CATEGORIES.map((c) => c.id);
     assert.deepEqual(ids, [
       "mcq_bank",
-      "pearl_points",
+      "one_liner",
       "guidelines",
       "books",
       "lectures",
@@ -58,7 +58,7 @@ describe("product structure freeze", () => {
       "ospe_material",
       "ospe_lectures",
     ]);
-    assert.equal(findCategoryBySlug("one-liner")?.id, "pearl_points");
+    assert.equal(findCategoryBySlug("one-liner")?.id, "one_liner");
     assert.equal(findCategoryBySlug("ospe-material")?.id, "ospe_material");
     assert.equal(findCategoryBySlug("notes")?.id, "notes");
     assert.equal(findCategoryBySlug("syllabus")?.id, "syllabus");

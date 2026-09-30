@@ -418,8 +418,9 @@ function categoryIdFromLibraryType(
   switch (libraryType) {
     case "mcq_bank":
       return "mcq_bank";
+    case "one_liner":
     case "pearl_points":
-      return "pearl_points";
+      return "one_liner";
     case "guidelines":
       return "guidelines";
     case "ospe_material":

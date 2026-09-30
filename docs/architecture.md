@@ -131,7 +131,7 @@ Each Block (and each Final Year clinical subject) shows these student-facing chr
 | Category / group | Notes |
 |---|---|
 | MCQ Bank | Practice with instant feedback — admin-managed **folders** under the Block / Final Year subject (`mcq_bank_folders`); each folder holds PDFs (`material_folders.library_type = mcq_bank`) and **subfolders** (`mcq_bank_subfolders`); MCQs attach to a subfolder (`questions.mcq_bank_subfolder_id`, with denormalized `mcq_bank_folder_id`). Hierarchy: Folder → Subfolder → MCQs. Question Bank taxonomy (year → departmental subject → book → chapter → topic) remains internal metadata for authoring/search — not a competing student navigation. |
-| One Liner | High-yield recall (not formal exams). Store remains `pearl_points`; student chrome label is One Liner. |
+| One Liner | Admin-created **folders** of PDFs under the Block / Final Year subject (`material_folders.library_type = 'one_liner'`, `content_surface = 'academic'`, required `subject_id`). Student opens via the existing materials PDF reader + highlights. Legacy `pearl_points` Q&A rows are retained but are **not** the student product model. |
 | Guidelines | Study guidelines / protocols |
 | Books | Reference texts |
 | Lectures | Lecture videos / recordings |
@@ -142,7 +142,7 @@ Each Block (and each Final Year clinical subject) shows these student-facing chr
 | → OSPE Lectures | OSPE lecture media |
 | → OSPE Practice | Links to the existing global `/practice/ospe` surface (not a Block-scoped content store) |
 
-**Notes** and **Syllabus** reuse the existing materials lifecycle (folders → `materials.kind = 'pdf'` → `/materials/[id]/read` → `/api/study-content/...`). Do **not** fold Notes into Books. Do **not** create a second PDF store. Legacy `/notes` may remain as a deep link; primary entry is Block / Final Year subject chrome.
+**Notes**, **Syllabus**, and **One Liner** reuse the existing materials lifecycle (folders → `materials.kind = 'pdf'` → `/materials/[id]/read` → `/api/study-content/...`). Do **not** fold Notes into Books. Do **not** create a second PDF store. Legacy `/notes` and `/pearl-points` may remain as deep links; primary entry is Block / Final Year subject chrome.
 
 **OSPE Practice** is **not** a top-level shell nav item; students reach it from the Block OSPE group (or deep link).
 
@@ -296,7 +296,7 @@ Ranking must be **coalesced** before a 1,500-submit event — hosting does not r
 
 **Study materials:** `materials.kind` is `drive` (Google Drive URL), `pdf` (private R2 object), or `guideline` (text body). Existing Drive rows stay `kind = 'drive'`. Student catalog SELECT must not leak `drive_url`, `body_text`, or R2 object keys; open via entitlement-checked RPCs. PDFs use the **same private objects bucket** as payment proofs (`R2_PAYMENT_BUCKET` in production; non-production may share `R2_BUCKET`) with prefix `study-content/`. **Upload:** authenticated admin begins an HMAC-sealed upload session; the browser uploads bytes **direct to R2** via short-lived presigned PUT (small files) or multipart UploadPart URLs (large files). Next.js never buffers the PDF body. After R2 completion the server HEAD + range-reads magic bytes (`%PDF-`), then inserts the `materials` row. **Read:** `GET /api/study-content/[materialId]` re-checks `authorize_study_object`, then **streams** R2 bytes (including HTTP `Range` / `206`) without buffering the whole object in Node. Students use an in-app **PDF.js** reader (range/chunk loading, text layer for selection, private `pdf_highlights` persistence, pinch zoom, true fullscreen chrome hide via Fullscreen API — browser/system chrome cannot be removed). Temporary R2 URLs and credentials never reach the browser. **Offline:** explicit “Save for Offline” stores the file in origin-private OPFS + IndexedDB metadata with entitlement expiry — not the user Downloads folder; not absolute DRM. Cover/thumbnail keys follow the same prefix (covers still go through a small Server Action body ≤2MB). **No artificial PDF size cap** — ceiling is R2 platform limits. **No new Cloudflare bucket** for this phase. Incomplete multipart uploads should be aborted on cancel; configure R2 AbortIncompleteMultipartUpload lifecycle as a safety net.
 
-**Pearl points:** lightweight recall items in `pearl_points` (not `question_versions`). Same entitlement columns as tests/folders. Answers are RPC-only.
+**Legacy pearl points:** lightweight recall items in `pearl_points` (not `question_versions`). Retained for admin archive; student One Liner chrome uses `material_folders.library_type = 'one_liner'` PDF folders. Answers remain RPC-only on the legacy table.
 
 **OSPE Practice stations:** image + hidden-answer items in `ospe_stations` (not library OSPE folders, not MCQs, not exam attempts). Same entitlement columns; private R2 under `study-content/`; answer and object key are RPC-only (`open_ospe_station` / `authorize_ospe_station_object`).
 

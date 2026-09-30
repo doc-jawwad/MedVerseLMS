@@ -15,6 +15,7 @@ export const FOLDER_LIBRARY_TYPES = [
   "flashcards",
   "other_services",
   "career_counseling_series",
+  "one_liner",
 ] as const;
 
 export type FolderLibraryType = (typeof FOLDER_LIBRARY_TYPES)[number];
@@ -22,7 +23,7 @@ export type FolderLibraryType = (typeof FOLDER_LIBRARY_TYPES)[number];
 /** Student top-level library nav (excludes Prof. Session–only folder types). */
 export const STUDENT_LIBRARY_TYPES = [
   "mcq_bank",
-  "pearl_points",
+  "one_liner",
   "guidelines",
   "ospe_material",
   "ospe_lectures",
@@ -55,15 +56,15 @@ export const LIBRARY_META: Record<StudentLibraryType, LibraryMeta> = {
     description: "Practice questions with instant feedback.",
     folderType: null,
   },
-  pearl_points: {
-    id: "pearl_points",
+  one_liner: {
+    id: "one_liner",
     slug: "one-liner",
     label: "One Liner",
     href: "/one-liner",
     freeHref: "/free-resources/one-liner",
     icon: "pearlPoints",
-    description: "High-yield recall. Reveal the answer when ready — not a scored exam.",
-    folderType: null,
+    description: "High-yield PDF folders — open, read, and highlight.",
+    folderType: "one_liner",
   },
   guidelines: {
     id: "guidelines",
@@ -181,6 +182,11 @@ export function folderLibraryLabel(type: FolderLibraryType): {
         label: "Flashcards",
         description: "Placeholder category — no flashcard engine yet.",
       };
+    case "one_liner":
+      return {
+        label: "One Liner",
+        description: "High-yield PDF folders — open, read, and highlight.",
+      };
     default: {
       const meta = LIBRARY_META[type as StudentLibraryType];
       return {
@@ -193,7 +199,7 @@ export function folderLibraryLabel(type: FolderLibraryType): {
 
 export function parseLibrarySlug(slug: string): StudentLibraryType | null {
   // Legacy Pearl Points slug kept so old free-resource bookmarks still resolve.
-  if (slug === "pearl-points") return "pearl_points";
+  if (slug === "pearl-points") return "one_liner";
   const found = LIBRARY_LIST.find((m) => m.slug === slug);
   return found?.id ?? null;
 }
@@ -223,6 +229,7 @@ export function itemDeliveryModes(type: FolderLibraryType): Array<
       return ["pdf"];
     case "syllabus":
     case "notes":
+    case "one_liner":
       return ["pdf"];
     case "other_services":
       return ["drive"];

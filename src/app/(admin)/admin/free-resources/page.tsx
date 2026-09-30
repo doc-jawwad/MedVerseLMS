@@ -1,17 +1,14 @@
-import Link from "next/link";
 import { requireAdmin } from "@/lib/auth/require-user";
 import { requireAdminClass } from "@/lib/admin/require-admin-class";
 import { AdminLibraryTypeTabs } from "@/components/admin/library-type-tabs";
 import { MaterialsAdmin } from "../materials/materials-admin";
 import { EntitlementSelect } from "@/components/admin/entitlement-select";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   LIBRARY_LIST,
   parseLibrarySlug,
   yearDisplayName,
-  type FolderLibraryType,
   type StudentLibraryType,
 } from "@/lib/library/types";
 
@@ -73,59 +70,18 @@ export default async function AdminFreeResourcesPage({
         );
       }
 
-      if (type === "pearl_points") {
-        const { data: pearls } = await supabase
-          .from("pearl_points")
-          .select("id, prompt, status, entitlement")
-          .eq("year_id", year.id)
-          .order("created_at", { ascending: false })
-          .limit(200);
+      const folderMeta = LIBRARY_LIST.find((t) => t.id === type);
+      if (!folderMeta?.folderType) {
         return (
           <FreeShell yearName={yearDisplayName(year)} type={type}>
-            <div className="flex justify-end">
-              <Button asChild size="sm">
-                <Link href="/admin/pearls/new">Add Pearl Point</Link>
-              </Button>
-            </div>
-            <Card className="shadow-none">
-              <CardHeader>
-                <CardTitle className="text-base text-[var(--student-ink)]">
-                  One Liner
-                </CardTitle>
-                <p className="text-sm text-muted-foreground">
-                  Set entitlement to Free for the curated subset. Publish so students can open them.
-                </p>
-              </CardHeader>
-              <CardContent className="grid gap-2">
-                {(pearls ?? []).map((p) => (
-                  <Row
-                    key={p.id}
-                    title={p.prompt}
-                    meta={p.status}
-                    badge={p.entitlement}
-                  >
-                    <EntitlementSelect
-                      kind="pearl_point"
-                      id={p.id}
-                      value={p.entitlement}
-                    />
-                    <Button asChild size="sm" variant="outline">
-                      <Link href={`/admin/pearls/${p.id}`}>Edit</Link>
-                    </Button>
-                  </Row>
-                ))}
-                {(pearls ?? []).length === 0 && (
-                  <p className="text-sm text-muted-foreground">
-                    No pearl points for this class yet.
-                  </p>
-                )}
-              </CardContent>
-            </Card>
+            <p className="text-sm text-muted-foreground">
+              This category is not managed as Free Resources folders.
+            </p>
           </FreeShell>
         );
       }
 
-      const libraryType = type as FolderLibraryType;
+      const libraryType = folderMeta.folderType;
       const [{ data: years }, { data: subjects }, { data: folders }, { data: materials }] =
         await Promise.all([
           supabase.from("years").select("id, year_number, name").order("year_number"),

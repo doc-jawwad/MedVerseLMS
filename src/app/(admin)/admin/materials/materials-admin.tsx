@@ -84,7 +84,9 @@ export function MaterialsAdmin({
   const meta = folderLibraryLabel(libraryType);
   const modes = itemDeliveryModes(libraryType);
   const requireSubject =
-    libraryType === "notes" || libraryType === "syllabus";
+    libraryType === "notes" ||
+    libraryType === "syllabus" ||
+    libraryType === "one_liner";
 
   return (
     <div className="grid gap-6">
@@ -124,7 +126,9 @@ export function MaterialsAdmin({
           onClick={() =>
             startTransition(async () => {
               if (requireSubject && !subjectId) {
-                toast.error("Subject is required for Notes and Syllabus.");
+                toast.error(
+                  "Subject is required for Notes, Syllabus, and One Liner."
+                );
                 return;
               }
               const result = await addFolder(

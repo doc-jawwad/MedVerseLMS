@@ -83,10 +83,10 @@ export const BLOCK_CATEGORIES: readonly BlockCategoryDef[] = [
     description: "Practice questions with instant feedback.",
   },
   {
-    id: "pearl_points",
+    id: "one_liner",
     name: "One Liner",
     slug: "one-liner",
-    description: "High-yield recall. Reveal the answer when ready — not a scored exam.",
+    description: "High-yield PDF folders — open, read, and highlight.",
   },
   {
     id: "guidelines",

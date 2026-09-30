@@ -1,6 +1,5 @@
 import { notFound } from "next/navigation";
 import { McqBankPage } from "@/components/library/mcq-bank-page";
-import { PearlPointsLibraryPage } from "@/components/library/pearl-points-library-page";
 import { MaterialLibraryPage } from "@/components/library/material-library-page";
 import { LIBRARY_META, parseLibrarySlug } from "@/lib/library/types";
 
@@ -28,6 +27,7 @@ export default async function FreeResourceTypePage({
   if (!id) notFound();
 
   if (id === "mcq_bank") return <McqBankPage mode="free" />;
-  if (id === "pearl_points") return <PearlPointsLibraryPage mode="free" />;
-  return <MaterialLibraryPage libraryType={id} mode="free" />;
+  const meta = LIBRARY_META[id];
+  if (!meta.folderType) notFound();
+  return <MaterialLibraryPage libraryType={meta.folderType} mode="free" />;
 }

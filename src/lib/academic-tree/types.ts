@@ -32,7 +32,7 @@ export type BlockProductKey =
  */
 export type BlockCategoryId =
   | "mcq_bank"
-  | "pearl_points"
+  | "one_liner"
   | "guidelines"
   | "ospe_material"
   | "ospe_lectures"
@@ -43,7 +43,7 @@ export type BlockCategoryId =
 
 /**
  * Prof. Session Block/Subject chrome (content_surface = prof_session).
- * Notes included. Pearl Points / Academic MCQ Bank are not PS chrome.
+ * Notes included. One Liner / Academic MCQ Bank are not PS chrome.
  */
 export type ProfSessionCategoryId =
   | "syllabus"
