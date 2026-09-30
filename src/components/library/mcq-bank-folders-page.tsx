@@ -105,7 +105,19 @@ export async function McqBankFoldersPage({
 
   const pageTitle = title ?? "MCQ Bank";
   const pageDescription =
-    description ?? "Open a folder for study PDFs and practice MCQs.";
+    description ??
+    "Open a folder for study PDFs and practice MCQs in its subfolders.";
+
+  const aggregate =
+    accessible && folders.length > 0
+      ? folders.reduce(
+          (acc, f) => ({
+            done: acc.done + f.done,
+            total: acc.total + f.total,
+          }),
+          { done: 0, total: 0 }
+        )
+      : null;
 
   return (
     <StudentPage>
@@ -166,7 +178,13 @@ export async function McqBankFoldersPage({
           description="When your academy creates MCQ Bank folders for this Block, they appear here."
         />
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4">
+          {aggregate && aggregate.total > 0 ? (
+            <p className="text-sm text-muted-foreground">
+              Bank progress: {aggregate.done} of {aggregate.total} complete
+            </p>
+          ) : null}
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {folders.map((f) => (
             <Link key={f.id} href={folderHref(blockSlug, "mcq-bank", f.id)}>
               <Card className="h-full shadow-none transition-colors hover:bg-accent/40">
@@ -193,6 +211,7 @@ export async function McqBankFoldersPage({
               </Card>
             </Link>
           ))}
+          </div>
         </div>
       )}
     </StudentPage>

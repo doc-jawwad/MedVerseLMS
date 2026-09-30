@@ -32,6 +32,7 @@ const ENTITY_TYPES = new Set<string>([
   "prof_session_day",
   "one_liner",
   "mcq_bank_folder",
+  "mcq_bank_subfolder",
 ]);
 
 function revalidateBinSurfaces() {

@@ -110,16 +110,25 @@ create temporary table t_folder_y2 (id uuid);
 create temporary table t_folder_free (id uuid);
 grant select, insert on t_folder_y1, t_folder_y2, t_folder_free to authenticated;
 
+create temporary table t_sf_y1 (id uuid);
+create temporary table t_sf_free (id uuid);
+create temporary table t_sf_y2 (id uuid);
+grant select, insert on t_sf_y1, t_sf_free, t_sf_y2 to authenticated;
+
 insert into t_folder_y1 (id)
 select public.admin_create_mcq_bank_folder((select id from t_block1_y1), 'Fav Ent Paid Folder Y1');
 insert into t_folder_free (id)
 select public.admin_create_mcq_bank_folder((select id from t_free_block), 'Fav Ent Free Folder');
+insert into t_sf_y1 (id)
+select public.admin_create_mcq_bank_subfolder((select id from t_folder_y1), 'Fav Ent Sub Y1');
+insert into t_sf_free (id)
+select public.admin_create_mcq_bank_subfolder((select id from t_folder_free), 'Fav Ent Sub Free');
 
-select public.admin_assign_unassigned_question_to_folder(
-  (select id from t_q_paid), (select id from t_folder_y1)
+select public.admin_assign_unassigned_question_to_subfolder(
+  (select id from t_q_paid), (select id from t_sf_y1)
 );
-select public.admin_assign_unassigned_question_to_folder(
-  (select id from t_q_free), (select id from t_folder_free)
+select public.admin_assign_unassigned_question_to_subfolder(
+  (select id from t_q_free), (select id from t_sf_free)
 );
 
 -- Y2 folder + question for class-switch destination
@@ -157,8 +166,10 @@ grant select on t_q_y2 to authenticated;
 select test_helpers.as_user((select id from t_admin));
 insert into t_folder_y2 (id)
 select public.admin_create_mcq_bank_folder((select id from t_block_y2), 'Fav Ent Paid Folder Y2');
-select public.admin_assign_unassigned_question_to_folder(
-  (select id from t_q_y2), (select id from t_folder_y2)
+insert into t_sf_y2 (id)
+select public.admin_create_mcq_bank_subfolder((select id from t_folder_y2), 'Fav Ent Sub Y2');
+select public.admin_assign_unassigned_question_to_subfolder(
+  (select id from t_q_y2), (select id from t_sf_y2)
 );
 
 ------------------------------------------------------------------

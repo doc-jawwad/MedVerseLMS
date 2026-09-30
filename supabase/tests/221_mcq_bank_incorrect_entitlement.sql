@@ -116,16 +116,25 @@ create temporary table t_folder_y2 (id uuid);
 create temporary table t_folder_free (id uuid);
 grant select, insert on t_folder_y1, t_folder_y2, t_folder_free to authenticated;
 
+create temporary table t_sf_y1 (id uuid);
+create temporary table t_sf_free (id uuid);
+create temporary table t_sf_y2 (id uuid);
+grant select, insert on t_sf_y1, t_sf_free, t_sf_y2 to authenticated;
+
 insert into t_folder_y1 (id)
 select public.admin_create_mcq_bank_folder((select id from t_block1_y1), 'Inc Ent Paid Folder Y1');
 insert into t_folder_free (id)
 select public.admin_create_mcq_bank_folder((select id from t_free_block), 'Inc Ent Free Folder');
+insert into t_sf_y1 (id)
+select public.admin_create_mcq_bank_subfolder((select id from t_folder_y1), 'Inc Ent Sub Y1');
+insert into t_sf_free (id)
+select public.admin_create_mcq_bank_subfolder((select id from t_folder_free), 'Inc Ent Sub Free');
 
-select public.admin_assign_unassigned_question_to_folder(
-  (select id from t_q_paid), (select id from t_folder_y1)
+select public.admin_assign_unassigned_question_to_subfolder(
+  (select id from t_q_paid), (select id from t_sf_y1)
 );
-select public.admin_assign_unassigned_question_to_folder(
-  (select id from t_q_free), (select id from t_folder_free)
+select public.admin_assign_unassigned_question_to_subfolder(
+  (select id from t_q_free), (select id from t_sf_free)
 );
 
 select test_helpers.as_runner();
@@ -167,8 +176,10 @@ select current_version_id from public.questions where id = (select id from t_q_y
 select test_helpers.as_user((select id from t_admin));
 insert into t_folder_y2 (id)
 select public.admin_create_mcq_bank_folder((select id from t_block_y2), 'Inc Ent Paid Folder Y2');
-select public.admin_assign_unassigned_question_to_folder(
-  (select id from t_q_y2), (select id from t_folder_y2)
+insert into t_sf_y2 (id)
+select public.admin_create_mcq_bank_subfolder((select id from t_folder_y2), 'Inc Ent Sub Y2');
+select public.admin_assign_unassigned_question_to_subfolder(
+  (select id from t_q_y2), (select id from t_sf_y2)
 );
 
 ------------------------------------------------------------------

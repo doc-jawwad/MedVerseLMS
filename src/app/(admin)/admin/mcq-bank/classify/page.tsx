@@ -4,6 +4,7 @@ import {
   McqBankClassifyClient,
   type FolderOption,
   type ProductSubjectOption,
+  type SubfolderOption,
   type UnassignedQuestionRow,
 } from "../mcq-bank-classify-client";
 
@@ -42,6 +43,7 @@ export default async function AdminMcqBankClassifyPage({
 
       const subjectIds = subjects.map((s) => s.id);
       let folders: FolderOption[] = [];
+      let subfolders: SubfolderOption[] = [];
       if (subjectIds.length > 0) {
         const { data: folderRows } = await supabase
           .from("mcq_bank_folders")
@@ -56,6 +58,29 @@ export default async function AdminMcqBankClassifyPage({
           name: f.name as string,
           product_subject_id: f.academic_product_subject_id as string,
         }));
+
+        const folderIds = folders.map((f) => f.folder_id);
+        if (folderIds.length > 0) {
+          const lists = await Promise.all(
+            folderIds.map(async (folderId) => {
+              const { data } = await supabase.rpc(
+                "admin_list_mcq_bank_subfolders",
+                { p_folder_id: folderId }
+              );
+              return (
+                (data ?? []) as Array<{
+                  subfolder_id: string;
+                  name: string;
+                }>
+              ).map((s) => ({
+                subfolder_id: s.subfolder_id,
+                name: s.name,
+                folder_id: folderId,
+              }));
+            })
+          );
+          subfolders = lists.flat();
+        }
       }
 
       const { data: rows, error } = await supabase.rpc(
@@ -102,6 +127,7 @@ export default async function AdminMcqBankClassifyPage({
           yearId={year.id}
           subjects={subjects}
           folders={folders}
+          subfolders={subfolders}
           questions={questions}
           totalCount={totalCount}
           page={page}

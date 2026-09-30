@@ -1,4 +1,5 @@
--- MCQ Bank folder bulk move / remove / soft-delete + folder CRUD invariants.
+-- MCQ Bank subfolder bulk move / soft-delete + folder CRUD invariants.
+-- Folder bulk RPCs refuse (mcq_bank_use_subfolder_bulk); this suite uses subfolder APIs.
 begin;
 select plan(24);
 
@@ -39,7 +40,9 @@ select public.set_admin_year_assignments(
 -- Folders A / B (no Source dependency)
 create temporary table t_fa (id uuid);
 create temporary table t_fb (id uuid);
-grant select, insert on t_fa, t_fb to anon, authenticated;
+create temporary table t_sa (id uuid);
+create temporary table t_sb (id uuid);
+grant select, insert on t_fa, t_fb, t_sa, t_sb to anon, authenticated;
 
 select test_helpers.as_user((select id from t_edit));
 insert into t_fa (id)
@@ -65,7 +68,10 @@ select is(
   '3. rename persists'
 );
 
--- Create questions into folder A
+-- Subfolder under A; create questions into it
+insert into t_sa (id)
+select public.admin_create_mcq_bank_subfolder((select id from t_fa), 'Bulk Sub A');
+
 create temporary table t_qs (id uuid, n int);
 grant select, insert on t_qs to anon, authenticated;
 
@@ -87,7 +93,7 @@ begin
       'medium',
       '{}',
       'approved',
-      (select id from t_fa)
+      (select id from t_sa)
     );
     insert into t_qs (id, n) values (v_id, i);
   end loop;
@@ -96,12 +102,12 @@ $$;
 
 select is(
   (select count(*)::int from public.questions
-   where mcq_bank_folder_id = (select id from t_fa) and deleted_at is null),
+   where mcq_bank_subfolder_id = (select id from t_sa) and deleted_at is null),
   12,
-  '4. manual create places questions in folder A'
+  '4. manual create places questions in subfolder A'
 );
 
--- Empty folder delete OK for B; non-empty A blocked
+-- Empty folder delete OK for B (no live subfolders); A blocked
 select lives_ok(
   $$select public.admin_soft_delete_mcq_bank_folder((select id from t_fb))$$,
   '5. empty folder soft-delete succeeds'
@@ -114,17 +120,20 @@ select throws_ok(
   '6. non-empty folder soft-delete blocked'
 );
 
--- Recreate B for move tests
+-- Recreate B + subfolder for move tests
 select test_helpers.as_user((select id from t_edit));
 delete from t_fb;
 insert into t_fb (id)
 select public.admin_create_mcq_bank_folder((select id from t_block1), 'Bulk Folder B');
+delete from t_sb;
+insert into t_sb (id)
+select public.admin_create_mcq_bank_subfolder((select id from t_fb), 'Bulk Sub B');
 
 -- Move 1 question
 select ok(
-  (select (public.admin_bulk_move_mcq_bank_folder_questions(
-    (select id from t_fa),
-    (select id from t_fb),
+  (select (public.admin_bulk_move_mcq_bank_subfolder_questions(
+    (select id from t_sa),
+    (select id from t_sb),
     array[(select id from t_qs where n = 1)],
     false
   ) ->> 'moved')::int = 1),
@@ -132,8 +141,8 @@ select ok(
 );
 
 select is(
-  (select mcq_bank_folder_id from public.questions where id = (select id from t_qs where n = 1)),
-  (select id from t_fb),
+  (select mcq_bank_subfolder_id from public.questions where id = (select id from t_qs where n = 1)),
+  (select id from t_sb),
   '8. moved question destination correct'
 );
 
@@ -145,9 +154,9 @@ select ok(
 
 -- Move multiple (5)
 select ok(
-  (select (public.admin_bulk_move_mcq_bank_folder_questions(
-    (select id from t_fa),
-    (select id from t_fb),
+  (select (public.admin_bulk_move_mcq_bank_subfolder_questions(
+    (select id from t_sa),
+    (select id from t_sb),
     (select array_agg(id) from t_qs where n between 2 and 6),
     false
   ) ->> 'moved')::int = 5),
@@ -156,23 +165,23 @@ select ok(
 
 select is(
   (select count(*)::int from public.questions
-   where mcq_bank_folder_id = (select id from t_fa) and deleted_at is null),
+   where mcq_bank_subfolder_id = (select id from t_sa) and deleted_at is null),
   6,
-  '11. source folder count after partial move'
+  '11. source subfolder count after partial move'
 );
 
 select is(
   (select count(*)::int from public.questions
-   where mcq_bank_folder_id = (select id from t_fb) and deleted_at is null),
+   where mcq_bank_subfolder_id = (select id from t_sb) and deleted_at is null),
   6,
-  '12. dest folder count after moves'
+  '12. dest subfolder count after moves'
 );
 
 -- Move remaining all-in-source
 select ok(
-  (select (public.admin_bulk_move_mcq_bank_folder_questions(
-    (select id from t_fa),
-    (select id from t_fb),
+  (select (public.admin_bulk_move_mcq_bank_subfolder_questions(
+    (select id from t_sa),
+    (select id from t_sb),
     null,
     true
   ) ->> 'moved')::int = 6),
@@ -181,7 +190,7 @@ select ok(
 
 select is(
   (select count(*)::int from public.questions
-   where mcq_bank_folder_id = (select id from t_fa) and deleted_at is null),
+   where mcq_bank_subfolder_id = (select id from t_sa) and deleted_at is null),
   0,
   '14. source empty after all-in-source move'
 );
@@ -189,9 +198,9 @@ select is(
 -- Unauthorized year rejected
 select test_helpers.as_user((select id from t_wrong));
 select throws_ok(
-  $$select public.admin_bulk_move_mcq_bank_folder_questions(
-    (select id from t_fb),
-    (select id from t_fa),
+  $$select public.admin_bulk_move_mcq_bank_subfolder_questions(
+    (select id from t_sb),
+    (select id from t_sa),
     null,
     true
   )$$,
@@ -202,9 +211,9 @@ select throws_ok(
 
 select test_helpers.as_user((select id from t_student));
 select throws_ok(
-  $$select public.admin_bulk_move_mcq_bank_folder_questions(
-    (select id from t_fb),
-    (select id from t_fa),
+  $$select public.admin_bulk_move_mcq_bank_subfolder_questions(
+    (select id from t_sb),
+    (select id from t_sa),
     null,
     true
   )$$,
@@ -216,8 +225,8 @@ select throws_ok(
 -- Bulk soft-delete selected (5) then remaining
 select test_helpers.as_user((select id from t_edit));
 select ok(
-  (select (public.admin_bulk_soft_delete_folder_questions(
-    (select id from t_fb),
+  (select (public.admin_bulk_soft_delete_subfolder_questions(
+    (select id from t_sb),
     (select array_agg(id) from t_qs where n between 1 and 5),
     false
   ) ->> 'binned')::int = 5),
@@ -226,18 +235,18 @@ select ok(
 
 select is(
   (select count(*)::int from public.questions
-   where mcq_bank_folder_id = (select id from t_fb) and deleted_at is null),
+   where mcq_bank_subfolder_id = (select id from t_sb) and deleted_at is null),
   7,
   '18. live questions remain after partial bin'
 );
 
 select ok(
-  (select (public.admin_bulk_soft_delete_folder_questions(
-    (select id from t_fb),
+  (select (public.admin_bulk_soft_delete_subfolder_questions(
+    (select id from t_sb),
     null,
     true
   ) ->> 'binned')::int = 7),
-  '19. bulk soft-delete all remaining in folder'
+  '19. bulk soft-delete all remaining in subfolder'
 );
 
 select is(
@@ -254,10 +263,13 @@ select ok(
   '21. question versions retained after soft-delete'
 );
 
--- Empty folder B can now be deleted
+-- Clear live empty subfolder then delete folder B
 select lives_ok(
-  $$select public.admin_soft_delete_mcq_bank_folder((select id from t_fb))$$,
-  '22. empty folder delete after clearing questions'
+  $$do $d$ begin
+    perform public.admin_soft_delete_mcq_bank_subfolder((select id from t_sb));
+    perform public.admin_soft_delete_mcq_bank_folder((select id from t_fb));
+  end $d$;$$,
+  '22. empty folder delete after clearing questions + subfolder'
 );
 
 -- Large batch (>50): prove not page-capped at 50
@@ -271,6 +283,12 @@ select public.admin_create_mcq_bank_folder((select id from t_block1), 'Bulk Larg
 delete from t_fb;
 insert into t_fb (id)
 select public.admin_create_mcq_bank_folder((select id from t_block1), 'Bulk Large B');
+delete from t_sa;
+insert into t_sa (id)
+select public.admin_create_mcq_bank_subfolder((select id from t_fa), 'Bulk Large Sub A');
+delete from t_sb;
+insert into t_sb (id)
+select public.admin_create_mcq_bank_subfolder((select id from t_fb), 'Bulk Large Sub B');
 
 do $$
 declare
@@ -289,7 +307,7 @@ begin
       'easy',
       '{}',
       'draft',
-      (select id from t_fa)
+      (select id from t_sa)
     );
     insert into t_large (id) values (v_id);
   end loop;
@@ -297,9 +315,9 @@ end;
 $$;
 
 select ok(
-  (select (public.admin_bulk_move_mcq_bank_folder_questions(
-    (select id from t_fa),
-    (select id from t_fb),
+  (select (public.admin_bulk_move_mcq_bank_subfolder_questions(
+    (select id from t_sa),
+    (select id from t_sb),
     null,
     true
   ) ->> 'moved')::int = 60),
@@ -307,8 +325,8 @@ select ok(
 );
 
 select ok(
-  (select (public.admin_bulk_soft_delete_folder_questions(
-    (select id from t_fb),
+  (select (public.admin_bulk_soft_delete_subfolder_questions(
+    (select id from t_sb),
     null,
     true
   ) ->> 'binned')::int = 60),

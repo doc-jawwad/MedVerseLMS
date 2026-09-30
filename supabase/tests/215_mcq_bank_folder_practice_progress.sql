@@ -96,8 +96,12 @@ select id into temp t_folder
 grant select on t_book, t_chapter, t_topic, t_q1, t_folder to authenticated;
 
 select test_helpers.as_user((select id from t_admin));
-select public.admin_assign_unassigned_question_to_folder(
-  (select id from t_q1), (select id from t_folder)
+create temporary table t_sf (id uuid);
+grant select, insert on t_sf to authenticated;
+insert into t_sf (id)
+select public.admin_create_mcq_bank_subfolder((select id from t_folder), '215 Prog Sub');
+select public.admin_assign_unassigned_question_to_subfolder(
+  (select id from t_q1), (select id from t_sf)
 );
 
 -- Paid student: folder batch returns departmental subject_id

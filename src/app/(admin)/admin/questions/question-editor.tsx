@@ -49,6 +49,7 @@ export type EditorInitial = {
   topic_id?: string;
   /** Fixed Academic MCQ Bank folder (create only; no picker). */
   mcq_bank_folder_id?: string;
+  mcq_bank_subfolder_id?: string;
 };
 
 const KEYS = ["A", "B", "C", "D", "E"];
@@ -145,6 +146,7 @@ export function QuestionEditor({
           tags: tagList,
           status,
           mcq_bank_folder_id: initial?.mcq_bank_folder_id ?? null,
+          mcq_bank_subfolder_id: initial?.mcq_bank_subfolder_id ?? null,
         });
         if (res.error) return void toast.error(res.error);
         toast.success("Question created");

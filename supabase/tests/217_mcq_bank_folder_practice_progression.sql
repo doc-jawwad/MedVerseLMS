@@ -99,25 +99,31 @@ $$;
 -- make_question leaves runner (JWT cleared); re-impersonate admin for folder RPCs
 select test_helpers.as_user((select id from t_admin));
 create temporary table t_folder (id uuid);
-grant select, insert on t_folder to authenticated;
+create temporary table t_sf (id uuid);
+grant select, insert on t_folder, t_sf to authenticated;
 insert into t_folder (id)
 select public.admin_create_mcq_bank_folder(
   (select id from t_block1),
   'QA Practice Progress Test'
+);
+insert into t_sf (id)
+select public.admin_create_mcq_bank_subfolder(
+  (select id from t_folder),
+  'QA Practice Progress Sub'
 );
 
 do $$
 declare r record;
 begin
   for r in select id from t_qs loop
-    perform public.admin_assign_unassigned_question_to_folder(
-      r.id, (select id from t_folder)
+    perform public.admin_assign_unassigned_question_to_subfolder(
+      r.id, (select id from t_sf)
     );
   end loop;
 end;
 $$;
 
-grant select on t_qs, t_folder to authenticated;
+grant select on t_qs, t_folder, t_sf to authenticated;
 
 -- 1. 0/10
 select test_helpers.as_user((select id from t_paid));

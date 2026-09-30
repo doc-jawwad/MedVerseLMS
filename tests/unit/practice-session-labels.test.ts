@@ -20,6 +20,18 @@ describe("MCQ practice session labels", () => {
       practiceSessionMeterLabel("mcq_bank_folder_incorrect"),
       "This round"
     );
+    assert.equal(
+      practiceSessionMeterLabel("mcq_bank_subfolder"),
+      "This round"
+    );
+    assert.equal(
+      practiceSessionMeterLabel("mcq_bank_subfolder_favorites"),
+      "This round"
+    );
+    assert.equal(
+      practiceSessionMeterLabel("mcq_bank_subfolder_incorrect"),
+      "This round"
+    );
     assert.equal(practiceSessionMeterLabel("subject"), "Session progress");
   });
 
@@ -31,6 +43,14 @@ describe("MCQ practice session labels", () => {
         scopeType: "mcq_bank_folder",
       }),
       "1 of 50 in this round"
+    );
+    assert.equal(
+      practiceSessionPositionLabel({
+        index: 0,
+        filteredLength: 20,
+        scopeType: "mcq_bank_subfolder",
+      }),
+      "1 of 20 in this round"
     );
     assert.equal(
       practiceSessionPositionLabel({
@@ -69,6 +89,7 @@ describe("MCQ practice session labels", () => {
   it("hints when a folder round finishes with remaining outside the batch", () => {
     assert.equal(MCQ_FOLDER_PRACTICE_BATCH_SIZE, 50);
     assert.ok(isMcqBankFolderPracticeScope("mcq_bank_folder"));
+    assert.ok(isMcqBankFolderPracticeScope("mcq_bank_subfolder"));
     const withMore = folderRoundCompleteHint({
       folderRemaining: 70,
       loadedCount: 50,

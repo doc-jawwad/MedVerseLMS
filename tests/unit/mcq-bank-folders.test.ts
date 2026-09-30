@@ -22,10 +22,24 @@ describe("mcq_bank_folder practice scope", () => {
     assert.equal(isPracticeScopeType("other"), false);
   });
 
+  it("includes mcq_bank_subfolder scopes", () => {
+    assert.ok(PRACTICE_SCOPE_TYPES.includes("mcq_bank_subfolder"));
+    assert.ok(PRACTICE_SCOPE_TYPES.includes("mcq_bank_subfolder_favorites"));
+    assert.ok(PRACTICE_SCOPE_TYPES.includes("mcq_bank_subfolder_incorrect"));
+    assert.equal(isPracticeScopeType("mcq_bank_subfolder"), true);
+  });
+
   it("maps folder-not-found to a student message", () => {
     assert.match(
       practiceBatchAccessMessage("mcq_bank_folder_not_found"),
       /folder/i
+    );
+  });
+
+  it("maps subfolder-not-found to a student message", () => {
+    assert.match(
+      practiceBatchAccessMessage("mcq_bank_subfolder_not_found"),
+      /subfolder/i
     );
   });
 });
@@ -34,6 +48,11 @@ describe("content bin mcq_bank_folder label", () => {
   it("labels mcq_bank_folder entity", () => {
     const t: ContentBinEntityType = "mcq_bank_folder";
     assert.ok(contentBinEntityLabel(t).length > 0);
+  });
+
+  it("labels mcq_bank_subfolder entity", () => {
+    const t: ContentBinEntityType = "mcq_bank_subfolder";
+    assert.equal(contentBinEntityLabel(t), "MCQ Bank subfolder");
   });
 });
 
@@ -71,6 +90,33 @@ describe("mcq bank folder delete UI contract", () => {
     );
   });
 
+  it("prefers subfolder_count for emptiness when present", () => {
+    assert.equal(
+      isMcqBankFolderEmptyForDelete({
+        question_count: 5,
+        pdf_count: 0,
+        subfolder_count: 0,
+      }),
+      true
+    );
+    assert.equal(
+      isMcqBankFolderEmptyForDelete({
+        question_count: 0,
+        pdf_count: 0,
+        subfolder_count: 2,
+      }),
+      false
+    );
+    assert.equal(
+      isMcqBankFolderEmptyForDelete({
+        question_count: 0,
+        pdf_count: 1,
+        subfolder_count: 0,
+      }),
+      false
+    );
+  });
+
   it("summarizes counts for questions-only, PDFs-only, both, and empty", () => {
     assert.equal(
       mcqBankFolderContentSummary({ question_count: 1, pdf_count: 0 }),
@@ -87,6 +133,14 @@ describe("mcq bank folder delete UI contract", () => {
     assert.equal(
       mcqBankFolderContentSummary({ question_count: 0, pdf_count: 0 }),
       "0 questions · 0 PDFs"
+    );
+    assert.equal(
+      mcqBankFolderContentSummary({
+        question_count: 4,
+        pdf_count: 1,
+        subfolder_count: 2,
+      }),
+      "4 questions · 2 subfolders · 1 PDF"
     );
   });
 
@@ -106,6 +160,22 @@ describe("mcq bank folder delete UI contract", () => {
     assert.equal(
       mcqBankFolderDeleteBlockedReason({ question_count: 1, pdf_count: 2 }),
       "Remove 1 question and 2 PDFs first."
+    );
+    assert.equal(
+      mcqBankFolderDeleteBlockedReason({
+        question_count: 9,
+        pdf_count: 0,
+        subfolder_count: 3,
+      }),
+      "Remove 3 subfolders first."
+    );
+    assert.equal(
+      mcqBankFolderDeleteBlockedReason({
+        question_count: 9,
+        pdf_count: 2,
+        subfolder_count: 1,
+      }),
+      "Remove 1 subfolder and 2 PDFs first."
     );
   });
 });

@@ -64,15 +64,15 @@ type Phase = "upload" | "preview" | "done";
 export function ImportClient({
   subjects,
   recentBatches,
-  mcqBankFolderId,
+  mcqBankSubfolderId,
   folderLabel,
   lockedSubjectId,
   returnHref,
 }: {
   subjects: { id: string; label: string }[];
   recentBatches: Batch[];
-  /** When set, imported questions are placed in this Academic MCQ Bank folder. */
-  mcqBankFolderId?: string;
+  /** When set, imported questions are placed in this Academic MCQ Bank subfolder. */
+  mcqBankSubfolderId?: string;
   folderLabel?: string;
   /** Pre-select / lock departmental subject (CSV taxonomy under this subject). */
   lockedSubjectId?: string;
@@ -222,7 +222,7 @@ export function ImportClient({
         batchId,
         payload,
         createMissing,
-        mcqBankFolderId
+        mcqBankSubfolderId
       );
       if ("error" in res && res.error) throw new Error(res.error);
       if (!("result" in res) || !res.result) throw new Error("Import failed");
@@ -263,14 +263,14 @@ export function ImportClient({
 
   return (
     <div className="grid gap-6">
-      {mcqBankFolderId ? (
+      {mcqBankSubfolderId ? (
         <div className="rounded-xl border bg-card px-4 py-3 text-sm">
           <p className="font-medium text-[var(--student-ink)]">
-            Importing into MCQ Bank folder
+            Importing into MCQ Bank subfolder
             {folderLabel ? `: ${folderLabel}` : ""}
           </p>
           <p className="mt-1 text-muted-foreground">
-            New questions are placed in this folder automatically. Book /
+            New questions are placed in this subfolder automatically. Book /
             chapter / topic in the CSV remain Question Bank taxonomy metadata.
           </p>
           {returnHref ? (

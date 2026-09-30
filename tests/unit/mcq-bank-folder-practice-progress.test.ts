@@ -4,6 +4,7 @@ import { completionPercent } from "../../src/lib/practice/engine.ts";
 import {
   folderPracticeProgressLabel,
   normalizeFolderPracticeProgress,
+  normalizeSubfolderPracticeProgress,
 } from "../../src/lib/practice/mcq-bank-folder-progress.ts";
 
 describe("mcq bank folder practice progress helpers", () => {
@@ -42,6 +43,35 @@ describe("mcq bank folder practice progress helpers", () => {
     });
     assert.equal(full.complete, true);
     assert.equal(full.percent_complete, 100);
+  });
+
+  it("normalizes subfolder progress with subfolder_id", () => {
+    const p = normalizeSubfolderPracticeProgress(
+      {
+        subfolder_id: "sf1",
+        total: 8,
+        done: 3,
+        remaining: 5,
+        percent_complete: 38,
+        complete: false,
+        favorites: 1,
+        incorrect: 2,
+      },
+      "sf-fallback"
+    );
+    assert.equal(p.subfolder_id, "sf1");
+    assert.equal(p.done, 3);
+    assert.equal(p.total, 8);
+    assert.equal(p.favorites, 1);
+    assert.equal(p.incorrect, 2);
+    assert.equal(p.complete, false);
+
+    const fallback = normalizeSubfolderPracticeProgress(
+      { total: 2, done: 2 },
+      "sf2"
+    );
+    assert.equal(fallback.subfolder_id, "sf2");
+    assert.equal(fallback.complete, true);
   });
 
   it("matches completionPercent for ring labels", () => {

@@ -19,3 +19,20 @@ export async function restartMcqBankFolderPractice(folderId: string) {
     result: data as { folder_id: string; reset_count: number },
   };
 }
+
+/** Explicit subfolder Restart — done→remaining for this subfolder only. */
+export async function restartMcqBankSubfolderPractice(subfolderId: string) {
+  if (!subfolderId) return { error: "Subfolder required." };
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc(
+    "reset_mcq_bank_subfolder_practice",
+    { p_subfolder_id: subfolderId }
+  );
+  revalidatePath("/academic");
+  revalidatePath("/mcq-bank");
+  revalidatePath("/practice");
+  if (error) return actionRpcResult("restartMcqBankSubfolderPractice", error);
+  return {
+    result: data as { subfolder_id: string; reset_count: number },
+  };
+}

@@ -45,14 +45,14 @@ export async function importChunk(
   batchId: string,
   rows: ImportRow[],
   createMissing: boolean,
-  mcqBankFolderId?: string | null
+  mcqBankSubfolderId?: string | null
 ) {
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("import_question_batch", {
     p_batch_id: batchId,
     p_rows: rows,
     p_create_missing: createMissing,
-    p_mcq_bank_folder_id: mcqBankFolderId ?? null,
+    p_mcq_bank_subfolder_id: mcqBankSubfolderId ?? null,
   });
   if (error) return actionRpcResult("action", error);
   const result = data as {

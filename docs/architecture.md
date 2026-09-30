@@ -130,7 +130,7 @@ Each Block (and each Final Year clinical subject) shows these student-facing chr
 
 | Category / group | Notes |
 |---|---|
-| MCQ Bank | Practice with instant feedback — admin-managed **folders** under the Block / Final Year subject (`mcq_bank_folders`); each folder is the container for its PDFs (`material_folders.library_type = mcq_bank`) and MCQs (`questions.mcq_bank_folder_id`). Question Bank taxonomy (year → departmental subject → book → chapter → topic) remains internal metadata for authoring/search — not a competing student navigation. |
+| MCQ Bank | Practice with instant feedback — admin-managed **folders** under the Block / Final Year subject (`mcq_bank_folders`); each folder holds PDFs (`material_folders.library_type = mcq_bank`) and **subfolders** (`mcq_bank_subfolders`); MCQs attach to a subfolder (`questions.mcq_bank_subfolder_id`, with denormalized `mcq_bank_folder_id`). Hierarchy: Folder → Subfolder → MCQs. Question Bank taxonomy (year → departmental subject → book → chapter → topic) remains internal metadata for authoring/search — not a competing student navigation. |
 | One Liner | High-yield recall (not formal exams). Store remains `pearl_points`; student chrome label is One Liner. |
 | Guidelines | Study guidelines / protocols |
 | Books | Reference texts |
@@ -260,7 +260,7 @@ Subscription **application** stores the selected purchase class. Subscription **
 
 ### 9. Practice (product law; separate from exams)
 
-Filters / states: **All / Remaining / Done / Favorites** (`practice_progress.marked`); **Incorrect** set (`practice_progress.incorrect`, maintained by `submit_practice_answer`); Practice Incorrect mode (`mcq_bank_folder_incorrect`); favorite/unfavorite; Done → Remaining reset; percentage completion; forward practice timer; practice report. **No** reuse of `test_attempts` for practice. Schema for practice progress is a future migration concern — see [database.md](database.md); do not invent attempt states.
+Filters / states: **All / Remaining / Done / Favorites** (`practice_progress.marked`); **Incorrect** set (`practice_progress.incorrect`, maintained by `submit_practice_answer`); Practice Incorrect mode (`mcq_bank_subfolder_incorrect` / folder-aggregate `mcq_bank_folder_incorrect`); favorite/unfavorite; Done → Remaining reset; percentage completion; forward practice timer; practice report. Primary practice unit is the **subfolder**; folder/bank progress aggregates child subfolders. **No** reuse of `test_attempts` for practice. See [database.md](database.md); do not invent attempt states.
 
 ### 10. Flashcards
 

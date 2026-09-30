@@ -24,6 +24,9 @@ export function practiceBatchAccessMessage(
   if (msg.includes("mcq_bank_folder_not_found")) {
     return "This MCQ Bank folder was not found.";
   }
+  if (msg.includes("mcq_bank_subfolder_not_found")) {
+    return "This MCQ Bank subfolder was not found.";
+  }
   if (msg.includes("invalid scope type")) {
     return "Invalid practice scope.";
   }

@@ -14,7 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { assignUnassignedQuestionToFolder } from "@/lib/actions/mcq-bank-folders";
+import { assignUnassignedQuestionToSubfolder } from "@/lib/actions/mcq-bank-subfolders";
 
 export type UnassignedQuestionRow = {
   question_id: string;
@@ -37,10 +37,17 @@ export type FolderOption = {
   product_subject_id: string;
 };
 
+export type SubfolderOption = {
+  subfolder_id: string;
+  name: string;
+  folder_id: string;
+};
+
 export function McqBankClassifyClient({
   yearId,
   subjects,
   folders,
+  subfolders,
   questions,
   totalCount,
   page,
@@ -49,6 +56,7 @@ export function McqBankClassifyClient({
   yearId: string;
   subjects: ProductSubjectOption[];
   folders: FolderOption[];
+  subfolders: SubfolderOption[];
   questions: UnassignedQuestionRow[];
   totalCount: number;
   page: number;
@@ -57,7 +65,7 @@ export function McqBankClassifyClient({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [subjectId, setSubjectId] = useState(subjects[0]?.id ?? "");
-  const [folderByQuestion, setFolderByQuestion] = useState<
+  const [subfolderByQuestion, setSubfolderByQuestion] = useState<
     Record<string, string>
   >({});
 
@@ -66,10 +74,31 @@ export function McqBankClassifyClient({
     [folders, subjectId]
   );
 
+  const subjectFolderIds = useMemo(
+    () => new Set(subjectFolders.map((f) => f.folder_id)),
+    [subjectFolders]
+  );
+
+  const subjectSubfolders = useMemo(() => {
+    const folderName = new Map(
+      subjectFolders.map((f) => [f.folder_id, f.name] as const)
+    );
+    return subfolders
+      .filter((s) => subjectFolderIds.has(s.folder_id))
+      .map((s) => ({
+        ...s,
+        label: `${folderName.get(s.folder_id) ?? "Folder"} / ${s.name}`,
+      }));
+  }, [subfolders, subjectFolderIds, subjectFolders]);
+
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
 
-  function folderFor(questionId: string) {
-    return folderByQuestion[questionId] ?? subjectFolders[0]?.folder_id ?? "";
+  function subfolderFor(questionId: string) {
+    return (
+      subfolderByQuestion[questionId] ??
+      subjectSubfolders[0]?.subfolder_id ??
+      ""
+    );
   }
 
   return (
@@ -82,8 +111,8 @@ export function McqBankClassifyClient({
           Classify unassigned MCQs
         </h1>
         <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-          Questions without an Academic MCQ Bank folder ({totalCount} for this
-          class). Assign each to a product subject folder.
+          Questions without an Academic MCQ Bank subfolder ({totalCount} for
+          this class). Assign each to a product subject subfolder.
         </p>
         <div className="mt-3 flex flex-wrap gap-3 text-sm">
           <Link
@@ -101,7 +130,7 @@ export function McqBankClassifyClient({
           value={subjectId || undefined}
           onValueChange={(v) => {
             setSubjectId(v);
-            setFolderByQuestion({});
+            setSubfolderByQuestion({});
           }}
           disabled={subjects.length === 0}
         >
@@ -125,7 +154,7 @@ export function McqBankClassifyClient({
       ) : (
         <ul className="grid gap-3">
           {questions.map((q) => {
-            const selectedFolder = folderFor(q.question_id);
+            const selectedSubfolder = subfolderFor(q.question_id);
             return (
               <li
                 key={q.question_id}
@@ -149,24 +178,27 @@ export function McqBankClassifyClient({
                 </div>
                 <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-end">
                   <div className="grid min-w-0 flex-1 gap-1">
-                    <Label className="text-xs">Folder</Label>
+                    <Label className="text-xs">Subfolder</Label>
                     <Select
-                      value={selectedFolder || undefined}
+                      value={selectedSubfolder || undefined}
                       onValueChange={(v) =>
-                        setFolderByQuestion((prev) => ({
+                        setSubfolderByQuestion((prev) => ({
                           ...prev,
                           [q.question_id]: v,
                         }))
                       }
-                      disabled={subjectFolders.length === 0}
+                      disabled={subjectSubfolders.length === 0}
                     >
                       <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Select folder" />
+                        <SelectValue placeholder="Select subfolder" />
                       </SelectTrigger>
                       <SelectContent>
-                        {subjectFolders.map((f) => (
-                          <SelectItem key={f.folder_id} value={f.folder_id}>
-                            {f.name}
+                        {subjectSubfolders.map((s) => (
+                          <SelectItem
+                            key={s.subfolder_id}
+                            value={s.subfolder_id}
+                          >
+                            {s.label}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -176,19 +208,19 @@ export function McqBankClassifyClient({
                     type="button"
                     size="sm"
                     className="w-full sm:w-auto"
-                    disabled={pending || !selectedFolder}
+                    disabled={pending || !selectedSubfolder}
                     onClick={() =>
                       startTransition(async () => {
                         const subj = subjects.find((s) => s.id === subjectId);
                         const { error } =
-                          await assignUnassignedQuestionToFolder(
+                          await assignUnassignedQuestionToSubfolder(
                             q.question_id,
-                            selectedFolder,
+                            selectedSubfolder,
                             subj?.product_key
                           );
                         if (error) toast.error(error);
                         else {
-                          toast.success("Assigned to folder");
+                          toast.success("Assigned to subfolder");
                           router.refresh();
                         }
                       })
@@ -209,20 +241,21 @@ export function McqBankClassifyClient({
             Page {page + 1} of {totalPages}
           </span>
           <div className="flex gap-2">
-            <Button asChild size="sm" variant="outline">
+            <Button asChild size="sm" variant="outline" disabled={page <= 0}>
               <Link
                 href={`/admin/mcq-bank/classify?year=${yearId}&page=${Math.max(0, page - 1)}`}
-                className={page <= 0 ? "pointer-events-none opacity-50" : ""}
               >
                 Previous
               </Link>
             </Button>
-            <Button asChild size="sm" variant="outline">
+            <Button
+              asChild
+              size="sm"
+              variant="outline"
+              disabled={page + 1 >= totalPages}
+            >
               <Link
                 href={`/admin/mcq-bank/classify?year=${yearId}&page=${page + 1}`}
-                className={
-                  page + 1 >= totalPages ? "pointer-events-none opacity-50" : ""
-                }
               >
                 Next
               </Link>

@@ -28,6 +28,7 @@ export type McqBankFolderRow = {
   sort_order: number;
   question_count: number;
   pdf_count: number;
+  subfolder_count?: number;
 };
 
 export function McqBankFoldersAdmin({
@@ -71,9 +72,8 @@ export function McqBankFoldersAdmin({
           Manage folders
         </h1>
         <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-          Folders hold Academic MCQ Bank questions and study PDFs for this
-          product subject. Empty folders (no questions and no live PDFs) can be
-          moved to the Bin.
+          Folders hold subfolders (MCQs) and study PDFs for this product subject.
+          Empty folders (no subfolders and no live PDFs) can be moved to the Bin.
         </p>
         <div className="mt-3 flex flex-wrap gap-3 text-sm">
           <Link
@@ -116,6 +116,7 @@ export function McqBankFoldersAdmin({
                   sort_order: prev.length,
                   question_count: 0,
                   pdf_count: 0,
+                  subfolder_count: 0,
                 },
               ]);
             }
@@ -238,12 +239,12 @@ export function McqBankFoldersAdmin({
                     <>
                       <p>
                         “{folder.name}” will be moved to the Bin if it has no
-                        questions and no live PDFs. It stays until about{" "}
+                        subfolders and no live PDFs. It stays until about{" "}
                         <strong>{purgeDateHint()}</strong>.
                       </p>
                       <p className="mt-2">
-                        Folders with questions or PDFs cannot be deleted — remove
-                        that content first.
+                        Folders with subfolders or PDFs cannot be deleted —
+                        remove that content first.
                       </p>
                     </>
                   }

@@ -9,7 +9,20 @@ export function isMcqBankFolderPracticeScope(
   return (
     scopeType === "mcq_bank_folder" ||
     scopeType === "mcq_bank_folder_favorites" ||
-    scopeType === "mcq_bank_folder_incorrect"
+    scopeType === "mcq_bank_folder_incorrect" ||
+    scopeType === "mcq_bank_subfolder" ||
+    scopeType === "mcq_bank_subfolder_favorites" ||
+    scopeType === "mcq_bank_subfolder_incorrect"
+  );
+}
+
+export function isMcqBankSubfolderPracticeScope(
+  scopeType: PracticeScopeType
+): boolean {
+  return (
+    scopeType === "mcq_bank_subfolder" ||
+    scopeType === "mcq_bank_subfolder_favorites" ||
+    scopeType === "mcq_bank_subfolder_incorrect"
   );
 }
 

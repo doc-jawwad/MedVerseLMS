@@ -65,6 +65,7 @@ export default async function AcademicMcqBankFolderPage({
       subjectId={subjectId}
       folderId={folderId}
       breadcrumbs={breadcrumbs}
+      blockSlug={subject.product_key}
       backHref={categoryHref(
         subject.product_key,
         categorySlugFromId("mcq_bank")

@@ -6,28 +6,63 @@ import { useTransition } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { McqFolderProgressRing } from "@/components/library/mcq-folder-progress-ring";
-import { restartMcqBankFolderPractice } from "@/lib/actions/mcq-bank-folder-practice";
-import type { McqBankFolderPracticeProgress } from "@/lib/practice/mcq-bank-folder-progress";
+import {
+  restartMcqBankFolderPractice,
+  restartMcqBankSubfolderPractice,
+} from "@/lib/actions/mcq-bank-folder-practice";
+import {
+  toContainerPracticeProgress,
+  type McqBankContainerPracticeProgress,
+  type McqBankFolderPracticeProgress,
+  type McqBankSubfolderPracticeProgress,
+} from "@/lib/practice/mcq-bank-folder-progress";
 import { MCQ_FOLDER_PRACTICE_BATCH_SIZE } from "@/lib/practice/session-labels";
 
-export function McqFolderPracticePanel({
-  folderId,
-  folderName,
-  progress,
+type ContainerKind = "folder" | "subfolder";
+
+function scopeFor(
+  kind: ContainerKind,
+  mode: "all" | "favorites" | "incorrect"
+): string {
+  if (kind === "subfolder") {
+    if (mode === "favorites") return "mcq_bank_subfolder_favorites";
+    if (mode === "incorrect") return "mcq_bank_subfolder_incorrect";
+    return "mcq_bank_subfolder";
+  }
+  if (mode === "favorites") return "mcq_bank_folder_favorites";
+  if (mode === "incorrect") return "mcq_bank_folder_incorrect";
+  return "mcq_bank_folder";
+}
+
+export function McqPracticePanel({
+  containerKind,
+  containerId,
+  containerName,
+  progress: rawProgress,
 }: {
-  folderId: string;
-  folderName: string;
-  progress: McqBankFolderPracticeProgress;
+  containerKind: ContainerKind;
+  containerId: string;
+  containerName: string;
+  progress:
+    | McqBankContainerPracticeProgress
+    | McqBankFolderPracticeProgress
+    | McqBankSubfolderPracticeProgress;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
-  const sessionHref = `/practice/session?scope=mcq_bank_folder&id=${encodeURIComponent(folderId)}&name=${encodeURIComponent(folderName)}`;
-  const favoritesHref = `/practice/session?scope=mcq_bank_folder_favorites&id=${encodeURIComponent(folderId)}&name=${encodeURIComponent(`${folderName} · Favorites`)}`;
-  const incorrectHref = `/practice/session?scope=mcq_bank_folder_incorrect&id=${encodeURIComponent(folderId)}&name=${encodeURIComponent(`${folderName} · Incorrect`)}`;
+  const progress = toContainerPracticeProgress(rawProgress);
+  const noun = containerKind === "subfolder" ? "subfolder" : "folder";
+
+  const sessionHref = `/practice/session?scope=${scopeFor(containerKind, "all")}&id=${encodeURIComponent(containerId)}&name=${encodeURIComponent(containerName)}`;
+  const favoritesHref = `/practice/session?scope=${scopeFor(containerKind, "favorites")}&id=${encodeURIComponent(containerId)}&name=${encodeURIComponent(`${containerName} · Favorites`)}`;
+  const incorrectHref = `/practice/session?scope=${scopeFor(containerKind, "incorrect")}&id=${encodeURIComponent(containerId)}&name=${encodeURIComponent(`${containerName} · Incorrect`)}`;
 
   function restartAndStart() {
     startTransition(async () => {
-      const res = await restartMcqBankFolderPractice(folderId);
+      const res =
+        containerKind === "subfolder"
+          ? await restartMcqBankSubfolderPractice(containerId)
+          : await restartMcqBankFolderPractice(containerId);
       if ("error" in res && res.error) {
         toast.error(res.error);
         return;
@@ -41,14 +76,18 @@ export function McqFolderPracticePanel({
   if (progress.total <= 0) {
     return (
       <p className="text-sm text-muted-foreground">
-        No approved MCQs in this folder yet.
+        No approved MCQs in this {noun} yet.
       </p>
     );
   }
 
   const favoritesAction =
     progress.favorites > 0 ? (
-      <Button asChild variant="outline" data-testid="mcq-folder-practice-favorites">
+      <Button
+        asChild
+        variant="outline"
+        data-testid={`mcq-${containerKind}-practice-favorites`}
+      >
         <Link href={favoritesHref}>
           Practice Favorites ({progress.favorites})
         </Link>
@@ -56,7 +95,7 @@ export function McqFolderPracticePanel({
     ) : (
       <p
         className="text-sm text-muted-foreground"
-        data-testid="mcq-folder-favorites-empty"
+        data-testid={`mcq-${containerKind}-favorites-empty`}
       >
         No favorites yet. Favorite an MCQ during practice to build this set.
       </p>
@@ -64,7 +103,11 @@ export function McqFolderPracticePanel({
 
   const incorrectAction =
     progress.incorrect > 0 ? (
-      <Button asChild variant="outline" data-testid="mcq-folder-practice-incorrect">
+      <Button
+        asChild
+        variant="outline"
+        data-testid={`mcq-${containerKind}-practice-incorrect`}
+      >
         <Link href={incorrectHref}>
           Practice Incorrect ({progress.incorrect})
         </Link>
@@ -72,7 +115,7 @@ export function McqFolderPracticePanel({
     ) : (
       <p
         className="text-sm text-muted-foreground"
-        data-testid="mcq-folder-incorrect-empty"
+        data-testid={`mcq-${containerKind}-incorrect-empty`}
       >
         No incorrect MCQs. Wrong answers during practice appear here until you
         get them right.
@@ -94,7 +137,9 @@ export function McqFolderPracticePanel({
             <McqFolderProgressRing done={progress.done} total={progress.total} />
             <div className="min-w-0">
               <p className="font-medium text-[var(--student-ink)]">
-                Folder complete
+                {containerKind === "subfolder"
+                  ? "Subfolder complete"
+                  : "Folder complete"}
               </p>
               <p className="text-sm text-muted-foreground">
                 You finished all {progress.total} MCQs. Start again only when you
@@ -106,7 +151,7 @@ export function McqFolderPracticePanel({
             type="button"
             disabled={pending}
             onClick={restartAndStart}
-            data-testid="mcq-folder-restart-practice"
+            data-testid={`mcq-${containerKind}-restart-practice`}
           >
             {pending ? "Restarting…" : "Restart Practice"}
           </Button>
@@ -133,11 +178,31 @@ export function McqFolderPracticePanel({
             </p>
           </div>
         </div>
-        <Button asChild data-testid="mcq-folder-start-practice">
+        <Button asChild data-testid={`mcq-${containerKind}-start-practice`}>
           <Link href={sessionHref}>Start practice</Link>
         </Button>
       </div>
       <div className="border-t pt-4">{setActions}</div>
     </div>
+  );
+}
+
+/** @deprecated Prefer McqPracticePanel with containerKind="folder". */
+export function McqFolderPracticePanel({
+  folderId,
+  folderName,
+  progress,
+}: {
+  folderId: string;
+  folderName: string;
+  progress: McqBankFolderPracticeProgress;
+}) {
+  return (
+    <McqPracticePanel
+      containerKind="folder"
+      containerId={folderId}
+      containerName={folderName}
+      progress={progress}
+    />
   );
 }

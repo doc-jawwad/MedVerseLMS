@@ -53,10 +53,18 @@ select
   now() + interval '30 days',
   0;
 
+grant select on curriculum, t_paid, t_admin, t_plan, t_block1, t_block2, t_fy, t_surgery, t_medicine
+  to authenticated;
+
 -- Ensure practice entitlement on product blocks (free or any_subscription with live sub)
-update public.subjects
-set entitlement = 'any_subscription'
-where id in (select id from t_block1 union select id from t_block2);
+select test_helpers.as_user((select id from t_admin));
+select public.set_resource_entitlement(
+  'practice_subject', (select id from t_block1), 'any_subscription'
+);
+select public.set_resource_entitlement(
+  'practice_subject', (select id from t_block2), 'any_subscription'
+);
+select test_helpers.as_runner();
 
 -- Source folders from migration seed
 select id into temp t_f1
@@ -110,6 +118,19 @@ select test_helpers.make_question((select id from t_topic), 'B') as id into temp
 update public.questions set status = 'approved'
 where id in (select id from t_q1 union select id from t_q2);
 
+grant select on t_f1, t_f2, t_fsurg, t_fmed, t_anatomy, t_book, t_chapter, t_topic, t_q1, t_q2
+  to authenticated;
+
+-- Subfolders under seeded folders (canonical placement)
+select test_helpers.as_user((select id from t_admin));
+create temporary table t_sf1 (id uuid);
+create temporary table t_sf2 (id uuid);
+grant select, insert on t_sf1, t_sf2 to authenticated;
+insert into t_sf1 (id)
+select public.admin_create_mcq_bank_subfolder((select id from t_f1), '210 Sub F1');
+insert into t_sf2 (id)
+select public.admin_create_mcq_bank_subfolder((select id from t_f2), '210 Sub F2');
+
 -- D: initially unassigned (legacy)
 select is(
   (select mcq_bank_folder_id from public.questions where id = (select id from t_q1)),
@@ -117,23 +138,22 @@ select is(
   'D: new questions start with null mcq_bank_folder_id'
 );
 
--- Assign q1 to Block 1 folder as admin
-select test_helpers.as_user((select id from t_admin));
+-- Assign q1 to Block 1 subfolder as admin
 select lives_ok(
-  $$select public.admin_assign_unassigned_question_to_folder(
-    (select id from t_q1), (select id from t_f1)
+  $$select public.admin_assign_unassigned_question_to_subfolder(
+    (select id from t_q1), (select id from t_sf1)
   )$$,
-  'assign unassigned to Block 1 folder'
+  'assign unassigned to Block 1 subfolder'
 );
 
--- D: cannot assign again to another folder
+-- D: cannot assign again to another subfolder
 select throws_ok(
-  $$select public.admin_assign_unassigned_question_to_folder(
-    (select id from t_q1), (select id from t_f2)
+  $$select public.admin_assign_unassigned_question_to_subfolder(
+    (select id from t_q1), (select id from t_sf2)
   )$$,
   'P0001',
-  'already_in_mcq_bank_folder',
-  'D: cannot place same question in a second Academic folder'
+  'question_already_assigned',
+  'D: cannot place same question in a second Academic subfolder'
 );
 
 -- A: Block 1 folder listed under Block 1
@@ -194,8 +214,8 @@ select isnt(
 );
 
 -- Re-assign for remaining tests
-select public.admin_assign_unassigned_question_to_folder(
-  (select id from t_q1), (select id from t_f1)
+select public.admin_assign_unassigned_question_to_subfolder(
+  (select id from t_q1), (select id from t_sf1)
 );
 
 -- F: same question can be used by Prof. Session
@@ -317,18 +337,20 @@ select throws_ok(
 );
 
 -- K: entitlement gate — product subject without access denies folder practice
-select test_helpers.as_runner();
-update public.subjects
-set entitlement = 'plan',
-    required_plan_id = coalesce(
-      (
-        select id from public.subscription_plans
-        where id is distinct from (select id from t_plan)
-        order by sort_order limit 1
-      ),
-      (select id from t_plan)
-    )
-where id = (select id from t_block1);
+select test_helpers.as_user((select id from t_admin));
+select public.set_resource_entitlement(
+  'practice_subject',
+  (select id from t_block1),
+  'plan',
+  coalesce(
+    (
+      select id from public.subscription_plans
+      where id is distinct from (select id from t_plan)
+      order by sort_order limit 1
+    ),
+    (select id from t_plan)
+  )
+);
 
 select test_helpers.as_user((select id from t_paid));
 select case
@@ -344,10 +366,10 @@ select case
 end;
 
 -- M: Prof. Session day batch still works with folder-owned question
-select test_helpers.as_runner();
-update public.subjects
-set entitlement = 'any_subscription', required_plan_id = null
-where id = (select id from t_block1);
+select test_helpers.as_user((select id from t_admin));
+select public.set_resource_entitlement(
+  'practice_subject', (select id from t_block1), 'any_subscription'
+);
 select test_helpers.as_user((select id from t_paid));
 select ok(
   exists (
@@ -382,7 +404,7 @@ select ok(
   'N: Block 1 folder linked to mcq_bank material_folder for PDFs'
 );
 
--- O: folder-scoped CSV import places question in folder
+-- O: subfolder-scoped CSV import places question (denormalized folder)
 select test_helpers.as_user((select id from t_admin));
 with ins as (
   insert into public.import_batches (filename, total_rows, created_by)
@@ -392,6 +414,10 @@ with ins as (
 select id into temp t_batch from ins;
 grant select on t_batch to authenticated;
 
+create temporary table t_folder_import (result jsonb);
+grant select, insert on t_folder_import to authenticated;
+
+insert into t_folder_import (result)
 select public.import_question_batch(
   (select id from t_batch),
   jsonb_build_array(
@@ -417,25 +443,24 @@ select public.import_question_batch(
     )
   ),
   true,
-  (select id from t_f2)
-) as result into temp t_folder_import;
-grant select on t_folder_import to authenticated;
+  (select id from t_sf2)
+);
 
 select test_helpers.as_runner();
 select is(
   (select (result ->> 'inserted')::int from t_folder_import),
   1,
-  'O: folder import inserts one row'
+  'O: subfolder import inserts one row'
 );
 
 select is(
   (
     select q.mcq_bank_folder_id
     from public.questions q
-    where q.id = ((select result -> 'question_ids' ->> 0)::uuid)
+    where q.id = ((select t_folder_import.result -> 'question_ids' ->> 0 from t_folder_import)::uuid)
   ),
   (select id from t_f2),
-  'O: imported question belongs to Folder B (t_f2)'
+  'O: imported question denormalized folder is Folder B (t_f2)'
 );
 
 select * from finish();

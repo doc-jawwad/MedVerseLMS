@@ -120,23 +120,29 @@ select current_version_id from public.questions where id = (select id from t_q_c
 select test_helpers.as_user((select id from t_admin));
 create temporary table t_folder_a (id uuid);
 create temporary table t_folder_b (id uuid);
-grant select, insert on t_folder_a, t_folder_b to authenticated;
+create temporary table t_sf_a (id uuid);
+create temporary table t_sf_b (id uuid);
+grant select, insert on t_folder_a, t_folder_b, t_sf_a, t_sf_b to authenticated;
 insert into t_folder_a (id)
 select public.admin_create_mcq_bank_folder((select id from t_block1), 'Inc Folder A');
 insert into t_folder_b (id)
 select public.admin_create_mcq_bank_folder((select id from t_block1), 'Inc Folder B');
+insert into t_sf_a (id)
+select public.admin_create_mcq_bank_subfolder((select id from t_folder_a), 'Inc Sub A');
+insert into t_sf_b (id)
+select public.admin_create_mcq_bank_subfolder((select id from t_folder_b), 'Inc Sub B');
 
-select public.admin_assign_unassigned_question_to_folder(
-  (select id from t_q_a), (select id from t_folder_a)
+select public.admin_assign_unassigned_question_to_subfolder(
+  (select id from t_q_a), (select id from t_sf_a)
 );
-select public.admin_assign_unassigned_question_to_folder(
-  (select id from t_q_b), (select id from t_folder_a)
+select public.admin_assign_unassigned_question_to_subfolder(
+  (select id from t_q_b), (select id from t_sf_a)
 );
-select public.admin_assign_unassigned_question_to_folder(
-  (select id from t_q_c), (select id from t_folder_b)
+select public.admin_assign_unassigned_question_to_subfolder(
+  (select id from t_q_c), (select id from t_sf_b)
 );
 
-grant select on t_folder_a, t_folder_b to authenticated;
+grant select on t_folder_a, t_folder_b, t_sf_a, t_sf_b to authenticated;
 
 -- 1–2) Empty Incorrect practice
 select test_helpers.as_user((select id from t_paid));

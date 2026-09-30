@@ -49,10 +49,21 @@ async function main() {
   await client.query(helperSql);
   console.log(`Loaded ${helperFile}`);
 
-  const testFiles = fs
+  // Optional CLI file args (basenames or paths under supabase/tests/).
+  // Example: node scripts/run-pgtap.mjs supabase/tests/222_mcq_bank_subfolders.sql
+  const requested = process.argv.slice(2).map((arg) => path.basename(arg));
+  const allTestFiles = fs
     .readdirSync(dir)
     .filter((f) => f.endsWith(".sql") && f !== helperFile)
     .sort();
+  const testFiles =
+    requested.length === 0
+      ? allTestFiles
+      : allTestFiles.filter((f) => requested.includes(f));
+  if (requested.length > 0 && testFiles.length === 0) {
+    console.error(`No matching test files for: ${requested.join(", ")}`);
+    process.exit(1);
+  }
 
   let totalFail = 0;
   for (const file of testFiles) {

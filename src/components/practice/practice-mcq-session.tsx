@@ -21,17 +21,19 @@ import { practiceBatchAccessMessage } from "@/lib/practice/scope";
 import type { PracticeScope } from "@/lib/practice/types";
 import { FolderPracticeCompleteGate } from "@/components/practice/folder-practice-complete-gate";
 import {
+  normalizeFolderPracticeProgress,
+  normalizeSubfolderPracticeProgress,
+  type McqBankContainerPracticeProgress,
+} from "@/lib/practice/mcq-bank-folder-progress";
+import {
   folderRoundCompleteHint,
   isMcqBankFolderPracticeScope,
+  isMcqBankSubfolderPracticeScope,
   MCQ_FOLDER_PRACTICE_BATCH_SIZE,
   practiceSessionMeterLabel,
   practiceSessionPositionLabel,
   practiceSetEmptyCopy,
 } from "@/lib/practice/session-labels";
-import {
-  normalizeFolderPracticeProgress,
-  type McqBankFolderPracticeProgress,
-} from "@/lib/practice/mcq-bank-folder-progress";
 
 const BATCH_SIZE = MCQ_FOLDER_PRACTICE_BATCH_SIZE;
 
@@ -103,7 +105,7 @@ export function PracticeMcqSession({
   const [feedback, setFeedback] = useState<PracticeAnswerFeedback | null>(null);
   const [checking, setChecking] = useState(false);
   const [folderProgress, setFolderProgress] =
-    useState<McqBankFolderPracticeProgress | null>(null);
+    useState<McqBankContainerPracticeProgress | null>(null);
   const [startedWithItems, setStartedWithItems] = useState(false);
   const loadStarted = useRef(false);
   /** Incorrect MCQs cleared by a correct answer — drop after feedback, on Next. */
@@ -111,9 +113,16 @@ export function PracticeMcqSession({
     string | null
   >(null);
 
-  const isFavoritesScope = scope.type === "mcq_bank_folder_favorites";
-  const isIncorrectScope = scope.type === "mcq_bank_folder_incorrect";
+  const isFavoritesScope =
+    scope.type === "mcq_bank_folder_favorites" ||
+    scope.type === "mcq_bank_subfolder_favorites";
+  const isIncorrectScope =
+    scope.type === "mcq_bank_folder_incorrect" ||
+    scope.type === "mcq_bank_subfolder_incorrect";
   const isFolderBatchScope = isMcqBankFolderPracticeScope(scope.type);
+  const isSubfolderScope = isMcqBankSubfolderPracticeScope(scope.type);
+  const isMainContainerScope =
+    scope.type === "mcq_bank_folder" || scope.type === "mcq_bank_subfolder";
 
   useEffect(() => {
     if (loadStarted.current) return;
@@ -148,12 +157,41 @@ export function PracticeMcqSession({
           { p_folder_id: scope.id }
         );
         if (prog) {
-          setFolderProgress(
-            normalizeFolderPracticeProgress(
-              prog as Record<string, unknown>,
-              scope.id
-            )
+          const p = normalizeFolderPracticeProgress(
+            prog as Record<string, unknown>,
+            scope.id
           );
+          setFolderProgress({
+            container_id: p.folder_id,
+            total: p.total,
+            done: p.done,
+            remaining: p.remaining,
+            percent_complete: p.percent_complete,
+            complete: p.complete,
+            favorites: p.favorites,
+            incorrect: p.incorrect,
+          });
+        }
+      } else if (scope.type === "mcq_bank_subfolder") {
+        const { data: prog } = await supabase.rpc(
+          "get_mcq_bank_subfolder_practice_progress",
+          { p_subfolder_id: scope.id }
+        );
+        if (prog) {
+          const p = normalizeSubfolderPracticeProgress(
+            prog as Record<string, unknown>,
+            scope.id
+          );
+          setFolderProgress({
+            container_id: p.subfolder_id,
+            total: p.total,
+            done: p.done,
+            remaining: p.remaining,
+            percent_complete: p.percent_complete,
+            complete: p.complete,
+            favorites: p.favorites,
+            incorrect: p.incorrect,
+          });
         }
       }
 
@@ -182,17 +220,37 @@ export function PracticeMcqSession({
           ? scope.id
           : progressSubjectIds[0] ?? null;
 
-      // Folder practice sessions may be attributed to the product subject for
-      // session summaries; progress store still uses departmental ids above.
+      // Folder / subfolder practice sessions may be attributed to the product
+      // subject for session summaries; progress store still uses departmental ids.
       if (isFolderBatchScope) {
-        const { data: folder } = await supabase
-          .from("mcq_bank_folders")
-          .select("academic_product_subject_id")
-          .eq("id", scope.id)
-          .is("deleted_at", null)
-          .maybeSingle();
-        if (folder?.academic_product_subject_id) {
-          sessionSubjectId = folder.academic_product_subject_id as string;
+        if (isSubfolderScope) {
+          const { data: subfolder } = await supabase
+            .from("mcq_bank_subfolders")
+            .select("folder_id")
+            .eq("id", scope.id)
+            .is("deleted_at", null)
+            .maybeSingle();
+          if (subfolder?.folder_id) {
+            const { data: folder } = await supabase
+              .from("mcq_bank_folders")
+              .select("academic_product_subject_id")
+              .eq("id", subfolder.folder_id as string)
+              .is("deleted_at", null)
+              .maybeSingle();
+            if (folder?.academic_product_subject_id) {
+              sessionSubjectId = folder.academic_product_subject_id as string;
+            }
+          }
+        } else {
+          const { data: folder } = await supabase
+            .from("mcq_bank_folders")
+            .select("academic_product_subject_id")
+            .eq("id", scope.id)
+            .is("deleted_at", null)
+            .maybeSingle();
+          if (folder?.academic_product_subject_id) {
+            sessionSubjectId = folder.academic_product_subject_id as string;
+          }
         }
       }
 
@@ -201,7 +259,7 @@ export function PracticeMcqSession({
         sessionSubjectId
       );
     })();
-  }, [supabase, scope.type, scope.id, isFolderBatchScope]);
+  }, [supabase, scope.type, scope.id, isFolderBatchScope, isSubfolderScope]);
 
   const itemIds = useMemo(() => contents.map((c) => c.itemId), [contents]);
   const contentById = useMemo(() => {
@@ -331,12 +389,15 @@ export function PracticeMcqSession({
   }
 
   if (itemIds.length === 0) {
-    if (scope.type === "mcq_bank_folder") {
+    if (isMainContainerScope) {
       return (
         <FolderPracticeCompleteGate
           folderId={scope.id}
           folderName={scope.title}
           backHref={backHref}
+          containerKind={
+            scope.type === "mcq_bank_subfolder" ? "subfolder" : "folder"
+          }
         />
       );
     }
@@ -357,7 +418,9 @@ export function PracticeMcqSession({
             <p className="mt-2 text-muted-foreground">{copy.body}</p>
           </div>
           <Button asChild variant="outline" className="w-fit">
-            <Link href={backHref}>Back to folder</Link>
+            <Link href={backHref}>
+              Back to {isSubfolderScope ? "subfolder" : "folder"}
+            </Link>
           </Button>
         </div>
       );
@@ -379,7 +442,9 @@ export function PracticeMcqSession({
             <p className="mt-2 text-muted-foreground">{copy.body}</p>
           </div>
           <Button asChild variant="outline" className="w-fit">
-            <Link href={backHref}>Back to folder</Link>
+            <Link href={backHref}>
+              Back to {isSubfolderScope ? "subfolder" : "folder"}
+            </Link>
           </Button>
         </div>
       );
@@ -407,7 +472,7 @@ export function PracticeMcqSession({
       : "Practice MCQ";
 
   const roundComplete =
-    scope.type === "mcq_bank_folder" &&
+    isMainContainerScope &&
     deck.counts.remaining === 0 &&
     deck.counts.done > 0 &&
     deck.counts.done === deck.counts.all;

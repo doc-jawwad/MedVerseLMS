@@ -95,6 +95,15 @@ export function folderHref(
   return `${categoryHref(undefined, a as string, b)}/f/${encodeURIComponent(c)}`;
 }
 
+/** MCQ Bank subfolder under a folder: `…/f/{folderId}/sf/{subfolderId}`. */
+export function subfolderHref(
+  blockSlug: string,
+  folderId: string,
+  subfolderId: string
+): string {
+  return `${folderHref(blockSlug, "mcq-bank", folderId)}/sf/${encodeURIComponent(subfolderId)}`;
+}
+
 export function profSessionHref(_surface?: AcademicTreeSurface): string {
   return `${ACADEMIC_BASE_PATH}/${PROF_SESSION_SLUG}`;
 }

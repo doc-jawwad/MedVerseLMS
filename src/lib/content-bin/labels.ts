@@ -8,7 +8,8 @@ export type ContentBinEntityType =
   | "question"
   | "prof_session_day"
   | "one_liner"
-  | "mcq_bank_folder";
+  | "mcq_bank_folder"
+  | "mcq_bank_subfolder";
 
 export function contentBinEntityLabel(type: ContentBinEntityType): string {
   switch (type) {
@@ -28,6 +29,8 @@ export function contentBinEntityLabel(type: ContentBinEntityType): string {
       return "One-liner";
     case "mcq_bank_folder":
       return "MCQ Bank folder";
+    case "mcq_bank_subfolder":
+      return "MCQ Bank subfolder";
     default:
       return type;
   }

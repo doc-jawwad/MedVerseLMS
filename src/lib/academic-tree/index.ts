@@ -79,6 +79,7 @@ export {
   profSessionHref,
   profSessionSubjectHref,
   searchHref,
+  subfolderHref,
   surfaceBasePath,
   surfaceLabel,
   yearHref,

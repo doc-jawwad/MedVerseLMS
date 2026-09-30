@@ -204,9 +204,13 @@ update public.questions set status = 'approved' where id = (select id from t_q1)
 grant select on t_q1 to anon, authenticated;
 
 select test_helpers.as_user((select id from t_edit));
-select public.admin_assign_unassigned_question_to_folder(
+create temporary table t_sf (id uuid);
+grant select, insert on t_sf to anon, authenticated;
+insert into t_sf (id)
+select public.admin_create_mcq_bank_subfolder((select id from t_folder), '214 SoftDel Sub');
+select public.admin_assign_unassigned_question_to_subfolder(
   (select id from t_q1),
-  (select id from t_folder)
+  (select id from t_sf)
 );
 
 select throws_ok(

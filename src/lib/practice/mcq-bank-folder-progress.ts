@@ -13,10 +13,34 @@ export type McqBankFolderPracticeProgress = {
   incorrect: number;
 };
 
-export function normalizeFolderPracticeProgress(
+export type McqBankSubfolderPracticeProgress = {
+  subfolder_id: string;
+  total: number;
+  done: number;
+  remaining: number;
+  percent_complete: number;
+  complete: boolean;
+  favorites: number;
+  incorrect: number;
+};
+
+/** Shared practice-progress shape used by McqPracticePanel. */
+export type McqBankContainerPracticeProgress = {
+  container_id: string;
+  total: number;
+  done: number;
+  remaining: number;
+  percent_complete: number;
+  complete: boolean;
+  favorites: number;
+  incorrect: number;
+};
+
+function normalizeContainerProgress(
   raw: Record<string, unknown> | null | undefined,
-  folderId?: string
-): McqBankFolderPracticeProgress {
+  idField: "folder_id" | "subfolder_id",
+  fallbackId?: string
+): McqBankContainerPracticeProgress {
   const total = Math.max(0, Number(raw?.total ?? 0) || 0);
   const done = Math.max(0, Math.min(total, Number(raw?.done ?? 0) || 0));
   const remaining = Math.max(0, total - done);
@@ -27,7 +51,7 @@ export function normalizeFolderPracticeProgress(
       ? Math.max(0, Math.min(100, Math.round(raw.percent_complete)))
       : completionPercent(done, total);
   return {
-    folder_id: String(raw?.folder_id ?? folderId ?? ""),
+    container_id: String(raw?.[idField] ?? fallbackId ?? ""),
     total,
     done,
     remaining,
@@ -35,6 +59,71 @@ export function normalizeFolderPracticeProgress(
     complete: total > 0 && done >= total,
     favorites,
     incorrect,
+  };
+}
+
+export function normalizeFolderPracticeProgress(
+  raw: Record<string, unknown> | null | undefined,
+  folderId?: string
+): McqBankFolderPracticeProgress {
+  const p = normalizeContainerProgress(raw, "folder_id", folderId);
+  return {
+    folder_id: p.container_id,
+    total: p.total,
+    done: p.done,
+    remaining: p.remaining,
+    percent_complete: p.percent_complete,
+    complete: p.complete,
+    favorites: p.favorites,
+    incorrect: p.incorrect,
+  };
+}
+
+export function normalizeSubfolderPracticeProgress(
+  raw: Record<string, unknown> | null | undefined,
+  subfolderId?: string
+): McqBankSubfolderPracticeProgress {
+  const p = normalizeContainerProgress(raw, "subfolder_id", subfolderId);
+  return {
+    subfolder_id: p.container_id,
+    total: p.total,
+    done: p.done,
+    remaining: p.remaining,
+    percent_complete: p.percent_complete,
+    complete: p.complete,
+    favorites: p.favorites,
+    incorrect: p.incorrect,
+  };
+}
+
+export function toContainerPracticeProgress(
+  progress:
+    | McqBankFolderPracticeProgress
+    | McqBankSubfolderPracticeProgress
+    | McqBankContainerPracticeProgress
+): McqBankContainerPracticeProgress {
+  if ("container_id" in progress) return progress;
+  if ("subfolder_id" in progress) {
+    return {
+      container_id: progress.subfolder_id,
+      total: progress.total,
+      done: progress.done,
+      remaining: progress.remaining,
+      percent_complete: progress.percent_complete,
+      complete: progress.complete,
+      favorites: progress.favorites,
+      incorrect: progress.incorrect,
+    };
+  }
+  return {
+    container_id: progress.folder_id,
+    total: progress.total,
+    done: progress.done,
+    remaining: progress.remaining,
+    percent_complete: progress.percent_complete,
+    complete: progress.complete,
+    favorites: progress.favorites,
+    incorrect: progress.incorrect,
   };
 }
 

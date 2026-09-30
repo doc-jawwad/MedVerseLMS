@@ -153,6 +153,8 @@ describe("content bin entity labels", () => {
       "question",
       "prof_session_day",
       "material_folder",
+      "mcq_bank_folder",
+      "mcq_bank_subfolder",
     ];
     for (const t of types) {
       assert.ok(contentBinEntityLabel(t).length > 0);
@@ -160,5 +162,10 @@ describe("content bin entity labels", () => {
     assert.equal(contentBinEntityLabel("material"), "Material");
     assert.equal(contentBinEntityLabel("question"), "MCQ");
     assert.equal(contentBinEntityLabel("prof_session_day"), "Prof. Session day");
+    assert.equal(contentBinEntityLabel("mcq_bank_folder"), "MCQ Bank folder");
+    assert.equal(
+      contentBinEntityLabel("mcq_bank_subfolder"),
+      "MCQ Bank subfolder"
+    );
   });
 });

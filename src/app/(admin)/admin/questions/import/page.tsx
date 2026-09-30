@@ -8,12 +8,14 @@ export default async function ImportPage({
 }: {
   searchParams: Promise<{
     folderId?: string;
+    subfolderId?: string;
     year?: string;
     subjectId?: string;
   }>;
 }) {
   const { supabase } = await requireAdmin();
   const sp = await searchParams;
+  const subfolderId = sp.subfolderId?.trim() || undefined;
   const folderId = sp.folderId?.trim() || undefined;
 
   const [{ data: subjects }, { data: batches }] = await Promise.all([
@@ -37,9 +39,45 @@ export default async function ImportPage({
 
   let folderLabel: string | undefined;
   let returnHref: string | undefined;
+  let mcqBankSubfolderId: string | undefined;
   const lockedSubjectId = sp.subjectId?.trim() || undefined;
+  const yearFilter = sp.year?.trim() || undefined;
 
-  if (folderId) {
+  if (subfolderId) {
+    const { data: subfolder } = await supabase
+      .from("mcq_bank_subfolders")
+      .select("id, name, folder_id")
+      .eq("id", subfolderId)
+      .is("deleted_at", null)
+      .maybeSingle();
+
+    if (subfolder) {
+      const { data: folder } = await supabase
+        .from("mcq_bank_folders")
+        .select("id, name, year_id, academic_product_subject_id")
+        .eq("id", subfolder.folder_id)
+        .is("deleted_at", null)
+        .maybeSingle();
+
+      if (
+        folder &&
+        (!yearFilter || folder.year_id === yearFilter)
+      ) {
+        mcqBankSubfolderId = subfolder.id;
+        folderLabel = `${folder.name} / ${subfolder.name}`;
+        const { data: product } = await supabase
+          .from("subjects")
+          .select("product_key")
+          .eq("id", folder.academic_product_subject_id)
+          .maybeSingle();
+        if (product?.product_key) {
+          returnHref = `/admin/mcq-bank/${encodeURIComponent(product.product_key)}/${folder.id}/${subfolder.id}?year=${folder.year_id}`;
+        }
+      }
+    }
+  } else if (folderId) {
+    // Legacy folderId links: prefer placing only when a single subfolder exists —
+    // otherwise show folder context without placement (imports need a subfolder).
     const { data: folder } = await supabase
       .from("mcq_bank_folders")
       .select("id, name, year_id, academic_product_subject_id")
@@ -47,7 +85,7 @@ export default async function ImportPage({
       .is("deleted_at", null)
       .maybeSingle();
 
-    if (folder) {
+    if (folder && (!yearFilter || folder.year_id === yearFilter)) {
       folderLabel = folder.name;
       const { data: product } = await supabase
         .from("subjects")
@@ -66,7 +104,7 @@ export default async function ImportPage({
       <ImportClient
         subjects={subjectItems}
         recentBatches={batches ?? []}
-        mcqBankFolderId={folderId}
+        mcqBankSubfolderId={mcqBankSubfolderId}
         folderLabel={folderLabel}
         lockedSubjectId={lockedSubjectId}
         returnHref={returnHref}
