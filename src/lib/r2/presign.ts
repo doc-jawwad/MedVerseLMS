@@ -1,3 +1,5 @@
+import "server-only";
+
 import { createHmac, createHash } from "node:crypto";
 
 const DEFAULT_EXPIRES_SECONDS = 300;

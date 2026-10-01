@@ -3,6 +3,8 @@
  * Builds on the same credentials/bucket as `presign.ts`. Study PDFs never
  * transit Next.js — the browser uploads parts to presigned URLs.
  */
+import "server-only";
+
 import { createHmac, createHash } from "node:crypto";
 import {
   getR2Config,

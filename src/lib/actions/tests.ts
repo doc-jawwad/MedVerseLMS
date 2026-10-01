@@ -7,22 +7,13 @@ import { redirect } from "next/navigation";
 import { readAdminSelectedYearId } from "@/lib/admin/selected-class";
 import { createClient } from "@/lib/supabase/server";
 import type { QuestionContent, QuestionMeta } from "@/lib/actions/questions";
+import {
+  pickTestConfigUpdate,
+  type TestConfig,
+} from "@/lib/tests/test-config-update";
 
-export type TestConfig = {
-  title: string;
-  year_id: string;
-  subject_id: string | null;
-  opens_at: string | null;
-  closes_at: string | null;
-  duration_minutes: number;
-  marks_per_question: number;
-  negative_mark: number;
-  shuffle_questions: boolean;
-  shuffle_options: boolean;
-  show_review: "after_submit" | "after_close" | "never";
-  min_questions: number;
-  test_type: "formal" | "mock";
-};
+// Types only — "use server" modules must not re-export sync helpers/constants.
+export type { TestConfig } from "@/lib/tests/test-config-update";
 
 function reval(testId?: string) {
   revalidatePath("/admin/tests");
@@ -58,9 +49,21 @@ export async function createTest(config: TestConfig) {
   redirect(`/admin/tests/${data.id}`);
 }
 
-export async function updateTestConfig(testId: string, config: Partial<TestConfig>) {
+export async function updateTestConfig(
+  testId: string,
+  config: Partial<TestConfig> & Record<string, unknown>
+) {
+  const picked = pickTestConfigUpdate(config);
+  if ("error" in picked) {
+    return {
+      error:
+        picked.error === "invalid_test_config_field"
+          ? "Invalid test configuration field."
+          : "No valid fields to update.",
+    };
+  }
   const supabase = await createClient();
-  const { error } = await supabase.from("tests").update(config).eq("id", testId);
+  const { error } = await supabase.from("tests").update(picked).eq("id", testId);
   reval(testId);
   return actionRpcResult("action", error);
 }

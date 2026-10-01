@@ -82,6 +82,7 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=       # server-only; never exposed to the client
 CRON_SECRET=                     # guards /api/cron/auto-submit, /api/cron/r2-purge, and /api/health/ready (required; empty → 503)
 POSTGREST_INTERNAL_URL=          # VPS only: http://127.0.0.1:3001
+# STUDY_UPLOAD_SESSION_SECRET=   # preferred HMAC for study PDF upload tokens; else keyed from R2_SECRET_ACCESS_KEY
 # Sentry (optional until DSN is provisioned; no-op when unset):
 # SENTRY_DSN=                    # server/edge DSN (preferred)
 # NEXT_PUBLIC_SENTRY_DSN=        # client DSN (same project DSN is fine; public by design)
@@ -100,6 +101,7 @@ POSTGREST_INTERNAL_URL=          # VPS only: http://127.0.0.1:3001
 ```
 PostgREST / Postgres / backup (VPS host files in `/etc/medverse/`, not git): JWT secret, `authenticator` DB password, `PGRST_DB_URI`, dump encryption key, R2 credentials. Not `NEXT_PUBLIC_`. Examples: `deploy/env/*.example`.
 
+**HSTS:** public HTTPS terminates at Cloudflare → Caddy. Set `Strict-Transport-Security` on the Caddy site `header` block (Cloudflare forwards origin response headers). Staging uses conservative `max-age=86400` without `includeSubDomains` / `preload`. Do not enable preload until a deliberate soak.
 Ops scripts refuse Cloud production (`pxoxijlhcvbrostrquft`) and Cloud staging (`vygtwrsshcyfahfzurgq`) URLs unless `MEDVERSE_ALLOW_PRODUCTION=yes` or `MEDVERSE_ALLOW_CLOUD_STAGING=yes` is set explicitly. Backup/restore scripts additionally refuse `*.supabase.co` hosts and any non-loopback `PGHOST`.
 
 ## Migrations

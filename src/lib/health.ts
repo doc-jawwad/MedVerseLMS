@@ -1,3 +1,5 @@
+import { timingSafeEqualBearer } from "./security/timing-safe-equal";
+
 export function livenessBody() {
   return { ok: true as const, service: "medverse-lms" };
 }
@@ -32,7 +34,7 @@ export function authorizeReady(opts: {
   cronSecret?: string | undefined;
 }): boolean {
   const secret = opts.cronSecret;
-  if (secret && (opts.authorization ?? "") === `Bearer ${secret}`) {
+  if (secret && timingSafeEqualBearer(opts.authorization, secret)) {
     return true;
   }
   if (!opts.xForwardedFor && isLoopbackHost(opts.host)) {

@@ -1,3 +1,5 @@
+import "server-only";
+
 import {
   deleteR2Object,
   getR2Config,

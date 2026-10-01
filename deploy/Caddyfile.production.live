@@ -66,6 +66,9 @@ https://staging.medversepk.com {
 		X-Content-Type-Options nosniff
 		Referrer-Policy strict-origin-when-cross-origin
 		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		# HSTS at Caddy (Cloudflare forwards origin headers). Conservative
+		# max-age only — no includeSubDomains / preload until soak is clean.
+		Strict-Transport-Security "max-age=86400"
 		-Server
 	}
 

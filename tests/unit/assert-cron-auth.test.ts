@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { assertCronAuthorized } from "../../src/lib/cron/assert-cron-auth.ts";
 
-describe("assertCronAuthorized (M7)", () => {
+describe("assertCronAuthorized (M7 / L2)", () => {
   it("denies when CRON_SECRET is missing", () => {
     const result = assertCronAuthorized("Bearer anything", undefined);
     assert.equal(result.ok, false);
@@ -37,6 +37,12 @@ describe("assertCronAuthorized (M7)", () => {
       assert.equal(result.status, 401);
       assert.equal(result.error, "unauthorized");
     }
+  });
+
+  it("denies non-Bearer scheme and prefix-only matches", () => {
+    assert.equal(assertCronAuthorized("Basic correct-secret", "correct-secret").ok, false);
+    assert.equal(assertCronAuthorized("Bearer correct-secre", "correct-secret").ok, false);
+    assert.equal(assertCronAuthorized("Bearer correct-secretX", "correct-secret").ok, false);
   });
 
   it("accepts valid Bearer secret", () => {
