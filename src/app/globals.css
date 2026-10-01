@@ -2,6 +2,8 @@
 @import "tw-animate-css";
 /* Vendored from shadcn@4.21.0 dist/tailwind.css — CSS-only, avoids CLI package at runtime. */
 @import "../styles/shadcn-tailwind.css";
+/* Sonner toast CSS — static file (not runtime <style>) for CSP style-src-elem. */
+@import "../styles/sonner-toast.css";
 
 @custom-variant dark (&:is(.dark *));
 
