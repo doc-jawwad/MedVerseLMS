@@ -4,7 +4,14 @@ import {
   sharedSentryInitOptions,
 } from "@/lib/observability/sentry";
 
-const options = sharedSentryInitOptions("client");
+// Direct process.env.NEXT_PUBLIC_* reads are required so Next inlines values
+// into the browser bundle (indirect env.FOO access is not replaced at build).
+const options = sharedSentryInitOptions("client", {
+  ...process.env,
+  NEXT_PUBLIC_SENTRY_DSN: process.env.NEXT_PUBLIC_SENTRY_DSN,
+  NEXT_PUBLIC_SENTRY_ENVIRONMENT: process.env.NEXT_PUBLIC_SENTRY_ENVIRONMENT,
+  NEXT_PUBLIC_SENTRY_RELEASE: process.env.NEXT_PUBLIC_SENTRY_RELEASE,
+});
 if (options) {
   Sentry.init({
     dsn: options.dsn,

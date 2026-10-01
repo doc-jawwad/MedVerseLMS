@@ -33,24 +33,41 @@ export function sentryServerEnabled(env = process.env): boolean {
 
 /** Client: requires public DSN; environment baked via NEXT_PUBLIC_SENTRY_ENVIRONMENT. */
 export function sentryClientEnabled(env = process.env): boolean {
-  if (!env.NEXT_PUBLIC_SENTRY_DSN) return false;
-  const publicEnv = (env.NEXT_PUBLIC_SENTRY_ENVIRONMENT ?? "").trim();
+  // Prefer direct process.env reads so Next can inline NEXT_PUBLIC_* into client bundles.
+  const dsn =
+    process.env.NEXT_PUBLIC_SENTRY_DSN || env.NEXT_PUBLIC_SENTRY_DSN || "";
+  if (!dsn) return false;
+  const publicEnv = (
+    process.env.NEXT_PUBLIC_SENTRY_ENVIRONMENT ||
+    env.NEXT_PUBLIC_SENTRY_ENVIRONMENT ||
+    ""
+  ).trim();
   return publicEnv === "production" || publicEnv === "staging";
 }
 
 export function resolveSentryDsn(env = process.env): string | undefined {
-  const dsn = (env.SENTRY_DSN || env.NEXT_PUBLIC_SENTRY_DSN || "").trim();
+  const dsn = (
+    env.SENTRY_DSN ||
+    process.env.NEXT_PUBLIC_SENTRY_DSN ||
+    env.NEXT_PUBLIC_SENTRY_DSN ||
+    ""
+  ).trim();
   return dsn || undefined;
 }
 
 export function resolveSentryEnvironment(env = process.env): string {
-  const publicEnv = (env.NEXT_PUBLIC_SENTRY_ENVIRONMENT || "").trim();
+  const publicEnv = (
+    process.env.NEXT_PUBLIC_SENTRY_ENVIRONMENT ||
+    env.NEXT_PUBLIC_SENTRY_ENVIRONMENT ||
+    ""
+  ).trim();
   if (publicEnv === "production" || publicEnv === "staging") return publicEnv;
   return mapMedverseEnvToSentryEnvironment(env.MEDVERSE_ENV);
 }
 
 export function resolveSentryRelease(env = process.env): string | undefined {
   const fromEnv = (
+    process.env.NEXT_PUBLIC_SENTRY_RELEASE ||
     env.SENTRY_RELEASE ||
     env.NEXT_PUBLIC_SENTRY_RELEASE ||
     ""
