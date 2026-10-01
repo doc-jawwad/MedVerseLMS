@@ -45,7 +45,14 @@ select public.set_admin_year_assignments(
 select test_helpers.as_runner();
 create temporary table t_test (id uuid);
 create temporary table t_day (id uuid);
-grant select, insert on t_test, t_day to anon, authenticated;
+create temporary table t_block1 (id uuid);
+grant select, insert on t_test, t_day, t_block1 to anon, authenticated;
+
+insert into t_block1 (id)
+select id
+  from public.subjects
+  where year_id = (select year_id from curriculum) and product_key = 'block-1'
+  limit 1;
 
 with ins as (
   insert into public.tests (title, year_id, status, duration_minutes, negative_mark, min_questions)
@@ -65,7 +72,7 @@ with ins as (
   insert into public.prof_session_days (year_id, subject_id, name, sort_order, status)
   values (
     (select year_id from curriculum),
-    (select subject_id from curriculum),
+    (select id from t_block1),
     'RBAC day ' || gen_random_uuid()::text,
     99001,
     'draft'
