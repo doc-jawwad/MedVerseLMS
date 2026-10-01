@@ -13,6 +13,7 @@ import {
   getAdminPermissionSet,
 } from "@/lib/admin/admin-nav";
 import { readAdminSelectedYearId } from "@/lib/admin/selected-class";
+import { loadAdminYearsForCaller } from "@/lib/admin/year-assignments";
 import { AdminClassSelector } from "@/components/admin/class-selector";
 
 export default async function AdminLayout({
@@ -20,15 +21,14 @@ export default async function AdminLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { profile, userId, supabase } = await requireAdmin();
+  const { profile, userId } = await requireAdmin();
   const perms = await getAdminPermissionSet();
   const nav = filterAdminNav(perms);
-  const [{ data: years }, selectedYearId] = await Promise.all([
-    supabase.from("years").select("id, year_number, name").order("year_number"),
+  const [yearList, selectedYearId] = await Promise.all([
+    loadAdminYearsForCaller(),
     readAdminSelectedYearId(),
   ]);
 
-  const yearList = years ?? [];
   const selected =
     yearList.find((y) => y.id === selectedYearId) ?? yearList[0] ?? null;
   const toolsProps = selected

@@ -3,23 +3,18 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { AdminYearOption } from "@/components/admin/class-selector";
 import { requireAdmin } from "@/lib/auth/require-user";
+import {
+  type AdminYearAssignmentRow,
+  resolveAdminYearAccessDecision,
+  resolveAdminYearsForCaller,
+} from "@/lib/admin/year-access-decision";
 
-export type AdminYearAssignmentRow = {
-  admin_id: string;
-  year_id: string;
-  year_number: number;
-  year_name: string;
-};
-
-function rpcMissing(error: { message?: string | null } | null): boolean {
-  const msg = (error?.message ?? "").toLowerCase();
-  return (
-    msg.includes("could not find the function") ||
-    msg.includes("does not exist") ||
-    msg.includes("pgrst202") ||
-    msg.includes("42883")
-  );
-}
+export type { AdminYearAssignmentRow };
+export {
+  isAdminYearAccessRpcMissing,
+  resolveAdminYearAccessDecision,
+  resolveAdminYearsForCaller,
+} from "@/lib/admin/year-access-decision";
 
 /** Main Admin → all years. Limited Admin → assigned years only (Data Spine). */
 export async function loadAdminYearsForCaller(
@@ -39,19 +34,12 @@ export async function loadAdminYearsForCaller(
   }
 
   const { data, error } = await sb.rpc("list_admin_year_assignments");
-  if (error && rpcMissing(error)) {
-    // Compat: spine not deployed — show all years (DB RPCs still authorize).
-    return years;
-  }
-  if (error) {
-    return [];
-  }
-
-  const assigned = (data ?? []) as AdminYearAssignmentRow[];
-  const byId = new Map(years.map((y) => [y.id, y]));
-  return assigned
-    .map((row) => byId.get(row.year_id))
-    .filter((y): y is AdminYearOption => Boolean(y));
+  return resolveAdminYearsForCaller({
+    isMainAdmin: false,
+    allYears: years,
+    assigned: (data ?? null) as AdminYearAssignmentRow[] | null,
+    assignmentError: error,
+  });
 }
 
 export async function adminCanAccessYear(
@@ -65,12 +53,11 @@ export async function adminCanAccessYear(
   const { data, error } = await sb.rpc("admin_can_access_year", {
     p_year_id: yearId,
   });
-  if (error && rpcMissing(error)) {
-    // Compat until spine: allow cookie selection; mutations stay RPC-gated.
-    return true;
-  }
-  if (error) return false;
-  return Boolean(data);
+  return resolveAdminYearAccessDecision({
+    isMainAdmin: false,
+    data,
+    error,
+  });
 }
 
 export async function listAdminYearAssignments(

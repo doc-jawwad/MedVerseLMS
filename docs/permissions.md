@@ -92,7 +92,7 @@ This login-kick exemption is **unchanged**. It is not the same as an admin chang
 
 ## Admin permissions
 
-`is_admin()` remains `profiles.role = 'admin'` (definer; avoids RLS recursion). It gates **entry to the admin surface**, not sensitive student/ops reads, not content-bank answer-key SELECT, not material Drive URLs, and not every write.
+`is_admin()` is `profiles.role = 'admin'` **and** `account_status = 'active'` (definer; avoids RLS recursion). Blocked statuses (`restricted` / `suspended` / `deactivated` / `revoked`) are not admin for RLS/RPC purposes. It gates **entry to the admin surface**, not sensitive student/ops reads, not content-bank answer-key SELECT, not material Drive URLs, and not every write.
 
 Sensitive admin **SELECT** (student PII, enrollments, subscriptions/applications/payment settings, attempts/answers/practice rows, year-change requests, notifications, audit logs, admin permission rows) requires `has_permission(code)` for the matching job — not merely `is_admin()`. Main Admin still short-circuits every code. UI hiding is UX only; PostgREST RLS and permissioned DEFINER RPCs are the boundary.
 
@@ -318,9 +318,9 @@ When these are decided, record the choices in this section (replace OWNER DECISI
 
 ## DB helpers (security definer, `set search_path = public`)
 
-- `is_admin()` — `profiles.role = 'admin'` for `auth.uid()`. Policies/RPC entry; not a substitute for `has_permission`.
-- `is_main_admin()` — `is_main_admin` on the caller’s profile.
-- `has_permission(code)` — Main Admin or (`is_admin()` and a matching `admin_permissions` row). Never `user_metadata` / frontend state.
+- `is_admin()` — `profiles.role = 'admin'` **and** `account_status = 'active'` for `auth.uid()`. Policies/RPC entry; not a substitute for `has_permission`.
+- `is_main_admin()` — `is_main_admin` on the caller’s profile (flag only; effective admin authority still requires `is_admin()` / `has_permission`).
+- `has_permission(code)` — Main Admin or (`is_admin()` and a matching `admin_permissions` row). Inherits the active-account requirement via `is_admin()`. Never `user_metadata` / frontend state.
 - `require_permission(code)` — raises `admin only` for non-admins, `permission_denied` for admins missing the code.
 - `account_allows_lms()` — `account_status = 'active'` for the caller.
 - `is_active_session()` — JWT session_id = `profiles.active_session_id` **OR** the session owns an `in_progress` attempt (Layer 2 exemption). Portal use also requires `account_allows_lms()` except where an explicit exam disposition keeps Layer 2 alive ([exam-state-machine.md](exam-state-machine.md)).
@@ -351,8 +351,8 @@ Admin **SELECT** on **sensitive student/ops tables** uses `has_permission(code)`
 | admin_permissions / permissions | none | `permissions` SELECT if `manage_admins`; `admin_permissions` SELECT own rows or if `manage_admins`; writes via `manage_admins` RPCs |
 | years/subjects/books/chapters/topics | SELECT current assigned year (account active); subjects/books/chapters/topics also if a live practice grant names that subject | SELECT if `is_admin()`; INSERT/UPDATE if `has_permission('manage_curriculum')`; empty-node DELETE via `admin_delete_curriculum_node` (same permission). Not a student-data write. |
 | questions | no direct SELECT (RPC only) | SELECT if `edit_questions` or `import_questions`; INSERT/UPDATE/DELETE if `has_permission('edit_questions')`; create/version RPCs check the same codes; Academic placement via `admin_assign_unassigned_question_to_subfolder` / `admin_remove_question_from_mcq_bank_subfolder` / `admin_bulk_move_mcq_bank_subfolder_questions` / `admin_bulk_remove_questions_from_mcq_bank_subfolder` / `admin_bulk_soft_delete_subfolder_questions` / `create_question(..., p_mcq_bank_subfolder_id)` / `import_question_batch(..., p_mcq_bank_subfolder_id)` (`edit_questions` + `admin_can_access_year`) |
-| mcq_bank_folders | SELECT live rows for enrolled year (`account_allows_lms` + enrollment); aggregate practice via `get_practice_batch('mcq_bank_folder*')` + `can_access_mcq_bank_folder_practice` | SELECT if `edit_questions`; INSERT/UPDATE/DELETE if `edit_questions`; soft-delete empty folders (no live subfolders / PDFs) via bin entity `mcq_bank_folder` |
-| mcq_bank_subfolders | SELECT live rows for enrolled year; practice via `get_practice_batch('mcq_bank_subfolder*')` + `can_access_mcq_bank_subfolder_practice` | SELECT if `edit_questions`; INSERT/UPDATE/DELETE if `edit_questions`; soft-delete empty subfolders via bin entity `mcq_bank_subfolder` |
+| mcq_bank_folders | SELECT live rows for enrolled year (`account_allows_lms` + enrollment); aggregate practice via `get_practice_batch('mcq_bank_folder*')` + `can_access_mcq_bank_folder_practice` | SELECT/INSERT/UPDATE/DELETE if `edit_questions` **and** `admin_can_access_year(year_id)`; soft-delete empty folders (no live subfolders / PDFs) via bin entity `mcq_bank_folder` |
+| mcq_bank_subfolders | SELECT live rows for enrolled year; practice via `get_practice_batch('mcq_bank_subfolder*')` + `can_access_mcq_bank_subfolder_practice` | SELECT/INSERT/UPDATE/DELETE if `edit_questions` **and** `admin_can_access_year(year_id)` (same boundary as parent folder); soft-delete empty subfolders via bin entity `mcq_bank_subfolder` |
 | question_versions | no direct SELECT (RPC only); no UPDATE/DELETE for anyone | SELECT if `edit_questions` or `import_questions` (answer keys); INSERT if `has_permission('edit_questions')` |
 | enrollments | SELECT own | SELECT if `view_students` or `manage_year_changes` or `manage_subscriptions` or `grant_resource_access`; writes via year-change / promote RPCs |
 | year_change_requests | SELECT own; insert/update pending via RPC | SELECT if `manage_year_changes`; approve/reject RPC |
