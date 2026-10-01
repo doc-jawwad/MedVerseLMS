@@ -132,7 +132,10 @@ select lives_ok(
 ------------------------------------------------------------------
 -- Student visibility + authorize
 ------------------------------------------------------------------
-select test_helpers.as_user((select id from t_stu_a));
+select test_helpers.as_user(
+  (select id from t_stu_a),
+  'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaa01'::uuid
+);
 
 select ok(
   public.can_view_material_folder('b1111111-1111-1111-1111-111111111111'::uuid)
@@ -146,7 +149,10 @@ select is(
   'student may authorize one_liner PDF object key'
 );
 
-select test_helpers.as_user((select id from t_other_year));
+select test_helpers.as_user(
+  (select id from t_other_year),
+  'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaa03'::uuid
+);
 select ok(
   not public.can_view_material_folder('b1111111-1111-1111-1111-111111111111'::uuid),
   'wrong-year student cannot view one_liner folder'
@@ -161,7 +167,10 @@ select throws_ok(
 ------------------------------------------------------------------
 -- Paid entitlement lock
 ------------------------------------------------------------------
-select test_helpers.as_user((select id from t_admin));
+select test_helpers.as_user(
+  (select id from t_admin),
+  'cccccccc-cccc-cccc-cccc-cccccccccc01'::uuid
+);
 select public.set_resource_entitlement(
   'materials_folder',
   'b1111111-1111-1111-1111-111111111111'::uuid,
@@ -176,7 +185,10 @@ set status = 'expired',
     ends_at = now() - interval '10 days'
 where student_id = (select id from t_stu_a);
 
-select test_helpers.as_user((select id from t_stu_a));
+select test_helpers.as_user(
+  (select id from t_stu_a),
+  'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaa01'::uuid
+);
 select ok(
   public.can_view_material_folder('b1111111-1111-1111-1111-111111111111'::uuid)
   and not public.can_access_material_folder('b1111111-1111-1111-1111-111111111111'::uuid),
@@ -200,7 +212,10 @@ where student_id = (select id from t_stu_a);
 ------------------------------------------------------------------
 -- Highlights: create, persist, peer isolation
 ------------------------------------------------------------------
-select test_helpers.as_user((select id from t_stu_a));
+select test_helpers.as_user(
+  (select id from t_stu_a),
+  'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaa01'::uuid
+);
 select lives_ok(
   $$insert into public.pdf_highlights (
       student_id, material_id, page_number, rects, selected_text, color
@@ -222,7 +237,10 @@ select is(
   'highlight persists for owner'
 );
 
-select test_helpers.as_user((select id from t_stu_b));
+select test_helpers.as_user(
+  (select id from t_stu_b),
+  'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaa02'::uuid
+);
 select is(
   (select count(*)::int from public.pdf_highlights
     where material_id = 'b2222222-2222-2222-2222-222222222222'::uuid),
@@ -258,7 +276,10 @@ update public.material_folders
 set deleted_at = now(), purge_after = now() + interval '7 days'
 where id = 'b1111111-1111-1111-1111-111111111111'::uuid;
 
-select test_helpers.as_user((select id from t_stu_a));
+select test_helpers.as_user(
+  (select id from t_stu_a),
+  'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaa01'::uuid
+);
 select ok(
   not public.can_view_material_folder('b1111111-1111-1111-1111-111111111111'::uuid),
   'soft-deleted one_liner folder is not viewable'

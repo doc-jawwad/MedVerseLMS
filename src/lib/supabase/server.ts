@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { supabaseAuthCookieOptions } from "@/lib/supabase/auth-cookie-options";
 import { supabaseFetch } from "@/lib/supabase/postgrest-fetch";
 
 // When SUPABASE_DIRECT_URL is set, rewrite server-side auth calls to bypass
@@ -41,6 +42,7 @@ export async function createClient() {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       global: { fetch: serverFetch },
+      cookieOptions: supabaseAuthCookieOptions(),
       cookies: {
         getAll() {
           return cookieStore.getAll();

@@ -1,6 +1,7 @@
 import "server-only";
 
 import { redirect } from "next/navigation";
+import { safeInternalPath } from "@/lib/http/safe-internal-path";
 import { createClient } from "@/lib/supabase/server";
 
 /**
@@ -15,8 +16,10 @@ export async function redirectIfAuthenticated(
   const { data } = await supabase.auth.getClaims();
   if (!data?.claims) return;
 
-  if (nextPath && nextPath.startsWith("/") && !nextPath.startsWith("//")) {
-    redirect(nextPath);
+  // Canonical open-redirect guard (same as login next= / auth confirm).
+  const safeNext = safeInternalPath(nextPath, "");
+  if (safeNext) {
+    redirect(safeNext);
   }
 
   const { data: profile } = await supabase

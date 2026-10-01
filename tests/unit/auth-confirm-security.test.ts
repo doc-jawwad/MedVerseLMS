@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import {
   isSafeInternalPath,
   safeInternalPath,
@@ -19,8 +21,28 @@ describe("safeInternalPath", () => {
     assert.equal(isSafeInternalPath("https://evil.example"), false);
     assert.equal(isSafeInternalPath("/\\evil"), false);
     assert.equal(isSafeInternalPath("dashboard"), false);
+    assert.equal(isSafeInternalPath("javascript:alert(1)"), false);
+    assert.equal(isSafeInternalPath("data:text/html,x"), false);
     assert.equal(safeInternalPath("//evil.example", "/login"), "/login");
     assert.equal(safeInternalPath("https://x", "/"), "/");
+    assert.equal(safeInternalPath("javascript:alert(1)", "/dashboard"), "/dashboard");
+  });
+
+  it("falls back for null/empty/malformed", () => {
+    assert.equal(safeInternalPath(null, "/login"), "/login");
+    assert.equal(safeInternalPath("", "/login"), "/login");
+    assert.equal(safeInternalPath("   ", "/login"), "/login");
+  });
+});
+
+describe("redirectIfAuthenticated uses safeInternalPath (M4)", () => {
+  it("delegates next= validation to safeInternalPath", () => {
+    const helper = readFileSync(
+      path.join(process.cwd(), "src/lib/auth/redirect-if-authenticated.ts"),
+      "utf8"
+    );
+    assert.match(helper, /safeInternalPath/);
+    assert.doesNotMatch(helper, /nextPath\.startsWith\("\/"\)/);
   });
 });
 

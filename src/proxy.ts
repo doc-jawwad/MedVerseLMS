@@ -5,6 +5,7 @@ import {
   adminClassCookieOptions,
   adminClassNeedsSync,
 } from "@/lib/admin/admin-class";
+import { supabaseAuthCookieOptions } from "@/lib/supabase/auth-cookie-options";
 import { supabaseFetch } from "@/lib/supabase/postgrest-fetch";
 import {
   SSR_TIMING_LOG_TAG,
@@ -50,6 +51,7 @@ export async function proxy(request: NextRequest) {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       global: { fetch: supabaseFetch },
+      cookieOptions: supabaseAuthCookieOptions(),
       cookies: {
         getAll() {
           return request.cookies.getAll();

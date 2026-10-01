@@ -84,7 +84,10 @@ grant select on curriculum, t_admin, t_student, t_folder, t_mat_a, t_mat_b, t_ma
 ------------------------------------------------------------------
 -- Soft-delete seals purge_after = deleted_at + 7 days
 ------------------------------------------------------------------
-select test_helpers.as_user((select id from t_admin));
+select test_helpers.as_user(
+  (select id from t_admin),
+  'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1'::uuid
+);
 select lives_ok(
   $$select public.soft_delete_content('material', (select id from t_mat_u))$$,
   'soft delete unique material'
@@ -108,14 +111,20 @@ select throws_ok(
   'admin authorize denied for soft-deleted material'
 );
 
-select test_helpers.as_user((select id from t_student));
+select test_helpers.as_user(
+  (select id from t_student),
+  'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbb1'::uuid
+);
 select throws_ok(
   $$select public.authorize_study_object((select id from t_mat_u))$$,
   'study_object_denied',
   'student authorize denied for soft-deleted material'
 );
 
-select test_helpers.as_user((select id from t_admin));
+select test_helpers.as_user(
+  (select id from t_admin),
+  'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1'::uuid
+);
 select lives_ok(
   $$select public.restore_content('material', (select id from t_mat_u))$$,
   'restore unique material'
@@ -180,7 +189,10 @@ select ok(
 ------------------------------------------------------------------
 -- Recovered before expiry → no purge
 ------------------------------------------------------------------
-select test_helpers.as_user((select id from t_admin));
+select test_helpers.as_user(
+  (select id from t_admin),
+  'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1'::uuid
+);
 select lives_ok(
   $$select public.soft_delete_content('material', (select id from t_mat_a))$$,
   'soft delete shared material A'
@@ -214,7 +226,10 @@ select ok(
 ------------------------------------------------------------------
 -- Shared R2: purge A while B still references → no enqueue
 ------------------------------------------------------------------
-select test_helpers.as_user((select id from t_admin));
+select test_helpers.as_user(
+  (select id from t_admin),
+  'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1'::uuid
+);
 select lives_ok(
   $$select public.soft_delete_content('material', (select id from t_mat_a))$$,
   'soft delete A again for shared R2'

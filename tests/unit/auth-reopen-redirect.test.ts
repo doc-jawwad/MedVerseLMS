@@ -23,6 +23,7 @@ describe("authenticated reopen UX", () => {
     );
 
     assert.match(helper, /getClaims/);
+    assert.match(helper, /safeInternalPath/);
     assert.match(helper, /\/dashboard/);
     assert.match(helper, /\/admin/);
     assert.match(home, /redirectIfAuthenticated/);

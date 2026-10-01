@@ -235,7 +235,10 @@ select is(
   'H1 main admin authorizes any-year PDF'
 );
 
-select test_helpers.as_user((select id from t_student));
+select test_helpers.as_user(
+  (select id from t_student),
+  'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1'::uuid
+);
 select is(
   public.authorize_study_object((select id from t_mat_y1)),
   'study-content/year-iso/y1.pdf',
