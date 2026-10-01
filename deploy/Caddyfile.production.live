@@ -12,6 +12,12 @@ https://lms.medversepk.com {
 		X-Content-Type-Options nosniff
 		Referrer-Policy strict-origin-when-cross-origin
 		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		# HSTS at Caddy (Cloudflare forwards origin headers). Conservative
+		# max-age only — no includeSubDomains / preload (validated staging soak).
+		Strict-Transport-Security "max-age=86400"
+		# Skip Cloudflare Email Address Obfuscation inject (CSP-incompatible
+		# email-decode.min.js). Validated via staging Caddy commit 0ba1ca4.
+		+Cache-Control "no-transform"
 		-Server
 	}
 
@@ -19,7 +25,7 @@ https://lms.medversepk.com {
 	# Keep the /auth/v1 prefix; Cloud GoTrue expects it.
 	# Host must be the Cloud project host, not lms.medversepk.com.
 	handle /auth/v1* {
-		header Cache-Control "no-store"
+		header Cache-Control "no-store, no-transform"
 		reverse_proxy https://pxoxijlhcvbrostrquft.supabase.co {
 			header_up Host pxoxijlhcvbrostrquft.supabase.co
 			header_up X-Forwarded-Host {host}
@@ -32,7 +38,7 @@ https://lms.medversepk.com {
 
 	# supabase-js prefixes /rest/v1; PostgREST serves /rpc and tables at root.
 	handle /rest/v1* {
-		header Cache-Control "no-store"
+		header Cache-Control "no-store, no-transform"
 		uri strip_prefix /rest/v1
 		reverse_proxy 127.0.0.1:3001 {
 			header_up Host {host}
