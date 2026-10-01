@@ -13,6 +13,9 @@ select test_helpers.make_limited_admin('Study Pub', array['publish_tests']) as i
   into temp t_pub;
 select test_helpers.make_limited_admin('Study Zero', '{}') as id into temp t_zero;
 
+grant select on curriculum, t_student, t_admin, t_mats, t_pub, t_zero
+  to anon, authenticated;
+
 select test_helpers.as_user((select id from t_admin));
 select public.set_admin_year_assignments(
   (select id from t_mats),
