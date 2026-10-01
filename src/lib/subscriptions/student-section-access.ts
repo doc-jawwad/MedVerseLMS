@@ -157,12 +157,19 @@ export function buildStudentShellNav(
     },
     // /performance removed from nav — analytics merged into Dashboard.
     { href: "/contact", label: "Contact Us", icon: "contact", locked: false },
-    {
-      href: "/imd-stepwise",
-      label: "Get iMD & StepWise MD Subscription",
-      icon: "imd",
-      locked: false,
-    },
+    // Free/expired students get the iMD promo entry; live subscribers already
+    // have access — keep a single "My Subscription" card to avoid duplicate
+    // subscribe CTAs in the shell.
+    ...(paid
+      ? []
+      : [
+          {
+            href: "/imd-stepwise",
+            label: "Get iMD & StepWise MD Subscription",
+            icon: "imd" as IconKey,
+            locked: false,
+          },
+        ]),
     {
       href: "/subscription",
       label: "My Subscription",

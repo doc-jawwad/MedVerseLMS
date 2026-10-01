@@ -58,16 +58,14 @@ export function StudentShellChrome({
     );
   }
 
-  const headerTools = (
-    <ShellTools
-      layout="header"
-      surface={surface}
-      yearId={yearId}
-      yearNumber={yearNumber}
-      yearName={yearName}
-      hasLiveSubscription={hasLiveAccess}
-    />
-  );
+  const toolsProps = {
+    layout: "header" as const,
+    surface,
+    yearId,
+    yearNumber,
+    yearName,
+    hasLiveSubscription: hasLiveAccess,
+  };
 
   return (
     <div className="flex h-svh overflow-hidden canvas-atmosphere">
@@ -106,11 +104,13 @@ export function StudentShellChrome({
           subLabel={subLabel}
           signOutAction={signOutAction}
           showBottomNav
-          headerActions={headerTools}
+          headerActions={
+            <ShellTools {...toolsProps} chrome="sidebar" />
+          }
         />
         {/* Desktop header: brand lives in the sidebar; tools on the right */}
-        <header className="sticky top-0 z-20 hidden items-center justify-end border-b border-border/70 bg-[var(--student-canvas)]/90 px-6 py-2 backdrop-blur-md md:flex md:px-8">
-          {headerTools}
+        <header className="shell-header-bar sticky top-0 z-20 hidden items-center justify-end px-6 py-2.5 md:flex md:px-8">
+          <ShellTools {...toolsProps} chrome="content" />
         </header>
         <main className="mx-auto w-full max-w-6xl flex-1 px-4 pt-4 pb-[calc(4.5rem+env(safe-area-inset-bottom))] md:px-8 md:pt-6 md:pb-10">
           {children}

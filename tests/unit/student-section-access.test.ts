@@ -46,6 +46,9 @@ describe("buildStudentShellNav", () => {
     assert.equal(byHref["/career-counseling-series"]?.label, "Career Counseling Series");
     assert.equal(byHref["/career-counseling-series"]?.locked, false);
     assert.equal(byHref["/career-counselling"], undefined);
+    assert.equal(byHref["/imd-stepwise"]?.label, "Get iMD & StepWise MD Subscription");
+    assert.equal(byHref["/subscription"]?.label, "My Subscription");
+    assert.equal(byHref["/profile"]?.label, "My Account");
     assert.equal(byHref["/mcq-bank"], undefined);
     assert.equal(byHref["/resources"], undefined);
     assert.equal(byHref["/library"], undefined);
@@ -57,7 +60,7 @@ describe("buildStudentShellNav", () => {
     );
   });
 
-  it("unlocks Prof. Session for live subscribers", () => {
+  it("unlocks Prof. Session for live subscribers and omits iMD promo", () => {
     const { items, bottomItems } = buildStudentShellNav(true, {
       year_number: 1,
       year_name: "1st Year MBBS",
@@ -67,6 +70,8 @@ describe("buildStudentShellNav", () => {
     assert.equal(byHref["/past-papers"]?.locked, false);
     assert.equal(byHref["/other-services"]?.locked, false);
     assert.equal(byHref["/career-counseling-series"]?.locked, false);
+    assert.equal(byHref["/imd-stepwise"], undefined);
+    assert.equal(byHref["/subscription"]?.label, "My Subscription");
     assert.equal(byHref["/performance"], undefined);
     assert.deepEqual(
       bottomItems.map((i) => i.href),
@@ -74,14 +79,24 @@ describe("buildStudentShellNav", () => {
     );
   });
 
-  it("keeps the same top-level labels for free and paid", () => {
+  it("keeps shared top-level labels for free and paid (except iMD promo)", () => {
     const enrollment = { year_number: 3, year_name: "3rd Year MBBS" };
     const free = buildStudentShellNav(false, enrollment);
     const paid = buildStudentShellNav(true, enrollment);
-    assert.equal(free.items.length, paid.items.length);
+    const freeLabels = free.items
+      .map((i) => i.label)
+      .filter((l) => l !== "Get iMD & StepWise MD Subscription");
     assert.deepEqual(
-      free.items.map((i) => i.label),
+      freeLabels,
       paid.items.map((i) => i.label)
+    );
+    assert.ok(
+      free.items.some((i) => i.href === "/imd-stepwise"),
+      "free students keep Get iMD entry"
+    );
+    assert.ok(
+      !paid.items.some((i) => i.href === "/imd-stepwise"),
+      "paid students omit Get iMD promo to avoid duplicate subscribe CTAs"
     );
   });
 });

@@ -52,8 +52,8 @@ export default async function Home() {
           </Button>
         </div>
         <BrandCredit
-          tone="auth"
-          className="mt-6"
+          tone="highlight"
+          className="mt-8 text-center text-white [&_a]:text-[var(--brand-teal)] [&_a]:hover:text-white"
         />
       </main>
     </div>

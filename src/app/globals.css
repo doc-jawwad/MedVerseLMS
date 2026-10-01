@@ -219,4 +219,18 @@
       color-mix(in srgb, var(--brand-navy) 55%, var(--brand-teal))
     );
   }
+
+  /* Desktop content header — light canvas, readable icon chrome */
+  .shell-header-bar {
+    border-bottom: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+    background: color-mix(in srgb, var(--student-canvas) 90%, transparent);
+    backdrop-filter: blur(10px);
+    color: var(--student-ink);
+  }
+
+  /* Dominant MedDesk credit on landing / auth */
+  .brand-credit-highlight {
+    font-weight: 500;
+    color: var(--student-ink);
+  }
 }

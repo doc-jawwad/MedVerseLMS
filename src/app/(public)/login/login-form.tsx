@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { PasswordInput } from "@/components/ui/password-input";
+import { BrandCredit } from "@/components/brand-credit";
 
 export function LoginForm({ next, reason }: { next?: string; reason?: string }) {
   const [state, action, pending] = useActionState<AuthResult | undefined, FormData>(
@@ -115,6 +116,7 @@ export function LoginForm({ next, reason }: { next?: string; reason?: string }) 
           <Button type="submit" disabled={pending} className="h-10">
             {pending ? "Signing in…" : "Sign in"}
           </Button>
+          <BrandCredit tone="highlight" className="text-center" />
           <p className="text-center text-sm text-muted-foreground">
             New student?{" "}
             <Link href="/register" className="font-medium text-foreground underline underline-offset-2">

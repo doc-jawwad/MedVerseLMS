@@ -128,13 +128,13 @@ export function MobileNav({
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       {/* Hamburger left · brand · optional header actions right */}
-      <header className="sticky top-0 z-30 flex items-center gap-2 border-b border-sidebar-border bg-sidebar px-2 py-2.5 pt-[max(0.625rem,env(safe-area-inset-top))] text-sidebar-foreground sm:px-3 md:hidden">
+      <header className="sticky top-0 z-30 flex items-center gap-2 border-b border-sidebar-border bg-sidebar px-2.5 py-2 pt-[max(0.5rem,env(safe-area-inset-top))] text-sidebar-foreground sm:gap-3 sm:px-3 md:hidden">
         <SheetTrigger asChild>
           <Button
             variant="ghost"
             size="icon"
             aria-label="Open menu"
-            className="size-10 shrink-0 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+            className="size-11 shrink-0 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
           >
             <Menu className="size-5" />
           </Button>
@@ -143,7 +143,7 @@ export function MobileNav({
           <Logo size={26} className="min-w-0" />
         </div>
         {headerActions ? (
-          <div className="flex shrink-0 items-center gap-0.5">{headerActions}</div>
+          <div className="flex shrink-0 items-center gap-1">{headerActions}</div>
         ) : null}
       </header>
 

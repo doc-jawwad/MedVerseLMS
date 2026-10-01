@@ -27,7 +27,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/student/page-header";
 import { StudentPage } from "@/components/student/student-page";
-import { InstallMedverseApp } from "@/components/pwa/install-medverse-app";
 import { StatTile } from "@/components/student/stat-tile";
 import { SectionHeading } from "@/components/student/section-heading";
 import { EmptyState } from "@/components/student/empty-state";
@@ -280,8 +279,6 @@ export default async function DashboardPage() {
         description="Incoming tests, your performance, and the last-test leaderboard — all in one place."
       />
 
-      <InstallMedverseApp variant="card" />
-
       <DashboardAlerts alerts={alerts} />
 
       <Card className="surface-card overflow-hidden border-border/80 shadow-none">
@@ -482,10 +479,8 @@ export default async function DashboardPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="grid gap-3">
+            {/* ResourceLockNotice already provides the single /subscription CTA */}
             <ResourceLockNotice compact />
-            <Button asChild size="sm" variant="secondary" className="w-fit">
-              <Link href="/subscription">My subscription</Link>
-            </Button>
           </CardContent>
         </Card>
       )}

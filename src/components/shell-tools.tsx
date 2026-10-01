@@ -14,9 +14,14 @@ type ShellToolsProps = {
   showSearch?: boolean;
   /**
    * `sidebar` — labeled Search row + segmented theme (admin drawer/aside).
-   * `header` — compact search icon + Light/Dark icon toggle (student header).
+   * `header` — compact search icon + Light/Dark icon toggle.
    */
   layout?: "sidebar" | "header";
+  /**
+   * Header chrome surface: `content` for light desktop bars, `sidebar` for
+   * navy mobile headers. Ignored when `layout="sidebar"`.
+   */
+  chrome?: "content" | "sidebar";
   className?: string;
 };
 
@@ -29,13 +34,17 @@ export function ShellTools({
   hasLiveSubscription,
   showSearch = true,
   layout = "sidebar",
+  chrome = "content",
   className,
 }: ShellToolsProps) {
   if (layout === "header") {
+    const searchTone = chrome === "sidebar" ? "sidebar" : "default";
+    const themeTone = chrome === "sidebar" ? "sidebar" : "content";
     return (
       <div
         className={cn("flex items-center gap-1", className)}
         data-testid="shell-header-tools"
+        data-chrome={chrome}
       >
         {showSearch ? (
           <GlobalSearch
@@ -44,11 +53,11 @@ export function ShellTools({
             yearNumber={yearNumber}
             yearName={yearName}
             hasLiveSubscription={hasLiveSubscription}
-            tone="sidebar"
+            tone={searchTone}
             className="size-9"
           />
         ) : null}
-        <ThemeToggle variant="icon" tone="sidebar" />
+        <ThemeToggle variant="icon" tone={themeTone} />
       </div>
     );
   }

@@ -26,7 +26,10 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
             and study materials in one academy workspace.
           </p>
         </div>
-        <BrandCredit tone="auth" className="relative" />
+        <BrandCredit
+          tone="highlight"
+          className="relative text-white [&_a]:text-[var(--brand-teal)] [&_a]:hover:text-white"
+        />
       </aside>
       <div className="flex flex-col bg-[var(--student-canvas)]">
         <div className="flex flex-1 items-center justify-center px-4 py-10">
@@ -41,7 +44,7 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
           </div>
         </div>
         <footer className="px-4 py-4 text-center lg:hidden">
-          <BrandCredit />
+          <BrandCredit tone="highlight" />
         </footer>
       </div>
     </div>

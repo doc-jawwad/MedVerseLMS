@@ -31,26 +31,24 @@ export default async function AdminLayout({
   const yearList = years ?? [];
   const selected =
     yearList.find((y) => y.id === selectedYearId) ?? yearList[0] ?? null;
-  const headerTools = selected ? (
-    <ShellTools
-      layout="header"
-      surface="library"
-      yearId={selected.id}
-      yearNumber={selected.year_number}
-      yearName={selected.name}
-      hasLiveSubscription
-    />
-  ) : (
-    <ShellTools
-      layout="header"
-      surface="library"
-      yearId=""
-      yearNumber={1}
-      yearName="Class"
-      hasLiveSubscription
-      showSearch={false}
-    />
-  );
+  const toolsProps = selected
+    ? {
+        layout: "header" as const,
+        surface: "library" as const,
+        yearId: selected.id,
+        yearNumber: selected.year_number,
+        yearName: selected.name,
+        hasLiveSubscription: true as const,
+      }
+    : {
+        layout: "header" as const,
+        surface: "library" as const,
+        yearId: "",
+        yearNumber: 1,
+        yearName: "Class",
+        hasLiveSubscription: true as const,
+        showSearch: false as const,
+      };
 
   return (
     <div className="flex h-svh overflow-hidden canvas-atmosphere">
@@ -88,10 +86,10 @@ export default async function AdminLayout({
           subLabel="Admin"
           signOutAction={signOutAction}
           showBottomNav={false}
-          headerActions={headerTools}
+          headerActions={<ShellTools {...toolsProps} chrome="sidebar" />}
         />
-        <header className="sticky top-0 z-20 hidden items-center justify-end border-b border-border/70 bg-[var(--student-canvas)]/90 px-6 py-2 backdrop-blur-md md:flex md:px-8">
-          {headerTools}
+        <header className="shell-header-bar sticky top-0 z-20 hidden items-center justify-end px-6 py-2.5 md:flex md:px-8">
+          <ShellTools {...toolsProps} chrome="content" />
         </header>
         <main className="mx-auto w-full max-w-7xl flex-1 px-4 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] md:px-8 md:py-8">
           <div className="mb-4">

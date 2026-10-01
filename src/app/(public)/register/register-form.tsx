@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { PasswordInput } from "@/components/ui/password-input";
+import { BrandCredit } from "@/components/brand-credit";
 
 type Year = { id: string; year_number: number; name: string };
 
@@ -142,6 +143,7 @@ export function RegisterForm({ years }: { years: Year[] }) {
           <Button type="submit" disabled={pending || years.length === 0} className="h-10">
             {pending ? "Creating account…" : "Register"}
           </Button>
+          <BrandCredit tone="highlight" className="text-center" />
           <p className="text-center text-sm text-muted-foreground">
             Already registered?{" "}
             <Link
