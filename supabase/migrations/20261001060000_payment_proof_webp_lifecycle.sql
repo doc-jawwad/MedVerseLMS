@@ -1,5 +1,11 @@
 -- Payment-proof WebP lifecycle: nullable screenshot key after subscription end,
 -- enqueue payment-proofs/ via shared R2 purge queue, release on expire/deactivate.
+--
+-- Prerequisite (R2 helpers only; not Content Bin):
+--   20261001035000_shared_r2_purge_helpers.sql
+--     → public.r2_object_still_referenced
+--     → public.enqueue_r2_purge_if_unreferenced
+-- Does NOT require 20261001040000 / 20261001050000.
 
 -- ---------------------------------------------------------------------------
 -- screenshot_object_key may be cleared after subscription end (history row kept)
