@@ -102,6 +102,8 @@ POSTGREST_INTERNAL_URL=          # VPS only: http://127.0.0.1:3001
 PostgREST / Postgres / backup (VPS host files in `/etc/medverse/`, not git): JWT secret, `authenticator` DB password, `PGRST_DB_URI`, dump encryption key, R2 credentials. Not `NEXT_PUBLIC_`. Examples: `deploy/env/*.example`.
 
 **HSTS:** public HTTPS terminates at Cloudflare → Caddy. Set `Strict-Transport-Security` on the Caddy site `header` block (Cloudflare forwards origin response headers). Staging uses conservative `max-age=86400` without `includeSubDomains` / `preload`. Do not enable preload until a deliberate soak.
+
+**Cloudflare Email Address Obfuscation vs CSP:** Scrape Shield injects `cdn-cgi/.../email-decode.min.js` when HTML contains email addresses (seen on staging `/admin/students`). That script is blocked under MedVerse CSP `script-src` nonce + `strict-dynamic` — do **not** widen CSP to allow it. MedVerse does not require CF obfuscation (contact `mailto:` and admin email display work as plain HTML). Staging Caddy adds `Cache-Control: no-transform` so Cloudflare skips the transform ([CF docs](https://developers.cloudflare.com/waf/tools/scrape-shield/email-address-obfuscation/)). Preferred long-term edge control: a Cloudflare **Configuration Rule** matching `staging.medversepk.com` with Email Obfuscation off — never zone-wide off while production shares `medversepk.com`. Production Caddy site block must not copy this until approved.
 Ops scripts refuse Cloud production (`pxoxijlhcvbrostrquft`) and Cloud staging (`vygtwrsshcyfahfzurgq`) URLs unless `MEDVERSE_ALLOW_PRODUCTION=yes` or `MEDVERSE_ALLOW_CLOUD_STAGING=yes` is set explicitly. Backup/restore scripts additionally refuse `*.supabase.co` hosts and any non-loopback `PGHOST`.
 
 ## Migrations

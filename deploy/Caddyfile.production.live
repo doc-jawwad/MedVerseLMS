@@ -69,11 +69,15 @@ https://staging.medversepk.com {
 		# HSTS at Caddy (Cloudflare forwards origin headers). Conservative
 		# max-age only — no includeSubDomains / preload until soak is clean.
 		Strict-Transport-Security "max-age=86400"
+		# Staging-only: Cloudflare skips Email Address Obfuscation when
+		# Cache-Control includes no-transform (avoids CSP-blocked email-decode.min.js).
+		# Do not copy into the production lms. site block.
+		+Cache-Control "no-transform"
 		-Server
 	}
 
 	handle /auth/v1* {
-		header Cache-Control "no-store"
+		header Cache-Control "no-store, no-transform"
 		reverse_proxy https://vygtwrsshcyfahfzurgq.supabase.co {
 			header_up Host vygtwrsshcyfahfzurgq.supabase.co
 			header_up X-Forwarded-Host {host}
@@ -85,7 +89,7 @@ https://staging.medversepk.com {
 	}
 
 	handle /rest/v1* {
-		header Cache-Control "no-store"
+		header Cache-Control "no-store, no-transform"
 		uri strip_prefix /rest/v1
 		reverse_proxy 127.0.0.1:3011 {
 			header_up Host {host}
