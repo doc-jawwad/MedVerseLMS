@@ -466,9 +466,11 @@ export async function markTestPaidWithLiveSubscription(
 export async function expireSubscription(subscriptionId: string) {
   requireUuid(subscriptionId, "subscriptionId");
   const ended = new Date(Date.now() - 3600_000).toISOString();
+  const started = new Date(Date.now() - 2 * 86400_000).toISOString();
 
-  // Preferred: set_subscription_end while still active.
-  const rpc = await adminRpc("set_subscription_end", {
+  // Preferred: set_subscription_end while still active (requires ends_at > starts_at).
+  // That path also releases payment-proof R2 objects via release_subscription_payment_proof.
+  let rpc = await adminRpc("set_subscription_end", {
     p_subscription_id: subscriptionId,
     p_ends_at: ended,
   });
@@ -476,17 +478,42 @@ export async function expireSubscription(subscriptionId: string) {
 
   const sshHost = stagingSshHost();
   if (e2e.target === "staging" && sshHost) {
+    // Freshly activated rows have starts_at ≈ now; rewind starts_at so
+    // ends_at < now still satisfies subscriptions_check (ends_at > starts_at),
+    // then retry the RPC so payment-proof cleanup runs.
     await stagingPsql(
       sshHost,
-      `update public.subscriptions set status='expired', ends_at='${ended}'::timestamptz ` +
-        `where id='${subscriptionId}'::uuid and current_database()='medverse_staging';`
+      `update public.subscriptions set starts_at=least(starts_at, '${started}'::timestamptz) ` +
+        `where id='${subscriptionId}'::uuid and status='active' ` +
+        `and current_database()='medverse_staging';`
+    );
+    rpc = await adminRpc("set_subscription_end", {
+      p_subscription_id: subscriptionId,
+      p_ends_at: ended,
+    });
+    if (rpc.ok) return;
+
+    // Last resort: expire + release via privileged SQL (keeps history; clears proof key).
+    await stagingPsql(
+      sshHost,
+      `begin; ` +
+        `update public.subscriptions set status='expired', ` +
+        `starts_at=least(starts_at, '${started}'::timestamptz), ` +
+        `ends_at='${ended}'::timestamptz ` +
+        `where id='${subscriptionId}'::uuid and current_database()='medverse_staging'; ` +
+        `select public.release_subscription_payment_proof('${subscriptionId}'::uuid); ` +
+        `commit;`
     );
     return;
   }
   await fetch(`${REST}/rest/v1/subscriptions?id=eq.${subscriptionId}`, {
     method: "PATCH",
     headers: await svcHeaders(),
-    body: JSON.stringify({ status: "expired", ends_at: ended }),
+    body: JSON.stringify({
+      status: "expired",
+      starts_at: started,
+      ends_at: ended,
+    }),
   });
 }
 
