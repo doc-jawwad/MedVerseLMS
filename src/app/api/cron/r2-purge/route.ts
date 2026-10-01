@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { assertCronAuthorized } from "@/lib/cron/assert-cron-auth";
 import { reportServerException } from "@/lib/observability/report-server-exception";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isJwt } from "@/lib/supabase/postgrest-fetch";
@@ -19,13 +20,9 @@ import {
  * opaque sb_secret_* keys, prefer deploy/scripts/r2-purge-once.sh (local SQL).
  */
 export async function GET(request: NextRequest) {
-  const cronSecret = process.env.CRON_SECRET;
-  if (!cronSecret) {
-    return NextResponse.json({ error: "cron_secret_unconfigured" }, { status: 503 });
-  }
-  const auth = request.headers.get("authorization");
-  if (auth !== `Bearer ${cronSecret}`) {
-    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  const cronAuth = assertCronAuthorized(request.headers.get("authorization"));
+  if (!cronAuth.ok) {
+    return NextResponse.json({ error: cronAuth.error }, { status: cronAuth.status });
   }
 
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";

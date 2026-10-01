@@ -150,7 +150,16 @@ describe("supabase clients do not use sb_* as PostgREST Bearer", () => {
     assert.match(src, /isJwt/);
     assert.match(src, /service_role_jwt_required/);
     assert.match(src, /auto_submit_failed/);
+    assert.match(src, /assertCronAuthorized/);
     assert.doesNotMatch(src, /error:\s*error\.message/);
+  });
+
+  it("HTTP auto-submit fail-closes when CRON_SECRET is unset", () => {
+    const src = read("src/app/api/cron/auto-submit/route.ts");
+    assert.match(src, /assertCronAuthorized/);
+    const helper = read("src/lib/cron/assert-cron-auth.ts");
+    assert.match(helper, /cron_secret_unconfigured/);
+    assert.match(helper, /!cronSecret/);
   });
 
   it("R2 probe does not log secret charset or length metadata", () => {

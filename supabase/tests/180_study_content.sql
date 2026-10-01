@@ -13,6 +13,13 @@ select test_helpers.make_limited_admin('Study Pub', array['publish_tests']) as i
   into temp t_pub;
 select test_helpers.make_limited_admin('Study Zero', '{}') as id into temp t_zero;
 
+select test_helpers.as_user((select id from t_admin));
+select public.set_admin_year_assignments(
+  (select id from t_mats),
+  array[(select year_id from curriculum)]
+);
+select test_helpers.as_runner();
+
 select id as id into temp t_std
   from public.subscription_plans
   where is_complimentary = false
