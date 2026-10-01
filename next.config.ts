@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { withSentryConfig } from "@sentry/nextjs/config";
 
 const securityHeaders = [
   { key: "X-Frame-Options", value: "DENY" },
@@ -47,4 +48,20 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+// Runtime capture works without build-time upload. Source maps stay local
+// until SENTRY_AUTH_TOKEN + SENTRY_ORG + SENTRY_PROJECT are configured on the host.
+export default withSentryConfig(nextConfig, {
+  org: process.env.SENTRY_ORG,
+  project: process.env.SENTRY_PROJECT,
+  authToken: process.env.SENTRY_AUTH_TOKEN,
+  silent: true,
+  sourcemaps: {
+    // No upload without SENTRY_AUTH_TOKEN (keeps VPS builds offline-safe).
+    disable: !process.env.SENTRY_AUTH_TOKEN,
+  },
+  webpack: {
+    treeshake: {
+      removeDebugLogging: true,
+    },
+  },
+});

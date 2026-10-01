@@ -4,6 +4,7 @@ import {
   isSafeBusinessErrorCode,
   sanitizeClientErrorMessage,
 } from "@/lib/errors/client-safe-error";
+import { reportServerException } from "@/lib/observability/report-server-exception";
 
 export { isSafeBusinessErrorCode, sanitizeClientErrorMessage };
 
@@ -42,6 +43,10 @@ export function toClientActionError(
       ? error.trim()
       : (error?.message ?? "").trim();
   logServerError(scope, raw || error);
+  // Expected RPC business codes stay journal-only; unexpected failures go to Sentry.
+  if (!raw || !isSafeBusinessErrorCode(raw)) {
+    reportServerException(scope, raw || error);
+  }
   return sanitizeClientErrorMessage(raw, fallback);
 }
 

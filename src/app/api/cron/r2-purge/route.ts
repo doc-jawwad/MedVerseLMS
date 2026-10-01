@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { reportServerException } from "@/lib/observability/report-server-exception";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isJwt } from "@/lib/supabase/postgrest-fetch";
 import {
@@ -110,6 +111,7 @@ export async function GET(request: NextRequest) {
     console.error("r2_purge_batch failed", {
       message: err instanceof Error ? err.message : "unknown",
     });
+    reportServerException("cron.r2_purge_batch", err);
     return NextResponse.json({ error: "r2_purge_failed" }, { status: 500 });
   }
 }

@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { reportServerException } from "@/lib/observability/report-server-exception";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isJwt } from "@/lib/supabase/postgrest-fetch";
 
@@ -28,6 +29,9 @@ export async function GET(request: NextRequest) {
     console.error("auto_submit_expired failed", {
       code: error.code ?? null,
       message: error.message ?? null,
+    });
+    reportServerException("cron.auto_submit_expired", error, {
+      code: error.code ?? null,
     });
     return NextResponse.json({ error: "auto_submit_failed" }, { status: 500 });
   }

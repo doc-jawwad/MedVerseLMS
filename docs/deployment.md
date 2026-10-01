@@ -82,6 +82,13 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=       # server-only; never exposed to the client
 CRON_SECRET=                     # guards /api/cron/auto-submit, /api/cron/r2-purge, and /api/health/ready (required; empty → 503)
 POSTGREST_INTERNAL_URL=          # VPS only: http://127.0.0.1:3001
+# Sentry (optional until DSN is provisioned; no-op when unset):
+# SENTRY_DSN=                    # server/edge DSN (preferred)
+# NEXT_PUBLIC_SENTRY_DSN=        # client DSN (same project DSN is fine; public by design)
+# NEXT_PUBLIC_SENTRY_ENVIRONMENT=production|staging   # required for client init
+# SENTRY_RELEASE=                # git SHA; also set NEXT_PUBLIC_SENTRY_RELEASE at build
+# NEXT_PUBLIC_SENTRY_RELEASE=
+# SENTRY_ORG= / SENTRY_PROJECT= / SENTRY_AUTH_TOKEN=  # optional source-map upload only
 # Payment-screenshot R2 (server-only; never NEXT_PUBLIC_):
 # R2_ACCOUNT_ID=
 # R2_ACCESS_KEY_ID=
@@ -125,10 +132,30 @@ Coalesced ranking, `ensure_profile()`, and dropping `profiles` → `auth.users` 
 
 ## Health and monitoring
 
-- `GET /api/health` — public liveness `{ ok: true, service: "medverse-lms" }`; no DB, no secrets. UptimeRobot (or equivalent) hits this.
-- `GET /api/health/ready` — PostgREST/Postgres reachability via loopback `POSTGREST_INTERNAL_URL` (falls back to `{NEXT_PUBLIC_SUPABASE_URL}/rest/v1/`). **Not a public monitor.** Allowed: `Authorization: Bearer $CRON_SECRET`, or a **direct** loopback request to Next (no `X-Forwarded-For`). Failure body is `{ ok: false }` only.
+- `GET /api/health` — public liveness `{ ok: true, service: "medverse-lms" }`; no DB, no secrets. **UptimeRobot (or equivalent) must hit this URL only.**
+- `GET /api/health/ready` — PostgREST/Postgres reachability via loopback `POSTGREST_INTERNAL_URL` (falls back to `{NEXT_PUBLIC_SUPABASE_URL}/rest/v1/`). **Not a public monitor.** Allowed: `Authorization: Bearer $CRON_SECRET`, or a **direct** loopback request to Next (no `X-Forwarded-For`). Failure body is `{ ok: false }` only. External probes correctly receive **401** — do not weaken this for monitoring.
 
-Logs: journald for Next, PostgREST, Postgres, Caddy. No paid APM required initially. SHOULD log exam RPC failures server-side (submit/save), not only client toasts.
+### UptimeRobot (production)
+
+Create **one** HTTPS monitor (do not monitor staging unless intentionally desired):
+
+| Field | Value |
+|---|---|
+| Monitor type | HTTP(s) |
+| URL | `https://lms.medversepk.com/api/health` |
+| Method | GET |
+| Expected status | 200 |
+| Interval | 5 minutes (Free) or 1–5 minutes (paid) |
+| Keyword (optional) | `"ok":true` |
+| Alert contacts | owner on-call channel |
+
+Do **not** point UptimeRobot at `/api/health/ready` (auth-gated). Do not invent an unauthenticated readiness endpoint.
+
+### Sentry
+
+Runtime error capture via `@sentry/nextjs` (`src/instrumentation.ts`, `src/instrumentation-client.ts`, `src/app/global-error.tsx`). Initializes only when DSN env vars are set and the environment is `production` / `vps-staging` (client also requires `NEXT_PUBLIC_SENTRY_ENVIRONMENT=production|staging`). No Session Replay. `dataCollection.userInfo/cookies/httpBodies` off by default for privacy. Unexpected server-action failures and selected cron failures are reported; expected RPC business codes stay journal-only. Associate releases with the deploy git SHA via `SENTRY_RELEASE` / `NEXT_PUBLIC_SENTRY_RELEASE` (build-time). Source-map upload is optional (`SENTRY_AUTH_TOKEN` + org/project).
+
+Logs: journald for Next, PostgREST, Postgres, Caddy. SHOULD log exam RPC failures server-side (submit/save), not only client toasts.
 
 ## Server security (target)
 
