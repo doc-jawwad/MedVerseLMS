@@ -1,7 +1,7 @@
 -- Admin year isolation seal: authorize_study_object, materials RLS writes,
 -- soft_delete_content / restore_content year scope (H1/H2/H3).
 begin;
-select plan(31);
+select plan(32);
 
 select test_helpers.as_runner();
 select * into temp curriculum from test_helpers.make_curriculum();
@@ -344,12 +344,22 @@ select lives_ok(
   'H2 cross-year MCQ UPDATE does not raise (RLS matches zero rows)'
 );
 
+-- SELECT is year-scoped: assigned admin cannot see other-year folder (M8).
+select ok(
+  not exists (
+    select 1 from public.mcq_bank_folders where id = (select id from t_mcq_y2)
+  ),
+  'H2 assigned edit_questions cannot select other-year MCQ folder'
+);
+
+select test_helpers.as_runner();
 select is(
   (select name from public.mcq_bank_folders where id = (select id from t_mcq_y2)),
   'YearIso MCQ Y2',
   'H2 assigned edit_questions cannot update other-year MCQ folder'
 );
 
+select test_helpers.as_user((select id from t_edit_y1));
 select throws_ok(
   $$insert into public.mcq_bank_folders (year_id, name, academic_product_subject_id)
     values (
@@ -367,6 +377,7 @@ select lives_ok(
   'H2 cross-year MCQ DELETE does not raise (RLS matches zero rows)'
 );
 
+select test_helpers.as_runner();
 select ok(
   exists (select 1 from public.mcq_bank_folders where id = (select id from t_mcq_y2)),
   'H2 assigned edit_questions cannot delete other-year MCQ folder'
