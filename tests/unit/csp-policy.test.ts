@@ -44,7 +44,13 @@ describe("CSP policy inventory", () => {
     assert.match(csp, /script-src [^;]*'nonce-test-nonce'/);
     assert.match(csp, /'strict-dynamic'/);
     assert.doesNotMatch(csp, /unsafe-eval/);
-    assert.match(csp, /style-src-attr 'unsafe-inline'/);
+    {
+      const styleSrcElem = csp.match(/(?:^|;\s*)style-src-elem\s+([^;]+)/i)?.[1] ?? "";
+      const styleSrcAttr = csp.match(/(?:^|;\s*)style-src-attr\s+([^;]+)/i)?.[1] ?? "";
+      assert.match(styleSrcElem, /'nonce-test-nonce'/);
+      assert.doesNotMatch(styleSrcElem, /'unsafe-inline'/);
+      assert.match(styleSrcAttr, /'unsafe-inline'/);
+    }
     assert.match(csp, /connect-src [^;]*'self'/);
     assert.match(csp, /https:\/\/\*\.r2\.cloudflarestorage\.com/);
     assert.match(csp, /https:\/\/o1\.ingest\.de\.sentry\.io/);
