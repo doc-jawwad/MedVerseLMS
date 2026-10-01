@@ -43,28 +43,36 @@ select public.set_admin_year_assignments(
 );
 
 select test_helpers.as_runner();
-insert into public.tests (title, year_id, status, duration_minutes, negative_mark, min_questions)
-values (
-  'RBAC PS day bind',
-  (select year_id from curriculum),
-  'draft',
-  30,
-  0,
-  1
-)
-returning id into temp t_test;
+create temporary table t_test (id uuid);
+create temporary table t_day (id uuid);
+grant select, insert on t_test, t_day to anon, authenticated;
 
-insert into public.prof_session_days (year_id, subject_id, name, sort_order, status)
-values (
-  (select year_id from curriculum),
-  (select subject_id from curriculum),
-  'RBAC day ' || gen_random_uuid()::text,
-  99001,
-  'draft'
+with ins as (
+  insert into public.tests (title, year_id, status, duration_minutes, negative_mark, min_questions)
+  values (
+    'RBAC PS day bind',
+    (select year_id from curriculum),
+    'draft',
+    30,
+    0,
+    1
+  )
+  returning id
 )
-returning id into temp t_day;
+insert into t_test (id) select id from ins;
 
-grant select on t_test, t_day to anon, authenticated;
+with ins as (
+  insert into public.prof_session_days (year_id, subject_id, name, sort_order, status)
+  values (
+    (select year_id from curriculum),
+    (select subject_id from curriculum),
+    'RBAC day ' || gen_random_uuid()::text,
+    99001,
+    'draft'
+  )
+  returning id
+)
+insert into t_day (id) select id from ins;
 
 ------------------------------------------------------------------
 select test_helpers.as_user((select id from t_main));
