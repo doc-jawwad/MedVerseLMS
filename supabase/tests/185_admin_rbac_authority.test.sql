@@ -24,6 +24,10 @@ select test_helpers.make_limited_admin(
 select test_helpers.make_student((select year_id from curriculum), 'RBAC Student') as id
   into temp t_student;
 
+-- Grant before any as_user() so authenticated can read fixture ids (VPS temp schema).
+grant select on curriculum, t_main, t_custom, t_publish, t_view,
+  t_curriculum, t_student to anon, authenticated;
+
 select test_helpers.as_user((select id from t_main));
 select public.set_admin_year_assignments(
   (select id from t_custom),
@@ -60,8 +64,7 @@ values (
 )
 returning id into temp t_day;
 
-grant select on curriculum, t_main, t_custom, t_publish, t_view,
-  t_curriculum, t_student, t_test, t_day to anon, authenticated;
+grant select on t_test, t_day to anon, authenticated;
 
 ------------------------------------------------------------------
 select test_helpers.as_user((select id from t_main));
