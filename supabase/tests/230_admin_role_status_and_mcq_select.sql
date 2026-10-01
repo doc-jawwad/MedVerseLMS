@@ -41,11 +41,19 @@ select id into temp t_block_y2
   where year_id = (select id from t_year2) and product_key = 'block-1'
   limit 1;
 
+-- Temp fixture tables must be created as runner before as_user (VPS temp schema).
+create temporary table t_folder_y1 (id uuid);
+create temporary table t_folder_y2 (id uuid);
+create temporary table t_sf_y1 (id uuid);
+create temporary table t_sf_y2 (id uuid);
+
 grant select on curriculum, t_year2, t_main, t_edit_y1, t_edit_y2, t_blocked,
-  t_student, t_block1, t_block_y2
+  t_student, t_block1, t_block_y2, t_folder_y1, t_folder_y2, t_sf_y1, t_sf_y2
+  to anon, authenticated;
+grant insert on t_folder_y1, t_folder_y2, t_sf_y1, t_sf_y2
   to anon, authenticated;
 
--- Assign years
+-- Assign years + seed MCQ folder/subfolder rows
 select test_helpers.as_user((select id from t_main));
 select public.set_admin_year_assignments(
   (select id from t_edit_y1),
@@ -60,15 +68,6 @@ select public.set_admin_year_assignments(
   array[(select year_id from curriculum)]
 );
 
--- Seed MCQ folder + subfolder in year 1 and year 2
-create temporary table t_folder_y1 (id uuid);
-create temporary table t_folder_y2 (id uuid);
-create temporary table t_sf_y1 (id uuid);
-create temporary table t_sf_y2 (id uuid);
-grant select, insert on t_folder_y1, t_folder_y2, t_sf_y1, t_sf_y2
-  to anon, authenticated;
-
-select test_helpers.as_user((select id from t_main));
 insert into t_folder_y1 (id)
 select public.admin_create_mcq_bank_folder((select id from t_block1), 'RoleStatus Y1');
 insert into t_folder_y2 (id)
