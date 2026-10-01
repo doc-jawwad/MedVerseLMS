@@ -309,7 +309,7 @@ Ranking must be **coalesced** before a 1,500-submit event — hosting does not r
 1. **Postgres enforces everything security- or correctness-critical**: RLS on every table (deny-by-default), constraints, unique indexes, security-definer RPCs. App-level checks are UX, not security.
 2. **Server clock is the only clock.** Client timers are display-only.
 3. **Explicit state enums, never boolean flag soup** (`status text check (...)`, one column).
-4. **History is immutable**: question versions are append-only; attempts are never deleted (invalidated, with reason, at worst); published test_questions are frozen snapshots.
+4. **History is immutable**: question versions are append-only; attempts are never deleted (invalidated, with reason, at worst); published test_questions are frozen snapshots. Content Bin’s 7-day question purge is eligibility only — hard delete is refused while any `test_questions` reference remains (retained for exam/draft composition; not an integrity defect). Soft-deleted questions cannot be newly published; see [database.md](database.md) Content bin retention and [test-rules.md](test-rules.md).
 5. **Idempotency everywhere in the exam path**: duplicate/out-of-order requests must be harmless.
 6. **`tenant_id` on every table** from day one (single constant now; future multi-academy).
 7. **All admin mutations of consequence are audit-logged.** Student-originated applications/requests are stored on those tables; students cannot write `audit_logs`.

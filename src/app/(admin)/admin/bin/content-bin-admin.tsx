@@ -151,8 +151,10 @@ export function ContentBinAdmin({
         <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
           Soft-deleted academic content. Restore returns it to its previous
           location. Permanent delete is irreversible and queues any R2 objects
-          for removal. Students never see the Bin. Soft-deleted items remain
-          recoverable until their purge-after time (~7 days).
+          for removal. Students never see the Bin. Soft-deleted items become
+          eligible for automatic purge after ~7 days — questions still linked
+          to a test stay retained (not a failure) until an admin removes that
+          reference.
         </p>
       </div>
 
@@ -193,8 +195,8 @@ export function ContentBinAdmin({
                   <p>
                     This permanently removes the selected Bin items from the
                     database. Associated R2 objects (if any) are queued for
-                    deletion. Items blocked by test references stay in the Bin.
-                    This cannot be undone.
+                    deletion. Questions retained because referenced by a test
+                    stay in the Bin. This cannot be undone.
                   </p>
                 }
                 confirmLabel="Permanently delete selected"
@@ -297,6 +299,11 @@ export function ContentBinAdmin({
                         {item.has_r2 ? (
                           <Badge variant="outline">R2 retained until purge</Badge>
                         ) : null}
+                        {item.retain_reason === "retained_referenced_by_test" ? (
+                          <Badge variant="outline">
+                            Retained because referenced by test
+                          </Badge>
+                        ) : null}
                       </div>
                       <dl className="mt-2 grid gap-1 text-xs text-muted-foreground sm:grid-cols-2">
                         <div>
@@ -307,10 +314,14 @@ export function ContentBinAdmin({
                         </div>
                         <div>
                           <dt className="inline font-medium text-[var(--student-ink)]">
-                            Purge after:{" "}
+                            {item.retain_reason === "retained_referenced_by_test"
+                              ? "Purge eligibility: "
+                              : "Purge after: "}
                           </dt>
                           <dd className="inline">
-                            {formatWhen(item.purge_after)}
+                            {item.retain_reason === "retained_referenced_by_test"
+                              ? "held while test reference exists"
+                              : formatWhen(item.purge_after)}
                           </dd>
                         </div>
                       </dl>

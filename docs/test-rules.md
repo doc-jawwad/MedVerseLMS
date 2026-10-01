@@ -23,20 +23,24 @@ Checklist order:
 1. ✓ question count ≥ `min_questions` **and** > 0
 2. ✓ no duplicate questions (`count(*) = count(distinct question_id)`)
 3. ✓ every question `status='approved'` (no draft/review/needs_revision/archived)
-4. ✓ every current version has 4–5 complete options and a `correct_key` matching an option
-5. ✓ valid schedule: `opens_at < closes_at`, `closes_at` in the future
-6. ✓ `duration_minutes > 0` (separate check)
-7. ✓ duration fits the window (≤ `closes_at - opens_at`)
-8. ✓ valid marking: `marks_per_question > 0`, `negative_mark ≥ 0`
-9. ✓ audience assigned (year in `test_audiences` or unrevoked student `access_grants`)
-10. ✓ (during publish) every `test_questions.question_version_id` freezes successfully
+4. ✓ no soft-deleted questions (`questions.deleted_at is null` on every `test_questions` row) — Content Bin items cannot be newly published
+5. ✓ every current version has 4–5 complete options and a `correct_key` matching an option
+6. ✓ valid schedule: `opens_at < closes_at`, `closes_at` in the future
+7. ✓ `duration_minutes > 0` (separate check)
+8. ✓ duration fits the window (≤ `closes_at - opens_at`)
+9. ✓ valid marking: `marks_per_question > 0`, `negative_mark ≥ 0`
+10. ✓ audience assigned (year in `test_audiences` or unrevoked student `access_grants`)
+11. ✓ (during publish) every `test_questions.question_version_id` freezes successfully
 
 Student audience **Neither** is a UI gate on Publish (stay draft); it is not a separate `validate_test` row.
+
+**Soft-deleted questions (Content Bin):** a question with `deleted_at is not null` may still appear on a **draft** test (admins can remove it deliberately; there is no automatic detach). It must **not** pass publish: `validate_test` fails “no soft-deleted questions”, and `publish_test` refuses. This is a **prevention rule for future publishing only** — it does not rewrite already-published tests or their frozen history. Hard purge of Bin questions that still have any `test_questions` reference remains blocked (`question_referenced_by_test`); see [database.md](database.md) Content bin retention.
+
 ## Publish = snapshot
 
 `publish_test(test_id)`: validate → set `question_version_id := questions.current_version_id` on every test_questions row → status 'published' → refresh `questions.used_in_test` cache → audit log. After publish, test config, `test_prep_guidelines.body_text`, and test_questions are immutable (triggers), except `voided`/`void_policy`. A test with student audience **Neither** must stay `draft` — unpublished tests are never catalogued. Free vs paid audience is `tests.entitlement` (`free` vs `any_subscription`), not a second access model. Subscription never removes `entitlement = 'free'`.
 
-Later edits to a question create new versions; **published tests keep the frozen version forever** — history is never rewritten. Re-freezing to a newer version is allowed only while `now() < opens_at`, via an explicit admin action (audit-logged).
+Later edits to a question create new versions; **published tests keep the frozen version forever** — history is never rewritten. Attempt review and scoring read those frozen `question_versions` (via `test_questions.question_version_id` / attempt answer versions), not `questions.current_version_id`. Soft-deleting a question after it was already published does **not** rewrite history; Content Bin hard purge is refused while the `test_questions` reference exists. Re-freezing to a newer version is allowed only while `now() < opens_at`, via an explicit admin action (audit-logged).
 
 ## Previews
 

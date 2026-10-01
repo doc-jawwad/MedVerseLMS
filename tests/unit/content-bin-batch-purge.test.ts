@@ -32,8 +32,9 @@ describe("content bin batch purge helpers", () => {
     assert.equal(r.failed, 0);
     assert.equal(r.rpcCalls, 1);
     assert.match(r.message, /Purged 2/);
-    assert.match(r.message, /1 blocked/);
+    assert.match(r.message, /1 retained because referenced by test/);
     assert.match(r.message, /1 already gone/);
+    assert.doesNotMatch(r.message, /\d+ blocked/);
   });
 
   it("treats retry already_gone as non-failure", () => {

@@ -21,6 +21,8 @@ export type ContentBinItem = {
   purge_after: string | null;
   deleted_by: string | null;
   has_r2: boolean;
+  /** e.g. retained_referenced_by_test — expected hold, not a purge failure */
+  retain_reason: string | null;
 };
 
 const ENTITY_TYPES = new Set<string>([
@@ -51,7 +53,7 @@ function revalidateBinSurfaces() {
   revalidatePath("/free-resources");
 }
 
-/** Soft-delete → Bin (7-day purge_after). Does not delete R2. */
+/** Soft-delete → Bin (purge_after = deleted_at + 7 days eligibility). Does not delete R2. */
 export async function moveContentToBin(
   entityType: ContentBinEntityType,
   entityId: string
@@ -98,6 +100,12 @@ export async function purgeContentFromBin(
     p_entity_id: entityId,
   });
   revalidateBinSurfaces();
+  if (error?.message?.includes("question_referenced_by_test")) {
+    return {
+      error:
+        "Retained because referenced by a test. Remove the question from the draft test (or wait until no test references remain) before permanent delete.",
+    };
+  }
   return actionRpcResult("purgeContentFromBin", error);
 }
 
@@ -228,6 +236,8 @@ export async function listContentBin(
       purge_after: typeof row.purge_after === "string" ? row.purge_after : null,
       deleted_by: typeof row.deleted_by === "string" ? row.deleted_by : null,
       has_r2: Boolean(row.has_r2),
+      retain_reason:
+        typeof row.retain_reason === "string" ? row.retain_reason : null,
     });
   }
 
