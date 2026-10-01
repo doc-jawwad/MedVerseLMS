@@ -22,7 +22,7 @@ import {
   yearNameFromEnrollment,
 } from "@/lib/admin/student-account-ui";
 import { subscriptionIsLiveAt } from "@/lib/subscriptions/student-status";
-import { presignR2Object } from "@/lib/r2/presign";
+import { avatarProxyUrl } from "@/lib/profile/avatar-url";
 
 type Supabase = Awaited<ReturnType<typeof createClient>>;
 
@@ -204,11 +204,10 @@ export function createAdminStudentDetailAdapter(
         }
         if (typeof row.avatar_object_key === "string") {
           biodata.avatar_object_key = row.avatar_object_key;
-          const signed = presignR2Object({
-            method: "GET",
-            key: row.avatar_object_key,
-          });
-          if ("url" in signed) biodata.avatar_url = signed.url;
+          biodata.avatar_url = avatarProxyUrl(
+            studentId,
+            row.avatar_object_key
+          );
         }
       }
 

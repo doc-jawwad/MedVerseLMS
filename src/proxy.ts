@@ -12,13 +12,38 @@ import {
   sanitizeSsrTimingToken,
   ssrTimingEnabled,
 } from "@/lib/observability/ssr-timing";
+import {
+  applyCspToResponse,
+  buildCspHeaderValue,
+  resolveCspMode,
+} from "@/lib/security/csp";
 
-function nextWithPathname(request: NextRequest, pathname: string) {
+function createNonce(): string {
+  return Buffer.from(crypto.randomUUID()).toString("base64");
+}
+
+function nextWithPathname(request: NextRequest, pathname: string, nonce: string) {
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set("x-medverse-pathname", pathname);
-  return NextResponse.next({
+  requestHeaders.set("x-nonce", nonce);
+
+  // Request CSP is always the real policy (with nonce) so Next can extract and
+  // attach nonces during SSR. Browser enforcement uses the response header mode.
+  const cspValue = buildCspHeaderValue({ nonce });
+  requestHeaders.set("Content-Security-Policy", cspValue);
+
+  const response = NextResponse.next({
     request: { headers: requestHeaders },
   });
+  applyCspToResponse(response, cspValue, resolveCspMode());
+  return response;
+}
+
+function redirectWithCsp(url: URL, nonce: string) {
+  const response = NextResponse.redirect(url);
+  const cspValue = buildCspHeaderValue({ nonce });
+  applyCspToResponse(response, cspValue, resolveCspMode());
+  return response;
 }
 
 // Next 16 proxy (formerly middleware): refresh the Supabase session cookie and do
@@ -26,18 +51,28 @@ function nextWithPathname(request: NextRequest, pathname: string) {
 // (docs/permissions.md); the single-session check runs in requireUser().
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  const nonce = createNonce();
 
   // PWA install assets must not depend on Auth client construction.
+  // SW keeps its own narrow CSP from next.config; do not attach app CSP here.
   if (
     pathname === "/sw.js" ||
     pathname === "/manifest.webmanifest" ||
     pathname === "/manifest.json" ||
     pathname.startsWith("/icons/")
   ) {
-    return nextWithPathname(request, pathname);
+    return NextResponse.next({
+      request: {
+        headers: (() => {
+          const h = new Headers(request.headers);
+          h.set("x-medverse-pathname", pathname);
+          return h;
+        })(),
+      },
+    });
   }
 
-  let response = nextWithPathname(request, pathname);
+  let response = nextWithPathname(request, pathname, nonce);
 
   // Captured before getClaims() runs: a failed refresh makes the Supabase
   // client's own setAll() callback clear this same cookie from `request`
@@ -60,7 +95,7 @@ export async function proxy(request: NextRequest) {
           cookiesToSet.forEach(({ name, value }) =>
             request.cookies.set(name, value)
           );
-          response = nextWithPathname(request, pathname);
+          response = nextWithPathname(request, pathname, nonce);
           cookiesToSet.forEach(({ name, value, options }) =>
             response.cookies.set(name, value, options)
           );
@@ -124,7 +159,7 @@ export async function proxy(request: NextRequest) {
     if (hadSupabaseSession) {
       loginUrl.searchParams.set("reason", "session_expired");
     }
-    return NextResponse.redirect(loginUrl);
+    return redirectWithCsp(loginUrl, nonce);
   }
 
   // Admin class SoT: cookie. Sync valid `?year=` onto the cookie so the

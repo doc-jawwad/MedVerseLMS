@@ -10,7 +10,6 @@ import { optimizePaymentProofToWebp } from "@/lib/payments/optimize-screenshot";
 import {
   deleteR2Object,
   getR2Config,
-  presignR2Object,
   putR2Object,
 } from "@/lib/r2/presign";
 import { revalidateAdminSubscriptionPaths } from "@/lib/actions/subscription-revalidate";
@@ -307,6 +306,11 @@ export async function uploadPaymentScreenshot(
   return { objectKey: key };
 }
 
+/**
+ * Authorize payment-proof read, then return a same-origin proxy path.
+ * Bytes stream from GET /api/payment-proofs/[applicationId] — no R2 signed URL
+ * is ever handed to the browser.
+ */
 export async function getPaymentScreenshotReadUrl(applicationId: string) {
   const supabase = await createClient();
   const { data: key, error } = await supabase.rpc(
@@ -318,9 +322,9 @@ export async function getPaymentScreenshotReadUrl(applicationId: string) {
   );
   if (error) return clientActionFailed("getPaymentScreenshotReadUrl", error);
   if (typeof key !== "string") return { error: "screenshot_access_denied" };
-  const signed = presignR2Object({ method: "GET", key });
-  if ("error" in signed) {
-    return clientActionFailed("getPaymentScreenshotReadUrl.sign", signed.error);
-  }
-  return { url: signed.url, expiresSeconds: 300 };
+  return {
+    url: `/api/payment-proofs/${encodeURIComponent(applicationId)}`,
+    /** Proxy re-authorizes on every request; no bearer TTL. */
+    expiresSeconds: 0,
+  };
 }

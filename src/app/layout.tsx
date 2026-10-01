@@ -1,10 +1,14 @@
 import type { Metadata, Viewport } from "next";
+import { headers } from "next/headers";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import { PwaRuntimeProvider } from "@/components/pwa/pwa-runtime-provider";
 import { PwaUpdateBanner } from "@/components/pwa/pwa-update-banner";
 import { ThemeProvider } from "@/components/theme/theme-provider";
 import "./globals.css";
+
+/** Nonces require per-request rendering (see Next.js CSP guide). */
+export const dynamic = "force-dynamic";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -43,7 +47,8 @@ export const viewport: Viewport = {
   viewportFit: "cover",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default async function RootLayout({ children }: LayoutProps<"/">) {
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
   return (
     <html
       lang="en"
@@ -51,7 +56,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="flex min-h-full flex-col">
-        <ThemeProvider>
+        <ThemeProvider nonce={nonce}>
           <PwaRuntimeProvider>
             {children}
             <PwaUpdateBanner />

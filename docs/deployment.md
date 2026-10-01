@@ -162,7 +162,7 @@ Logs: journald for Next, PostgREST, Postgres, Caddy. SHOULD log exam RPC failure
 - SSH keys; host firewall allows **22**. Public **443** is restricted to Cloudflare’s **live published** IP ranges (`deploy/scripts/sync-cloudflare-ufw.sh`, daily timer). Do not hardcode stale ranges. Rollback: `deploy/scripts/rollback-cloudflare-ufw.sh`. Deny public 5432, 3000, 3001, 2019.
 - Postgres `listen_addresses = 'localhost'` (`deploy/postgres/listen-localhost.conf`).
 - Cloudflare orange-cloud in front of the origin; Full (strict) with Origin CA. Caddy must `header_up Host {host}` (and `X-Forwarded-*`) to Next — otherwise `/auth/confirm` builds `localhost` redirects.
-- Baseline response headers on Caddy + Next: `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy` (not a broad CSP — browser→PostgREST exam traffic must keep working).
+- Baseline response headers on Caddy + Next: `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`. App-wide CSP is set by `src/proxy.ts` (`src/lib/security/csp.ts`): nonce + `strict-dynamic` for scripts, same-origin Auth/PostgREST under `connect-src 'self'`, R2 + Sentry ingest allowlisted from inventory, YouTube `frame-src`, pdf.js `worker-src`. Mode via `MEDVERSE_CSP_MODE` (`report-only` default → `enforce` after staging validation; `off` disables). SW keeps its own narrow CSP on `/sw.js`.
 - `service_role` and JWT secret only on the server (`/etc/medverse/`).
 - Do not publish Studio or 5432. Do not leave credential files world-readable under `/tmp`.
 

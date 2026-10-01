@@ -155,7 +155,8 @@ export function ApplicationActions({
           <DialogHeader>
             <DialogTitle>Payment screenshot</DialogTitle>
             <DialogDescription>
-              Short-lived authorized link. Not a public URL.
+              Authorized same-origin preview. Bytes never leave a public or
+              signed R2 URL in the browser.
             </DialogDescription>
           </DialogHeader>
           {previewLoading && (

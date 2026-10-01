@@ -8,6 +8,7 @@ export { THEME_STORAGE_KEY };
 
 export function ThemeProvider({
   children,
+  nonce,
   ...props
 }: React.ComponentProps<typeof NextThemesProvider>) {
   return (
@@ -17,6 +18,7 @@ export function ThemeProvider({
       enableSystem
       disableTransitionOnChange
       storageKey={THEME_STORAGE_KEY}
+      nonce={nonce}
       {...props}
     >
       {children}

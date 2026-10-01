@@ -24,6 +24,7 @@ import {
   validatePurchaseClassConfirmation,
 } from "@/lib/profile/validation";
 import { getR2Config, presignR2Object, studyContentPrefix } from "@/lib/r2/presign";
+import { avatarProxyUrl } from "@/lib/profile/avatar-url";
 
 type Supabase = Awaited<ReturnType<typeof createClient>>;
 
@@ -167,12 +168,6 @@ async function buildProfile(
       ? row.avatar_object_key.trim()
       : null) ?? metaString(meta, META_AVATAR);
 
-  let avatarUrl: string | null = null;
-  if (avatarKey) {
-    const signed = presignR2Object({ method: "GET", key: avatarKey });
-    if ("url" in signed) avatarUrl = signed.url;
-  }
-
   return {
     id: row.id,
     full_name: row.full_name,
@@ -180,7 +175,8 @@ async function buildProfile(
     contact_number: metaString(meta, META_CONTACT),
     college_name: college,
     avatar_object_key: avatarKey,
-    avatar_url: avatarUrl,
+    // Same-origin proxy — never a browser-visible R2 signed URL.
+    avatar_url: avatarKey ? avatarProxyUrl("me", avatarKey) : null,
     current_year_id: enrollment.year_id,
     current_year_name: enrollment.year_name,
     current_year_number: enrollment.year_number,
