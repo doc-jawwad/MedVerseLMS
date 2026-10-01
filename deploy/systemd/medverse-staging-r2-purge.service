@@ -1,16 +1,20 @@
 [Unit]
 Description=MedVerse LMS staging R2 purge queue consumer
 Documentation=file:///opt/medverse-staging/current/docs/deployment.md
-After=network.target medverse-staging-next.service
+After=network-online.target postgresql.service
+Wants=network-online.target
 
 [Service]
 Type=oneshot
-User=root
+User=medverse
+Group=medverse
 EnvironmentFile=/etc/medverse-staging/nextjs.env
 Environment=MEDVERSE_DATABASE=medverse_staging
 Environment=R2_PURGE_LIMIT=50
-# Prefer release path; fall back to repo checkout only if current symlink missing.
-ExecStart=/bin/bash -c 'SCRIPT=/opt/medverse-staging/current/deploy/scripts/r2-purge-once.sh; if [[ ! -x "$SCRIPT" ]]; then SCRIPT=/opt/medverse-staging/current/deploy/scripts/r2-purge-once.sh; fi; exec bash "$SCRIPT"'
+# bash wrapper: durable even if release tree loses +x (rsync/umask).
+ExecStart=/usr/bin/bash /opt/medverse-staging/current/deploy/scripts/r2-purge-once.sh
+StandardOutput=journal
+StandardError=journal
 
 [Install]
 WantedBy=multi-user.target

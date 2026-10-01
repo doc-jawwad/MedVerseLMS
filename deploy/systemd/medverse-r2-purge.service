@@ -1,0 +1,20 @@
+[Unit]
+Description=MedVerse LMS production R2 purge queue consumer
+Documentation=file:///opt/medverse/current/docs/deployment.md
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=medverse
+Group=medverse
+EnvironmentFile=/etc/medverse/nextjs.env
+Environment=MEDVERSE_DATABASE=medverse
+Environment=R2_PURGE_LIMIT=50
+# bash wrapper: durable even if release tree loses +x (rsync/umask).
+ExecStart=/usr/bin/bash /opt/medverse/current/deploy/scripts/r2-purge-once.sh
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
