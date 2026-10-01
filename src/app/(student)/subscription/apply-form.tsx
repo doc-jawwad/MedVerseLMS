@@ -429,7 +429,7 @@ export function SubscriptionApplyForm({
 
         <div className="grid gap-2">
           <Label htmlFor="screenshot">
-            Payment screenshot (JPEG, PNG, or WebP · max{" "}
+            Payment screenshot (JPEG, PNG, or WebP · stored as optimized WebP · max{" "}
             {formatBytes(PAYMENT_SCREENSHOT_MAX_BYTES)})
           </Label>
           <Input

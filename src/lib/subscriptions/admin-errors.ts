@@ -15,6 +15,7 @@ const MESSAGES: Record<string, string> = {
   application_not_pending: "Only pending applications can be reviewed or edited.",
   application_already_pending: "This student already has a pending application.",
   screenshot_access_denied: "You cannot view that payment screenshot.",
+  screenshot_not_available: "That payment screenshot is no longer available.",
   r2_not_configured: "R2 is not configured for payment screenshots.",
   invalid_amount: "Enter a valid amount greater than zero.",
   account_not_eligible: "That account is not eligible for this action.",

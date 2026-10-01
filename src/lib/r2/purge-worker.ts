@@ -45,11 +45,17 @@ export function assertSafeStudyPurgeKey(objectKey: string): string | null {
   if (objectKey.startsWith("medverse/")) {
     return "backup_prefix_forbidden";
   }
-  if (!objectKey.startsWith("study-content/")) {
-    return "not_study_content_prefix";
+  if (
+    !objectKey.startsWith("study-content/") &&
+    !objectKey.startsWith("payment-proofs/")
+  ) {
+    return "unsupported_object_prefix";
   }
   return null;
 }
+
+/** @deprecated Prefer assertSafeStudyPurgeKey (now allows study-content/ and payment-proofs/). */
+export const assertSafePurgeKey = assertSafeStudyPurgeKey;
 
 /**
  * Claim → safety-check → delete R2 → complete.

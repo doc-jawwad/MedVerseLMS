@@ -6,6 +6,7 @@ import {
   validatePaymentAmount,
   validatePaymentScreenshotFile,
 } from "@/lib/payments/application";
+import { optimizePaymentProofToWebp } from "@/lib/payments/optimize-screenshot";
 import {
   deleteR2Object,
   getR2Config,
@@ -283,11 +284,18 @@ export async function uploadPaymentScreenshot(
 
   const config = getR2Config();
   if ("error" in config) return { error: config.error };
-  const body = Buffer.from(await file.arrayBuffer());
+
+  // Canonical store is optimized WebP only — never retain the original upload.
+  const raw = Buffer.from(await file.arrayBuffer());
+  const optimized = await optimizePaymentProofToWebp(raw);
+  if ("error" in optimized) {
+    return { error: optimized.error };
+  }
+
   const uploaded = await putR2Object({
     key,
-    body,
-    contentType: file.type,
+    body: optimized.buffer,
+    contentType: optimized.contentType,
   });
   if (uploaded.error) {
     return clientActionFailed(

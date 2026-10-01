@@ -20,6 +20,8 @@ const MESSAGES: Record<string, string> = {
     "The payment screenshot could not be attached. Please try uploading again.",
   screenshot_access_denied:
     "You do not have access to that payment screenshot.",
+  screenshot_not_available:
+    "That payment screenshot is no longer available.",
   screenshot_discard_denied:
     "That payment screenshot cannot be discarded.",
   r2_not_configured:

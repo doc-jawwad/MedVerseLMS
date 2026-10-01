@@ -99,10 +99,13 @@ SELECT EXISTS (
 def safe_key(object_key: str) -> str | None:
     if not object_key or "://" in object_key or ".." in object_key or any(c.isspace() for c in object_key):
         return "invalid_object_key"
-    if not object_key.startswith("study-content/"):
-        return "not_study_content_prefix"
     if object_key.startswith("medverse/"):
         return "backup_prefix_forbidden"
+    if not (
+        object_key.startswith("study-content/")
+        or object_key.startswith("payment-proofs/")
+    ):
+        return "unsupported_object_prefix"
     return None
 
 

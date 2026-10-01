@@ -19,21 +19,19 @@ function row(partial: Partial<R2PurgeQueueRow> & { id: string; object_key: strin
 }
 
 describe("assertSafeStudyPurgeKey", () => {
-  it("allows study-content keys", () => {
-    assert.equal(
-      assertSafeStudyPurgeKey("study-content/t/u/obj"),
-      null
-    );
+  it("allows study-content and payment-proofs keys", () => {
+    assert.equal(assertSafeStudyPurgeKey("study-content/t/u/obj"), null);
+    assert.equal(assertSafeStudyPurgeKey("payment-proofs/t/s/x"), null);
   });
 
-  it("rejects payment proofs and backups", () => {
-    assert.equal(
-      assertSafeStudyPurgeKey("payment-proofs/t/s/x"),
-      "not_study_content_prefix"
-    );
+  it("rejects backups and unknown prefixes", () => {
     assert.equal(
       assertSafeStudyPurgeKey("medverse/vps-staging/x.dump.enc"),
       "backup_prefix_forbidden"
+    );
+    assert.equal(
+      assertSafeStudyPurgeKey("other-prefix/x"),
+      "unsupported_object_prefix"
     );
   });
 });
@@ -65,6 +63,27 @@ describe("processR2PurgeBatch", () => {
     assert.deepEqual(completed, [
       { id: "11111111-1111-1111-1111-111111111111", error: null },
     ]);
+  });
+
+  it("deletes unreferenced payment-proof keys", async () => {
+    const deleted: string[] = [];
+    const deps: R2PurgeDeps = {
+      claimBatch: async () => [
+        row({
+          id: "55555555-5555-5555-5555-555555555555",
+          object_key: "payment-proofs/t/s/x",
+        }),
+      ],
+      complete: async () => {},
+      isObjectKeyStillReferenced: async () => false,
+      deleteObject: async (key) => {
+        deleted.push(key);
+        return {};
+      },
+    };
+    const result = await processR2PurgeBatch(deps);
+    assert.equal(result.deleted, 1);
+    assert.deepEqual(deleted, ["payment-proofs/t/s/x"]);
   });
 
   it("skips delete when still referenced", async () => {
@@ -111,14 +130,17 @@ describe("processR2PurgeBatch", () => {
 
   it("does not delete invalid keys", async () => {
     const deleted: string[] = [];
+    const completed: Array<{ id: string; error: string | null | undefined }> = [];
     const deps: R2PurgeDeps = {
       claimBatch: async () => [
         row({
           id: "44444444-4444-4444-4444-444444444444",
-          object_key: "payment-proofs/x",
+          object_key: "backups/x",
         }),
       ],
-      complete: async () => {},
+      complete: async (id, error) => {
+        completed.push({ id, error });
+      },
       isObjectKeyStillReferenced: async () => false,
       deleteObject: async (key) => {
         deleted.push(key);
@@ -128,5 +150,6 @@ describe("processR2PurgeBatch", () => {
     const result = await processR2PurgeBatch(deps);
     assert.equal(result.failed, 1);
     assert.deepEqual(deleted, []);
+    assert.equal(completed[0]?.error, "unsupported_object_prefix");
   });
 });
