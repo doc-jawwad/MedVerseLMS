@@ -49,6 +49,7 @@ import {
   loadLastCompletedLeaderboardBoard,
 } from "@/lib/leaderboard/load-last-completed-board";
 import { LEADERBOARD_PROJECTION_LIMITS } from "@/lib/leaderboard/projection-contract";
+import { deriveDashboardUpcomingFromCatalog } from "@/lib/dashboard/derive-upcoming-from-catalog";
 
 export const metadata = { title: "Dashboard — MedVerse LMS" };
 
@@ -84,17 +85,16 @@ export default async function DashboardPage() {
   await finalizeOwnExpiredAttempts(supabase);
 
   const now = new Date();
-  const nowIso = now.toISOString();
   const nowMs = now.getTime();
 
   // Live-subscription: request-local React.cache helper only (shared with layout).
   // Do not add a second raw has_live_subscription RPC in this fan-out.
+  // Tests: one RLS-visible catalog fetch; upcoming is derived in-process (v2).
   const [
     hasLiveAccess,
     { data: summary },
     { data: recent },
     { data: trend },
-    { data: upcoming },
     { data: catalogTests },
     { data: myAttempts },
     { data: accessible },
@@ -111,14 +111,7 @@ export default async function DashboardPage() {
       .from("tests")
       .select(
         "id, title, subjects(name), duration_minutes, opens_at, closes_at, question_count, entitlement, status"
-      )
-      .eq("status", "published")
-      .gt("closes_at", nowIso)
-      .order("opens_at", { ascending: true })
-      .limit(20),
-    supabase
-      .from("tests")
-      .select("id, title, status, opens_at, closes_at, entitlement"),
+      ),
     supabase
       .from("test_attempts")
       .select("test_id, state, expires_at")
@@ -146,6 +139,11 @@ export default async function DashboardPage() {
       .eq("grant_type", "test"),
     supabase.rpc("accessible_test_prep"),
   ]);
+
+  const upcoming = deriveDashboardUpcomingFromCatalog(
+    catalogTests ?? [],
+    nowMs
+  );
 
   const paidDetails = studentHasPaidLmsSections(hasLiveAccess);
 
