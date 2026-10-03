@@ -63,7 +63,9 @@ export default async function AdminMaterialsPage({
       supabase.from("subjects").select("id, name, year_id").order("name"),
       supabase
         .from("material_folders")
-        .select("id, name, year_id, subject_id, entitlement, library_type")
+        .select(
+          "id, name, year_id, subject_id, entitlement, library_type, content_surface"
+        )
         .is("deleted_at", null)
         // Academic Materials admin — do not mix Prof. Session folders here.
         .or("content_surface.eq.academic,content_surface.is.null")

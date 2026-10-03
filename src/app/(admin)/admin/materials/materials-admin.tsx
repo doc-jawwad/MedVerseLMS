@@ -7,6 +7,7 @@ import {
   deleteFolder,
   addMaterial,
   deleteMaterial,
+  moveNotesPdfMaterial,
   updateMaterial,
 } from "@/lib/actions/materials";
 import {
@@ -35,6 +36,11 @@ import {
   type FolderLibraryType,
 } from "@/lib/library/types";
 import { OpenMaterialButton } from "@/components/materials/open-material-button";
+import {
+  filterNotesPdfMoveDestinations,
+  notesPdfMoveDestinationLabel,
+  type NotesPdfMoveDestination,
+} from "@/lib/admin/notes-pdf-move";
 
 type Year = { id: string; year_number: number; name?: string };
 type Subject = { id: string; name: string; year_id: string };
@@ -45,6 +51,7 @@ type Folder = {
   subject_id: string | null;
   entitlement: string;
   library_type: string;
+  content_surface?: string | null;
 };
 type Material = {
   id: string;
@@ -152,8 +159,30 @@ export function MaterialsAdmin({
           <FolderCard
             key={f.id}
             folder={f}
+            libraryType={libraryType}
             subjectName={subjects.find((s) => s.id === f.subject_id)?.name}
             materials={materials.filter((m) => m.folder_id === f.id)}
+            moveDestinations={
+              libraryType === "notes"
+                ? filterNotesPdfMoveDestinations(
+                    yearFolders.map(
+                      (d): NotesPdfMoveDestination => ({
+                        id: d.id,
+                        name: d.name,
+                        year_id: d.year_id,
+                        library_type: d.library_type,
+                        content_surface: d.content_surface || "academic",
+                        subject_id: d.subject_id,
+                      })
+                    ),
+                    {
+                      sourceFolderId: f.id,
+                      yearId: yearId,
+                      contentSurface: f.content_surface || "academic",
+                    }
+                  )
+                : []
+            }
             modes={modes}
             linkLabel={
               libraryType === "lectures" || libraryType === "ospe_lectures"
@@ -174,14 +203,18 @@ export function MaterialsAdmin({
 
 function FolderCard({
   folder,
+  libraryType,
   subjectName,
   materials,
+  moveDestinations,
   modes,
   linkLabel,
 }: {
   folder: Folder;
+  libraryType: FolderLibraryType;
   subjectName?: string;
   materials: Material[];
+  moveDestinations: NotesPdfMoveDestination[];
   modes: Array<"pdf" | "guideline" | "drive">;
   linkLabel: string;
 }) {
@@ -230,7 +263,12 @@ function FolderCard({
           <p className="text-sm text-muted-foreground">Nothing in this folder yet.</p>
         )}
         {materials.map((m) => (
-          <MaterialRow key={m.id} material={m} />
+          <MaterialRow
+            key={m.id}
+            material={m}
+            libraryType={libraryType}
+            moveDestinations={moveDestinations}
+          />
         ))}
 
         <div className="flex flex-wrap gap-2 border-t pt-3">
@@ -254,12 +292,24 @@ function FolderCard({
   );
 }
 
-function MaterialRow({ material }: { material: Material }) {
+function MaterialRow({
+  material,
+  libraryType,
+  moveDestinations,
+}: {
+  material: Material;
+  libraryType: FolderLibraryType;
+  moveDestinations: NotesPdfMoveDestination[];
+}) {
   const [pending, startTransition] = useTransition();
   const [editing, setEditing] = useState(false);
   const [replacing, setReplacing] = useState(false);
+  const [moving, setMoving] = useState(false);
+  const [destFolderId, setDestFolderId] = useState("");
   const [title, setTitle] = useState(material.title);
   const [description, setDescription] = useState(material.description ?? "");
+  const canMoveNotesPdf =
+    libraryType === "notes" && material.kind === "pdf" && moveDestinations.length > 0;
 
   return (
     <div className="grid gap-3 rounded-md border p-3 text-sm">
@@ -337,11 +387,26 @@ function MaterialRow({ material }: { material: Material }) {
             <Button size="sm" variant="outline" onClick={() => setEditing(true)}>
               Edit details
             </Button>
+            {canMoveNotesPdf ? (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  setMoving((v) => !v);
+                  setReplacing(false);
+                }}
+              >
+                {moving ? "Cancel move" : "Move"}
+              </Button>
+            ) : null}
             {material.kind === "pdf" ? (
               <Button
                 size="sm"
                 variant="outline"
-                onClick={() => setReplacing((v) => !v)}
+                onClick={() => {
+                  setReplacing((v) => !v);
+                  setMoving(false);
+                }}
               >
                 {replacing ? "Cancel replace" : "Replace PDF"}
               </Button>
@@ -385,6 +450,55 @@ function MaterialRow({ material }: { material: Material }) {
           </div>
         ) : null}
       </div>
+      {moving && canMoveNotesPdf ? (
+        <div className="grid gap-2 border-t pt-3">
+          <p className="text-xs text-muted-foreground">
+            Move this PDF to another Notes folder. The file stays in place — only
+            the folder assignment changes.
+          </p>
+          <div className="flex flex-wrap items-end gap-2">
+            <div className="grid gap-1">
+              <Label className="text-xs">Destination folder</Label>
+              <Select
+                value={destFolderId || undefined}
+                onValueChange={setDestFolderId}
+              >
+                <SelectTrigger className="w-64">
+                  <SelectValue placeholder="Choose folder…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {moveDestinations.map((d) => (
+                    <SelectItem key={d.id} value={d.id}>
+                      {notesPdfMoveDestinationLabel(d)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button
+              size="sm"
+              disabled={pending || !destFolderId}
+              onClick={() =>
+                startTransition(async () => {
+                  const res = await moveNotesPdfMaterial({
+                    materialId: material.id,
+                    destFolderId,
+                    sourceFolderId: material.folder_id,
+                  });
+                  if ("error" in res && res.error) toast.error(res.error);
+                  else {
+                    toast.success("Moved to folder");
+                    setMoving(false);
+                    setDestFolderId("");
+                  }
+                })
+              }
+            >
+              Confirm move
+            </Button>
+          </div>
+        </div>
+      ) : null}
       {replacing && material.kind === "pdf" ? (
         <div className="grid gap-2 border-t pt-3">
           <p className="text-xs text-muted-foreground">

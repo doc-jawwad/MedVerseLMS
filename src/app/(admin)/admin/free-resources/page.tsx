@@ -92,14 +92,19 @@ export default async function AdminFreeResourcesPage({
             .order("name"),
           supabase
             .from("material_folders")
-            .select("id, name, year_id, subject_id, entitlement, library_type")
+            .select(
+              "id, name, year_id, subject_id, entitlement, library_type, content_surface"
+            )
             .eq("year_id", year.id)
             .eq("library_type", libraryType)
+            .is("deleted_at", null)
+            .or("content_surface.eq.academic,content_surface.is.null")
             .order("sort_order")
             .order("name"),
           supabase
             .from("materials")
             .select("id, folder_id, title, description, file_type, kind, status")
+            .is("deleted_at", null)
             .order("sort_order")
             .order("title"),
         ]);

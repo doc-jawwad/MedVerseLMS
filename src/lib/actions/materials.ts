@@ -1,11 +1,19 @@
 "use server";
 
-import { actionRpcResult } from "@/lib/errors/safe-action-error";
+import {
+  actionRpcResult,
+  isSafeBusinessErrorCode,
+  logServerError,
+} from "@/lib/errors/safe-action-error";
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { moveContentToBin } from "@/lib/actions/content-bin";
 import { STUDY_REVALIDATE_PATHS } from "@/lib/library/types";
+import {
+  notesPdfMoveErrorMessage,
+  notesPdfMoveRevalidatePaths,
+} from "@/lib/admin/notes-pdf-move";
 
 function validDriveUrl(url: string) {
   try {
@@ -215,4 +223,46 @@ export async function deleteMaterial(materialId: string) {
   const result = await moveContentToBin("material", materialId);
   revalidateStudyPaths();
   return result;
+}
+
+export type MoveNotesPdfMaterialResult = {
+  material_id: string;
+  folder_id: string;
+  source_folder_id: string;
+  r2_object_key: string | null;
+  deleted_at: string | null;
+};
+
+/** Move a live Notes PDF to another live Notes folder. Preserves id + R2 key. */
+export async function moveNotesPdfMaterial(input: {
+  materialId: string;
+  destFolderId: string;
+  sourceFolderId?: string | null;
+}) {
+  if (!input.materialId || !input.destFolderId) {
+    return { error: "Material and destination folder required." };
+  }
+  if (input.sourceFolderId && input.sourceFolderId === input.destFolderId) {
+    return { error: "Choose a different folder." };
+  }
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("admin_move_notes_pdf_material", {
+    p_material_id: input.materialId,
+    p_dest_folder_id: input.destFolderId,
+  });
+  for (const path of notesPdfMoveRevalidatePaths({
+    sourceFolderId: input.sourceFolderId,
+    destFolderId: input.destFolderId,
+  })) {
+    revalidatePath(path);
+  }
+  if (error) {
+    const raw = (error.message ?? "").trim().toLowerCase();
+    if (raw && isSafeBusinessErrorCode(raw)) {
+      logServerError("moveNotesPdfMaterial", raw);
+      return { error: notesPdfMoveErrorMessage(raw) };
+    }
+    return actionRpcResult("moveNotesPdfMaterial", error);
+  }
+  return { result: data as MoveNotesPdfMaterialResult };
 }
