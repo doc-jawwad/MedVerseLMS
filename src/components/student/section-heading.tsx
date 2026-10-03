@@ -8,9 +8,7 @@ export function SectionHeading({
   return (
     <div className="flex flex-col gap-1.5 sm:flex-row sm:items-end sm:justify-between">
       <div>
-        <h2 className="font-heading text-[13px] font-semibold tracking-[0.14em] text-[var(--brand-teal-ink)] uppercase">
-          {title}
-        </h2>
+        <h2 className="section-eyebrow font-heading">{title}</h2>
         <div className="brand-rule mt-2" aria-hidden />
       </div>
       {description ? (

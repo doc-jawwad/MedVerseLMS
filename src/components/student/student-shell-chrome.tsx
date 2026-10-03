@@ -51,7 +51,7 @@ export function StudentShellChrome({
 
   if (exam) {
     return (
-      <div className="min-h-svh bg-[var(--student-canvas)]">
+      <div className="min-h-svh bg-canvas">
         <SessionWatch userId={userId} />
         <main className="p-4 md:p-8">{children}</main>
       </div>

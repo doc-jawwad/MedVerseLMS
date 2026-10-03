@@ -11,14 +11,14 @@ export function PracticeTimer({
 }) {
   return (
     <div
-      className="inline-flex items-baseline gap-1.5 rounded-full bg-[var(--brand-teal)]/12 px-3 py-1 tabular-nums"
+      className="inline-flex items-baseline gap-1.5 rounded-full bg-brand/12 px-3 py-1 tabular-nums"
       aria-live="polite"
       aria-label={`${label} ${formatElapsed(elapsedMs)}`}
     >
-      <span className="text-[10px] font-semibold tracking-[0.14em] text-[var(--brand-teal-ink)] uppercase">
+      <span className="text-[10px] font-semibold tracking-[0.14em] text-brand-ink uppercase">
         {label}
       </span>
-      <span className="font-heading text-sm font-semibold text-[var(--student-ink)]">
+      <span className="font-heading text-sm font-semibold text-ink">
         {formatElapsed(elapsedMs)}
       </span>
     </div>

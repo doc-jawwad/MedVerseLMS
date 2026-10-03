@@ -28,7 +28,7 @@ export function BrandCredit({
           href="https://meddesk.pk"
           target="_blank"
           rel="noopener noreferrer"
-          className="font-semibold text-[var(--brand-teal-ink)] underline decoration-[var(--brand-teal)]/55 underline-offset-4 transition-colors hover:text-[var(--brand-teal)]"
+          className="font-semibold text-brand-ink underline decoration-brand/55 underline-offset-4 transition-colors hover:text-brand"
         >
           MedDesk.pk
         </Link>

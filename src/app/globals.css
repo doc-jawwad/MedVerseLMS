@@ -49,9 +49,27 @@
   --radius-2xl: calc(var(--radius) * 1.8);
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
+
+  /* MedVerse semantic colors → Tailwind utilities (bg-canvas, text-ink, …).
+     Leaf values live on :root / .dark; do not self-reference here. */
+  --color-canvas: var(--student-canvas);
+  --color-surface: var(--student-surface);
+  --color-surface-muted: var(--muted);
+  --color-ink: var(--student-ink);
+  --color-ink-muted: var(--muted-foreground);
+  --color-brand: var(--brand-teal);
+  --color-brand-ink: var(--brand-teal-ink);
+  --color-brand-strong: var(--brand-navy);
+  --color-brand-contrast: var(--brand-contrast);
+  --color-danger: var(--destructive);
+  --color-success: var(--success);
+  --shadow-elevated: var(--student-elevated-shadow);
+  --max-width-content: var(--layout-content-max);
+  --max-width-content-wide: var(--layout-content-max-wide);
 }
 
 /* MedVerse Healthcare brand: navy #072855 + teal #05AEA9 (docs/architecture.md).
+   Canonical token source of truth: docs/design-tokens.md
    --brand-teal stays the logo sample; --brand-teal-ink is contrast-safe for text.
    Light mode: neutral/off-white canvas — navy is for sidebar/header/strong brand only.
    Dark mode: near-black navy foundation — never use brand navy as body text. */
@@ -104,6 +122,46 @@
   --student-surface: #ffffff;
   --student-elevated-shadow: 0 1px 2px rgb(15 23 42 / 0.04),
     0 8px 24px rgb(15 23 42 / 0.05);
+
+  /* Leaf values for semantic / @theme wiring (aliases below keep stable names). */
+  --brand-contrast: #ffffff;
+  /* Status success (subscription / confirmations). MCQ “correct” greens stay local. */
+  --success: #15803d;
+
+  /* ── Semantic aliases (canonical names; values = existing production) ── */
+  --color-canvas: var(--student-canvas);
+  --color-surface: var(--student-surface);
+  --color-surface-muted: var(--muted);
+  --color-ink: var(--student-ink);
+  --color-ink-muted: var(--muted-foreground);
+  --color-brand: var(--brand-teal);
+  --color-brand-ink: var(--brand-teal-ink);
+  --color-brand-strong: var(--brand-navy);
+  --color-brand-contrast: var(--brand-contrast);
+  --color-danger: var(--destructive);
+  --color-success: var(--success);
+  --shadow-elevated: var(--student-elevated-shadow);
+
+  /* Soft navy wash on card headers / section bands (4% / 5% production mixes). */
+  --surface-tint: color-mix(in srgb, var(--brand-navy) 4%, var(--student-surface));
+  --surface-tint-strong: color-mix(
+    in srgb,
+    var(--brand-navy) 5%,
+    var(--student-surface)
+  );
+
+  /* Layout / spacing used by student + admin shells. */
+  --layout-content-max: 72rem; /* max-w-6xl */
+  --layout-content-max-wide: 80rem; /* max-w-7xl */
+  --space-page-x: 1rem; /* px-4 */
+  --space-page-x-md: 2rem; /* md:px-8 */
+  --space-page-y: 1rem; /* pt-4 */
+  --space-page-y-md: 1.5rem; /* md:pt-6 */
+  --space-stack: 1.25rem; /* gap-5 / page-stack */
+  --space-header-y: 0.625rem; /* py-2.5 */
+
+  /* Nav active teal rail (sidebar + mobile drawer). */
+  --nav-active-inset: inset 3px 0 0 0 var(--brand-teal);
 }
 
 .dark {
@@ -152,6 +210,31 @@
   --student-surface: #0b1528;
   --student-elevated-shadow: 0 1px 2px rgb(0 0 0 / 0.4),
     0 12px 32px rgb(0 0 0 / 0.4);
+
+  --brand-contrast: #ffffff;
+  --success: #4ade80;
+
+  --color-canvas: var(--student-canvas);
+  --color-surface: var(--student-surface);
+  --color-surface-muted: var(--muted);
+  --color-ink: var(--student-ink);
+  --color-ink-muted: var(--muted-foreground);
+  --color-brand: var(--brand-teal);
+  --color-brand-ink: var(--brand-teal-ink);
+  --color-brand-strong: var(--brand-navy);
+  --color-brand-contrast: var(--brand-contrast);
+  --color-danger: var(--destructive);
+  --color-success: var(--success);
+  --shadow-elevated: var(--student-elevated-shadow);
+
+  --surface-tint: color-mix(in srgb, var(--brand-navy) 4%, var(--student-surface));
+  --surface-tint-strong: color-mix(
+    in srgb,
+    var(--brand-navy) 5%,
+    var(--student-surface)
+  );
+
+  --nav-active-inset: inset 3px 0 0 0 var(--brand-teal);
 }
 
 @layer base {
@@ -173,10 +256,10 @@
 
   /* Prefer semantic ink over raw navy hex so dark mode stays readable. */
   .ink {
-    color: var(--student-ink);
+    color: var(--color-ink);
   }
   .teal-ink {
-    color: var(--brand-teal-ink);
+    color: var(--color-brand-ink);
   }
 }
 
@@ -186,13 +269,21 @@
   }
 
   .surface-card {
-    background: var(--student-surface);
-    box-shadow: var(--student-elevated-shadow);
+    background: var(--color-surface);
+    box-shadow: var(--shadow-elevated);
+  }
+
+  .surface-tint {
+    background: var(--surface-tint);
+  }
+
+  .surface-tint-strong {
+    background: var(--surface-tint-strong);
   }
 
   /* Soft brand atmosphere behind student/admin canvases (not a flat wash). */
   .canvas-atmosphere {
-    background-color: var(--student-canvas);
+    background-color: var(--color-canvas);
     background-image:
       radial-gradient(
         120% 80% at 0% 0%,
@@ -203,6 +294,35 @@
         90% 60% at 100% 0%,
         color-mix(in srgb, var(--brand-navy) 8%, transparent),
         transparent 50%
+      );
+  }
+
+  /* Landing / auth navy hero wash — same teal ellipses, no hard-coded hex. */
+  .landing-atmosphere {
+    background-image:
+      radial-gradient(
+        ellipse at 15% 0%,
+        color-mix(in srgb, var(--brand-teal) 33%, transparent),
+        transparent 50%
+      ),
+      radial-gradient(
+        ellipse at 90% 80%,
+        color-mix(in srgb, var(--brand-teal) 13%, transparent),
+        transparent 40%
+      );
+  }
+
+  .auth-atmosphere {
+    background-image:
+      radial-gradient(
+        ellipse at 18% 8%,
+        color-mix(in oklab, var(--brand-teal) 55%, transparent),
+        transparent 55%
+      ),
+      radial-gradient(
+        ellipse at 92% 88%,
+        color-mix(in oklab, var(--brand-teal) 28%, transparent),
+        transparent 48%
       );
   }
 
@@ -222,22 +342,52 @@
     );
   }
 
+  /* Page / section eyebrows — matches production 11px / 0.16em labels. */
+  .eyebrow {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--color-brand-ink);
+  }
+
+  .eyebrow-wide {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--color-brand-ink);
+  }
+
+  .section-eyebrow {
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--color-brand-ink);
+  }
+
   /* Desktop content header — light canvas, readable icon chrome */
   .shell-header-bar {
-    border-bottom: 1px solid color-mix(in srgb, var(--border) 88%, var(--student-ink));
-    background: color-mix(in srgb, var(--student-canvas) 94%, var(--student-surface));
+    border-bottom: 1px solid color-mix(in srgb, var(--border) 88%, var(--color-ink));
+    background: color-mix(in srgb, var(--color-canvas) 94%, var(--color-surface));
     backdrop-filter: blur(10px);
-    color: var(--student-ink);
+    color: var(--color-ink);
   }
 
   .shell-header-bar [data-testid="shell-header-tools"] {
-    color: var(--student-ink);
+    color: var(--color-ink);
   }
 
   /* Dominant MedDesk credit on landing / auth */
   .brand-credit-highlight {
     font-weight: 600;
     letter-spacing: 0.01em;
-    color: var(--student-ink);
+    color: var(--color-ink);
+  }
+
+  /* Sidebar / mobile drawer active item teal rail. */
+  .nav-active-rail {
+    box-shadow: var(--nav-active-inset);
   }
 }

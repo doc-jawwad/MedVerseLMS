@@ -19,10 +19,11 @@ Use `public/logo-icon.png` (navy + teal) on light backgrounds and
 `public/logo-icon-on-dark.png` (white + teal) on navy/blue backgrounds —
 the shared `Logo` component (`src/components/logo.tsx`) picks the variant via
 its `dark` prop and is the only place the wordmark/icon combination should be
-assembled. Theme tokens live in `src/app/globals.css`. Product theme modes are
-**Light / Dark / System** (SPEC FREEZE). If the logo is ever replaced,
-re-sample these two hex values from the new asset and update both this doc
-and `globals.css`.
+assembled. Theme tokens live in `src/app/globals.css`; semantic naming, usage
+rules, and migration guidance are in [design-tokens.md](design-tokens.md).
+Product theme modes are **Light / Dark / System** (SPEC FREEZE). If the logo is
+ever replaced, re-sample these two hex values from the new asset and update this
+doc, `globals.css`, and `design-tokens.md`.
 
 ## Progressive Web App
 

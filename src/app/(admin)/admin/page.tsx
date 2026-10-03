@@ -73,10 +73,8 @@ export default async function AdminOverviewPage() {
   return (
     <div className="grid gap-6">
       <div>
-        <p className="mb-1.5 text-[11px] font-semibold tracking-[0.16em] text-[var(--brand-teal-ink)] uppercase">
-          Admin
-        </p>
-        <h1 className="font-heading text-2xl font-semibold tracking-tight text-[var(--student-ink)] sm:text-[1.85rem]">
+        <p className="eyebrow mb-1.5">Admin</p>
+        <h1 className="font-heading text-2xl font-semibold tracking-tight text-ink sm:text-[1.85rem]">
           Overview
         </h1>
         <div className="brand-rule mt-2.5" aria-hidden />
@@ -133,7 +131,7 @@ export default async function AdminOverviewPage() {
 
       <Card className="surface-card border-border/80 shadow-none">
         <CardHeader>
-          <CardTitle className="font-heading text-base text-[var(--student-ink)]">
+          <CardTitle className="font-heading text-base text-ink">
             Most missed questions
           </CardTitle>
           <CardDescription>
@@ -178,7 +176,7 @@ function Tile({
   small?: boolean;
 }) {
   return (
-    <Card className="surface-card h-full gap-0 border-border/80 py-0 shadow-none transition-colors hover:border-[var(--brand-teal)]/35">
+    <Card className="surface-card h-full gap-0 border-border/80 py-0 shadow-none transition-colors hover:border-brand/35">
       <CardHeader className="gap-2 px-4 py-4">
         <CardDescription className="text-[11px] font-semibold tracking-[0.14em] uppercase">
           {label}
@@ -187,8 +185,8 @@ function Tile({
         <CardTitle
           className={
             small
-              ? "truncate font-heading text-lg text-[var(--student-ink)]"
-              : "metric-value font-heading text-3xl text-[var(--student-ink)]"
+              ? "truncate font-heading text-lg text-ink"
+              : "metric-value font-heading text-3xl text-ink"
           }
         >
           {value}

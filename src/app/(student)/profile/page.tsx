@@ -68,7 +68,7 @@ export default async function ProfilePage() {
 
       <Card className="surface-card border-border/80 shadow-none">
         <CardHeader>
-          <CardTitle className="text-base text-[var(--student-ink)]">Profile</CardTitle>
+          <CardTitle className="text-base text-ink">Profile</CardTitle>
           <CardDescription>
             Biodata, contact, college, and photo. Contact details stay private —
             leaderboards only show name, college, and photo.
@@ -87,7 +87,7 @@ export default async function ProfilePage() {
 
       <Card className="surface-card border-border/80 shadow-none">
         <CardHeader>
-          <CardTitle className="text-base text-[var(--student-ink)]">Class</CardTitle>
+          <CardTitle className="text-base text-ink">Class</CardTitle>
           <CardDescription>
             Free students can change class freely. Pending or active
             subscriptions lock class to the purchased year.
@@ -105,7 +105,7 @@ export default async function ProfilePage() {
 
       <Card className="surface-card border-border/80 shadow-none">
         <CardHeader>
-          <CardTitle className="text-base text-[var(--student-ink)]">Subscription</CardTitle>
+          <CardTitle className="text-base text-ink">Subscription</CardTitle>
           <CardDescription>
             View status, payment instructions, and submit or update an
             application. Confirm your purchase class before paying.
@@ -127,7 +127,7 @@ export default async function ProfilePage() {
 
       <Card className="surface-card border-border/80 shadow-none">
         <CardHeader>
-          <CardTitle className="text-base text-[var(--student-ink)]">Practice access</CardTitle>
+          <CardTitle className="text-base text-ink">Practice access</CardTitle>
           <CardDescription>
             Subjects your admin has granted you for practice MCQs.
           </CardDescription>
@@ -147,7 +147,7 @@ export default async function ProfilePage() {
 
       <Card className="surface-card border-border/80 shadow-none">
         <CardHeader>
-          <CardTitle className="text-base text-[var(--student-ink)]">Change password</CardTitle>
+          <CardTitle className="text-base text-ink">Change password</CardTitle>
         </CardHeader>
         <CardContent>
           <ChangePasswordForm />

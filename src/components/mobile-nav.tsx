@@ -233,7 +233,7 @@ function NavPendingMark() {
   if (!pending) return null;
   return (
     <Loader2
-      className="size-3.5 shrink-0 animate-spin text-[var(--brand-teal)]"
+      className="size-3.5 shrink-0 animate-spin text-brand"
       aria-label="Loading"
     />
   );
@@ -244,7 +244,7 @@ function NavPendingDot() {
   if (!pending) return null;
   return (
     <span
-      className="absolute top-1.5 right-1.5 size-1.5 rounded-full bg-[var(--brand-teal)] animate-pulse"
+      className="absolute top-1.5 right-1.5 size-1.5 animate-pulse rounded-full bg-brand"
       aria-hidden
     />
   );
@@ -272,7 +272,7 @@ function MobileNavEntry({
             item.locked
               ? "text-[var(--sidebar-muted)] hover:bg-sidebar-accent/50"
               : active
-                ? "bg-sidebar-accent font-medium text-white shadow-[inset_3px_0_0_0_var(--brand-teal)]"
+                ? "nav-active-rail bg-sidebar-accent font-medium text-white"
                 : "text-sidebar-foreground/90 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
           }`}
         >

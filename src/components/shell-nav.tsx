@@ -22,7 +22,7 @@ function NavPendingMark() {
   if (!pending) return null;
   return (
     <Loader2
-      className="size-3.5 shrink-0 animate-spin text-[var(--brand-teal)]"
+      className="size-3.5 shrink-0 animate-spin text-brand"
       aria-label="Loading"
     />
   );
@@ -49,7 +49,7 @@ function ShellNavEntry({
           item.locked
             ? "text-[var(--sidebar-muted)] hover:bg-sidebar-accent/50"
             : active
-              ? "bg-sidebar-accent font-medium text-white shadow-[inset_3px_0_0_0_var(--brand-teal)]"
+              ? "nav-active-rail bg-sidebar-accent font-medium text-white"
               : "text-sidebar-foreground/80 hover:bg-sidebar-accent/80 hover:text-sidebar-accent-foreground"
         }`}
       >

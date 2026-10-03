@@ -282,8 +282,8 @@ export default async function DashboardPage() {
       <DashboardAlerts alerts={alerts} />
 
       <Card className="surface-card overflow-hidden border-border/80 shadow-none">
-        <CardHeader className="border-b border-border/80 bg-[color-mix(in_srgb,var(--brand-navy)_4%,var(--student-surface))]">
-          <CardTitle className="font-heading text-base text-[var(--student-ink)]">
+        <CardHeader className="surface-tint border-b border-border/80">
+          <CardTitle className="font-heading text-base text-ink">
             Incoming tests
           </CardTitle>
           <CardDescription>
@@ -311,7 +311,7 @@ export default async function DashboardPage() {
                   className="grid gap-2 rounded-xl border border-border/80 bg-card/60 p-3.5"
                 >
                   <div className="flex flex-wrap items-start justify-between gap-2">
-                    <p className="font-heading text-lg font-semibold text-[var(--student-ink)]">
+                    <p className="font-heading text-lg font-semibold text-ink">
                       {displayTestTitle(t.title, pricing)}
                     </p>
                     <StatusBadge tone={pricing === "FREE" ? "info" : "muted"}>
@@ -332,7 +332,7 @@ export default async function DashboardPage() {
                   )}
                   {isEntitled && prepByTest.get(t.id) && (
                     <div className="rounded-lg border bg-muted/40 p-3">
-                      <p className="mb-1 text-xs font-semibold tracking-wide text-[var(--brand-teal-ink)] uppercase">
+                      <p className="mb-1 text-xs font-semibold tracking-wide text-brand-ink uppercase">
                         Preparation
                       </p>
                       <StudyMarkdown source={prepByTest.get(t.id)!} />
@@ -410,7 +410,7 @@ export default async function DashboardPage() {
           {subjectRows.length > 0 && (
             <Card className="surface-card border-border/80 shadow-none">
               <CardHeader>
-                <CardTitle className="font-heading text-base text-[var(--student-ink)]">
+                <CardTitle className="font-heading text-base text-ink">
                   Subject performance
                 </CardTitle>
                 <CardDescription>{PERFORMANCE_GRAIN_COPY.subject}</CardDescription>
@@ -418,7 +418,7 @@ export default async function DashboardPage() {
               <CardContent className="grid gap-5">
                 {subjectRows.map((sub) => (
                   <div key={sub.subject_id} className="grid gap-3">
-                    <p className="text-sm font-semibold text-[var(--student-ink)]">
+                    <p className="text-sm font-semibold text-ink">
                       {sub.subject_name}
                     </p>
                     <ProgressBar
@@ -438,7 +438,7 @@ export default async function DashboardPage() {
           {weakRows.length > 0 && (
             <Card className="surface-card border-border/80 shadow-none">
               <CardHeader>
-                <CardTitle className="font-heading text-base text-[var(--student-ink)]">
+                <CardTitle className="font-heading text-base text-ink">
                   Weak chapters
                 </CardTitle>
                 <CardDescription>{PERFORMANCE_GRAIN_COPY.weakChapters}</CardDescription>
@@ -467,7 +467,7 @@ export default async function DashboardPage() {
       ) : (
         <Card className="surface-card border-dashed border-border/80 shadow-none">
           <CardHeader>
-            <CardTitle className="font-heading text-base text-[var(--student-ink)]">
+            <CardTitle className="font-heading text-base text-ink">
               Subject &amp; practice analytics
             </CardTitle>
             <CardDescription>
@@ -509,7 +509,7 @@ export default async function DashboardPage() {
 
       <Card className="surface-card border-border/80 shadow-none">
         <CardHeader>
-          <CardTitle className="font-heading text-base text-[var(--student-ink)]">
+          <CardTitle className="font-heading text-base text-ink">
             Recent tests
           </CardTitle>
           <CardDescription>

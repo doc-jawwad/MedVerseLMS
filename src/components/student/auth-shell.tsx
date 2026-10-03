@@ -5,19 +5,11 @@ import { InstallMedverseApp } from "@/components/pwa/install-medverse-app";
 export function AuthShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="grid min-h-svh lg:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)]">
-      <aside className="relative hidden flex-col justify-between overflow-hidden bg-[var(--brand-navy)] px-10 py-10 text-white lg:flex">
-        <div
-          className="pointer-events-none absolute inset-0 opacity-45"
-          style={{
-            background:
-              "radial-gradient(ellipse at 18% 8%, color-mix(in oklab, var(--brand-teal) 55%, transparent), transparent 55%), radial-gradient(ellipse at 92% 88%, color-mix(in oklab, var(--brand-teal) 28%, transparent), transparent 48%)",
-          }}
-        />
+      <aside className="relative hidden flex-col justify-between overflow-hidden bg-brand-strong px-10 py-10 text-brand-contrast lg:flex">
+        <div className="auth-atmosphere pointer-events-none absolute inset-0 opacity-45" />
         <Logo />
         <div className="relative max-w-md">
-          <p className="text-[11px] font-semibold tracking-[0.2em] text-[var(--brand-teal)] uppercase">
-            Medical education
-          </p>
+          <p className="eyebrow-wide text-brand">Medical education</p>
           <h1 className="mt-3 font-heading text-4xl font-semibold tracking-tight text-balance">
             Prepared, calm, exam-ready.
           </h1>
@@ -28,10 +20,10 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
         </div>
         <BrandCredit
           tone="highlight"
-          className="relative text-white [&_a]:text-[var(--brand-teal)] [&_a]:hover:text-white"
+          className="relative text-white [&_a]:text-brand [&_a]:hover:text-white"
         />
       </aside>
-      <div className="flex flex-col bg-[var(--student-canvas)]">
+      <div className="flex flex-col bg-canvas">
         <div className="flex flex-1 items-center justify-center px-4 py-10">
           <div className="w-full max-w-md">
             <div className="mb-8 lg:hidden">

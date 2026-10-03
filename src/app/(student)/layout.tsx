@@ -24,7 +24,7 @@ export default async function StudentLayout({
   // never the student shell nav (dashboard / payments / year-change, etc.).
   if (isBlockedExamContinue) {
     return (
-      <div className="min-h-svh bg-[var(--student-canvas)]">
+      <div className="min-h-svh bg-canvas">
         <SessionWatch userId={userId} />
         <main className="p-4 md:p-8">{children}</main>
       </div>

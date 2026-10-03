@@ -13,7 +13,7 @@ export default function OfflineShellLayout({
   children: ReactNode;
 }) {
   return (
-    <div className="min-h-svh bg-[var(--student-canvas,#f6f7f9)] text-foreground">
+    <div className="min-h-svh bg-canvas text-foreground">
       <header className="border-b bg-card px-4 py-3">
         <div className="mx-auto flex max-w-3xl items-center justify-between gap-3">
           <Link href="/offline" className="text-sm font-semibold tracking-tight">

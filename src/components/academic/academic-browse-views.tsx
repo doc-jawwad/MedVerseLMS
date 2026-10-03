@@ -55,12 +55,12 @@ function TreeLinkCard({
   const body = (
     <Card
       className={`surface-card h-full gap-0 border-border/80 py-0 shadow-none transition-colors ${
-        locked ? "opacity-90" : "hover:border-[var(--brand-teal)]/40 hover:bg-accent/30"
+        locked ? "opacity-90" : "hover:border-brand/40 hover:bg-accent/30"
       }`}
     >
       <CardHeader className="gap-2 px-4 py-4">
         <div className="flex items-start justify-between gap-2">
-          <CardTitle className="font-heading text-base font-semibold text-[var(--student-ink)]">
+          <CardTitle className="font-heading text-base font-semibold text-ink">
             {title}
           </CardTitle>
           {locked ? (
@@ -207,8 +207,8 @@ export function BlockHomeView({
       </div>
       {ospeGroup ? (
         <section className="mt-8 overflow-hidden rounded-xl border border-border/80 surface-card">
-          <div className="border-b border-border/80 bg-[color-mix(in_srgb,var(--brand-navy)_5%,var(--student-surface))] px-4 py-3.5">
-            <h2 className="font-heading text-lg font-semibold text-[var(--student-ink)]">
+          <div className="surface-tint-strong border-b border-border/80 px-4 py-3.5">
+            <h2 className="font-heading text-lg font-semibold text-ink">
               {ospeGroup.name}
             </h2>
             <p className="mt-0.5 text-sm text-muted-foreground">
@@ -342,8 +342,8 @@ export function ProfSessionSubjectView({
       </div>
       {ospeGroup ? (
         <section className="mt-8 overflow-hidden rounded-xl border border-border/80 surface-card">
-          <div className="border-b border-border/80 bg-[color-mix(in_srgb,var(--brand-navy)_5%,var(--student-surface))] px-4 py-3.5">
-            <h2 className="font-heading text-lg font-semibold text-[var(--student-ink)]">
+          <div className="surface-tint-strong border-b border-border/80 px-4 py-3.5">
+            <h2 className="font-heading text-lg font-semibold text-ink">
               {ospeGroup.name}
             </h2>
             <p className="mt-0.5 text-sm text-muted-foreground">

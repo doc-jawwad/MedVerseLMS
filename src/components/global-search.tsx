@@ -209,7 +209,7 @@ export function GlobalSearch({
           "size-9 shrink-0",
           sidebar
             ? "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-            : "text-[var(--student-ink)] hover:bg-accent hover:text-[var(--student-ink)]",
+            : "text-ink hover:bg-accent hover:text-ink",
           className
         )}
         aria-label="Search academic tree"

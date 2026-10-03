@@ -24,10 +24,10 @@ export function PracticeSessionReportCard({
       data-testid="practice-session-report"
     >
       <div>
-        <p className="text-[11px] font-semibold tracking-[0.16em] text-[var(--brand-teal-ink)] uppercase">
+        <p className="eyebrow">
           Session report
         </p>
-        <h1 className="mt-1 font-heading text-2xl font-semibold tracking-tight text-[var(--student-ink)]">
+        <h1 className="mt-1 font-heading text-2xl font-semibold tracking-tight text-ink">
           {title}
         </h1>
         <p className="mt-1.5 text-sm text-muted-foreground">
@@ -75,10 +75,10 @@ function Stat({
     <div
       className={`rounded-2xl bg-muted/50 px-4 py-3 ${className ?? ""}`}
     >
-      <dt className="text-[11px] font-semibold tracking-wide text-[var(--student-ink)]/55 uppercase">
+      <dt className="text-[11px] font-semibold tracking-wide text-ink/55 uppercase">
         {label}
       </dt>
-      <dd className="mt-1 font-heading text-xl font-semibold tabular-nums text-[var(--student-ink)]">
+      <dd className="mt-1 font-heading text-xl font-semibold tabular-nums text-ink">
         {value}
       </dd>
     </div>

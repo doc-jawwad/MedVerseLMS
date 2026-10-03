@@ -58,10 +58,10 @@ export function PracticeSessionChrome({
       <header className="grid gap-3">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="text-[11px] font-semibold tracking-[0.16em] text-[var(--brand-teal-ink)] uppercase">
+            <p className="eyebrow">
               {eyebrow}
             </p>
-            <h1 className="font-heading text-xl font-semibold tracking-tight text-[var(--student-ink)] sm:text-2xl">
+            <h1 className="font-heading text-xl font-semibold tracking-tight text-ink sm:text-2xl">
               {title}
             </h1>
             <div className="brand-rule mt-2" aria-hidden />
