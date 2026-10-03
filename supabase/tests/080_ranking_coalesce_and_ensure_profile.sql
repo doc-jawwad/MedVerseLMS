@@ -2,7 +2,7 @@
 -- Transaction-scoped fixtures, rolled back.
 
 begin;
-select plan(22);
+select plan(26);
 
 select test_helpers.as_runner();
 -- Shared staging can contain dirty tests from real staging fixtures. Drain
@@ -36,7 +36,8 @@ select test_helpers.as_user(
   (select id from t_ensured) || '@ensure.invalid',
   jsonb_build_object(
     'full_name', 'Ensured Student',
-    'year_id', (select year_id from curriculum)
+    'year_id', (select year_id from curriculum),
+    'college_name', 'King Edward Medical University'
   )
 );
 select lives_ok(
@@ -59,6 +60,11 @@ select is(
   (select full_name from public.profiles where id = (select id from t_ensured)),
   'Ensured Student',
   'ensure_profile copies full_name from JWT user_metadata'
+);
+select is(
+  (select college_name from public.profiles where id = (select id from t_ensured)),
+  'King Edward Medical University',
+  'ensure_profile copies college_name from JWT user_metadata'
 );
 select is(
   (select role from public.profiles where id = (select id from t_ensured)),
@@ -105,7 +111,13 @@ select is(
 );
 
 -- Existing handle_new_user student already has an active enrollment.
-select test_helpers.as_user((select id from t_existing));
+-- Heal blank college from metadata without creating a second enrollment.
+select test_helpers.as_user(
+  (select id from t_existing),
+  null,
+  null,
+  jsonb_build_object('college_name', 'Allama Iqbal Medical College')
+);
 select lives_ok('select public.ensure_profile()', 'ensure_profile is a no-op insert on an existing profile');
 select test_helpers.as_runner();
 select is(
@@ -113,6 +125,32 @@ select is(
    where student_id = (select id from t_existing) and status = 'active'),
   1,
   'ensure_profile does not add a second class enrollment when an active enrollment already exists'
+);
+select is(
+  (select college_name from public.profiles where id = (select id from t_existing)),
+  'Allama Iqbal Medical College',
+  'ensure_profile heals blank profiles.college_name from user_metadata'
+);
+
+-- Do not overwrite an already-set college with a different metadata value.
+select test_helpers.as_user(
+  (select id from t_ensured),
+  null,
+  (select id from t_ensured) || '@ensure.invalid',
+  jsonb_build_object(
+    'full_name', 'Ensured Student',
+    'college_name', 'Should Not Overwrite College'
+  )
+);
+select lives_ok(
+  'select public.ensure_profile()',
+  'ensure_profile succeeds when college already set'
+);
+select test_helpers.as_runner();
+select is(
+  (select college_name from public.profiles where id = (select id from t_ensured)),
+  'King Edward Medical University',
+  'ensure_profile does not overwrite a non-empty profiles.college_name'
 );
 
 ------------------------------------------------------------------

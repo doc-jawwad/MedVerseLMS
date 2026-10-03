@@ -64,6 +64,65 @@ describe("leaderboard projection adapter", () => {
     assert.equal(row?.avatar_object_key, "avatars/aaa.png");
   });
 
+  it("maps each student's college and keeps rank order unchanged", () => {
+    const raw = [
+      {
+        rank: 1,
+        student_id: "a",
+        full_name: "Ada",
+        score: 95,
+        college_name: "King Edward Medical University",
+        email: "ada@secret.example",
+        phone: "+10000000001",
+      },
+      {
+        rank: 2,
+        student_id: "b",
+        full_name: "Bea",
+        score: 90,
+        college_name: "Allama Iqbal Medical College",
+        contact_number: "+10000000002",
+      },
+      {
+        rank: 3,
+        student_id: "c",
+        full_name: "Cy",
+        score: 85,
+        college_name: null,
+      },
+    ];
+    const rows = adaptTestLeaderboardRows(
+      raw,
+      LEADERBOARD_PROJECTION_LIMITS.dashboardFull
+    );
+    assert.deepEqual(
+      rows.map((r) => r.rank),
+      [1, 2, 3]
+    );
+    assert.deepEqual(
+      rows.map((r) => r.college_name),
+      [
+        "King Edward Medical University",
+        "Allama Iqbal Medical College",
+        null,
+      ]
+    );
+    for (const row of rows) {
+      assert.equal(projectionRowHasForbiddenKey(row), false);
+      assert.equal("email" in row, false);
+      assert.equal("phone" in row, false);
+      assert.equal("contact_number" in row, false);
+    }
+  });
+
+  it("treats blank college as missing for the UI fallback", () => {
+    const row = adaptTestLeaderboardRow({
+      ...sampleRpc,
+      college_name: "   ",
+    });
+    assert.equal(row?.college_name, null);
+  });
+
   it("slices to Top 5 / Top 20 without re-sorting by score", () => {
     const raw = [
       { rank: 2, student_id: "b", full_name: "B", score: 80 },

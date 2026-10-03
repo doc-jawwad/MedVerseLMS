@@ -22,7 +22,7 @@ export type StudentProfile = {
   email: string;
   /** Planned: profiles.contact_number or metadata until migration. */
   contact_number: string | null;
-  /** Planned: profiles.college_name. */
+  /** profiles.college_name (leaderboard-authoritative; metadata is bootstrap only). */
   college_name: string | null;
   /** Planned: profiles.avatar_object_key (private R2). */
   avatar_object_key: string | null;

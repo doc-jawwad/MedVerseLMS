@@ -1,7 +1,7 @@
 -- Data Spine: class lock, admin year assignments, practice progress,
 -- tree/search, leaderboard projection, profile avatar.
 begin;
-select plan(36);
+select plan(37);
 
 select test_helpers.as_runner();
 select * into temp curriculum from test_helpers.make_curriculum();
@@ -351,6 +351,11 @@ select is(
   (select college_name from public.profiles where id = (select id from t_paid)),
   'KEMU',
   '33 college persisted'
+);
+select is(
+  public.test_leaderboard_projection((select id from t_test), 3)->0->>'college_name',
+  'KEMU',
+  '33b projection surfaces profiles.college_name'
 );
 select lives_ok($$select public.allocate_avatar_object_key()$$, '34 allocate avatar');
 select ok(

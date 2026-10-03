@@ -63,8 +63,9 @@ export async function signUp(
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
-    // user_metadata: ensure_profile reads full_name + year_id.
-    // contact_number + college_name bridge until profiles columns ship.
+    // user_metadata: ensure_profile reads full_name, year_id, college_name
+    // (promotes college into profiles.college_name for leaderboard).
+    // contact_number stays Auth-metadata-only (no profiles column).
     options: {
       data: {
         full_name: fullName,
