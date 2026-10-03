@@ -17,7 +17,8 @@ export function BrandCredit({
     return (
       <p
         className={cn(
-          "brand-credit-highlight text-sm leading-relaxed tracking-wide sm:text-base",
+          // Default ink for light cards; callers may pass text-white on navy.
+          "brand-credit-highlight text-sm leading-relaxed tracking-wide text-ink sm:text-base",
           className
         )}
         data-testid="brand-credit"

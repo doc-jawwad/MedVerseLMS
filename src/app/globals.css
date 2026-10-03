@@ -379,11 +379,11 @@
     color: var(--color-ink);
   }
 
-  /* Dominant MedDesk credit on landing / auth */
+  /* Dominant MedDesk credit weight/tracking — color comes from utilities
+     (text-ink on light forms; text-white on navy landing/auth). */
   .brand-credit-highlight {
     font-weight: 600;
     letter-spacing: 0.01em;
-    color: var(--color-ink);
   }
 
   /* Sidebar / mobile drawer active item teal rail. */
