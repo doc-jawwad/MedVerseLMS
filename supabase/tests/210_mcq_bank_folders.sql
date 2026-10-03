@@ -1,6 +1,6 @@
 -- Academic MCQ Bank folders: isolation, ownership, remove, usages, practice batch.
 begin;
-select plan(24);
+select plan(25);
 
 select test_helpers.as_runner();
 select * into temp curriculum from test_helpers.make_curriculum();
@@ -380,13 +380,15 @@ select ok(
   'M: Prof. Session day practice batch unchanged for folder-owned question'
 );
 
--- Folder delete blocked when non-empty
+-- Folder cascade soft-delete (Main Admin) then restore so later checks keep t_f1 live
 select test_helpers.as_user((select id from t_admin));
-select throws_ok(
+select lives_ok(
   $$select public.admin_soft_delete_mcq_bank_folder((select id from t_f1))$$,
-  'P0001',
-  'folder_not_empty',
-  'soft-delete folder refuses when questions still assigned'
+  'soft-delete folder cascades when questions still assigned'
+);
+select lives_ok(
+  $$select public.restore_content('mcq_bank_folder', (select id from t_f1))$$,
+  'restore folder hierarchy after cascade soft-delete'
 );
 
 -- N: each live folder has a linked mcq_bank material folder for PDFs

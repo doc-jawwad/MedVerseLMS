@@ -43,7 +43,7 @@ export async function createQuestion(content: QuestionContent, meta: QuestionMet
     p_reference: content.reference,
     p_difficulty: meta.difficulty,
     p_tags: meta.tags,
-    p_status: meta.status ?? "draft",
+    p_status: meta.status ?? "approved",
     p_mcq_bank_subfolder_id: meta.mcq_bank_subfolder_id ?? null,
   });
   revalidatePath("/admin/questions");
@@ -112,11 +112,11 @@ export async function updateQuestionMeta(
 }
 
 const allowedTransitions: Record<string, string[]> = {
-  draft: ["review", "approved", "archived"],
-  review: ["approved", "needs_revision", "draft", "archived"],
-  approved: ["needs_revision", "archived"],
-  needs_revision: ["review", "approved", "archived"],
-  archived: ["draft"],
+  draft: ["approved", "archived"],
+  review: ["approved", "archived"],
+  approved: ["archived"],
+  needs_revision: ["approved", "archived"],
+  archived: ["approved"],
 };
 
 export async function setQuestionStatus(

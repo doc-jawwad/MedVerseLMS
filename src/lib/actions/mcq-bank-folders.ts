@@ -142,16 +142,16 @@ export type BulkSoftDeleteFolderQuestionsResult = {
   folder_id: string;
 };
 
-/** Atomic folder→folder move. Preserves question IDs. */
+/** Atomic folder→destination-subfolder move. Preserves question IDs. */
 export async function bulkMoveMcqBankFolderQuestions(input: {
   sourceFolderId: string;
-  destFolderId: string;
+  destSubfolderId: string;
   questionIds?: string[];
   allInSource?: boolean;
   productKey?: string;
 }) {
-  if (!input.sourceFolderId || !input.destFolderId) {
-    return { error: "Source and destination folders required." };
+  if (!input.sourceFolderId || !input.destSubfolderId) {
+    return { error: "Source folder and destination subfolder required." };
   }
   if (!input.allInSource && !(input.questionIds?.length)) {
     return { error: "No questions selected." };
@@ -161,7 +161,7 @@ export async function bulkMoveMcqBankFolderQuestions(input: {
     "admin_bulk_move_mcq_bank_folder_questions",
     {
       p_source_folder_id: input.sourceFolderId,
-      p_dest_folder_id: input.destFolderId,
+      p_dest_subfolder_id: input.destSubfolderId,
       p_question_ids: input.allInSource ? null : (input.questionIds ?? null),
       p_all_in_source: Boolean(input.allInSource),
     }
@@ -225,4 +225,39 @@ export async function bulkSoftDeleteFolderQuestions(input: {
   revalidatePath("/admin/bin");
   if (error) return actionRpcResult("bulkSoftDeleteFolderQuestions", error);
   return { result: data as BulkSoftDeleteFolderQuestionsResult };
+}
+
+export type BulkRestoreFolderQuestionsResult = {
+  restored: number;
+  folder_id: string;
+  question_ids: string[];
+};
+
+/** Restore soft-deleted questions that still belong to this folder. */
+export async function bulkRestoreFolderQuestions(input: {
+  folderId: string;
+  questionIds?: string[];
+  allBinnedInFolder?: boolean;
+  productKey?: string;
+}) {
+  if (!input.folderId) return { error: "Folder required." };
+  if (!input.allBinnedInFolder && !(input.questionIds?.length)) {
+    return { error: "No questions selected." };
+  }
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc(
+    "admin_bulk_restore_folder_questions",
+    {
+      p_folder_id: input.folderId,
+      p_question_ids: input.allBinnedInFolder
+        ? null
+        : (input.questionIds ?? null),
+      p_all_binned_in_folder: Boolean(input.allBinnedInFolder),
+    }
+  );
+  revalidateMcqBankPaths(input.productKey);
+  revalidatePath("/admin/questions");
+  revalidatePath("/admin/bin");
+  if (error) return actionRpcResult("bulkRestoreFolderQuestions", error);
+  return { result: data as BulkRestoreFolderQuestionsResult };
 }

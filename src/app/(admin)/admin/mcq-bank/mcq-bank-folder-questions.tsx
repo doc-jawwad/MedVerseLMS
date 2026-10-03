@@ -33,8 +33,8 @@ export type FolderMaterialRow = {
   status: string;
 };
 
-export type SiblingFolderOption = {
-  folder_id: string;
+export type SiblingSubfolderOption = {
+  subfolder_id: string;
   name: string;
 };
 
@@ -49,7 +49,7 @@ export function McqBankFolderQuestions({
   materialFolderId,
   materials,
   questions,
-  siblingFolders,
+  siblingSubfolders,
   totalCount,
   page,
   pageSize,
@@ -62,7 +62,7 @@ export function McqBankFolderQuestions({
   materialFolderId: string | null;
   materials: FolderMaterialRow[];
   questions: FolderQuestionRow[];
-  siblingFolders: SiblingFolderOption[];
+  siblingSubfolders: SiblingSubfolderOption[];
   totalCount: number;
   page: number;
   pageSize: number;
@@ -71,7 +71,7 @@ export function McqBankFolderQuestions({
   const [pending, startTransition] = useTransition();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [selectAllInFolder, setSelectAllInFolder] = useState(false);
-  const [destFolderId, setDestFolderId] = useState("");
+  const [destSubfolderId, setDestSubfolderId] = useState("");
 
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
   const importHref = `/admin/questions/import?folderId=${encodeURIComponent(folderId)}&year=${yearId}`;
@@ -82,7 +82,7 @@ export function McqBankFolderQuestions({
   const pageAllSelected =
     pageIds.length > 0 && pageIds.every((id) => selected.has(id));
   const selectedCount = selectAllInFolder ? totalCount : selected.size;
-  const destinations = siblingFolders.filter((f) => f.folder_id !== folderId);
+  const destinations = siblingSubfolders;
 
   function clearSelection() {
     setSelected(new Set());
@@ -146,12 +146,12 @@ export function McqBankFolderQuestions({
       toast.error("Select questions first.");
       return;
     }
-    if (!destFolderId) {
-      toast.error("Choose a destination folder.");
+    if (!destSubfolderId) {
+      toast.error("Choose a destination subfolder.");
       return;
     }
     const destName =
-      destinations.find((f) => f.folder_id === destFolderId)?.name ??
+      destinations.find((f) => f.subfolder_id === destSubfolderId)?.name ??
       "destination";
     if (
       !window.confirm(
@@ -163,7 +163,7 @@ export function McqBankFolderQuestions({
     startTransition(async () => {
       const res = await bulkMoveMcqBankFolderQuestions({
         sourceFolderId: folderId,
-        destFolderId,
+        destSubfolderId,
         productKey,
         ...(payload.allInFolder
           ? { allInSource: true }
@@ -398,22 +398,22 @@ export function McqBankFolderQuestions({
                       className="text-xs font-medium text-muted-foreground"
                       htmlFor="mcq-move-dest"
                     >
-                      Move to folder
+                      Move to subfolder
                     </label>
                     <select
                       id="mcq-move-dest"
                       className="h-9 w-full rounded-md border bg-background px-3 text-sm"
-                      value={destFolderId}
+                      value={destSubfolderId}
                       disabled={pending || destinations.length === 0}
-                      onChange={(e) => setDestFolderId(e.target.value)}
+                      onChange={(e) => setDestSubfolderId(e.target.value)}
                     >
                       <option value="">
                         {destinations.length === 0
-                          ? "No other folders"
+                          ? "No subfolders"
                           : "Choose destination…"}
                       </option>
                       {destinations.map((f) => (
-                        <option key={f.folder_id} value={f.folder_id}>
+                        <option key={f.subfolder_id} value={f.subfolder_id}>
                           {f.name}
                         </option>
                       ))}
@@ -422,7 +422,7 @@ export function McqBankFolderQuestions({
                   <Button
                     type="button"
                     size="sm"
-                    disabled={pending || !destFolderId}
+                    disabled={pending || !destSubfolderId}
                     onClick={runBulkMove}
                   >
                     Move

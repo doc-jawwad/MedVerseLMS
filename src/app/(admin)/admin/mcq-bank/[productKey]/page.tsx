@@ -15,7 +15,7 @@ export default async function AdminMcqBankProductPage({
   params: Promise<{ productKey: string }>;
   searchParams: Promise<{ year?: string }>;
 }) {
-  const { supabase } = await requireAdmin();
+  const { supabase, profile } = await requireAdmin();
   const { productKey: rawKey } = await params;
   const productKey = decodeURIComponent(rawKey);
   const sp = await searchParams;
@@ -72,6 +72,7 @@ export default async function AdminMcqBankProductPage({
           productSubjectId={subject.id}
           subjectName={subject.name}
           folders={folders}
+          isMainAdmin={Boolean(profile.is_main_admin)}
         />
       );
     },

@@ -82,7 +82,7 @@ export function QuestionEditor({
   const [reference, setReference] = useState(initial?.reference ?? "");
   const [difficulty, setDifficulty] = useState(initial?.difficulty ?? "medium");
   const [tags, setTags] = useState((initial?.tags ?? []).join(", "));
-  const [status, setStatus] = useState(initial?.status ?? "draft");
+  const status = "approved";
   const [showAnswer, setShowAnswer] = useState(true);
 
   const subjects = useMemo(
@@ -237,20 +237,6 @@ export function QuestionEditor({
             placeholder="virchow, thrombosis"
           />
         </div>
-
-        {!isEdit && (
-          <div className="grid gap-2">
-            <Label>Initial status</Label>
-            <Select value={status} onValueChange={setStatus}>
-              <SelectTrigger className="w-48"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="draft">Draft</SelectItem>
-                <SelectItem value="review">Review</SelectItem>
-                <SelectItem value="approved">Approved</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        )}
 
         <div>
           <Button onClick={save} disabled={!valid || pending}>

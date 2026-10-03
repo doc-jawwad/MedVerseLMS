@@ -16,11 +16,7 @@ import {
   ConfirmDangerDialog,
   purgeDateHint,
 } from "@/components/admin/confirm-danger-dialog";
-import {
-  isMcqBankFolderEmptyForDelete,
-  mcqBankFolderContentSummary,
-  mcqBankFolderDeleteBlockedReason,
-} from "@/lib/admin/mcq-bank-folder-ui";
+import { mcqBankFolderContentSummary } from "@/lib/admin/mcq-bank-folder-ui";
 
 export type McqBankFolderRow = {
   folder_id: string;
@@ -37,12 +33,14 @@ export function McqBankFoldersAdmin({
   productSubjectId,
   subjectName,
   folders: initialFolders,
+  isMainAdmin = false,
 }: {
   yearId: string;
   productKey: string;
   productSubjectId: string;
   subjectName: string;
   folders: McqBankFolderRow[];
+  isMainAdmin?: boolean;
 }) {
   const router = useRouter();
   const [folders, setFolders] = useState(initialFolders);
@@ -73,7 +71,9 @@ export function McqBankFoldersAdmin({
         </h1>
         <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
           Folders hold subfolders (MCQs) and study PDFs for this product subject.
-          Empty folders (no subfolders and no live PDFs) can be moved to the Bin.
+          {isMainAdmin
+            ? " Main Admin can move a folder (and its contents) to the Bin."
+            : " Folder delete is Main Admin only."}
         </p>
         <div className="mt-3 flex flex-wrap gap-3 text-sm">
           <Link
@@ -191,11 +191,6 @@ export function McqBankFoldersAdmin({
                 <p className="text-xs text-muted-foreground">
                   {mcqBankFolderContentSummary(folder)}
                 </p>
-                {!isMcqBankFolderEmptyForDelete(folder) ? (
-                  <p className="text-xs text-muted-foreground">
-                    {mcqBankFolderDeleteBlockedReason(folder)}
-                  </p>
-                ) : null}
               </div>
               <div className="flex flex-wrap gap-2">
                 <Button asChild type="button" size="sm" variant="secondary">
@@ -233,46 +228,45 @@ export function McqBankFoldersAdmin({
                 >
                   Move up
                 </Button>
-                <ConfirmDangerDialog
-                  title="Delete empty folder?"
-                  description={
-                    <>
-                      <p>
-                        “{folder.name}” will be moved to the Bin if it has no
-                        subfolders and no live PDFs. It stays until about{" "}
-                        <strong>{purgeDateHint()}</strong>.
-                      </p>
-                      <p className="mt-2">
-                        Folders with subfolders or PDFs cannot be deleted —
-                        remove that content first.
-                      </p>
-                    </>
-                  }
-                  confirmLabel="Move to Bin"
-                  disabled={!isMcqBankFolderEmptyForDelete(folder)}
-                  trigger={
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="ghost"
-                      className="text-destructive"
-                      disabled={
-                        pending || !isMcqBankFolderEmptyForDelete(folder)
-                      }
-                    >
-                      Delete
-                    </Button>
-                  }
-                  onConfirm={() =>
-                    softDeleteMcqBankFolder(folder.folder_id, productKey)
-                  }
-                  onSuccess={() => {
-                    setFolders((prev) =>
-                      prev.filter((f) => f.folder_id !== folder.folder_id)
-                    );
-                    refresh();
-                  }}
-                />
+                {isMainAdmin ? (
+                  <ConfirmDangerDialog
+                    title="Delete folder and contents?"
+                    description={
+                      <>
+                        <p>
+                          “{folder.name}” and its subfolders, MCQs, and PDFs will
+                          move to the Bin together. They stay until about{" "}
+                          <strong>{purgeDateHint()}</strong>.
+                        </p>
+                        <p className="mt-2">
+                          This is not a permanent delete. Hierarchy restore from
+                          the Bin recovers matching cascade contents only.
+                        </p>
+                      </>
+                    }
+                    confirmLabel="Move to Bin"
+                    trigger={
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        className="text-destructive"
+                        disabled={pending}
+                      >
+                        Delete
+                      </Button>
+                    }
+                    onConfirm={() =>
+                      softDeleteMcqBankFolder(folder.folder_id, productKey)
+                    }
+                    onSuccess={() => {
+                      setFolders((prev) =>
+                        prev.filter((f) => f.folder_id !== folder.folder_id)
+                      );
+                      refresh();
+                    }}
+                  />
+                ) : null}
               </div>
             </li>
           ))}

@@ -16,7 +16,7 @@ export default async function AdminMcqBankFolderPage({
   params: Promise<{ productKey: string; folderId: string }>;
   searchParams: Promise<{ year?: string }>;
 }) {
-  const { supabase } = await requireAdmin();
+  const { supabase, profile } = await requireAdmin();
   const { productKey: rawKey, folderId } = await params;
   const productKey = decodeURIComponent(rawKey);
   const sp = await searchParams;
@@ -121,6 +121,7 @@ export default async function AdminMcqBankFolderPage({
           materialFolderId={folder.material_folder_id}
           materials={materials}
           subfolders={subfolders}
+          isMainAdmin={Boolean(profile.is_main_admin)}
         />
       );
     },

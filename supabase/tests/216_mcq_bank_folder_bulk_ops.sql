@@ -107,17 +107,18 @@ select is(
   '4. manual create places questions in subfolder A'
 );
 
--- Empty folder delete OK for B (no live subfolders); A blocked
-select lives_ok(
+-- Folder soft-delete is Main Admin only; limited admin denied
+select throws_ok(
   $$select public.admin_soft_delete_mcq_bank_folder((select id from t_fb))$$,
-  '5. empty folder soft-delete succeeds'
+  'P0001',
+  'permission_denied',
+  '5. limited admin cannot soft-delete empty folder'
 );
 
-select throws_ok(
-  $$select public.admin_soft_delete_mcq_bank_folder((select id from t_fa))$$,
-  'P0001',
-  'folder_not_empty',
-  '6. non-empty folder soft-delete blocked'
+select test_helpers.as_user((select id from t_main));
+select lives_ok(
+  $$select public.admin_soft_delete_mcq_bank_folder((select id from t_fb))$$,
+  '6. Main Admin soft-delete empty folder succeeds'
 );
 
 -- Recreate B + subfolder for move tests
@@ -263,13 +264,14 @@ select ok(
   '21. question versions retained after soft-delete'
 );
 
--- Clear live empty subfolder then delete folder B
+-- Main Admin cascade-delete subfolder + folder B
+select test_helpers.as_user((select id from t_main));
 select lives_ok(
   $$do $d$ begin
     perform public.admin_soft_delete_mcq_bank_subfolder((select id from t_sb));
     perform public.admin_soft_delete_mcq_bank_folder((select id from t_fb));
   end $d$;$$,
-  '22. empty folder delete after clearing questions + subfolder'
+  '22. Main Admin cascade-delete subfolder then folder'
 );
 
 -- Large batch (>50): prove not page-capped at 50

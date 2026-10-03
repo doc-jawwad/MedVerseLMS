@@ -169,8 +169,8 @@ select test_helpers.as_user((select id from t_edit));
 select throws_ok(
   $$select public.admin_soft_delete_mcq_bank_folder((select id from t_empty_folder))$$,
   'P0001',
-  'folder_not_empty',
-  'soft-delete refuses when live PDFs exist (questions=0)'
+  'permission_denied',
+  'limited admin cannot soft-delete folder (even with PDFs)'
 );
 
 select is(
@@ -190,10 +190,10 @@ set deleted_at = now(), purge_after = now() + interval '7 days'
 where folder_id = (select id from t_empty_mat)
   and deleted_at is null;
 
-select test_helpers.as_user((select id from t_edit));
+select test_helpers.as_user((select id from t_main));
 select lives_ok(
   $$select public.admin_soft_delete_mcq_bank_folder((select id from t_empty_folder))$$,
-  'soft-delete succeeds for genuinely empty folder'
+  'Main Admin soft-delete succeeds for empty folder'
 );
 
 -- Questions-only: assign a question to seed folder (no live PDFs yet)
@@ -216,8 +216,8 @@ select public.admin_assign_unassigned_question_to_subfolder(
 select throws_ok(
   $$select public.admin_soft_delete_mcq_bank_folder((select id from t_folder))$$,
   'P0001',
-  'folder_not_empty',
-  'soft-delete refuses when questions exist (PDFs=0)'
+  'permission_denied',
+  'limited admin cannot soft-delete folder when questions exist'
 );
 
 -- Both: add a live PDF while question remains
@@ -239,8 +239,8 @@ select test_helpers.as_user((select id from t_edit));
 select throws_ok(
   $$select public.admin_soft_delete_mcq_bank_folder((select id from t_folder))$$,
   'P0001',
-  'folder_not_empty',
-  'soft-delete refuses when questions and PDFs both exist'
+  'permission_denied',
+  'limited admin cannot soft-delete folder when questions and PDFs both exist'
 );
 
 select ok(

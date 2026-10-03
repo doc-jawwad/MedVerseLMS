@@ -80,7 +80,7 @@ export function ImportClient({
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [subjectId, setSubjectId] = useState(lockedSubjectId ?? "");
-  const [status, setStatus] = useState("draft");
+  const status = "approved";
   const [createMissing, setCreateMissing] = useState(true);
   const [filename, setFilename] = useState("");
   const [rows, setRows] = useState<ParsedCsvRow[]>([]);
@@ -351,19 +351,9 @@ export function ImportClient({
                 </p>
               ) : null}
             </div>
-            <div className="grid gap-2">
-              <Label>Import as</Label>
-              <Select value={status} onValueChange={setStatus}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="draft">Draft</SelectItem>
-                  <SelectItem value="review">Review</SelectItem>
-                  <SelectItem value="approved">Approved</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            <p className="pb-2 text-sm text-muted-foreground">
+              Imported MCQs become active immediately (no approval step).
+            </p>
             <label className="flex items-end gap-2 pb-2 text-sm">
               <Checkbox
                 checked={createMissing}
@@ -576,7 +566,7 @@ export function ImportClient({
                   ? "Importing…"
                   : `Confirm import ${validRows.length} question${
                       validRows.length === 1 ? "" : "s"
-                    } as ${status}`}
+                    }`}
               </Button>
               <Button
                 variant="outline"
@@ -595,9 +585,8 @@ export function ImportClient({
           <CardHeader>
             <CardTitle>4. Import result</CardTitle>
             <CardDescription>
-              Edit any imported question before publishing to tests or practice.
-              Status transitions stay on the normal draft → review → approved path
-              unless you imported as approved.
+              Imported questions are active immediately and available for tests
+              and practice. Use Archive on a question detail page to retire one.
             </CardDescription>
           </CardHeader>
           <CardContent className="grid gap-4">

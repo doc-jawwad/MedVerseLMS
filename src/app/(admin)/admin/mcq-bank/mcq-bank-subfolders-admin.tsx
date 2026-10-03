@@ -44,6 +44,7 @@ export function McqBankSubfoldersAdmin({
   materialFolderId,
   materials,
   subfolders: initialSubfolders,
+  isMainAdmin = false,
 }: {
   yearId: string;
   productKey: string;
@@ -53,6 +54,7 @@ export function McqBankSubfoldersAdmin({
   materialFolderId: string | null;
   materials: FolderMaterialRow[];
   subfolders: McqBankSubfolderRow[];
+  isMainAdmin?: boolean;
 }) {
   const router = useRouter();
   const [subfolders, setSubfolders] = useState(initialSubfolders);
@@ -289,50 +291,52 @@ export function McqBankSubfoldersAdmin({
                   >
                     Move up
                   </Button>
-                  <ConfirmDangerDialog
-                    title="Delete empty subfolder?"
-                    description={
-                      <>
-                        <p>
-                          “{subfolder.name}” will be moved to the Bin if it has
-                          no questions. It stays until about{" "}
-                          <strong>{purgeDateHint()}</strong>.
-                        </p>
-                        <p className="mt-2">
-                          Subfolders with questions cannot be deleted — remove
-                          or move those MCQs first.
-                        </p>
-                      </>
-                    }
-                    confirmLabel="Move to Bin"
-                    disabled={subfolder.question_count > 0}
-                    trigger={
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="ghost"
-                        className="text-destructive"
-                        disabled={pending || subfolder.question_count > 0}
-                      >
-                        Delete
-                      </Button>
-                    }
-                    onConfirm={() =>
-                      softDeleteMcqBankSubfolder(
-                        subfolder.subfolder_id,
-                        productKey,
-                        folderId
-                      )
-                    }
-                    onSuccess={() => {
-                      setSubfolders((prev) =>
-                        prev.filter(
-                          (f) => f.subfolder_id !== subfolder.subfolder_id
+                  {isMainAdmin ? (
+                    <ConfirmDangerDialog
+                      title="Delete subfolder and MCQs?"
+                      description={
+                        <>
+                          <p>
+                            “{subfolder.name}” and its MCQs will move to the Bin
+                            together. They stay until about{" "}
+                            <strong>{purgeDateHint()}</strong>.
+                          </p>
+                          <p className="mt-2">
+                            This is not a permanent delete. Restoring the
+                            subfolder from the Bin restores MCQs deleted in the
+                            same cascade.
+                          </p>
+                        </>
+                      }
+                      confirmLabel="Move to Bin"
+                      trigger={
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          className="text-destructive"
+                          disabled={pending}
+                        >
+                          Delete
+                        </Button>
+                      }
+                      onConfirm={() =>
+                        softDeleteMcqBankSubfolder(
+                          subfolder.subfolder_id,
+                          productKey,
+                          folderId
                         )
-                      );
-                      refresh();
-                    }}
-                  />
+                      }
+                      onSuccess={() => {
+                        setSubfolders((prev) =>
+                          prev.filter(
+                            (f) => f.subfolder_id !== subfolder.subfolder_id
+                          )
+                        );
+                        refresh();
+                      }}
+                    />
+                  ) : null}
                 </div>
               </li>
             ))}

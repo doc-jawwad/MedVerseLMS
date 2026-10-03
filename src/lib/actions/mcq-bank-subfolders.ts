@@ -235,3 +235,39 @@ export async function bulkSoftDeleteSubfolderQuestions(input: {
   if (error) return actionRpcResult("bulkSoftDeleteSubfolderQuestions", error);
   return { result: data as BulkSoftDeleteSubfolderQuestionsResult };
 }
+
+export type BulkRestoreSubfolderQuestionsResult = {
+  restored: number;
+  subfolder_id: string;
+  question_ids: string[];
+};
+
+/** Restore soft-deleted questions that still belong to this subfolder. */
+export async function bulkRestoreSubfolderQuestions(input: {
+  subfolderId: string;
+  questionIds?: string[];
+  allBinnedInSubfolder?: boolean;
+  productKey?: string;
+  folderId?: string;
+}) {
+  if (!input.subfolderId) return { error: "Subfolder required." };
+  if (!input.allBinnedInSubfolder && !(input.questionIds?.length)) {
+    return { error: "No questions selected." };
+  }
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc(
+    "admin_bulk_restore_subfolder_questions",
+    {
+      p_subfolder_id: input.subfolderId,
+      p_question_ids: input.allBinnedInSubfolder
+        ? null
+        : (input.questionIds ?? null),
+      p_all_binned_in_subfolder: Boolean(input.allBinnedInSubfolder),
+    }
+  );
+  revalidateMcqBankPaths(input.productKey, input.folderId);
+  revalidatePath("/admin/questions");
+  revalidatePath("/admin/bin");
+  if (error) return actionRpcResult("bulkRestoreSubfolderQuestions", error);
+  return { result: data as BulkRestoreSubfolderQuestionsResult };
+}

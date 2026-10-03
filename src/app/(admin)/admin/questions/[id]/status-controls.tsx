@@ -22,27 +22,13 @@ import {
 } from "@/components/ui/dialog";
 import { purgeDateHint } from "@/components/admin/confirm-danger-dialog";
 
+/** Approval workflow retired — only archive / unarchive remain. */
 const transitions: Record<string, { to: string; label: string }[]> = {
-  draft: [
-    { to: "review", label: "Send to review" },
-    { to: "approved", label: "Approve" },
-    { to: "archived", label: "Archive" },
-  ],
-  review: [
-    { to: "approved", label: "Approve" },
-    { to: "needs_revision", label: "Needs revision" },
-    { to: "archived", label: "Archive" },
-  ],
-  approved: [
-    { to: "needs_revision", label: "Needs revision" },
-    { to: "archived", label: "Archive" },
-  ],
-  needs_revision: [
-    { to: "review", label: "Back to review" },
-    { to: "approved", label: "Approve" },
-    { to: "archived", label: "Archive" },
-  ],
-  archived: [{ to: "draft", label: "Restore to draft" }],
+  draft: [{ to: "approved", label: "Activate" }],
+  review: [{ to: "approved", label: "Activate" }],
+  approved: [{ to: "archived", label: "Archive" }],
+  needs_revision: [{ to: "approved", label: "Activate" }],
+  archived: [{ to: "approved", label: "Unarchive" }],
 };
 
 export function StatusControls({

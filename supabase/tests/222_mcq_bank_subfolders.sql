@@ -1,4 +1,4 @@
--- Academic MCQ Bank subfolders: CRUD, year inheritance, soft-delete, year scope.
+-- Academic MCQ Bank subfolders: CRUD, year inheritance, Main-Admin cascade soft-delete.
 begin;
 select plan(14);
 
@@ -70,7 +70,7 @@ select is(
   '3. subfolder product subject inherits from parent'
 );
 
--- 4–5. empty subfolder OK; soft-delete empty OK
+-- 4. empty subfolder listed
 insert into t_sf_empty (id)
 select public.admin_create_mcq_bank_subfolder(
   (select id from t_folder),
@@ -84,16 +84,25 @@ select is(
   '4. empty subfolder listed with question_count=0'
 );
 
-select lives_ok(
+-- 5. limited admin cannot soft-delete (Main Admin only)
+select throws_ok(
   $$select public.admin_soft_delete_mcq_bank_subfolder((select id from t_sf_empty))$$,
-  '5. soft-delete empty subfolder succeeds'
+  'P0001',
+  'permission_denied',
+  '5. limited admin cannot soft-delete subfolder'
 );
 
--- 6–7. refuse delete with live questions
+-- 6. Main Admin soft-delete empty subfolder
+select test_helpers.as_user((select id from t_main));
+select lives_ok(
+  $$select public.admin_soft_delete_mcq_bank_subfolder((select id from t_sf_empty))$$,
+  '6. Main Admin soft-delete empty subfolder succeeds'
+);
+
+-- 7. Main Admin cascade soft-delete with live questions
 select test_helpers.as_runner();
 select test_helpers.make_question((select topic_id from curriculum), 'A') as id
   into temp t_q1;
-update public.questions set status = 'approved' where id = (select id from t_q1);
 grant select on t_q1 to anon, authenticated;
 
 select test_helpers.as_user((select id from t_edit));
@@ -102,29 +111,19 @@ select public.admin_assign_unassigned_question_to_subfolder(
   (select id from t_sf)
 );
 
-select throws_ok(
-  $$select public.admin_soft_delete_mcq_bank_subfolder((select id from t_sf))$$,
-  'P0001',
-  'subfolder_not_empty',
-  '6. soft-delete refuses when live questions remain'
-);
-
--- 8. folder soft-delete refuses while live subfolder exists
-select throws_ok(
-  $$select public.admin_soft_delete_mcq_bank_folder((select id from t_folder))$$,
-  'P0001',
-  'folder_not_empty',
-  '7. folder soft-delete refuses while live subfolder exists'
-);
-
--- 9. remove question then soft-delete subfolder; folder still blocked if another empty? only one live
-select public.admin_remove_question_from_mcq_bank_subfolder((select id from t_q1));
+select test_helpers.as_user((select id from t_main));
 select lives_ok(
   $$select public.admin_soft_delete_mcq_bank_subfolder((select id from t_sf))$$,
-  '8. soft-delete succeeds after clearing questions'
+  '7. Main Admin cascade soft-delete subfolder with questions'
 );
 
--- recreate one live empty subfolder to keep folder non-empty for year-scope checks
+select ok(
+  (select deleted_at is not null from public.questions where id = (select id from t_q1)),
+  '8. cascaded question is soft-deleted'
+);
+
+-- recreate live subfolder for remaining checks
+select test_helpers.as_user((select id from t_edit));
 delete from t_sf;
 insert into t_sf (id)
 select public.admin_create_mcq_bank_subfolder(
@@ -132,7 +131,7 @@ select public.admin_create_mcq_bank_subfolder(
   'Subfold Scoped'
 );
 
--- 10–11. isolation / admin year scope
+-- 9–10. isolation / admin year scope
 select test_helpers.as_user((select id from t_wrong));
 select throws_ok(
   $$select public.admin_create_mcq_bank_subfolder(
@@ -146,8 +145,8 @@ select throws_ok(
 select throws_ok(
   $$select public.admin_soft_delete_mcq_bank_subfolder((select id from t_sf))$$,
   'P0001',
-  'year_scope_denied',
-  '10. wrong-year admin cannot soft-delete subfolder'
+  'permission_denied',
+  '10. wrong-year / non-main cannot soft-delete subfolder'
 );
 
 select test_helpers.as_user((select id from t_edit));
@@ -172,12 +171,12 @@ select is(
   '13. rename persists'
 );
 
--- folder still refuses while live (empty) subfolder remains
+-- 14. limited admin cannot cascade-delete folder
 select throws_ok(
   $$select public.admin_soft_delete_mcq_bank_folder((select id from t_folder))$$,
   'P0001',
-  'folder_not_empty',
-  '14. folder soft-delete still refuses with live empty subfolder'
+  'permission_denied',
+  '14. limited admin cannot soft-delete folder'
 );
 
 select * from finish();

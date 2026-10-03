@@ -9,11 +9,7 @@ import {
   contentBinEntityLabel,
   type ContentBinEntityType,
 } from "../../src/lib/content-bin/labels.ts";
-import {
-  isMcqBankFolderEmptyForDelete,
-  mcqBankFolderContentSummary,
-  mcqBankFolderDeleteBlockedReason,
-} from "../../src/lib/admin/mcq-bank-folder-ui.ts";
+import { mcqBankFolderContentSummary } from "../../src/lib/admin/mcq-bank-folder-ui.ts";
 
 describe("mcq_bank_folder practice scope", () => {
   it("includes mcq_bank_folder in PRACTICE_SCOPE_TYPES", () => {
@@ -56,67 +52,7 @@ describe("content bin mcq_bank_folder label", () => {
   });
 });
 
-describe("mcq bank folder bulk UX constants", () => {
-  it("keeps folder delete empty contract distinct from question soft-delete", () => {
-    // Remove-from-folder is unassign; Move-to-Bin is soft-delete — UI must not collapse.
-    assert.equal(
-      isMcqBankFolderEmptyForDelete({ question_count: 0, pdf_count: 0 }),
-      true
-    );
-    assert.equal(
-      mcqBankFolderDeleteBlockedReason({ question_count: 5, pdf_count: 0 }),
-      "Remove 5 questions first."
-    );
-  });
-});
-
-describe("mcq bank folder delete UI contract", () => {
-  it("allows delete only when questions and PDFs are both zero", () => {
-    assert.equal(
-      isMcqBankFolderEmptyForDelete({ question_count: 0, pdf_count: 0 }),
-      true
-    );
-    assert.equal(
-      isMcqBankFolderEmptyForDelete({ question_count: 2, pdf_count: 0 }),
-      false
-    );
-    assert.equal(
-      isMcqBankFolderEmptyForDelete({ question_count: 0, pdf_count: 1 }),
-      false
-    );
-    assert.equal(
-      isMcqBankFolderEmptyForDelete({ question_count: 3, pdf_count: 2 }),
-      false
-    );
-  });
-
-  it("prefers subfolder_count for emptiness when present", () => {
-    assert.equal(
-      isMcqBankFolderEmptyForDelete({
-        question_count: 5,
-        pdf_count: 0,
-        subfolder_count: 0,
-      }),
-      true
-    );
-    assert.equal(
-      isMcqBankFolderEmptyForDelete({
-        question_count: 0,
-        pdf_count: 0,
-        subfolder_count: 2,
-      }),
-      false
-    );
-    assert.equal(
-      isMcqBankFolderEmptyForDelete({
-        question_count: 0,
-        pdf_count: 1,
-        subfolder_count: 0,
-      }),
-      false
-    );
-  });
-
+describe("mcq bank folder content summary", () => {
   it("summarizes counts for questions-only, PDFs-only, both, and empty", () => {
     assert.equal(
       mcqBankFolderContentSummary({ question_count: 1, pdf_count: 0 }),
@@ -144,38 +80,15 @@ describe("mcq bank folder delete UI contract", () => {
     );
   });
 
-  it("explains delete block for questions-only, PDFs-only, and both", () => {
-    assert.equal(
-      mcqBankFolderDeleteBlockedReason({ question_count: 0, pdf_count: 0 }),
-      null
-    );
-    assert.equal(
-      mcqBankFolderDeleteBlockedReason({ question_count: 2, pdf_count: 0 }),
-      "Remove 2 questions first."
-    );
-    assert.equal(
-      mcqBankFolderDeleteBlockedReason({ question_count: 0, pdf_count: 1 }),
-      "Remove 1 PDF first."
-    );
-    assert.equal(
-      mcqBankFolderDeleteBlockedReason({ question_count: 1, pdf_count: 2 }),
-      "Remove 1 question and 2 PDFs first."
-    );
-    assert.equal(
-      mcqBankFolderDeleteBlockedReason({
-        question_count: 9,
-        pdf_count: 0,
-        subfolder_count: 3,
-      }),
-      "Remove 3 subfolders first."
-    );
-    assert.equal(
-      mcqBankFolderDeleteBlockedReason({
-        question_count: 9,
-        pdf_count: 2,
-        subfolder_count: 1,
-      }),
-      "Remove 1 subfolder and 2 PDFs first."
-    );
+  it("documents Main Admin cascade delete is not gated on empty folder UI helpers", () => {
+    // Delete authorization + cascade live in admin_soft_delete_mcq_bank_folder
+    // (is_main_admin). UI shows content summary only; non-empty folders are deletable.
+    const nonEmpty = mcqBankFolderContentSummary({
+      question_count: 5,
+      pdf_count: 1,
+      subfolder_count: 2,
+    });
+    assert.match(nonEmpty, /5 questions/);
+    assert.match(nonEmpty, /2 subfolders/);
   });
 });

@@ -50,8 +50,8 @@ grant select on t_q to authenticated;
 select test_helpers.as_runner();
 select is(
   (select status from public.questions where id = (select id from t_q)),
-  'draft',
-  'create_question creates the identity row in the requested (allowed) status'
+  'approved',
+  'create_question coerces p_status to approved (admin-managed bank; no approval gate)'
 );
 select is(
   (select tenant_id from public.questions where id = (select id from t_q)),
@@ -119,25 +119,16 @@ select throws_ok(
 );
 
 ------------------------------------------------------------------
--- 4) Status transition guard (20260913000005): valid transitions
---    succeed, invalid transitions are rejected even via a DIRECT table
---    UPDATE (not just through the setQuestionStatus Server Action) —
---    this is the actual DB-level enforcement the app-level check alone
---    could not guarantee.
+-- 4) Status transition guard: create_question always lands on approved.
+--    Legacy draft→review still allowed for pre-existing rows; approved→draft
+--    remains illegal. Direct table UPDATE is the enforcement surface.
 ------------------------------------------------------------------
 select test_helpers.as_user((select id from t_admin));
-update public.questions set status = 'review' where id = (select id from t_q);
-select is(
-  (select status from public.questions where id = (select id from t_q)),
-  'review',
-  'a valid transition (draft -> review) succeeds via direct table update'
-);
-
 update public.questions set status = 'needs_revision' where id = (select id from t_q);
 select is(
   (select status from public.questions where id = (select id from t_q)),
   'needs_revision',
-  'a valid transition (review -> needs_revision) succeeds'
+  'a valid transition (approved -> needs_revision) succeeds via direct table update'
 );
 
 update public.questions set status = 'approved' where id = (select id from t_q);
@@ -145,6 +136,30 @@ select is(
   (select status from public.questions where id = (select id from t_q)),
   'approved',
   'a valid transition (needs_revision -> approved) succeeds'
+);
+
+-- Legacy draft→review path (rows that still exist as draft outside create_question)
+select test_helpers.as_runner();
+with ins as (
+  insert into public.questions (topic_id, status, difficulty, content_hash, stem_normalized)
+  values (
+    (select topic_id from curriculum),
+    'draft',
+    'medium',
+    '060-legacy-draft-' || gen_random_uuid()::text,
+    '060 legacy draft stem'
+  )
+  returning id
+)
+select id into temp t_legacy_draft from ins;
+grant select on t_legacy_draft to authenticated;
+
+select test_helpers.as_user((select id from t_admin));
+update public.questions set status = 'review' where id = (select id from t_legacy_draft);
+select is(
+  (select status from public.questions where id = (select id from t_legacy_draft)),
+  'review',
+  'a valid transition (draft -> review) still succeeds for legacy draft rows'
 );
 
 select throws_ok(

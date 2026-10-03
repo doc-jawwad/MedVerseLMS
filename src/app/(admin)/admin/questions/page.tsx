@@ -166,7 +166,7 @@ export default async function QuestionsPage({
 
             <div className="grid gap-3 text-sm">
               <div className="flex flex-wrap gap-1.5">
-                {["", "draft", "review", "approved", "needs_revision", "archived"].map(
+                {["", "approved", "archived"].map(
                   (s) => (
                     <Link
                       key={s || "all"}
@@ -351,24 +351,6 @@ export default async function QuestionsPage({
               Could not load this page. Please try again.
             </p>
           )}
-
-          {/* Draft / review indicator — prominent approval queue link */}
-          {!params.status && (() => {
-            const draftCount = (questions ?? []).filter(
-              (q) => q.status === "draft" || q.status === "review"
-            ).length;
-            return draftCount > 0 ? (
-              <Link
-                href={filterLink({ status: "review" })}
-                className="flex items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-4 py-2.5 text-sm font-medium text-amber-800 hover:bg-amber-100 dark:border-amber-600 dark:bg-amber-950/40 dark:text-amber-200"
-              >
-                <Badge variant="outline" className="border-amber-400 text-amber-700 dark:text-amber-300">
-                  {draftCount}
-                </Badge>
-                question{draftCount !== 1 ? "s" : ""} awaiting review/approval — click to filter
-              </Link>
-            ) : null;
-          })()}
 
           <QuestionsBulkTable
             questions={(questions ?? []).map((q) => ({
