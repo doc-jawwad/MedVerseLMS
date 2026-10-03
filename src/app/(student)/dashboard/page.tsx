@@ -82,14 +82,15 @@ type WeakChapter = {
 export default async function DashboardPage() {
   const { supabase, profile, enrollment, userId } = await requireStudent();
   await finalizeOwnExpiredAttempts(supabase);
-  const hasLiveAccess = await getStudentHasLiveSubscription();
-  const paidDetails = studentHasPaidLmsSections(hasLiveAccess);
 
   const now = new Date();
   const nowIso = now.toISOString();
   const nowMs = now.getTime();
 
+  // Live-subscription: request-local React.cache helper only (shared with layout).
+  // Do not add a second raw has_live_subscription RPC in this fan-out.
   const [
+    hasLiveAccess,
     { data: summary },
     { data: recent },
     { data: trend },
@@ -97,12 +98,12 @@ export default async function DashboardPage() {
     { data: catalogTests },
     { data: myAttempts },
     { data: accessible },
-    { data: liveSub },
     { data: subscriptions },
     { data: applications },
     { data: grants },
     { data: prepRows },
   ] = await Promise.all([
+    getStudentHasLiveSubscription(),
     supabase.rpc("student_test_summary"),
     supabase.rpc("student_recent_tests", { p_limit: 5 }),
     supabase.rpc("student_trend"),
@@ -124,7 +125,6 @@ export default async function DashboardPage() {
       .eq("student_id", userId)
       .neq("state", "invalidated"),
     supabase.rpc("accessible_test_ids"),
-    supabase.rpc("has_live_subscription"),
     supabase
       .from("subscriptions")
       .select(
@@ -146,6 +146,8 @@ export default async function DashboardPage() {
       .eq("grant_type", "test"),
     supabase.rpc("accessible_test_prep"),
   ]);
+
+  const paidDetails = studentHasPaidLmsSections(hasLiveAccess);
 
   // Paid-only: subject performance and weak chapters (skip fetch for free students)
   let subjectRows: SubjectPerf[] = [];
@@ -183,7 +185,7 @@ export default async function DashboardPage() {
   });
 
   const subView = buildStudentSubscriptionView({
-    hasLiveAccess: Boolean(liveSub),
+    hasLiveAccess,
     subscriptions: subRows,
     applications: (applications ?? []).map((a) => ({
       id: a.id as string,
