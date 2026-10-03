@@ -2,11 +2,10 @@ import "server-only";
 
 import type { McqMoveDestination } from "@/lib/admin/mcq-bank-move";
 
+/** Minimal client shape — Supabase rpc() returns a thenable builder. */
 type RpcClient = {
-  rpc: (
-    fn: string,
-    args?: Record<string, unknown>
-  ) => Promise<{ data: unknown; error: { message?: string } | null }>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  rpc: (fn: string, args?: Record<string, unknown>) => any;
 };
 
 /**
