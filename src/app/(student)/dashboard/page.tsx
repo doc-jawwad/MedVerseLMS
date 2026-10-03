@@ -1,10 +1,8 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import { requireStudent } from "@/lib/auth/require-user";
 import { formatDateTime } from "@/lib/utils";
-import {
-  buildStudentDashboardPresentation,
-  PERFORMANCE_GRAIN_COPY,
-} from "@/lib/tests/student-dashboard-presentation";
+import { buildStudentDashboardPresentation } from "@/lib/tests/student-dashboard-presentation";
 import {
   classifyCatalogTestStates,
   displayTestTitle,
@@ -30,55 +28,25 @@ import { StudentPage } from "@/components/student/student-page";
 import { StatTile } from "@/components/student/stat-tile";
 import { SectionHeading } from "@/components/student/section-heading";
 import { EmptyState } from "@/components/student/empty-state";
-import { ProgressBar } from "@/components/student/progress-bar";
 import { StatusBadge } from "@/components/student/status-badge";
-import { ActivityItem } from "@/components/student/activity-item";
 import { OpensCountdown } from "@/components/study/opens-countdown";
 import { StudyMarkdown } from "@/components/study/study-markdown";
 import { sortByOpensAtAsc } from "@/lib/study/upcoming";
 import { DashboardAlerts } from "@/components/dashboard/dashboard-alerts";
-import { LeaderboardBoardCard } from "@/components/dashboard/leaderboard-board-card";
-import { DashboardPerformanceGraphs } from "@/components/dashboard/performance-graphs";
 import { buildDashboardAlerts } from "@/lib/dashboard/build-alerts";
-import {
-  adaptLifetimeSummaryBars,
-  adaptStudentTrendForChart,
-} from "@/lib/dashboard/trend-chart-adapter";
-import {
-  dashboardFullLimit,
-  loadLastCompletedLeaderboardBoard,
-} from "@/lib/leaderboard/load-last-completed-board";
-import { LEADERBOARD_PROJECTION_LIMITS } from "@/lib/leaderboard/projection-contract";
 import { deriveDashboardUpcomingFromCatalog } from "@/lib/dashboard/derive-upcoming-from-catalog";
+import { DashboardLeaderboardSection } from "@/components/dashboard/dashboard-leaderboard-section";
+import { DashboardHistoricalSection } from "@/components/dashboard/dashboard-historical-section";
+import { DashboardPaidSection } from "@/components/dashboard/dashboard-paid-section";
+import { DashboardRecentSection } from "@/components/dashboard/dashboard-recent-section";
+import {
+  DashboardHistoricalFallback,
+  DashboardLeaderboardFallback,
+  DashboardPaidFallback,
+  DashboardRecentFallback,
+} from "@/components/dashboard/dashboard-section-fallback";
 
 export const metadata = { title: "Dashboard — MedVerse LMS" };
-
-type RecentTest = {
-  test_id: string;
-  title: string;
-  score: number;
-  max_score: number;
-  percentage: number;
-  rank: number | null;
-  submitted_at: string;
-};
-
-type SubjectPerf = {
-  subject_id: string;
-  subject_name: string;
-  test_average_percentage: number;
-  tests_taken: number;
-  practice_accuracy: number;
-  practice_answered: number;
-};
-
-type WeakChapter = {
-  chapter_id: string;
-  chapter_name: string;
-  subject_name: string;
-  accuracy: number;
-  answered: number;
-};
 
 export default async function DashboardPage() {
   const { supabase, profile, enrollment, userId } = await requireStudent();
@@ -87,14 +55,12 @@ export default async function DashboardPage() {
   const now = new Date();
   const nowMs = now.getTime();
 
+  // Shell fan-out only (v3). Deferred sections stream via Suspense:
+  // leaderboard, historical, paid analytics, recent.
   // Live-subscription: request-local React.cache helper only (shared with layout).
-  // Do not add a second raw has_live_subscription RPC in this fan-out.
   // Tests: one RLS-visible catalog fetch; upcoming is derived in-process (v2).
   const [
     hasLiveAccess,
-    { data: summary },
-    { data: recent },
-    { data: trend },
     { data: catalogTests },
     { data: myAttempts },
     { data: accessible },
@@ -104,9 +70,6 @@ export default async function DashboardPage() {
     { data: prepRows },
   ] = await Promise.all([
     getStudentHasLiveSubscription(),
-    supabase.rpc("student_test_summary"),
-    supabase.rpc("student_recent_tests", { p_limit: 5 }),
-    supabase.rpc("student_trend"),
     supabase
       .from("tests")
       .select(
@@ -146,18 +109,6 @@ export default async function DashboardPage() {
   );
 
   const paidDetails = studentHasPaidLmsSections(hasLiveAccess);
-
-  // Paid-only: subject performance and weak chapters (skip fetch for free students)
-  let subjectRows: SubjectPerf[] = [];
-  let weakRows: WeakChapter[] = [];
-  if (paidDetails) {
-    const [{ data: subjects }, { data: weak }] = await Promise.all([
-      supabase.rpc("student_subject_performance"),
-      supabase.rpc("student_weak_chapters", { p_limit: 5 }),
-    ]);
-    subjectRows = (subjects ?? []) as SubjectPerf[];
-    weakRows = (weak ?? []) as WeakChapter[];
-  }
 
   const prepByTest = new Map(
     ((prepRows ?? []) as { test_id: string; body_text: string }[]).map((row) => [
@@ -209,16 +160,10 @@ export default async function DashboardPage() {
     grants: grants ?? [],
   });
 
-  const s = summary as {
-    tests_taken: number;
-    average_percentage: number;
-    best_percentage: number;
-    average_rank: number;
-  } | null;
-
+  // Shell presentation: catalog + access banner only (lifetime deferred).
   const presentation = buildStudentDashboardPresentation({
     subscriptionKind: subView.kind,
-    lifetime: s,
+    lifetime: null,
     catalogStates,
   });
 
@@ -252,24 +197,14 @@ export default async function DashboardPage() {
     nowMs,
   });
 
-  // Fetch up to 20 rows server-side; the card renders Top 5 initially with a
-  // client-side "View Full Leaderboard" toggle to reveal up to Top 20.
-  const leaderboardBoard = await loadLastCompletedLeaderboardBoard(supabase, {
-    candidates: (catalogTests ?? []).map((t) => ({
-      id: t.id as string,
-      title: (t.title as string) ?? "",
-      status: t.status as string,
-      closes_at: (t.closes_at as string | null) ?? null,
-      opens_at: (t.opens_at as string | null) ?? null,
-      entitlement: (t.entitlement as string | null) ?? null,
-    })),
-    nowMs,
-    limit: dashboardFullLimit(),
-  });
-
-  const trendSeries = adaptStudentTrendForChart(trend);
-  const summaryBars = adaptLifetimeSummaryBars(s);
-  const recentRows = (recent ?? []) as RecentTest[];
+  const leaderboardCandidates = (catalogTests ?? []).map((t) => ({
+    id: t.id as string,
+    title: (t.title as string) ?? "",
+    status: t.status as string,
+    closes_at: (t.closes_at as string | null) ?? null,
+    opens_at: (t.opens_at as string | null) ?? null,
+    entitlement: (t.entitlement as string | null) ?? null,
+  }));
 
   return (
     <StudentPage>
@@ -364,106 +299,22 @@ export default async function DashboardPage() {
         </CardContent>
       </Card>
 
-      <LeaderboardBoardCard
-        title="Last test leaderboard"
-        description="Top 5 from the most recently completed formal test. Free and paid students can view this board."
-        board={leaderboardBoard}
-        viewerStudentId={userId}
-        initialDisplayCount={LEADERBOARD_PROJECTION_LIMITS.dashboardTop}
-      />
+      <Suspense fallback={<DashboardLeaderboardFallback />}>
+        <DashboardLeaderboardSection
+          candidates={leaderboardCandidates}
+          nowMs={nowMs}
+          viewerStudentId={userId}
+        />
+      </Suspense>
 
-      {presentation.showHistoricalPerformance && (
-        <div className="grid gap-3">
-          <SectionHeading
-            title="Lifetime performance"
-            description={presentation.lifetime.grainNote}
-          />
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <StatTile
-              label={presentation.lifetime.attemptedLabel}
-              value={String(presentation.lifetime.attempted)}
-            />
-            <StatTile
-              label={presentation.lifetime.averageLabel}
-              value={`${presentation.lifetime.averagePercentage}%`}
-            />
-            <StatTile
-              label={presentation.lifetime.bestLabel}
-              value={`${presentation.lifetime.bestPercentage}%`}
-            />
-            <StatTile
-              label={presentation.lifetime.rankLabel}
-              value={
-                presentation.lifetime.averageRank
-                  ? `#${presentation.lifetime.averageRank}`
-                  : "—"
-              }
-            />
-          </div>
-        </div>
-      )}
-
-      <DashboardPerformanceGraphs trend={trendSeries} summary={summaryBars} />
+      <Suspense fallback={<DashboardHistoricalFallback />}>
+        <DashboardHistoricalSection subscriptionKind={subView.kind} />
+      </Suspense>
 
       {paidDetails ? (
-        <>
-          {subjectRows.length > 0 && (
-            <Card className="surface-card border-border/80 shadow-none">
-              <CardHeader>
-                <CardTitle className="font-heading text-base text-ink">
-                  Subject performance
-                </CardTitle>
-                <CardDescription>{PERFORMANCE_GRAIN_COPY.subject}</CardDescription>
-              </CardHeader>
-              <CardContent className="grid gap-5">
-                {subjectRows.map((sub) => (
-                  <div key={sub.subject_id} className="grid gap-3">
-                    <p className="text-sm font-semibold text-ink">
-                      {sub.subject_name}
-                    </p>
-                    <ProgressBar
-                      label={`Tests (${sub.tests_taken})`}
-                      value={sub.test_average_percentage}
-                    />
-                    <ProgressBar
-                      label={`Practice (${sub.practice_answered} answered)`}
-                      value={sub.practice_accuracy}
-                    />
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          )}
-
-          {weakRows.length > 0 && (
-            <Card className="surface-card border-border/80 shadow-none">
-              <CardHeader>
-                <CardTitle className="font-heading text-base text-ink">
-                  Weak chapters
-                </CardTitle>
-                <CardDescription>{PERFORMANCE_GRAIN_COPY.weakChapters}</CardDescription>
-              </CardHeader>
-              <CardContent className="grid gap-2">
-                {weakRows.map((w) => (
-                  <div
-                    key={w.chapter_id}
-                    className="flex items-center justify-between gap-3 rounded-lg border border-border/80 px-3 py-2 text-sm"
-                  >
-                    <span>
-                      {w.chapter_name}{" "}
-                      <span className="text-muted-foreground">
-                        ({w.subject_name})
-                      </span>
-                    </span>
-                    <StatusBadge tone={w.accuracy < 50 ? "danger" : "warning"}>
-                      {w.accuracy}% ({w.answered})
-                    </StatusBadge>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          )}
-        </>
+        <Suspense fallback={<DashboardPaidFallback />}>
+          <DashboardPaidSection />
+        </Suspense>
       ) : (
         <Card className="surface-card border-dashed border-border/80 shadow-none">
           <CardHeader>
@@ -476,7 +327,6 @@ export default async function DashboardPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="grid gap-3">
-            {/* ResourceLockNotice provides the single locked badge + /subscription CTA */}
             <ResourceLockNotice compact />
           </CardContent>
         </Card>
@@ -507,42 +357,9 @@ export default async function DashboardPage() {
         </div>
       </div>
 
-      <Card className="surface-card border-border/80 shadow-none">
-        <CardHeader>
-          <CardTitle className="font-heading text-base text-ink">
-            Recent tests
-          </CardTitle>
-          <CardDescription>
-            Submitted history — kept after subscription expiry.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {recentRows.length === 0 ? (
-            <EmptyState
-              title="No history yet"
-              description="Submitted tests will list here with your score and rank."
-            />
-          ) : (
-            <div className="grid gap-2">
-              {recentRows.map((r) => (
-                <ActivityItem
-                  key={r.test_id}
-                  href={`/tests/${r.test_id}/result`}
-                  title={r.title}
-                  meta={
-                    r.rank != null
-                      ? `${formatDateTime(r.submitted_at)} · Rank #${r.rank}`
-                      : formatDateTime(r.submitted_at)
-                  }
-                  trailing={
-                    <StatusBadge tone="info">{r.percentage}%</StatusBadge>
-                  }
-                />
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      <Suspense fallback={<DashboardRecentFallback />}>
+        <DashboardRecentSection />
+      </Suspense>
     </StudentPage>
   );
 }
