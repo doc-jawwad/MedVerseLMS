@@ -467,19 +467,16 @@ export default async function DashboardPage() {
       ) : (
         <Card className="surface-card border-dashed border-border/80 shadow-none">
           <CardHeader>
-            <div className="flex flex-wrap items-center gap-2">
-              <CardTitle className="font-heading text-base text-[var(--student-ink)]">
-                Subject &amp; practice analytics
-              </CardTitle>
-              <StatusBadge tone="muted">locked</StatusBadge>
-            </div>
+            <CardTitle className="font-heading text-base text-[var(--student-ink)]">
+              Subject &amp; practice analytics
+            </CardTitle>
             <CardDescription>
               Subject bars and weak chapters unlock with a live subscription.
               Lifetime score graphs and leaderboard are always available.
             </CardDescription>
           </CardHeader>
           <CardContent className="grid gap-3">
-            {/* ResourceLockNotice already provides the single /subscription CTA */}
+            {/* ResourceLockNotice provides the single locked badge + /subscription CTA */}
             <ResourceLockNotice compact />
           </CardContent>
         </Card>

@@ -20,7 +20,6 @@ import type { YearChangeRequestView } from "./year-change-panel";
 import { PageHeader } from "@/components/student/page-header";
 import { StudentPage } from "@/components/student/student-page";
 import { FieldRow } from "@/components/student/field-row";
-import { InstallMedverseApp } from "@/components/pwa/install-medverse-app";
 
 export const metadata = { title: "My Account — MedVerse LMS" };
 
@@ -66,8 +65,6 @@ export default async function ProfilePage() {
   return (
     <StudentPage width="narrow">
       <PageHeader title="My Account" />
-
-      <InstallMedverseApp variant="card" />
 
       <Card className="surface-card border-border/80 shadow-none">
         <CardHeader>

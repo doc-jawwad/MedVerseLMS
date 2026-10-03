@@ -43,9 +43,8 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
             </div>
           </div>
         </div>
-        <footer className="px-4 py-4 text-center lg:hidden">
-          <BrandCredit tone="highlight" />
-        </footer>
+        {/* MedDesk credit lives on the desktop aside + login/register forms
+            (form-adjacent highlight). No duplicate mobile footer credit. */}
       </div>
     </div>
   );

@@ -49,8 +49,8 @@ export function ThemeToggle({
           active: "bg-sidebar-accent text-sidebar-accent-foreground",
         }
       : {
-          frame: "border-border bg-card text-[var(--student-ink)]",
-          idle: "text-[var(--student-ink)]/75 hover:bg-accent hover:text-[var(--student-ink)]",
+          frame: "border-border bg-card text-[var(--student-ink)] shadow-none",
+          idle: "text-[var(--student-ink)]/90 hover:bg-accent hover:text-[var(--student-ink)]",
           active: "bg-primary text-primary-foreground",
         };
 
