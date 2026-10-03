@@ -14,6 +14,10 @@ import {
   notesPdfMoveErrorMessage,
   notesPdfMoveRevalidatePaths,
 } from "@/lib/admin/notes-pdf-move";
+import {
+  notesFolderEditErrorMessage,
+  notesFolderEditRevalidatePaths,
+} from "@/lib/admin/notes-folder-edit";
 
 function validDriveUrl(url: string) {
   try {
@@ -232,6 +236,54 @@ export type MoveNotesPdfMaterialResult = {
   r2_object_key: string | null;
   deleted_at: string | null;
 };
+
+/** Rename and/or change subject on a live Notes folder. */
+export async function updateNotesFolder(input: {
+  folderId: string;
+  name?: string | null;
+  subjectId?: string | null;
+}) {
+  if (!input.folderId) return { error: "Folder required." };
+  const name =
+    input.name === undefined || input.name === null
+      ? null
+      : input.name.trim();
+  const subjectId = input.subjectId ?? null;
+  if (name === null && subjectId === null) {
+    return { error: "Nothing to update." };
+  }
+  if (name !== null && !name) {
+    return { error: "Folder name required." };
+  }
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("admin_update_notes_folder", {
+    p_folder_id: input.folderId,
+    p_name: name,
+    p_subject_id: subjectId,
+  });
+  for (const path of notesFolderEditRevalidatePaths()) {
+    revalidatePath(path);
+  }
+  if (error) {
+    const raw = (error.message ?? "").trim().toLowerCase();
+    if (raw && isSafeBusinessErrorCode(raw)) {
+      logServerError("updateNotesFolder", raw);
+      return { error: notesFolderEditErrorMessage(raw) };
+    }
+    return actionRpcResult("updateNotesFolder", error);
+  }
+  return {
+    result: data as {
+      folder_id: string;
+      name: string;
+      subject_id: string;
+      year_id: string;
+      library_type: string;
+      content_surface: string;
+      deleted_at: string | null;
+    },
+  };
+}
 
 /** Move a live Notes PDF to another live Notes folder. Preserves id + R2 key. */
 export async function moveNotesPdfMaterial(input: {

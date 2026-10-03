@@ -9,6 +9,7 @@ import {
   deleteMaterial,
   moveNotesPdfMaterial,
   updateMaterial,
+  updateNotesFolder,
 } from "@/lib/actions/materials";
 import {
   addGuidelineMaterial,
@@ -41,6 +42,7 @@ import {
   notesPdfMoveDestinationLabel,
   type NotesPdfMoveDestination,
 } from "@/lib/admin/notes-pdf-move";
+import { filterNotesFolderSubjects } from "@/lib/admin/notes-folder-edit";
 
 type Year = { id: string; year_number: number; name?: string };
 type Subject = { id: string; name: string; year_id: string };
@@ -160,6 +162,7 @@ export function MaterialsAdmin({
             key={f.id}
             folder={f}
             libraryType={libraryType}
+            yearSubjects={yearSubjects}
             subjectName={subjects.find((s) => s.id === f.subject_id)?.name}
             materials={materials.filter((m) => m.folder_id === f.id)}
             moveDestinations={
@@ -204,6 +207,7 @@ export function MaterialsAdmin({
 function FolderCard({
   folder,
   libraryType,
+  yearSubjects,
   subjectName,
   materials,
   moveDestinations,
@@ -212,6 +216,7 @@ function FolderCard({
 }: {
   folder: Folder;
   libraryType: FolderLibraryType;
+  yearSubjects: Subject[];
   subjectName?: string;
   materials: Material[];
   moveDestinations: NotesPdfMoveDestination[];
@@ -220,6 +225,17 @@ function FolderCard({
 }) {
   const [pending, startTransition] = useTransition();
   const [mode, setMode] = useState<"drive" | "pdf" | "guideline">(modes[0] ?? "pdf");
+  const [renaming, setRenaming] = useState(false);
+  const [changingSubject, setChangingSubject] = useState(false);
+  const [folderName, setFolderName] = useState(folder.name);
+  const [nextSubjectId, setNextSubjectId] = useState(folder.subject_id || "");
+  const notesEdit = libraryType === "notes";
+  const subjectOptions = notesEdit
+    ? filterNotesFolderSubjects(yearSubjects, {
+        yearId: folder.year_id,
+        excludeSubjectId: null,
+      })
+    : [];
 
   return (
     <Card>
@@ -229,6 +245,32 @@ function FolderCard({
           {subjectName && <Badge variant="outline">{subjectName}</Badge>}
         </CardTitle>
         <div className="flex flex-wrap items-center gap-2">
+          {notesEdit ? (
+            <>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  setRenaming((v) => !v);
+                  setChangingSubject(false);
+                  setFolderName(folder.name);
+                }}
+              >
+                {renaming ? "Cancel rename" : "Rename"}
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  setChangingSubject((v) => !v);
+                  setRenaming(false);
+                  setNextSubjectId(folder.subject_id || "");
+                }}
+              >
+                {changingSubject ? "Cancel subject" : "Change subject"}
+              </Button>
+            </>
+          ) : null}
           <EntitlementSelect
             kind="materials_folder"
             id={folder.id}
@@ -258,6 +300,84 @@ function FolderCard({
           </Button>
         </div>
       </CardHeader>
+      {notesEdit && renaming ? (
+        <CardContent className="border-b pb-4">
+          <div className="flex flex-wrap items-end gap-2">
+            <div className="grid gap-1">
+              <Label className="text-xs">Folder name</Label>
+              <Input
+                value={folderName}
+                onChange={(e) => setFolderName(e.target.value)}
+                className="w-64"
+              />
+            </div>
+            <Button
+              size="sm"
+              disabled={pending || !folderName.trim()}
+              onClick={() =>
+                startTransition(async () => {
+                  const res = await updateNotesFolder({
+                    folderId: folder.id,
+                    name: folderName,
+                  });
+                  if ("error" in res && res.error) toast.error(res.error);
+                  else {
+                    toast.success("Renamed");
+                    setRenaming(false);
+                  }
+                })
+              }
+            >
+              Save name
+            </Button>
+          </div>
+        </CardContent>
+      ) : null}
+      {notesEdit && changingSubject ? (
+        <CardContent className="border-b pb-4">
+          <div className="flex flex-wrap items-end gap-2">
+            <div className="grid gap-1">
+              <Label className="text-xs">Subject</Label>
+              <Select
+                value={nextSubjectId || undefined}
+                onValueChange={setNextSubjectId}
+              >
+                <SelectTrigger className="w-64">
+                  <SelectValue placeholder="Choose subject…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {subjectOptions.map((s) => (
+                    <SelectItem key={s.id} value={s.id}>
+                      {s.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button
+              size="sm"
+              disabled={
+                pending || !nextSubjectId || nextSubjectId === folder.subject_id
+              }
+              onClick={() =>
+                startTransition(async () => {
+                  const res = await updateNotesFolder({
+                    folderId: folder.id,
+                    subjectId: nextSubjectId,
+                  });
+                  if ("error" in res && res.error) toast.error(res.error);
+                  else {
+                    toast.success("Subject updated");
+                    setChangingSubject(false);
+                  }
+                })
+              }
+            >
+              Save subject
+            </Button>
+          </div>
+        </CardContent>
+      ) : null}
       <CardContent className="grid gap-3">
         {materials.length === 0 && (
           <p className="text-sm text-muted-foreground">Nothing in this folder yet.</p>
