@@ -58,12 +58,14 @@ export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const nonce = createNonce();
 
-  // PWA install assets must not depend on Auth client construction.
+  // PWA install assets + static PDF.js worker must not depend on Auth.
   // SW keeps its own narrow CSP from next.config; do not attach app CSP here.
+  // The worker is public static JS only — not entitlement-bearing content.
   if (
     pathname === "/sw.js" ||
     pathname === "/manifest.webmanifest" ||
     pathname === "/manifest.json" ||
+    pathname === "/pdf.worker.min.mjs" ||
     pathname.startsWith("/icons/")
   ) {
     return NextResponse.next({
@@ -186,7 +188,7 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    // everything except static assets
-    "/((?!_next/static|_next/image|favicon.ico|sw\\.js|manifest\\.webmanifest|icons/|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
+    // everything except static assets (incl. public PDF.js worker; not all .mjs)
+    "/((?!_next/static|_next/image|favicon.ico|sw\\.js|manifest\\.webmanifest|pdf\\.worker\\.min\\.mjs|icons/|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
   ],
 };

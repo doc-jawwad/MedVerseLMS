@@ -44,6 +44,20 @@ const nextConfig: NextConfig = {
           },
         ],
       },
+      {
+        // Fixed filename (not content-hashed) — cacheable but not immutable.
+        source: "/pdf.worker.min.mjs",
+        headers: [
+          {
+            key: "Content-Type",
+            value: "text/javascript; charset=utf-8",
+          },
+          {
+            key: "Cache-Control",
+            value: "public, max-age=86400, stale-while-revalidate=604800",
+          },
+        ],
+      },
     ];
   },
 };
