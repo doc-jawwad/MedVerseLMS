@@ -1,6 +1,11 @@
 import { notFound } from "next/navigation";
 import { requireAdmin } from "@/lib/auth/require-user";
 import { requireAdminClass } from "@/lib/admin/require-admin-class";
+import { loadMcqMoveDestinations } from "@/lib/admin/load-mcq-move-destinations";
+import {
+  McqBankFolderQuestions,
+  type FolderQuestionRow,
+} from "../../mcq-bank-folder-questions";
 import {
   McqBankSubfoldersAdmin,
   type FolderMaterialRow,
@@ -9,17 +14,20 @@ import {
 
 export const metadata = { title: "MCQ Bank folder — MedVerse Admin" };
 
+const PAGE_SIZE = 50;
+
 export default async function AdminMcqBankFolderPage({
   params,
   searchParams,
 }: {
   params: Promise<{ productKey: string; folderId: string }>;
-  searchParams: Promise<{ year?: string }>;
+  searchParams: Promise<{ year?: string; page?: string }>;
 }) {
   const { supabase, profile } = await requireAdmin();
   const { productKey: rawKey, folderId } = await params;
   const productKey = decodeURIComponent(rawKey);
   const sp = await searchParams;
+  const page = Math.max(0, Number.parseInt(sp.page ?? "0", 10) || 0);
 
   return requireAdminClass({
     searchYear: sp.year,
@@ -64,7 +72,12 @@ export default async function AdminMcqBankFolderPage({
         folder = refreshed.data ?? folder;
       }
 
-      const [{ data: subfolderRows, error }, materialsRes] = await Promise.all([
+      const [
+        { data: subfolderRows, error },
+        materialsRes,
+        questionsRes,
+        moveDestinations,
+      ] = await Promise.all([
         supabase.rpc("admin_list_mcq_bank_subfolders", {
           p_folder_id: folderId,
         }),
@@ -77,6 +90,12 @@ export default async function AdminMcqBankFolderPage({
               .order("sort_order")
               .order("title")
           : Promise.resolve({ data: [] as FolderMaterialRow[], error: null }),
+        supabase.rpc("admin_list_folder_questions", {
+          p_folder_id: folderId,
+          p_limit: PAGE_SIZE,
+          p_offset: page * PAGE_SIZE,
+        }),
+        loadMcqMoveDestinations(supabase, subject.id),
       ]);
 
       if (error) {
@@ -111,18 +130,58 @@ export default async function AdminMcqBankFolderPage({
         })
       );
 
+      const qList = (questionsRes.data ?? []) as Array<{
+        question_id: string;
+        status: string;
+        difficulty: string | null;
+        stem: string | null;
+        subject_name: string | null;
+        topic_name: string | null;
+        total_count: number | string;
+      }>;
+
+      const questions: FolderQuestionRow[] = qList.map((r) => ({
+        question_id: r.question_id,
+        status: r.status,
+        difficulty: r.difficulty,
+        stem: r.stem,
+        subject_name: r.subject_name,
+        topic_name: r.topic_name,
+      }));
+
+      const totalCount =
+        qList.length > 0 ? Number(qList[0]!.total_count ?? 0) : 0;
+
       return (
-        <McqBankSubfoldersAdmin
-          yearId={year.id}
-          productKey={productKey}
-          folderId={folderId}
-          folderName={folder.name}
-          subjectName={subject.name}
-          materialFolderId={folder.material_folder_id}
-          materials={materials}
-          subfolders={subfolders}
-          isMainAdmin={Boolean(profile.is_main_admin)}
-        />
+        <div className="grid gap-10">
+          <McqBankSubfoldersAdmin
+            yearId={year.id}
+            productKey={productKey}
+            folderId={folderId}
+            folderName={folder.name}
+            subjectName={subject.name}
+            materialFolderId={folder.material_folder_id}
+            materials={materials}
+            subfolders={subfolders}
+            isMainAdmin={Boolean(profile.is_main_admin)}
+          />
+          {questionsRes.error ? (
+            <p className="text-sm text-destructive">
+              Could not load folder questions. Try again.
+            </p>
+          ) : (
+            <McqBankFolderQuestions
+              yearId={year.id}
+              productKey={productKey}
+              folderId={folderId}
+              questions={questions}
+              moveDestinations={moveDestinations}
+              totalCount={totalCount}
+              page={page}
+              pageSize={PAGE_SIZE}
+            />
+          )}
+        </div>
       );
     },
   });

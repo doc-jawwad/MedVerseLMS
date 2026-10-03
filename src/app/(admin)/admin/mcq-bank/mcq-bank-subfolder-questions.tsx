@@ -8,6 +8,11 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
+  filterMcqMoveDestinations,
+  mcqMoveDestinationLabel,
+  type McqMoveDestination,
+} from "@/lib/admin/mcq-bank-move";
+import {
   bulkMoveMcqBankSubfolderQuestions,
   bulkRemoveQuestionsFromMcqBankSubfolder,
   bulkSoftDeleteSubfolderQuestions,
@@ -23,10 +28,8 @@ export type SubfolderQuestionRow = {
   topic_name: string | null;
 };
 
-export type SiblingSubfolderOption = {
-  subfolder_id: string;
-  name: string;
-};
+/** @deprecated Use McqMoveDestination — kept for older imports. */
+export type SiblingSubfolderOption = McqMoveDestination;
 
 const MOVE_DELETE_MAX = 2000;
 
@@ -40,6 +43,7 @@ export function McqBankSubfolderQuestions({
   subjectName,
   questions,
   siblingSubfolders,
+  moveDestinations,
   totalCount,
   page,
   pageSize,
@@ -52,7 +56,9 @@ export function McqBankSubfolderQuestions({
   subfolderName: string;
   subjectName: string;
   questions: SubfolderQuestionRow[];
-  siblingSubfolders: SiblingSubfolderOption[];
+  /** @deprecated Prefer moveDestinations (product-scoped). */
+  siblingSubfolders?: McqMoveDestination[];
+  moveDestinations?: McqMoveDestination[];
   totalCount: number;
   page: number;
   pageSize: number;
@@ -72,9 +78,11 @@ export function McqBankSubfolderQuestions({
   const pageAllSelected =
     pageIds.length > 0 && pageIds.every((id) => selected.has(id));
   const selectedCount = selectAllInSubfolder ? totalCount : selected.size;
-  const destinations = siblingSubfolders.filter(
-    (f) => f.subfolder_id !== subfolderId
+  const destinations = filterMcqMoveDestinations(
+    moveDestinations ?? siblingSubfolders ?? [],
+    { excludeSubfolderId: subfolderId }
   );
+  const destMeta = destinations.find((d) => d.subfolder_id === destSubfolderId);
 
   function clearSelection() {
     setSelected(new Set());
@@ -138,16 +146,13 @@ export function McqBankSubfolderQuestions({
       toast.error("Select questions first.");
       return;
     }
-    if (!destSubfolderId) {
+    if (!destSubfolderId || !destMeta) {
       toast.error("Choose a destination subfolder.");
       return;
     }
-    const destName =
-      destinations.find((f) => f.subfolder_id === destSubfolderId)?.name ??
-      "destination";
     if (
       !window.confirm(
-        `Move ${selectedCount} question(s) to “${destName}”? Question IDs stay the same.`
+        `Move ${selectedCount} question(s) to “${mcqMoveDestinationLabel(destMeta)}”? Question IDs stay the same.`
       )
     ) {
       return;
@@ -158,6 +163,7 @@ export function McqBankSubfolderQuestions({
         destSubfolderId,
         productKey,
         folderId,
+        destFolderId: destMeta.folder_id,
         ...(payload.allInSubfolder
           ? { allInSource: true }
           : { questionIds: payload.questionIds }),
@@ -170,6 +176,7 @@ export function McqBankSubfolderQuestions({
         "result" in res && res.result ? res.result.moved : selectedCount;
       toast.success(`Moved ${moved} question(s)`);
       clearSelection();
+      setDestSubfolderId("");
       router.refresh();
     });
   }
@@ -358,12 +365,12 @@ export function McqBankSubfolderQuestions({
                     >
                       <option value="">
                         {destinations.length === 0
-                          ? "No other subfolders"
+                          ? "No other destination subfolders in this product"
                           : "Choose destination…"}
                       </option>
                       {destinations.map((f) => (
                         <option key={f.subfolder_id} value={f.subfolder_id}>
-                          {f.name}
+                          {mcqMoveDestinationLabel(f)}
                         </option>
                       ))}
                     </select>
@@ -374,7 +381,7 @@ export function McqBankSubfolderQuestions({
                     disabled={pending || !destSubfolderId}
                     onClick={runBulkMove}
                   >
-                    Move
+                    {pending ? "Moving…" : "Move"}
                   </Button>
                   <Button
                     type="button"

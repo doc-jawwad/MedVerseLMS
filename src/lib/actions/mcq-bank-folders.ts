@@ -1,17 +1,26 @@
 "use server";
 
 import { actionRpcResult } from "@/lib/errors/safe-action-error";
+import { mcqBankMoveRevalidatePaths } from "@/lib/admin/mcq-bank-move";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 
-function revalidateMcqBankPaths(productKey?: string) {
-  revalidatePath("/admin/mcq-bank");
-  revalidatePath("/admin/mcq-bank/classify");
-  revalidatePath("/admin/bin");
-  revalidatePath("/admin/questions");
-  revalidatePath("/academic");
-  if (productKey) {
-    revalidatePath(`/admin/mcq-bank/${productKey}`);
+function revalidateMcqBankPaths(
+  productKey?: string,
+  opts?: {
+    folderIds?: Array<string | null | undefined>;
+    subfolders?: Array<{
+      folderId: string | null | undefined;
+      subfolderId: string | null | undefined;
+    }>;
+  }
+) {
+  for (const path of mcqBankMoveRevalidatePaths({
+    productKey,
+    folderIds: opts?.folderIds,
+    subfolders: opts?.subfolders,
+  })) {
+    revalidatePath(path);
   }
 }
 
@@ -124,7 +133,7 @@ export async function assignUnassignedQuestionToFolder(
 export type BulkMoveFolderQuestionsResult = {
   moved: number;
   source_folder_id: string;
-  dest_folder_id: string;
+  dest_subfolder_id: string;
   question_ids: string[];
 };
 
@@ -146,6 +155,7 @@ export type BulkSoftDeleteFolderQuestionsResult = {
 export async function bulkMoveMcqBankFolderQuestions(input: {
   sourceFolderId: string;
   destSubfolderId: string;
+  destFolderId?: string;
   questionIds?: string[];
   allInSource?: boolean;
   productKey?: string;
@@ -166,8 +176,15 @@ export async function bulkMoveMcqBankFolderQuestions(input: {
       p_all_in_source: Boolean(input.allInSource),
     }
   );
-  revalidateMcqBankPaths(input.productKey);
-  revalidatePath("/admin/questions");
+  revalidateMcqBankPaths(input.productKey, {
+    folderIds: [input.sourceFolderId, input.destFolderId],
+    subfolders: [
+      {
+        folderId: input.destFolderId,
+        subfolderId: input.destSubfolderId,
+      },
+    ],
+  });
   if (error) return actionRpcResult("bulkMoveMcqBankFolderQuestions", error);
   return { result: data as BulkMoveFolderQuestionsResult };
 }

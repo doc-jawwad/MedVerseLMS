@@ -1,20 +1,31 @@
 "use server";
 
 import { actionRpcResult } from "@/lib/errors/safe-action-error";
+import { mcqBankMoveRevalidatePaths } from "@/lib/admin/mcq-bank-move";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 
-function revalidateMcqBankPaths(productKey?: string, folderId?: string) {
-  revalidatePath("/admin/mcq-bank");
-  revalidatePath("/admin/mcq-bank/classify");
-  revalidatePath("/admin/bin");
-  revalidatePath("/admin/questions");
-  revalidatePath("/academic");
-  if (productKey) {
-    revalidatePath(`/admin/mcq-bank/${productKey}`);
-    if (folderId) {
-      revalidatePath(`/admin/mcq-bank/${productKey}/${folderId}`);
-    }
+function revalidateMcqBankPaths(
+  productKey?: string,
+  folderId?: string,
+  opts?: {
+    folderIds?: Array<string | null | undefined>;
+    subfolders?: Array<{
+      folderId: string | null | undefined;
+      subfolderId: string | null | undefined;
+    }>;
+  }
+) {
+  const folderIds = [
+    folderId,
+    ...(opts?.folderIds ?? []),
+  ];
+  for (const path of mcqBankMoveRevalidatePaths({
+    productKey,
+    folderIds,
+    subfolders: opts?.subfolders,
+  })) {
+    revalidatePath(path);
   }
 }
 
@@ -148,7 +159,7 @@ export type BulkSoftDeleteSubfolderQuestionsResult = {
   subfolder_id: string;
 };
 
-/** Atomic subfolder→subfolder move (same parent folder). Preserves question IDs. */
+/** Atomic subfolder→subfolder move (same product/year). Preserves question IDs. */
 export async function bulkMoveMcqBankSubfolderQuestions(input: {
   sourceSubfolderId: string;
   destSubfolderId: string;
@@ -156,6 +167,7 @@ export async function bulkMoveMcqBankSubfolderQuestions(input: {
   allInSource?: boolean;
   productKey?: string;
   folderId?: string;
+  destFolderId?: string;
 }) {
   if (!input.sourceSubfolderId || !input.destSubfolderId) {
     return { error: "Source and destination subfolders required." };
@@ -173,8 +185,19 @@ export async function bulkMoveMcqBankSubfolderQuestions(input: {
       p_all_in_source: Boolean(input.allInSource),
     }
   );
-  revalidateMcqBankPaths(input.productKey, input.folderId);
-  revalidatePath("/admin/questions");
+  revalidateMcqBankPaths(input.productKey, input.folderId, {
+    folderIds: [input.destFolderId],
+    subfolders: [
+      {
+        folderId: input.folderId,
+        subfolderId: input.sourceSubfolderId,
+      },
+      {
+        folderId: input.destFolderId ?? input.folderId,
+        subfolderId: input.destSubfolderId,
+      },
+    ],
+  });
   if (error) return actionRpcResult("bulkMoveMcqBankSubfolderQuestions", error);
   return { result: data as BulkMoveSubfolderQuestionsResult };
 }

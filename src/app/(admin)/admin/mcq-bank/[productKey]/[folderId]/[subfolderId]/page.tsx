@@ -1,9 +1,9 @@
 import { notFound } from "next/navigation";
 import { requireAdmin } from "@/lib/auth/require-user";
 import { requireAdminClass } from "@/lib/admin/require-admin-class";
+import { loadMcqMoveDestinations } from "@/lib/admin/load-mcq-move-destinations";
 import {
   McqBankSubfolderQuestions,
-  type SiblingSubfolderOption,
   type SubfolderQuestionRow,
 } from "../../../mcq-bank-subfolder-questions";
 
@@ -56,8 +56,8 @@ export default async function AdminMcqBankSubfolderPage({
         notFound();
       }
 
-      const [{ data: subfolderList }, { data: rows, error }] = await Promise.all(
-        [
+      const [{ data: subfolderList }, { data: rows, error }, moveDestinations] =
+        await Promise.all([
           supabase.rpc("admin_list_mcq_bank_subfolders", {
             p_folder_id: folderId,
           }),
@@ -66,8 +66,8 @@ export default async function AdminMcqBankSubfolderPage({
             p_limit: PAGE_SIZE,
             p_offset: page * PAGE_SIZE,
           }),
-        ]
-      );
+          loadMcqMoveDestinations(supabase, subject.id),
+        ]);
 
       const siblings = (
         (subfolderList ?? []) as Array<{
@@ -109,8 +109,6 @@ export default async function AdminMcqBankSubfolderPage({
         topic_name: r.topic_name,
       }));
 
-      const siblingSubfolders: SiblingSubfolderOption[] = siblings;
-
       const totalCount =
         list.length > 0 ? Number(list[0]!.total_count ?? 0) : 0;
 
@@ -124,7 +122,7 @@ export default async function AdminMcqBankSubfolderPage({
           subfolderName={current.name}
           subjectName={subject.name}
           questions={questions}
-          siblingSubfolders={siblingSubfolders}
+          moveDestinations={moveDestinations}
           totalCount={totalCount}
           page={page}
           pageSize={PAGE_SIZE}
