@@ -4,9 +4,13 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 
 describe("authenticated reopen UX", () => {
-  it("home and auth shells redirect already-authenticated users", () => {
+  it("home bootstraps session on the client; auth shells still server-redirect", () => {
     const home = readFileSync(
       path.join(process.cwd(), "src/app/page.tsx"),
+      "utf8"
+    );
+    const start = readFileSync(
+      path.join(process.cwd(), "src/components/pwa/pwa-start-screen.tsx"),
       "utf8"
     );
     const login = readFileSync(
@@ -26,7 +30,11 @@ describe("authenticated reopen UX", () => {
     assert.match(helper, /safeInternalPath/);
     assert.match(helper, /\/dashboard/);
     assert.match(helper, /\/admin/);
-    assert.match(home, /redirectIfAuthenticated/);
+    // PWA start_url must paint before awaiting server auth/profile.
+    assert.match(home, /PwaStartScreen/);
+    assert.doesNotMatch(home, /redirectIfAuthenticated/);
+    assert.match(start, /getSession/);
+    assert.match(start, /\/dashboard/);
     assert.match(login, /redirectIfAuthenticated/);
     assert.match(register, /redirectIfAuthenticated/);
     // Kick / expired must still reach the login form.

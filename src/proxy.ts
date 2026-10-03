@@ -17,6 +17,11 @@ import {
   buildCspHeaderValue,
   resolveCspMode,
 } from "@/lib/security/csp";
+import {
+  PUBLIC_AUTH_REFRESH_BUDGET_MS,
+  isPublicStartupPath,
+  raceWithTimeout,
+} from "@/lib/pwa/startup-budget";
 
 function createNonce(): string {
   return Buffer.from(crypto.randomUUID()).toString("base64");
@@ -104,12 +109,29 @@ export async function proxy(request: NextRequest) {
     }
   );
 
-  // IMPORTANT: keep this call — it refreshes expired auth tokens.
+  // IMPORTANT: keep getClaims — it refreshes expired auth tokens.
+  // Public paths (PWA start_url "/") must not block HTML on slow Auth refresh.
+  const isPublic = isPublicStartupPath(pathname);
   const timeProxy =
     ssrTimingEnabled() &&
     (pathname === "/tests" || /\/tests\/[^/]+\/result\/?$/.test(pathname));
   const proxyT0 = timeProxy ? performance.now() : 0;
-  const { data } = await supabase.auth.getClaims();
+
+  let isAuthed = false;
+  if (isPublic) {
+    const raced = await raceWithTimeout(
+      supabase.auth.getClaims(),
+      PUBLIC_AUTH_REFRESH_BUDGET_MS
+    );
+    if (!raced.timedOut) {
+      isAuthed = Boolean(raced.value.data?.claims);
+    }
+    // On timeout: paint public HTML immediately. Client/session restore continues.
+  } else {
+    const { data } = await supabase.auth.getClaims();
+    isAuthed = Boolean(data?.claims);
+  }
+
   if (timeProxy) {
     const ms = Math.round((performance.now() - proxyT0) * 10) / 10;
     console.info(
@@ -126,24 +148,6 @@ export async function proxy(request: NextRequest) {
       })
     );
   }
-  const isAuthed = Boolean(data?.claims);
-
-  const isPublic =
-    pathname === "/" ||
-    pathname.startsWith("/login") ||
-    pathname.startsWith("/register") ||
-    pathname.startsWith("/verify-email") ||
-    pathname.startsWith("/forgot-password") ||
-    pathname.startsWith("/reset-password") ||
-    pathname.startsWith("/auth") ||
-    pathname.startsWith("/offline") ||
-    pathname.startsWith("/api/cron") ||
-    pathname === "/api/health" ||
-    pathname.startsWith("/api/health/") ||
-    pathname === "/sw.js" ||
-    pathname === "/manifest.webmanifest" ||
-    pathname === "/manifest.json" ||
-    pathname.startsWith("/icons/");
 
   if (!isAuthed && !isPublic) {
     // Built fresh from request.url rather than request.nextUrl.clone(): a

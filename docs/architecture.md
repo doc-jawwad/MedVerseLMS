@@ -39,6 +39,14 @@ icons only. It must not cache HTML/RSC documents, PostgREST (`/rest/v1`), Auth
 or other authenticated educational content. App updates wait until no live exam
 player is open; they must not interrupt an in-progress attempt.
 
+**Installed PWA cold start:** `start_url` is `/`. The OS splash (manifest
+`background_color` + icons) remains until first HTML paint. To keep mobile-data
+launches responsive, `/` paints a local branded splash (`PwaBootSplash`: logo,
+MedVerse, MedDesk.pk) and restores session on the client with a bounded budget
+(`src/lib/pwa/startup-budget.ts`). Proxy `getClaims()` on public paths is also
+budgeted so Auth refresh cannot block HTML indefinitely; protected routes still
+fully await claims. “Update now” / `SKIP_WAITING` behavior is unchanged.
+
 ## Stack (approved production target)
 
 | Layer | Choice |
