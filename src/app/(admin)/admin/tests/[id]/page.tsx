@@ -25,6 +25,11 @@ import {
   RemoveQuestionButton,
   VoidQuestionButton,
 } from "./test-actions";
+import {
+  presentPublishChecklistItem,
+  publishChecklistBlockReason,
+  type ValidateTestCheck,
+} from "@/lib/tests/publish-checklist";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -35,8 +40,6 @@ import {
 } from "@/components/ui/card";
 
 export const metadata = { title: "Test — MedVerse Admin" };
-
-type Check = { check: string; pass: boolean; detail: string };
 
 const POOL_PAGE_SIZE = 50;
 
@@ -151,8 +154,9 @@ export default async function TestDetailPage({
         }),
   ]);
 
-  const checklist = (checklistRes.data ?? []) as Check[];
+  const checklist = (checklistRes.data ?? []) as ValidateTestCheck[];
   const allPass = checklist.length > 0 && checklist.every((c) => c.pass);
+  const checklistBlockReason = publishChecklistBlockReason(checklist);
   const orderedQuestions = testQuestions ?? [];
 
   const productBanks = (productBankRows ?? []).filter(
@@ -557,20 +561,51 @@ export default async function TestDetailPage({
               <CardTitle className="text-base">Pre-publication checklist</CardTitle>
             </CardHeader>
             <CardContent className="grid gap-2">
-              {checklist.map((c, i) => (
-                <div key={i} className="flex items-center gap-2 text-sm">
-                  <span className={c.pass ? "text-green-600" : "text-destructive"}>
-                    {c.pass ? "✓" : "✗"}
-                  </span>
-                  <span>{c.check}</span>
-                  <span className="text-muted-foreground">— {c.detail}</span>
-                </div>
-              ))}
+              {checklist.map((c, i) => {
+                const presented = presentPublishChecklistItem(c);
+                return (
+                  <div
+                    key={i}
+                    className="grid gap-0.5 text-sm"
+                    data-testid="publish-checklist-item"
+                    data-pass={c.pass ? "true" : "false"}
+                    data-check={c.check}
+                  >
+                    <div className="flex items-start gap-2">
+                      <span
+                        className={
+                          c.pass ? "text-green-600" : "text-destructive"
+                        }
+                      >
+                        {c.pass ? "✓" : "✗"}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className={c.pass ? undefined : "font-medium"}>
+                          {presented.title}
+                          <span className="font-normal text-muted-foreground">
+                            {" "}
+                            — {presented.detail}
+                          </span>
+                        </p>
+                        {presented.hint ? (
+                          <p
+                            className="mt-0.5 text-xs text-destructive"
+                            data-testid="publish-checklist-hint"
+                          >
+                            {presented.hint}
+                          </p>
+                        ) : null}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
               <div className="mt-2">
                 <PublishButton
                   testId={id}
                   allPass={allPass}
                   canPublishTests={canPublishTests}
+                  checklistBlockReason={checklistBlockReason}
                 />
               </div>
             </CardContent>

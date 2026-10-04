@@ -6,7 +6,7 @@ describe("publishTestErrorMessage", () => {
   it("preserves validation failed checklist language", () => {
     assert.equal(
       publishTestErrorMessage("validation failed: question count >= 1"),
-      "validation failed: question count >= 1"
+      "This test has no questions. Add at least one question before publishing."
     );
     assert.equal(
       publishTestErrorMessage("validation failed: no soft-deleted questions"),

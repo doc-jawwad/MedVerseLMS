@@ -484,11 +484,14 @@ export function PublishButton({
   testId,
   allPass,
   canPublishTests = true,
+  checklistBlockReason = null,
 }: {
   testId: string;
   allPass: boolean;
   /** Server-side publish_tests gate mirrored for UX (RPC still enforces). */
   canPublishTests?: boolean;
+  /** When checklist fails, short actionable reason (e.g. zero questions). */
+  checklistBlockReason?: string | null;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -518,6 +521,14 @@ export function PublishButton({
       {!canPublish && (
         <p className="mb-2 text-sm text-destructive">
           Student access is set to Neither — choose Free, Both, or Paid before publishing.
+        </p>
+      )}
+      {canPublishTests && canPublish && checklistBlockReason && (
+        <p
+          className="mb-2 text-sm text-destructive"
+          data-testid="publish-checklist-blocked"
+        >
+          {checklistBlockReason}
         </p>
       )}
       <Button

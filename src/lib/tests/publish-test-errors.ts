@@ -29,6 +29,9 @@ export function publishTestErrorMessage(
 
   // Existing publish_test style — checklist item name after the prefix.
   if (/^validation failed:\s+/i.test(trimmed)) {
+    if (/question count\s*>=/i.test(trimmed)) {
+      return "This test has no questions. Add at least one question before publishing.";
+    }
     return trimmed;
   }
 
