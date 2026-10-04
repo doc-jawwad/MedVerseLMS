@@ -148,23 +148,34 @@ export function QuestionMarksInput({
   );
 }
 
-// All filter changes (including cascading book/chapter/topic) navigate
-// immediately via the URL query string — the same source of truth both this
-// form and AddRandomButton's server-computed `filter` prop read from, so the
-// visible filter and "Add N random" can never diverge (a prior bug class:
-// see addRandomQuestions' comment on why it re-derives the test's own year
+// All filter changes (including cascading book/chapter/topic and MCQ Bank
+// bank/folder/subfolder) navigate immediately via the URL query string —
+// the same source of truth both this form and AddRandomButton's
+// server-computed `filter` prop read from, so the visible filter and
+// "Add N random" can never diverge (a prior bug class: see
+// addRandomQuestions' comment on why it re-derives the test's own year
 // rather than trusting an arbitrary client-supplied one).
 export function QuestionFilterForm({
   subjects,
   books,
   chapters,
   topics,
+  productBanks,
+  mcqFolders,
+  mcqSubfolders,
   filter,
 }: {
   subjects: { id: string; name: string }[];
   books: { id: string; name: string; subject_id: string }[];
   chapters: { id: string; name: string; book_id: string }[];
   topics: { id: string; name: string; chapter_id: string }[];
+  productBanks: { id: string; name: string }[];
+  mcqFolders: {
+    id: string;
+    name: string;
+    academic_product_subject_id: string;
+  }[];
+  mcqSubfolders: { id: string; name: string; folder_id: string }[];
   filter: {
     subject_id?: string;
     book_id?: string;
@@ -172,6 +183,9 @@ export function QuestionFilterForm({
     topic_id?: string;
     difficulty?: string;
     q?: string;
+    mcq_bank_product_subject_id?: string;
+    mcq_bank_folder_id?: string;
+    mcq_bank_subfolder_id?: string;
   };
 }) {
   const router = useRouter();
@@ -185,6 +199,15 @@ export function QuestionFilterForm({
   const visibleTopics = filter.chapter_id
     ? topics.filter((t) => t.chapter_id === filter.chapter_id)
     : [];
+  const visibleFolders = filter.mcq_bank_product_subject_id
+    ? mcqFolders.filter(
+        (f) =>
+          f.academic_product_subject_id === filter.mcq_bank_product_subject_id
+      )
+    : [];
+  const visibleSubfolders = filter.mcq_bank_folder_id
+    ? mcqSubfolders.filter((s) => s.folder_id === filter.mcq_bank_folder_id)
+    : [];
 
   function navigate(next: {
     subject?: string;
@@ -193,6 +216,9 @@ export function QuestionFilterForm({
     topic?: string;
     difficulty?: string;
     q?: string;
+    bank?: string;
+    folder?: string;
+    subfolder?: string;
   }) {
     const merged = {
       subject: filter.subject_id ?? "",
@@ -201,6 +227,9 @@ export function QuestionFilterForm({
       topic: filter.topic_id ?? "",
       difficulty: filter.difficulty ?? "",
       q: filter.q ?? "",
+      bank: filter.mcq_bank_product_subject_id ?? "",
+      folder: filter.mcq_bank_folder_id ?? "",
+      subfolder: filter.mcq_bank_subfolder_id ?? "",
       ...next,
     };
     // Selecting a broader level clears anything narrower beneath it.
@@ -214,6 +243,12 @@ export function QuestionFilterForm({
     } else if (next.chapter !== undefined) {
       merged.topic = "";
     }
+    if (next.bank !== undefined) {
+      merged.folder = "";
+      merged.subfolder = "";
+    } else if (next.folder !== undefined) {
+      merged.subfolder = "";
+    }
     const params = new URLSearchParams();
     if (merged.subject) params.set("subject", merged.subject);
     if (merged.book) params.set("book", merged.book);
@@ -221,6 +256,9 @@ export function QuestionFilterForm({
     if (merged.topic) params.set("topic", merged.topic);
     if (merged.difficulty) params.set("difficulty", merged.difficulty);
     if (merged.q) params.set("q", merged.q);
+    if (merged.bank) params.set("bank", merged.bank);
+    if (merged.folder) params.set("folder", merged.folder);
+    if (merged.subfolder) params.set("subfolder", merged.subfolder);
     router.push(`?${params.toString()}`);
   }
 
@@ -293,6 +331,57 @@ export function QuestionFilterForm({
           ))}
         </select>
       )}
+      {productBanks.length > 0 && (
+        <select
+          name="bank"
+          value={filter.mcq_bank_product_subject_id ?? ""}
+          onChange={(e) => navigate({ bank: e.target.value })}
+          className="h-9 rounded-md border bg-transparent px-2"
+          data-testid="filter-mcq-bank"
+          aria-label="MCQ Bank"
+        >
+          <option value="">Any MCQ Bank</option>
+          {productBanks.map((b) => (
+            <option key={b.id} value={b.id}>
+              Bank: {b.name}
+            </option>
+          ))}
+        </select>
+      )}
+      {visibleFolders.length > 0 && (
+        <select
+          name="folder"
+          value={filter.mcq_bank_folder_id ?? ""}
+          onChange={(e) => navigate({ folder: e.target.value })}
+          className="h-9 rounded-md border bg-transparent px-2"
+          data-testid="filter-mcq-folder"
+          aria-label="MCQ Bank folder"
+        >
+          <option value="">All folders in bank</option>
+          {visibleFolders.map((f) => (
+            <option key={f.id} value={f.id}>
+              Folder: {f.name}
+            </option>
+          ))}
+        </select>
+      )}
+      {visibleSubfolders.length > 0 && (
+        <select
+          name="subfolder"
+          value={filter.mcq_bank_subfolder_id ?? ""}
+          onChange={(e) => navigate({ subfolder: e.target.value })}
+          className="h-9 rounded-md border bg-transparent px-2"
+          data-testid="filter-mcq-subfolder"
+          aria-label="MCQ Bank subfolder"
+        >
+          <option value="">All subfolders in folder</option>
+          {visibleSubfolders.map((s) => (
+            <option key={s.id} value={s.id}>
+              Subfolder: {s.name}
+            </option>
+          ))}
+        </select>
+      )}
       <select
         name="difficulty"
         value={filter.difficulty ?? ""}
@@ -333,6 +422,7 @@ export function AddRandomButton({
       <Input type="number" min={1} max={poolSize} value={n}
         onChange={(e) => setN(Number(e.target.value))} className="h-8 w-20" />
       <Button size="sm" variant="outline" disabled={pending || poolSize === 0}
+        data-testid="add-random-from-filter"
         onClick={() => run(() => addRandomQuestions(testId, filter, n), "Added randomly")}>
         Add N random from this filter
       </Button>

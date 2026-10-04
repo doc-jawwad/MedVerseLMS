@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireAdmin } from "@/lib/auth/require-user";
 import { loadCurriculumFilterCascade } from "@/lib/admin/curriculum-load";
+import { resolveMcqBankScope } from "@/lib/tests/random-selection-scope";
 import { TestConfigForm } from "../test-config-form";
 import {
   TestPrepGuidelinesForm,
@@ -51,6 +52,9 @@ export default async function TestDetailPage({
     q?: string;
     page?: string;
     import_batch?: string;
+    bank?: string;
+    folder?: string;
+    subfolder?: string;
   }>;
 }) {
   const { supabase } = await requireAdmin();
@@ -80,6 +84,9 @@ export default async function TestDetailPage({
     checklistRes,
     filterCurriculum,
     prepRes,
+    { data: productBankRows },
+    { data: mcqFolderRows },
+    { data: mcqSubfolderRows },
   ] = await Promise.all([
     supabase.from("years").select("id, year_number").order("year_number"),
     supabase.from("subjects").select("id, name, year_id").order("name"),
@@ -105,11 +112,61 @@ export default async function TestDetailPage({
           topics: [] as { id: string; name: string; chapter_id: string }[],
         }),
     supabase.rpc("get_test_prep_guidelines", { p_test_id: id }),
+    isDraft
+      ? supabase
+          .from("subjects")
+          .select("id, name")
+          .eq("year_id", test.year_id)
+          .not("product_key", "is", null)
+          .order("name")
+      : Promise.resolve({ data: [] as { id: string; name: string }[] }),
+    isDraft
+      ? supabase
+          .from("mcq_bank_folders")
+          .select("id, name, year_id, academic_product_subject_id")
+          .eq("year_id", test.year_id)
+          .is("deleted_at", null)
+          .order("name")
+      : Promise.resolve({
+          data: [] as {
+            id: string;
+            name: string;
+            year_id: string;
+            academic_product_subject_id: string;
+          }[],
+        }),
+    isDraft
+      ? supabase
+          .from("mcq_bank_subfolders")
+          .select("id, name, folder_id")
+          .is("deleted_at", null)
+          .order("name")
+      : Promise.resolve({
+          data: [] as { id: string; name: string; folder_id: string }[],
+        }),
   ]);
 
   const checklist = (checklistRes.data ?? []) as Check[];
   const allPass = checklist.length > 0 && checklist.every((c) => c.pass);
   const orderedQuestions = testQuestions ?? [];
+
+  const productBanks = (productBankRows ?? []).filter(
+    (s): s is { id: string; name: string } => Boolean(s?.id && s?.name)
+  );
+  const mcqFolders = (mcqFolderRows ?? []) as Array<{
+    id: string;
+    name: string;
+    year_id: string;
+    academic_product_subject_id: string;
+  }>;
+  const folderIdSet = new Set(mcqFolders.map((f) => f.id));
+  const mcqSubfolders = (
+    (mcqSubfolderRows ?? []) as Array<{
+      id: string;
+      name: string;
+      folder_id: string;
+    }>
+  ).filter((s) => folderIdSet.has(s.folder_id));
 
   // question picker pool (draft only), paginated the same way as the
   // question-bank list page. Optional import_batch scopes the pool to that
@@ -132,7 +189,16 @@ export default async function TestDetailPage({
     chapter_id: filters.chapter,
     topic_id: filters.topic,
     difficulty: filters.difficulty,
+    mcq_bank_product_subject_id: filters.bank,
+    mcq_bank_folder_id: filters.folder,
+    mcq_bank_subfolder_id: filters.subfolder,
   };
+  const mcqScope = resolveMcqBankScope({
+    filter,
+    testYearId: test.year_id,
+    folders: mcqFolders,
+    subfolders: mcqSubfolders,
+  });
   if (isDraft) {
     if (importBatchId) {
       const [{ data: batchMeta }, { data: batchRows }] = await Promise.all([
@@ -185,18 +251,36 @@ export default async function TestDetailPage({
     if (filters.difficulty) q = q.eq("difficulty", filters.difficulty);
     if (filters.q?.trim())
       q = q.ilike("stem_normalized", `%${filters.q.trim().toLowerCase()}%`);
-    const { data, count } = await q;
-    poolCount = count ?? 0;
-    const inTest = new Set(orderedQuestions.map((t) => t.question_id));
-    pool = (data ?? [])
-      .filter((r) => !inTest.has(r.id))
-      .map((r) => ({
-        id: r.id,
-        difficulty: r.difficulty,
-        stem:
-          (r.question_versions as unknown as { stem: string } | null)?.stem ?? null,
-        subject: (r.subjects as unknown as { name: string } | null)?.name ?? null,
-      }));
+    // Exact MCQ Bank scope — never broaden when bank/folder/subfolder is set.
+    const skipMcqPool =
+      mcqScope.kind === "invalid" ||
+      (mcqScope.kind === "bank_folders" && mcqScope.folderIds.length === 0);
+    if (skipMcqPool) {
+      poolCount = 0;
+      pool = [];
+    } else {
+      if (mcqScope.kind === "subfolder") {
+        q = q.eq("mcq_bank_subfolder_id", mcqScope.subfolderId);
+      } else if (mcqScope.kind === "folder") {
+        q = q.eq("mcq_bank_folder_id", mcqScope.folderId);
+      } else if (mcqScope.kind === "bank_folders") {
+        q = q.in("mcq_bank_folder_id", mcqScope.folderIds);
+      }
+      const { data, count } = await q;
+      poolCount = count ?? 0;
+      const inTest = new Set(orderedQuestions.map((t) => t.question_id));
+      pool = (data ?? [])
+        .filter((r) => !inTest.has(r.id))
+        .map((r) => ({
+          id: r.id,
+          difficulty: r.difficulty,
+          stem:
+            (r.question_versions as unknown as { stem: string } | null)?.stem ??
+            null,
+          subject:
+            (r.subjects as unknown as { name: string } | null)?.name ?? null,
+        }));
+    }
   }
   const poolTotalPages = Math.max(1, Math.ceil(poolCount / POOL_PAGE_SIZE));
 
@@ -367,6 +451,9 @@ export default async function TestDetailPage({
                 books={filterCurriculum.books}
                 chapters={filterCurriculum.chapters}
                 topics={filterCurriculum.topics}
+                productBanks={productBanks}
+                mcqFolders={mcqFolders}
+                mcqSubfolders={mcqSubfolders}
                 filter={{
                   subject_id: filters.subject,
                   book_id: filters.book,
@@ -374,6 +461,9 @@ export default async function TestDetailPage({
                   topic_id: filters.topic,
                   difficulty: filters.difficulty,
                   q: filters.q,
+                  mcq_bank_product_subject_id: filters.bank,
+                  mcq_bank_folder_id: filters.folder,
+                  mcq_bank_subfolder_id: filters.subfolder,
                 }}
               />
 

@@ -11,9 +11,15 @@ import {
   pickTestConfigUpdate,
   type TestConfig,
 } from "@/lib/tests/test-config-update";
+import {
+  pickRandomQuestionIds,
+  resolveMcqBankScope,
+  type RandomSelectionFilter,
+} from "@/lib/tests/random-selection-scope";
 
 // Types only — "use server" modules must not re-export sync helpers/constants.
 export type { TestConfig } from "@/lib/tests/test-config-update";
+export type { RandomSelectionFilter as QuestionFilter } from "@/lib/tests/random-selection-scope";
 
 function reval(testId?: string) {
   revalidatePath("/admin/tests");
@@ -249,21 +255,15 @@ export async function setQuestionMarks(
   return actionRpcResult("action", error);
 }
 
-export type QuestionFilter = {
-  subject_id?: string;
-  book_id?: string;
-  chapter_id?: string;
-  topic_id?: string;
-  difficulty?: string;
-};
-
 // "Add N randomly from this filtered set" — a builder convenience, not autopilot.
 // Always scoped to the test's own year — a test must never pull random
 // questions from a different year's curriculum regardless of what other
 // filters are (or aren't) applied.
+// MCQ Bank bank/folder/subfolder (when set) is an exact placement scope —
+// never silently broaden to the whole departmental subject.
 export async function addRandomQuestions(
   testId: string,
-  filter: QuestionFilter,
+  filter: RandomSelectionFilter,
   n: number
 ) {
   const supabase = await createClient();
@@ -275,46 +275,92 @@ export async function addRandomQuestions(
     .single();
   if (!test) return { error: "Test not found." };
 
-  const { data: existing } = await supabase
-    .from("test_questions")
-    .select("question_id")
-    .eq("test_id", testId);
+  const [{ data: existing }, { data: folderRows }, { data: subfolderRows }] =
+    await Promise.all([
+      supabase
+        .from("test_questions")
+        .select("question_id")
+        .eq("test_id", testId),
+      supabase
+        .from("mcq_bank_folders")
+        .select("id, year_id, academic_product_subject_id")
+        .eq("year_id", test.year_id)
+        .is("deleted_at", null),
+      supabase
+        .from("mcq_bank_subfolders")
+        .select("id, folder_id")
+        .is("deleted_at", null),
+    ]);
+
+  const folders = (folderRows ?? []) as Array<{
+    id: string;
+    year_id: string;
+    academic_product_subject_id: string;
+  }>;
+  const folderIds = new Set(folders.map((f) => f.id));
+  const subfolders = ((subfolderRows ?? []) as Array<{
+    id: string;
+    folder_id: string;
+  }>).filter((s) => folderIds.has(s.folder_id));
+
+  const mcqScope = resolveMcqBankScope({
+    filter,
+    testYearId: test.year_id,
+    folders,
+    subfolders,
+  });
+  if (mcqScope.kind === "invalid") {
+    return {
+      error:
+        "MCQ Bank scope does not match this test class. Clear or re-select bank/folder/subfolder.",
+    };
+  }
+  if (mcqScope.kind === "bank_folders" && mcqScope.folderIds.length === 0) {
+    return { added: 0 };
+  }
+
   const excluded = new Set((existing ?? []).map((r) => r.question_id));
 
   let q = supabase
     .from("questions")
     .select("id")
     .eq("status", "approved")
-    .eq("year_id", test.year_id);
+    .eq("year_id", test.year_id)
+    .is("deleted_at", null);
   if (filter.subject_id) q = q.eq("subject_id", filter.subject_id);
   if (filter.book_id) q = q.eq("book_id", filter.book_id);
   if (filter.chapter_id) q = q.eq("chapter_id", filter.chapter_id);
   if (filter.topic_id) q = q.eq("topic_id", filter.topic_id);
   if (filter.difficulty) q = q.eq("difficulty", filter.difficulty);
+  if (mcqScope.kind === "subfolder") {
+    q = q.eq("mcq_bank_subfolder_id", mcqScope.subfolderId);
+  } else if (mcqScope.kind === "folder") {
+    q = q.eq("mcq_bank_folder_id", mcqScope.folderId);
+  } else if (mcqScope.kind === "bank_folders") {
+    q = q.in("mcq_bank_folder_id", mcqScope.folderIds);
+  }
 
   const { data: pool, error } = await q.limit(2000);
   if (error) return actionRpcResult("action", error);
 
-  const candidates = (pool ?? []).filter((r) => !excluded.has(r.id));
-  // Fisher–Yates shuffle, take n
-  for (let i = candidates.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
-  }
-  const picked = candidates.slice(0, n);
-  if (picked.length === 0) return { added: 0 };
+  const pickedIds = pickRandomQuestionIds({
+    candidateIds: (pool ?? []).map((r) => r.id as string),
+    excludedIds: excluded,
+    n,
+  });
+  if (pickedIds.length === 0) return { added: 0 };
 
   const base = excluded.size;
   const { error: insErr } = await supabase.from("test_questions").insert(
-    picked.map((r, i) => ({
+    pickedIds.map((questionId, i) => ({
       test_id: testId,
-      question_id: r.id,
+      question_id: questionId,
       position: base + i + 1,
     }))
   );
   if (insErr) return actionRpcResult("addRandomQuestions.insert", insErr);
   reval(testId);
-  return { added: picked.length };
+  return { added: pickedIds.length };
 }
 
 export async function removeQuestionFromTest(testId: string, questionId: string) {
