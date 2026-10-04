@@ -128,14 +128,14 @@ export function QuestionPoolMultiAdd({
   }
 
   return (
-    <div className="grid gap-2">
+    <div className="grid min-w-0 max-w-full gap-2">
       {importedSet ? (
         <div
-          className="grid gap-2 rounded-md border border-dashed border-border/80 bg-muted/20 p-3"
+          className="grid min-w-0 gap-2 rounded-md border border-dashed border-border/80 bg-muted/20 p-3"
           data-testid="imported-question-set"
           data-batch-id={importedSet.batchId}
         >
-          <div className="text-sm">
+          <div className="min-w-0 break-words text-sm">
             <span className="font-medium">Imported set</span>
             <span className="text-muted-foreground">
               {" "}
@@ -214,7 +214,7 @@ export function QuestionPoolMultiAdd({
           return (
             <label
               key={p.id}
-              className={`flex items-center gap-3 rounded-md border p-2 text-sm ${
+              className={`flex min-w-0 items-start gap-3 rounded-md border p-2 text-sm sm:items-center ${
                 fromImport ? "border-primary/40 bg-primary/5" : ""
               }`}
               data-from-import={fromImport ? "true" : undefined}
@@ -224,8 +224,9 @@ export function QuestionPoolMultiAdd({
                 disabled={pending}
                 data-testid={`tick-question-${p.id}`}
                 onCheckedChange={(c) => toggle(p.id, c === true)}
+                className="mt-0.5 shrink-0 sm:mt-0"
               />
-              <div className="min-w-0 flex-1 truncate">
+              <div className="min-w-0 flex-1 break-words">
                 {p.stem}
                 <span className="ml-2 text-xs text-muted-foreground">
                   {p.subject} · {p.difficulty}

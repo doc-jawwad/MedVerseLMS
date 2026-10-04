@@ -172,23 +172,23 @@ export function TestBuilderCsvImport({
 
   return (
     <div
-      className="grid gap-3 rounded-lg border border-dashed border-border/80 p-4"
+      className="grid min-w-0 max-w-full gap-3 rounded-lg border border-dashed border-border/80 p-4"
       data-testid="test-builder-csv-import"
     >
-      <div>
+      <div className="min-w-0">
         <h3 className="text-sm font-semibold">Import questions from CSV</h3>
-        <p className="mt-1 text-xs text-muted-foreground">
+        <p className="mt-1 text-xs text-muted-foreground break-words">
           Uses the same Question Bank CSV format and import pipeline. Rows are
           inserted as <strong>approved</strong> (like Manual MCQ), then shown
           below as a selectable imported set. Publish still freezes question
           versions.
         </p>
       </div>
-      <div className="grid gap-2 sm:grid-cols-2 sm:items-end">
-        <div className="grid gap-1">
+      <div className="grid min-w-0 gap-2 sm:grid-cols-2 sm:items-end">
+        <div className="grid min-w-0 gap-1">
           <Label htmlFor="tb-csv-subject">Subject for CSV rows</Label>
           <Select value={subjectId} onValueChange={setSubjectId}>
-            <SelectTrigger id="tb-csv-subject">
+            <SelectTrigger id="tb-csv-subject" className="max-w-full min-w-0">
               <SelectValue placeholder="Subject" />
             </SelectTrigger>
             <SelectContent>
@@ -200,18 +200,36 @@ export function TestBuilderCsvImport({
             </SelectContent>
           </Select>
         </div>
-        <div className="grid gap-1">
+        <div className="grid min-w-0 gap-1">
           <Label htmlFor="tb-csv-file">CSV file</Label>
-          <input
-            id="tb-csv-file"
-            ref={fileRef}
-            type="file"
-            accept=".csv,text/csv"
-            data-testid="test-builder-csv-file"
-            className="block w-full text-sm file:mr-2 file:rounded-md file:border-0 file:bg-primary file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-primary-foreground"
-            onChange={(e) => onFile(e.target.files?.[0] ?? null)}
-            disabled={pending}
-          />
+          {/* Native file inputs have a large intrinsic min-width that forces
+              the Add-questions Card past the mobile viewport. Keep the real
+              input for Playwright/setInputFiles, trigger it from a button. */}
+          <div className="flex min-w-0 max-w-full flex-wrap items-center gap-2">
+            <input
+              id="tb-csv-file"
+              ref={fileRef}
+              type="file"
+              accept=".csv,text/csv"
+              data-testid="test-builder-csv-file"
+              className="sr-only"
+              onChange={(e) => onFile(e.target.files?.[0] ?? null)}
+              disabled={pending}
+            />
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              disabled={pending}
+              data-testid="test-builder-csv-choose"
+              onClick={() => fileRef.current?.click()}
+            >
+              Choose CSV
+            </Button>
+            <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
+              {preview?.filename ?? "No file chosen"}
+            </span>
+          </div>
         </div>
       </div>
       {preview ? (

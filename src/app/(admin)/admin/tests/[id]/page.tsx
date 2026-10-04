@@ -308,9 +308,9 @@ export default async function TestDetailPage({
       entitlement={test.entitlement ?? "free"}
       status={test.status}
     >
-      <div className="grid gap-6">
-        <div className="flex flex-wrap items-center gap-3">
-          <h1 className="text-2xl font-semibold">{test.title}</h1>
+      <div className="grid min-w-0 max-w-full gap-6">
+        <div className="flex min-w-0 flex-wrap items-center gap-3">
+          <h1 className="min-w-0 break-words text-2xl font-semibold">{test.title}</h1>
           <Badge>{test.status}</Badge>
           <Button asChild variant="outline" size="sm">
             <Link href={`/admin/tests/${id}/preview`}>Preview as student</Link>
@@ -396,8 +396,8 @@ export default async function TestDetailPage({
               } | null;
               return (
                 <div key={tq.id}
-                  className={`flex items-center justify-between gap-2 rounded-md border p-2 text-sm ${tq.voided ? "opacity-60" : ""}`}>
-                  <div className="min-w-0">
+                  className={`flex min-w-0 flex-col gap-2 rounded-md border p-2 text-sm sm:flex-row sm:items-center sm:justify-between ${tq.voided ? "opacity-60" : ""}`}>
+                  <div className="min-w-0 break-words">
                     <span className="mr-2 text-muted-foreground">#{tq.position}</span>
                     <span className="font-medium">{qq?.question_versions?.stem}</span>
                     <span className="ml-2 text-xs text-muted-foreground">
@@ -408,7 +408,7 @@ export default async function TestDetailPage({
                       {tq.voided && ` · voided (${tq.void_policy})`}
                     </span>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex shrink-0 flex-wrap items-center gap-2">
                     {isDraft ? (
                       <Button asChild size="sm" variant="ghost">
                         <Link
@@ -463,7 +463,7 @@ export default async function TestDetailPage({
             <CardHeader>
               <CardTitle className="text-base">Add questions</CardTitle>
             </CardHeader>
-            <CardContent className="grid gap-4">
+            <CardContent className="grid min-w-0 max-w-full gap-4">
               <TestBuilderManualMcq
                 testId={id}
                 yearId={test.year_id}
@@ -524,7 +524,7 @@ export default async function TestDetailPage({
               />
 
               {poolTotalPages > 1 && (
-                <div className="flex items-center justify-between text-sm">
+                <div className="flex min-w-0 flex-wrap items-center justify-between gap-2 text-sm">
                   {poolPage > 1 ? (
                     <Button asChild variant="outline" size="sm">
                       <Link href={poolFilterLink({ page: poolPage > 2 ? String(poolPage - 1) : undefined })}>
@@ -534,7 +534,7 @@ export default async function TestDetailPage({
                   ) : (
                     <Button variant="outline" size="sm" disabled>← Previous</Button>
                   )}
-                  <span className="text-muted-foreground">
+                  <span className="min-w-0 break-words text-muted-foreground">
                     Page {poolPage} of {poolTotalPages} ({poolCount} approved questions match)
                   </span>
                   {poolPage < poolTotalPages ? (

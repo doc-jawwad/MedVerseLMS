@@ -263,9 +263,15 @@ export function QuestionFilterForm({
     router.push(`?${params.toString()}`);
   }
 
+  // Native <select> min-content width follows long option labels; without
+  // max-w-full the filter row forces the Card (overflow-hidden) wider than
+  // the mobile viewport and clips CSV / pool controls on the right.
+  const filterControlClass =
+    "h-9 w-full max-w-full min-w-0 rounded-md border bg-transparent px-2 sm:w-auto";
+
   return (
     <form
-      className="flex flex-wrap gap-2 text-sm"
+      className="flex min-w-0 max-w-full flex-wrap gap-2 text-sm"
       onSubmit={(e) => {
         e.preventDefault();
         const form = e.currentTarget;
@@ -278,7 +284,7 @@ export function QuestionFilterForm({
         name="subject"
         value={filter.subject_id ?? ""}
         onChange={(e) => navigate({ subject: e.target.value })}
-        className="h-9 rounded-md border bg-transparent px-2"
+        className={filterControlClass}
       >
         <option value="">All subjects</option>
         {subjects.map((s) => (
@@ -292,7 +298,7 @@ export function QuestionFilterForm({
           name="book"
           value={filter.book_id ?? ""}
           onChange={(e) => navigate({ book: e.target.value })}
-          className="h-9 rounded-md border bg-transparent px-2"
+          className={filterControlClass}
         >
           <option value="">All books</option>
           {visibleBooks.map((b) => (
@@ -307,7 +313,7 @@ export function QuestionFilterForm({
           name="chapter"
           value={filter.chapter_id ?? ""}
           onChange={(e) => navigate({ chapter: e.target.value })}
-          className="h-9 rounded-md border bg-transparent px-2"
+          className={filterControlClass}
         >
           <option value="">All chapters</option>
           {visibleChapters.map((c) => (
@@ -322,7 +328,7 @@ export function QuestionFilterForm({
           name="topic"
           value={filter.topic_id ?? ""}
           onChange={(e) => navigate({ topic: e.target.value })}
-          className="h-9 rounded-md border bg-transparent px-2"
+          className={filterControlClass}
         >
           <option value="">All topics</option>
           {visibleTopics.map((t) => (
@@ -337,7 +343,7 @@ export function QuestionFilterForm({
           name="bank"
           value={filter.mcq_bank_product_subject_id ?? ""}
           onChange={(e) => navigate({ bank: e.target.value })}
-          className="h-9 rounded-md border bg-transparent px-2"
+          className={filterControlClass}
           data-testid="filter-mcq-bank"
           aria-label="MCQ Bank"
         >
@@ -354,7 +360,7 @@ export function QuestionFilterForm({
           name="folder"
           value={filter.mcq_bank_folder_id ?? ""}
           onChange={(e) => navigate({ folder: e.target.value })}
-          className="h-9 rounded-md border bg-transparent px-2"
+          className={filterControlClass}
           data-testid="filter-mcq-folder"
           aria-label="MCQ Bank folder"
         >
@@ -371,7 +377,7 @@ export function QuestionFilterForm({
           name="subfolder"
           value={filter.mcq_bank_subfolder_id ?? ""}
           onChange={(e) => navigate({ subfolder: e.target.value })}
-          className="h-9 rounded-md border bg-transparent px-2"
+          className={filterControlClass}
           data-testid="filter-mcq-subfolder"
           aria-label="MCQ Bank subfolder"
         >
@@ -387,7 +393,7 @@ export function QuestionFilterForm({
         name="difficulty"
         value={filter.difficulty ?? ""}
         onChange={(e) => navigate({ difficulty: e.target.value })}
-        className="h-9 rounded-md border bg-transparent px-2"
+        className={filterControlClass}
       >
         <option value="">Any difficulty</option>
         <option value="easy">easy</option>
@@ -398,7 +404,7 @@ export function QuestionFilterForm({
         name="q"
         defaultValue={filter.q ?? ""}
         placeholder="Search text…"
-        className="h-9 w-56 rounded-md border bg-transparent px-2"
+        className="h-9 w-full max-w-full min-w-0 rounded-md border bg-transparent px-2 sm:w-56"
       />
       <Button type="submit" variant="secondary" size="sm">
         Search
@@ -419,11 +425,12 @@ export function AddRandomButton({
   const { pending, run } = useAction();
   const [n, setN] = useState(10);
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex min-w-0 max-w-full flex-wrap items-center gap-2">
       <Input type="number" min={1} max={poolSize} value={n}
-        onChange={(e) => setN(Number(e.target.value))} className="h-8 w-20" />
+        onChange={(e) => setN(Number(e.target.value))} className="h-8 w-20 shrink-0" />
       <Button size="sm" variant="outline" disabled={pending || poolSize === 0}
         data-testid="add-random-from-filter"
+        className="max-w-full whitespace-normal sm:whitespace-nowrap"
         onClick={() => run(() => addRandomQuestions(testId, filter, n), "Added randomly")}>
         Add N random from this filter
       </Button>

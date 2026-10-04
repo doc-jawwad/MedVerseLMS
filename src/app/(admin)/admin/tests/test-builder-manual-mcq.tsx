@@ -171,8 +171,8 @@ export function TestBuilderManualMcq({
   }
 
   return (
-    <div className="grid gap-4 rounded-md border p-4">
-      <div>
+    <div className="grid min-w-0 max-w-full gap-4 rounded-md border p-4">
+      <div className="min-w-0">
         <h3 className="text-sm font-medium">Create MCQ inline</h3>
         <p className="text-xs text-muted-foreground">
           Year locked to {yearLabel}. Created as approved and added to this
@@ -180,8 +180,8 @@ export function TestBuilderManualMcq({
         </p>
       </div>
 
-      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="grid gap-1">
+      <div className="grid min-w-0 gap-2 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid min-w-0 gap-1">
           <Label>Subject</Label>
           <Select
             value={subjectId || undefined}
@@ -275,23 +275,24 @@ export function TestBuilderManualMcq({
         </div>
       </div>
 
-      <div className="grid gap-2">
+      <div className="grid min-w-0 gap-2">
         <Label>Stem</Label>
         <Textarea
           value={stem}
           onChange={(e) => setStem(e.target.value)}
           rows={3}
           placeholder="Which of the following…"
+          className="min-w-0 max-w-full"
         />
       </div>
 
-      <div className="grid gap-2">
+      <div className="grid min-w-0 gap-2">
         <Label>Options (A–D required, E optional)</Label>
         <RadioGroup value={correctKey} onValueChange={setCorrectKey}>
           {KEYS.map((k, i) => (
-            <div key={k} className="flex items-center gap-2">
+            <div key={k} className="flex min-w-0 items-center gap-2">
               <RadioGroupItem value={k} id={`manual-correct-${k}`} />
-              <span className="w-4 text-sm font-medium">{k}</span>
+              <span className="w-4 shrink-0 text-sm font-medium">{k}</span>
               <Input
                 value={options[i]}
                 onChange={(e) =>
@@ -300,6 +301,7 @@ export function TestBuilderManualMcq({
                   )
                 }
                 placeholder={i === 4 ? "Option E (optional)" : `Option ${k}`}
+                className="min-w-0 flex-1"
               />
             </div>
           ))}
