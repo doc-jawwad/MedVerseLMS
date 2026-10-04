@@ -85,15 +85,26 @@ test.describe("Test draft management — Edit + Delete", () => {
       // --- list: draft shows Edit + Delete; published does not ---
       const draftRow = page.getByTestId(`test-row-${draftId}`);
       await expect(draftRow).toBeVisible({ timeout: 15000 });
-      await expect(page.getByTestId(`edit-draft-test-${draftId}`)).toBeVisible();
-      await expect(page.getByTestId(`delete-draft-test-${draftId}`)).toBeVisible();
+      const draftEdit = draftRow
+        .getByTestId(`edit-draft-test-${draftId}`)
+        .filter({ visible: true });
+      const draftDelete = draftRow
+        .getByTestId(`delete-draft-test-${draftId}`)
+        .filter({ visible: true });
+      await expect(draftEdit).toBeVisible();
+      await expect(draftDelete).toBeVisible();
 
-      await expect(page.getByTestId(`test-row-${publishedId}`)).toBeVisible();
-      await expect(page.getByTestId(`delete-draft-test-${publishedId}`)).toHaveCount(0);
-      await expect(page.getByTestId(`edit-draft-test-${publishedId}`)).toHaveCount(0);
+      const publishedRow = page.getByTestId(`test-row-${publishedId}`);
+      await expect(publishedRow).toBeVisible();
+      await expect(
+        publishedRow.getByTestId(`delete-draft-test-${publishedId}`).filter({ visible: true })
+      ).toHaveCount(0);
+      await expect(
+        publishedRow.getByTestId(`edit-draft-test-${publishedId}`).filter({ visible: true })
+      ).toHaveCount(0);
 
       // --- Edit opens existing builder ---
-      await page.getByTestId(`edit-draft-test-${draftId}`).click();
+      await draftEdit.click();
       await page.waitForURL(new RegExp(`/admin/tests/${draftId}`));
       await expect(page.getByRole("heading", { name: draftTitle })).toBeVisible();
       await expect(page.getByRole("button", { name: "Save config" })).toBeVisible();
@@ -121,12 +132,21 @@ test.describe("Test draft management — Edit + Delete", () => {
 
       // --- Delete from list ---
       await page.goto("/admin/tests");
-      await expect(page.getByTestId(`delete-draft-test-${draftId}`)).toBeVisible({
-        timeout: 15000,
-      });
-      await page.getByTestId(`delete-draft-test-${draftId}`).click();
+      if (await page.getByRole("heading", { name: "Select a class" }).isVisible()) {
+        await page.getByRole("button", { name: /1st Year/i }).click();
+        await page.waitForURL(/\/admin\/tests/);
+      }
+      const draftRowAgain = page.getByTestId(`test-row-${draftId}`);
+      const draftDeleteAgain = draftRowAgain
+        .getByTestId(`delete-draft-test-${draftId}`)
+        .filter({ visible: true });
+      await expect(draftDeleteAgain).toBeVisible({ timeout: 15000 });
+      await draftDeleteAgain.click();
       await expect(page.getByText("Delete this draft test?")).toBeVisible();
-      await page.getByTestId(`confirm-delete-draft-test-${draftId}`).click();
+      await page
+        .getByTestId(`confirm-delete-draft-test-${draftId}`)
+        .filter({ visible: true })
+        .click();
       await expect(page.getByTestId(`test-row-${draftId}`)).toHaveCount(0, {
         timeout: 15000,
       });
