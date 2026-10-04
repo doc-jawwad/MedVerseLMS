@@ -21,9 +21,29 @@ function rpcMissing(error: { message?: string | null } | null): boolean {
 }
 
 /**
+ * Normalize RPC payloads for the board adapter.
+ * `test_leaderboard_projection` returns jsonb (array); PostgREST usually
+ * parses it, but a string body must not collapse into an empty board.
+ * Legacy `test_leaderboard` already returns a row array.
+ */
+export function normalizeLeaderboardRpcRows(data: unknown): unknown[] {
+  if (Array.isArray(data)) return data;
+  if (typeof data === "string") {
+    try {
+      const parsed: unknown = JSON.parse(data);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
+
+/**
  * Load Top-N board for the most recently completed catalog test via
- * `test_leaderboard_projection` (rank_test ranks only). Falls back to
- * legacy `test_leaderboard` only when the projection RPC is missing.
+ * `test_leaderboard_projection` (rank_test ranks + profiles.college_name).
+ * Falls back to legacy `test_leaderboard` only when the projection RPC is
+ * missing — that legacy shape has no college field.
  */
 export async function loadLastCompletedLeaderboardBoard(
   supabase: SupabaseClient,
@@ -50,7 +70,7 @@ export async function loadLastCompletedLeaderboardBoard(
   if (!projected.error) {
     return buildLeaderboardBoardState({
       resolved,
-      rawRows: projected.data,
+      rawRows: normalizeLeaderboardRpcRows(projected.data),
       limit: input.limit,
       fetchFailed: false,
     });
@@ -65,14 +85,14 @@ export async function loadLastCompletedLeaderboardBoard(
     });
   }
 
-  // Compat: projection RPC not deployed yet.
+  // Compat: projection RPC not deployed yet (no college on this path).
   const { data, error } = await supabase.rpc("test_leaderboard", {
     p_test_id: resolved.id,
   });
 
   return buildLeaderboardBoardState({
     resolved,
-    rawRows: data,
+    rawRows: normalizeLeaderboardRpcRows(data),
     limit: input.limit,
     fetchFailed: Boolean(error),
   });
