@@ -10,6 +10,8 @@ import {
   flattenCsvErrors,
   formatCsvErrorsForCopy,
   parseQuestionCsvRecords,
+  presentCsvFieldError,
+  presentCsvFieldErrorsForUi,
   toImportPayloadRow,
   validateQuestionCsvHeaders,
   validateQuestionCsvRow,
@@ -158,6 +160,50 @@ describe("parse + copy-all-errors + retry shape", () => {
     assert.match(text, /option_e/);
     assert.match(text, /Expected:/);
     assert.match(text, /Preserve exact column names/);
+  });
+
+  it("presentCsvFieldError keeps row, field, reason, and expected", () => {
+    const errors = validateQuestionCsvRow({ ...validRow, correct: "Z" }, 2);
+    assert.ok(errors.length >= 1);
+    const line = presentCsvFieldError(errors[0]!);
+    assert.match(line, /^Row 2 ·/);
+    assert.match(line, /correct/);
+    assert.match(line, /got "Z"/);
+    assert.match(line, /A|B|C|D|E/);
+    assert.ok(errors[0]!.expected.length > 0);
+    assert.match(line, new RegExp(errors[0]!.expected.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  });
+
+  it("presentCsvFieldErrorsForUi surfaces multiple row errors without collapsing", () => {
+    const { rows, headerErrors } = parseQuestionCsvRecords([
+      { ...validRow, correct: "Z" },
+      { ...validRow, option_c: "" },
+      validRow,
+    ]);
+    const all = flattenCsvErrors(headerErrors, rows);
+    assert.ok(all.length >= 2);
+    const { visible, hidden } = presentCsvFieldErrorsForUi(all, 20);
+    assert.equal(hidden, 0);
+    assert.equal(visible.length, all.length);
+    assert.ok(visible.some((l) => /Row 2 · correct/i.test(l)));
+    assert.ok(visible.some((l) => /Row 3 · option_c/i.test(l)));
+    // Valid third data row (CSV row 4) contributes no errors
+    assert.ok(!visible.some((l) => /Row 4 ·/.test(l)));
+  });
+
+  it("presentCsvFieldErrorsForUi caps visible lines and reports hidden count", () => {
+    const errors = Array.from({ length: 5 }, (_, i) => ({
+      row: i + 2,
+      field: "correct",
+      error: "Invalid correct key",
+      expected: "A/B/C/D/E",
+      invalidValue: "Z",
+    }));
+    const { visible, hidden } = presentCsvFieldErrorsForUi(errors, 2);
+    assert.equal(visible.length, 2);
+    assert.equal(hidden, 3);
+    assert.match(visible[0]!, /Row 2/);
+    assert.match(visible[1]!, /Row 3/);
   });
 
   it("correction/retry: fixing the row clears errors", () => {

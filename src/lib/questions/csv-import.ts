@@ -269,6 +269,38 @@ export function flattenCsvErrors(
   return [...headerErrors, ...rows.flatMap((r) => r.errors)];
 }
 
+/** Max structured errors shown inline in compact admin surfaces (Test Builder). */
+export const CSV_FIELD_ERROR_UI_LIMIT = 20;
+
+/**
+ * One-line admin-facing summary for a CsvFieldError.
+ * Keeps row + field + reason (+ expected / invalid when useful).
+ */
+export function presentCsvFieldError(error: CsvFieldError): string {
+  const parts = [`Row ${error.row}`, error.field, error.error];
+  let line = parts.join(" · ");
+  if (error.invalidValue !== undefined && error.invalidValue !== "") {
+    line += ` (got "${error.invalidValue}")`;
+  }
+  if (error.expected) {
+    line += ` — ${error.expected}`;
+  }
+  return line;
+}
+
+/** Slice for UI lists; `hidden` is how many remain after the visible cap. */
+export function presentCsvFieldErrorsForUi(
+  errors: readonly CsvFieldError[],
+  limit = CSV_FIELD_ERROR_UI_LIMIT
+): { visible: string[]; hidden: number } {
+  const cap = Math.max(0, limit);
+  const visible = errors.slice(0, cap).map(presentCsvFieldError);
+  return {
+    visible,
+    hidden: Math.max(0, errors.length - visible.length),
+  };
+}
+
 /** Pasteable into ChatGPT for correction — stable, plain-text format. */
 export function formatCsvErrorsForCopy(errors: CsvFieldError[]): string {
   if (errors.length === 0) {
