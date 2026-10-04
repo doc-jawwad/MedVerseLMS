@@ -1,6 +1,10 @@
 "use server";
 
-import { actionRpcResult, toClientActionError } from "@/lib/errors/safe-action-error";
+import {
+  actionRpcResult,
+  logServerError,
+  toClientActionError,
+} from "@/lib/errors/safe-action-error";
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -16,6 +20,7 @@ import {
   resolveMcqBankScope,
   type RandomSelectionFilter,
 } from "@/lib/tests/random-selection-scope";
+import { publishTestErrorMessage } from "@/lib/tests/publish-test-errors";
 
 // Types only — "use server" modules must not re-export sync helpers/constants.
 export type { TestConfig } from "@/lib/tests/test-config-update";
@@ -403,7 +408,11 @@ export async function publishTest(testId: string) {
   const supabase = await createClient();
   const { error } = await supabase.rpc("publish_test", { p_test_id: testId });
   reval(testId);
-  return actionRpcResult("action", error);
+  if (!error) return {};
+  // Preserve existing publish_test checklist language for admins; do not
+  // genericize "validation failed: …" through the snake_case-only sanitizer.
+  logServerError("publishTest", error.message);
+  return { error: publishTestErrorMessage(error.message) };
 }
 
 /** Hard-delete a draft test only — see public.delete_draft_test. */

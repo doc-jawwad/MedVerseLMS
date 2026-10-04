@@ -16,6 +16,7 @@ import {
   voidTestQuestion,
   type QuestionFilter,
 } from "@/lib/actions/tests";
+import { publishTestErrorMessage } from "@/lib/tests/publish-test-errors";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -479,19 +480,51 @@ export function AudiencePicker({
   );
 }
 
-export function PublishButton({ testId, allPass }: { testId: string; allPass: boolean }) {
-  const { pending, run } = useAction();
+export function PublishButton({
+  testId,
+  allPass,
+  canPublishTests = true,
+}: {
+  testId: string;
+  allPass: boolean;
+  /** Server-side publish_tests gate mirrored for UX (RPC still enforces). */
+  canPublishTests?: boolean;
+}) {
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
   const { canPublish } = useTestDraftAudience();
   const [confirm, setConfirm] = useState(false);
-  const disabled = !allPass || !canPublish || pending;
+  const disabled = !allPass || !canPublish || !canPublishTests || pending;
+
+  const runPublish = () => {
+    setConfirm(false);
+    startTransition(async () => {
+      const res = await publishTest(testId);
+      if (res.error) toast.error(publishTestErrorMessage(res.error));
+      else {
+        toast.success("Published");
+        router.refresh();
+      }
+    });
+  };
+
   return (
     <>
+      {!canPublishTests && (
+        <p className="mb-2 text-sm text-destructive">
+          You do not have permission to publish tests.
+        </p>
+      )}
       {!canPublish && (
         <p className="mb-2 text-sm text-destructive">
           Student access is set to Neither — choose Free, Both, or Paid before publishing.
         </p>
       )}
-      <Button disabled={disabled} onClick={() => setConfirm(true)}>
+      <Button
+        disabled={disabled}
+        data-testid="publish-test-button"
+        onClick={() => setConfirm(true)}
+      >
         Publish test
       </Button>
       <Dialog open={confirm} onOpenChange={setConfirm}>
@@ -506,8 +539,7 @@ export function PublishButton({ testId, allPass }: { testId: string; allPass: bo
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => setConfirm(false)}>Cancel</Button>
-            <Button disabled={pending}
-              onClick={() => { setConfirm(false); run(() => publishTest(testId), "Published"); }}>
+            <Button disabled={pending} onClick={runPublish}>
               Publish
             </Button>
           </DialogFooter>

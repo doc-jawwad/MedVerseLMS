@@ -61,7 +61,8 @@ export default async function TestDetailPage({
 }) {
   const { supabase } = await requireAdmin();
   const perms = await getAdminPermissionSet();
-  const canDeleteDraft = perms.has("publish_tests");
+  const canPublishTests = perms.has("publish_tests");
+  const canDeleteDraft = canPublishTests;
   const { id } = await params;
   const filters = await searchParams;
   const poolPage = Math.max(1, Number.parseInt(filters.page ?? "1", 10) || 1);
@@ -566,7 +567,11 @@ export default async function TestDetailPage({
                 </div>
               ))}
               <div className="mt-2">
-                <PublishButton testId={id} allPass={allPass} />
+                <PublishButton
+                  testId={id}
+                  allPass={allPass}
+                  canPublishTests={canPublishTests}
+                />
               </div>
             </CardContent>
           </Card>
