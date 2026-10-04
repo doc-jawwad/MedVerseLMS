@@ -62,8 +62,9 @@ Admin → `invalidate_attempt(attempt_id, reason)` — **reason required**, audi
 Manual only (no autopilot). Admins can:
 
 - **Bank pick:** filter by year/subject/book/chapter/topic/difficulty/status → tick one or many questions → **Add selected**, or **"add N randomly from this filtered set"** (builder convenience; admin still reviews the final list). Only `approved` questions selectable; already-in-test ids are skipped.
+- **CSV import set:** draft Test Builder reuses Question Bank CSV + `import_question_batch` (`import_batches` / `import_rows`). After a valid import, the picker scopes to that batch (`?import_batch=`) so the admin can **Select imported set** / **Add imported set** (or still tick individuals). Does not change random-selection, scoring, or publish freeze.
 - **Inline create:** author a new MCQ on the draft test page (subject/book/chapter/topic locked to the test’s year). `create_question` with `status='approved'`, then attach to the draft. Topic year must match `tests.year_id`.
-- **Mix:** bank picks and inline creates can be combined on the same draft; reorder, per-question marks, and remove apply to the full list before publish.
+- **Mix:** bank picks, CSV import sets, and inline creates can be combined on the same draft; reorder, per-question marks, and remove apply to the full list before publish.
 
 `validate_test` / Publish stay the gate — see checklist above.
 ## Access

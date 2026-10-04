@@ -8,9 +8,9 @@ import {
   importChunk,
   type ImportRow,
 } from "@/lib/actions/import";
-import { addQuestionsToTest } from "@/lib/actions/tests";
 import {
   flattenCsvErrors,
+  formatCsvErrorsForCopy,
   parseQuestionCsvRecords,
   toImportPayloadRow,
   type ParsedCsvRow,
@@ -26,8 +26,9 @@ import {
 } from "@/components/ui/select";
 
 /**
- * Test Builder CSV import — reuses Question Bank parser + import_question_batch,
- * then attaches inserted IDs to this draft via add_questions_to_test.
+ * Test Builder CSV import — reuses Question Bank parser + import_question_batch.
+ * Imported rows stay associated via import_batches / import_rows; the draft's
+ * question picker then surfaces them as a selectable set (Add imported set).
  * Status is forced to approved so questions are eligible for the test pool
  * (same as createManualTestQuestion). Does not bypass freeze/publish rules.
  */
@@ -46,6 +47,7 @@ export function TestBuilderCsvImport({
     filename: string;
     rows: ParsedCsvRow[];
     errorCount: number;
+    errors: string[];
   } | null>(null);
 
   async function onFile(file: File | null) {
@@ -62,10 +64,18 @@ export function TestBuilderCsvImport({
         const records = (result.data ?? []) as Record<string, string>[];
         const { rows, headerErrors } = parseQuestionCsvRecords(records);
         const allErrors = flattenCsvErrors(headerErrors, rows);
+        const errorLines =
+          allErrors.length === 0
+            ? []
+            : formatCsvErrorsForCopy(allErrors)
+                .split("\n")
+                .map((s) => s.trim())
+                .filter(Boolean);
         setPreview({
           filename: file.name,
           rows,
           errorCount: allErrors.length,
+          errors: errorLines.slice(0, 12),
         });
         if (allErrors.length > 0) {
           toast.error(
@@ -73,7 +83,7 @@ export function TestBuilderCsvImport({
           );
         } else {
           toast.message(
-            `${rows.length} valid row(s) ready. Click Import & add to test.`
+            `${rows.length} valid row(s) ready. Click Import CSV set.`
           );
         }
       },
@@ -81,7 +91,7 @@ export function TestBuilderCsvImport({
     });
   }
 
-  function importAndAttach() {
+  function importCsvSet() {
     if (!preview || preview.rows.length === 0) return;
     if (preview.errorCount > 0) {
       toast.error("Resolve CSV validation errors before importing.");
@@ -137,22 +147,17 @@ export function TestBuilderCsvImport({
         );
         return;
       }
-      const add = await addQuestionsToTest(testId, questionIds);
-      if (add.error) {
-        toast.error(
-          `Imported ${questionIds.length} question(s) to the bank, but could not attach to this test: ${add.error}`
-        );
-        router.refresh();
-        return;
-      }
       toast.success(
-        `Added ${questionIds.length} CSV question(s) to this test` +
+        `Imported ${questionIds.length} question(s) as a selectable set` +
           (skipped || errors
             ? ` (skipped ${skipped}, row errors ${errors})`
-            : "")
+            : "") +
+          ". Use Add imported set below."
       );
       setPreview(null);
       if (fileRef.current) fileRef.current.value = "";
+      // Surface the batch in the question picker (import_rows identity).
+      router.push(`/admin/tests/${testId}?import_batch=${batchId}`);
       router.refresh();
     });
   }
@@ -174,8 +179,9 @@ export function TestBuilderCsvImport({
         <h3 className="text-sm font-semibold">Import questions from CSV</h3>
         <p className="mt-1 text-xs text-muted-foreground">
           Uses the same Question Bank CSV format and import pipeline. Rows are
-          inserted as <strong>approved</strong> (like Manual MCQ), then attached
-          to this draft. Publish still freezes question versions.
+          inserted as <strong>approved</strong> (like Manual MCQ), then shown
+          below as a selectable imported set. Publish still freezes question
+          versions.
         </p>
       </div>
       <div className="grid gap-2 sm:grid-cols-2 sm:items-end">
@@ -201,6 +207,7 @@ export function TestBuilderCsvImport({
             ref={fileRef}
             type="file"
             accept=".csv,text/csv"
+            data-testid="test-builder-csv-file"
             className="block w-full text-sm file:mr-2 file:rounded-md file:border-0 file:bg-primary file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-primary-foreground"
             onChange={(e) => onFile(e.target.files?.[0] ?? null)}
             disabled={pending}
@@ -208,38 +215,56 @@ export function TestBuilderCsvImport({
         </div>
       </div>
       {preview ? (
-        <div className="flex flex-wrap items-center gap-2 text-sm">
-          <span>
-            {preview.filename}: {preview.rows.length} row(s)
-            {preview.errorCount > 0
-              ? ` · ${preview.errorCount} validation error(s)`
-              : " · valid"}
-          </span>
-          <Button
-            type="button"
-            size="sm"
-            disabled={pending || preview.errorCount > 0}
-            onClick={importAndAttach}
-          >
-            {pending ? "Importing…" : "Import & add to test"}
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant="ghost"
-            disabled={pending}
-            onClick={() => {
-              setPreview(null);
-              if (fileRef.current) fileRef.current.value = "";
-            }}
-          >
-            Clear
-          </Button>
+        <div className="grid gap-2 text-sm">
+          <div className="flex flex-wrap items-center gap-2">
+            <span>
+              {preview.filename}: {preview.rows.length} row(s)
+              {preview.errorCount > 0
+                ? ` · ${preview.errorCount} validation error(s)`
+                : " · valid"}
+            </span>
+            <Button
+              type="button"
+              size="sm"
+              disabled={pending || preview.errorCount > 0}
+              data-testid="test-builder-csv-commit"
+              onClick={importCsvSet}
+            >
+              {pending ? "Importing…" : "Import CSV set"}
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              disabled={pending}
+              onClick={() => {
+                setPreview(null);
+                if (fileRef.current) fileRef.current.value = "";
+              }}
+            >
+              Clear
+            </Button>
+          </div>
+          {preview.errors.length > 0 ? (
+            <ul
+              className="max-h-40 list-disc overflow-y-auto rounded-md border bg-muted/30 px-5 py-2 text-xs text-destructive"
+              data-testid="test-builder-csv-errors"
+            >
+              {preview.errors.map((err) => (
+                <li key={err}>{err}</li>
+              ))}
+              {preview.errorCount > preview.errors.length ? (
+                <li>
+                  …and {preview.errorCount - preview.errors.length} more
+                </li>
+              ) : null}
+            </ul>
+          ) : null}
         </div>
       ) : null}
       <p className="text-xs text-muted-foreground">
-        Prefer the full Question Bank importer for large files or drafts needing
-        review — then add from the pool below.
+        Prefer the full Question Bank importer for large files — then filter
+        the pool below, or re-import here to get an imported set handle.
       </p>
     </div>
   );

@@ -50,12 +50,14 @@ export default async function TestDetailPage({
     difficulty?: string;
     q?: string;
     page?: string;
+    import_batch?: string;
   }>;
 }) {
   const { supabase } = await requireAdmin();
   const { id } = await params;
   const filters = await searchParams;
   const poolPage = Math.max(1, Number.parseInt(filters.page ?? "1", 10) || 1);
+  const importBatchId = filters.import_batch?.trim() || null;
 
   const { data: test } = await supabase
     .from("tests")
@@ -110,7 +112,8 @@ export default async function TestDetailPage({
   const orderedQuestions = testQuestions ?? [];
 
   // question picker pool (draft only), paginated the same way as the
-  // question-bank list page.
+  // question-bank list page. Optional import_batch scopes the pool to that
+  // CSV import set (import_rows.question_id) so the set is selectable as a batch.
   let pool: {
     id: string;
     difficulty: string;
@@ -118,6 +121,11 @@ export default async function TestDetailPage({
     subject: string | null;
   }[] = [];
   let poolCount = 0;
+  let importedSet: {
+    batchId: string;
+    filename: string;
+    questionIds: string[];
+  } | null = null;
   const filter = {
     subject_id: filters.subject,
     book_id: filters.book,
@@ -126,6 +134,36 @@ export default async function TestDetailPage({
     difficulty: filters.difficulty,
   };
   if (isDraft) {
+    if (importBatchId) {
+      const [{ data: batchMeta }, { data: batchRows }] = await Promise.all([
+        supabase
+          .from("import_batches")
+          .select("id, filename")
+          .eq("id", importBatchId)
+          .maybeSingle(),
+        supabase
+          .from("import_rows")
+          .select("question_id")
+          .eq("batch_id", importBatchId)
+          .not("question_id", "is", null)
+          .order("row_number"),
+      ]);
+      if (batchMeta) {
+        const questionIds = [
+          ...new Set(
+            (batchRows ?? [])
+              .map((r) => r.question_id as string | null)
+              .filter((qid): qid is string => Boolean(qid))
+          ),
+        ];
+        importedSet = {
+          batchId: batchMeta.id as string,
+          filename: (batchMeta.filename as string) ?? "",
+          questionIds,
+        };
+      }
+    }
+
     let q = supabase
       .from("questions")
       .select(
@@ -134,8 +172,12 @@ export default async function TestDetailPage({
       )
       .eq("status", "approved")
       .eq("year_id", test.year_id)
+      .is("deleted_at", null)
       .order("created_at", { ascending: false })
       .range((poolPage - 1) * POOL_PAGE_SIZE, poolPage * POOL_PAGE_SIZE - 1);
+    if (importedSet && importedSet.questionIds.length > 0) {
+      q = q.in("id", importedSet.questionIds);
+    }
     if (filters.subject) q = q.eq("subject_id", filters.subject);
     if (filters.book) q = q.eq("book_id", filters.book);
     if (filters.chapter) q = q.eq("chapter_id", filters.chapter);
@@ -341,7 +383,28 @@ export default async function TestDetailPage({
                   existing questions server-side regardless of this value. */}
               <AddRandomButton testId={id} filter={filter} poolSize={poolCount} />
 
-              <QuestionPoolMultiAdd testId={id} pool={pool} />
+              {importedSet ? (
+                <div className="flex flex-wrap items-center gap-2 text-sm">
+                  <span className="text-muted-foreground">
+                    Pool scoped to imported CSV set
+                  </span>
+                  <Button asChild size="sm" variant="ghost">
+                    <Link
+                      href={poolFilterLink({ import_batch: undefined })}
+                      data-testid="clear-import-batch-filter"
+                    >
+                      Show full pool
+                    </Link>
+                  </Button>
+                </div>
+              ) : null}
+
+              <QuestionPoolMultiAdd
+                testId={id}
+                pool={pool}
+                importedSet={importedSet}
+                alreadyOnTestIds={orderedQuestions.map((t) => t.question_id)}
+              />
 
               {poolTotalPages > 1 && (
                 <div className="flex items-center justify-between text-sm">
