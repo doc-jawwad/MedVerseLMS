@@ -65,6 +65,7 @@ Manual only (no autopilot). Admins can:
 - **CSV import set:** draft Test Builder reuses Question Bank CSV + `import_question_batch` (`import_batches` / `import_rows`). After a valid import, the picker scopes to that batch (`?import_batch=`) so the admin can **Select imported set** / **Add imported set** (or still tick individuals). Does not change random-selection, scoring, or publish freeze.
 - **Inline create:** author a new MCQ on the draft test page (subject/book/chapter/topic locked to the test’s year). `create_question` with `status='approved'`, then attach to the draft. Topic year must match `tests.year_id`.
 - **Mix:** bank picks, CSV import sets, and inline creates can be combined on the same draft; reorder, per-question marks, and remove apply to the full list before publish.
+- **Edit question content from a draft:** the builder’s **Edit question** link opens the shared Question Bank editor and saves via `create_question_version` (append-only). There is no draft-local question copy. Remove from draft deletes only the `test_questions` row. Published tests keep their frozen `question_version_id`; the draft reads `questions.current_version_id` until publish.
 
 `validate_test` / Publish stay the gate — see checklist above.
 ## Access

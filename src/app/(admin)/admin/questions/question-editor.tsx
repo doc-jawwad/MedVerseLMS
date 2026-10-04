@@ -57,9 +57,15 @@ const KEYS = ["A", "B", "C", "D", "E"];
 export function QuestionEditor({
   curriculum,
   initial,
+  fromTestId,
+  returnHref,
 }: {
   curriculum: CurriculumData;
   initial?: EditorInitial;
+  /** When set, save revalidates this draft Test Builder page. */
+  fromTestId?: string | null;
+  /** After a successful content save, navigate back (draft round-trip). */
+  returnHref?: string | null;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -135,10 +141,13 @@ export function QuestionEditor({
           tags: tagList,
         });
         if (metaRes.error) return void toast.error(metaRes.error);
-        const res = await saveNewVersion(initial!.questionId!, buildContent());
+        const res = await saveNewVersion(initial!.questionId!, buildContent(), {
+          fromTestId: fromTestId ?? undefined,
+        });
         if (res.error) return void toast.error(res.error);
         toast.success("Saved as a new version");
-        router.refresh();
+        if (returnHref) router.push(returnHref);
+        else router.refresh();
       } else {
         const res = await createQuestion(buildContent(), {
           topic_id: topicId,

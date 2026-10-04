@@ -67,6 +67,7 @@ export function RemoveQuestionButton({ testId, questionId }: { testId: string; q
   const { pending, run } = useAction();
   return (
     <Button size="sm" variant="ghost" className="text-destructive" disabled={pending}
+      data-testid={`remove-draft-question-${questionId}`}
       onClick={() => run(() => removeQuestionFromTest(testId, questionId), "Removed")}>
       Remove
     </Button>

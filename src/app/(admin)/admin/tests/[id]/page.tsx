@@ -409,9 +409,25 @@ export default async function TestDetailPage({
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Button asChild size="sm" variant="ghost">
-                      <Link href={`/admin/questions/${tq.question_id}`}>Edit</Link>
-                    </Button>
+                    {isDraft ? (
+                      <Button asChild size="sm" variant="ghost">
+                        <Link
+                          href={`/admin/questions/${tq.question_id}?fromTest=${id}`}
+                          data-testid={`edit-draft-question-${tq.question_id}`}
+                        >
+                          Edit question
+                        </Link>
+                      </Button>
+                    ) : (
+                      <Button asChild size="sm" variant="ghost">
+                        <Link
+                          href={`/admin/questions/${tq.question_id}`}
+                          data-testid={`open-bank-question-${tq.question_id}`}
+                        >
+                          Open in bank
+                        </Link>
+                      </Button>
+                    )}
                     {isDraft && (
                       <>
                         <QuestionMarksInput

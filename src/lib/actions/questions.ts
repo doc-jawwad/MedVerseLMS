@@ -81,7 +81,11 @@ export async function listQuestionUsages(questionId: string) {
 }
 
 // Editing content = append an immutable new version (docs/database.md).
-export async function saveNewVersion(questionId: string, content: QuestionContent) {
+export async function saveNewVersion(
+  questionId: string,
+  content: QuestionContent,
+  opts?: { fromTestId?: string }
+) {
   const supabase = await createClient();
   const { error } = await supabase.rpc("create_question_version", {
     p_question_id: questionId,
@@ -93,6 +97,11 @@ export async function saveNewVersion(questionId: string, content: QuestionConten
   });
   revalidatePath(`/admin/questions/${questionId}`);
   revalidatePath("/admin/questions");
+  // Draft Test Builder reads current_version stem — refresh that surface too.
+  if (opts?.fromTestId) {
+    revalidatePath(`/admin/tests/${opts.fromTestId}`);
+  }
+  revalidatePath("/admin/tests");
   return actionRpcResult("action", error);
 }
 
