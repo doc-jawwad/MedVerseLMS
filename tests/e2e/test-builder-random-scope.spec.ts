@@ -321,10 +321,12 @@ test.describe("Test Builder random selection scope", () => {
       await page.goto(
         `/admin/tests/${fixture.testId}?bank=${fixture.bankId}&folder=${fixture.folderA}`
       );
-      await expect(
-        page.getByTestId(`tick-question-${fixture.qA2[0]}`)
-      ).toBeVisible({ timeout: 15000 });
-      await page.getByTestId(`tick-question-${fixture.qA2[0]}`).click();
+      const tickA2 = page
+        .getByRole("main")
+        .getByTestId(`tick-question-${fixture.qA2[0]}`)
+        .first();
+      await expect(tickA2).toBeVisible({ timeout: 15000 });
+      await tickA2.click();
       await page.getByTestId("add-selected-questions").click();
       await expect(
         page.getByRole("main").getByText("Questions (4)")
