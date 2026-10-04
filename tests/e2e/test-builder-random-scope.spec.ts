@@ -289,7 +289,10 @@ test.describe("Test Builder random selection scope", () => {
       const nInput = page.locator('input[type="number"]').first();
       await nInput.fill("10");
       await page.getByTestId("add-random-from-filter").click();
-      await expect(page.getByText("Questions (3)")).toBeVisible({
+      const questionsHeading = page
+        .getByRole("main")
+        .getByText(/^Questions \(\d+\)$/);
+      await expect(questionsHeading).toHaveText("Questions (3)", {
         timeout: 20000,
       });
 
@@ -308,7 +311,9 @@ test.describe("Test Builder random selection scope", () => {
 
       // Refresh preserves questions
       await page.reload();
-      await expect(page.getByText("Questions (3)")).toBeVisible({
+      await expect(
+        page.getByRole("main").getByText("Questions (3)")
+      ).toBeVisible({
         timeout: 15000,
       });
 
@@ -321,7 +326,9 @@ test.describe("Test Builder random selection scope", () => {
       ).toBeVisible({ timeout: 15000 });
       await page.getByTestId(`tick-question-${fixture.qA2[0]}`).click();
       await page.getByTestId("add-selected-questions").click();
-      await expect(page.getByText("Questions (4)")).toBeVisible({
+      await expect(
+        page.getByRole("main").getByText("Questions (4)")
+      ).toBeVisible({
         timeout: 15000,
       });
       await expect(page.getByText(`${fixture.tag} IN_A2 sibling`)).toBeVisible();
