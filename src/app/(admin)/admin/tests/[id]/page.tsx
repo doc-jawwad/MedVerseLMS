@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireAdmin } from "@/lib/auth/require-user";
+import { getAdminPermissionSet } from "@/lib/admin/admin-nav";
 import { loadCurriculumFilterCascade } from "@/lib/admin/curriculum-load";
 import { resolveMcqBankScope } from "@/lib/tests/random-selection-scope";
 import { TestConfigForm } from "../test-config-form";
@@ -11,6 +12,7 @@ import {
 import { TestDraftAudienceProvider } from "../test-draft-audience-context";
 import { TestBuilderManualMcq } from "../test-builder-manual-mcq";
 import { TestBuilderCsvImport } from "../test-builder-csv-import";
+import { DraftTestDeleteButton } from "../draft-test-actions";
 import { QuestionPoolMultiAdd } from "./question-pool-multi-add";
 import {
   AddRandomButton,
@@ -58,6 +60,8 @@ export default async function TestDetailPage({
   }>;
 }) {
   const { supabase } = await requireAdmin();
+  const perms = await getAdminPermissionSet();
+  const canDeleteDraft = perms.has("publish_tests");
   const { id } = await params;
   const filters = await searchParams;
   const poolPage = Math.max(1, Number.parseInt(filters.page ?? "1", 10) || 1);
@@ -311,6 +315,13 @@ export default async function TestDetailPage({
           <Button asChild variant="outline" size="sm">
             <Link href={`/admin/tests/${id}/preview`}>Preview as student</Link>
           </Button>
+          {isDraft && canDeleteDraft && (
+            <DraftTestDeleteButton
+              testId={id}
+              title={test.title}
+              redirectToList
+            />
+          )}
           {test.status !== "draft" && (
             <Button asChild variant="outline" size="sm">
               <Link href={`/admin/tests/${id}/results`}>Results</Link>

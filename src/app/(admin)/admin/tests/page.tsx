@@ -14,6 +14,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  DraftTestDeleteButton,
+  DraftTestEditLink,
+} from "./draft-test-actions";
 
 export const metadata = { title: "Tests — MedVerse Admin" };
 
@@ -35,6 +39,7 @@ export default async function AdminTestsPage({
     "Tests"
   );
   if (gate.denied) return gate.denied;
+  const canDeleteDraft = gate.perms.has("publish_tests");
   const { supabase } = await requireAdmin();
   const params = await searchParams;
   const typeFilter = params.type === "mock" ? "mock" : params.type === "formal" ? "formal" : null;
@@ -84,13 +89,13 @@ export default async function AdminTestsPage({
               <TableHead>Questions</TableHead>
               <TableHead className="hidden lg:table-cell">Window</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead />
+              <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {(tests ?? []).length === 0 && (
               <TableRow>
-                <TableCell colSpan={6} className="text-center text-muted-foreground">
+                <TableCell colSpan={7} className="text-center text-muted-foreground">
                   No tests yet.
                 </TableCell>
               </TableRow>
@@ -99,8 +104,9 @@ export default async function AdminTestsPage({
               const y = t.years as unknown as { year_number: number } | null;
               const s = t.subjects as unknown as { name: string } | null;
               const qc = (t.test_questions as unknown as { count: number }[])?.[0]?.count ?? 0;
+              const isDraft = t.status === "draft";
               return (
-                <TableRow key={t.id}>
+                <TableRow key={t.id} data-testid={`test-row-${t.id}`}>
                   <TableCell>
                     <Link href={`/admin/tests/${t.id}`} className="font-medium hover:underline">
                       {t.title}
@@ -122,14 +128,23 @@ export default async function AdminTestsPage({
                     <Badge variant={statusVariant[t.status] ?? "outline"}>{t.status}</Badge>
                   </TableCell>
                   <TableCell>
-                    {t.status !== "draft" && (
-                      <Link
-                        href={`/admin/tests/${t.id}/results`}
-                        className="text-sm text-muted-foreground hover:underline"
-                      >
-                        Results
-                      </Link>
-                    )}
+                    <div className="flex flex-wrap items-center justify-end gap-2">
+                      {isDraft ? (
+                        <>
+                          <DraftTestEditLink testId={t.id} />
+                          {canDeleteDraft && (
+                            <DraftTestDeleteButton testId={t.id} title={t.title} />
+                          )}
+                        </>
+                      ) : (
+                        <Link
+                          href={`/admin/tests/${t.id}/results`}
+                          className="text-sm text-muted-foreground hover:underline"
+                        >
+                          Results
+                        </Link>
+                      )}
+                    </div>
                   </TableCell>
                 </TableRow>
               );

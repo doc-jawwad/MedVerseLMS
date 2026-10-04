@@ -5,10 +5,10 @@
 ```
 draft ──publish_test()──▶ published ──closes_at passes / close now──▶ closed ──▶ archived
   │                          │
-  └──delete allowed          └──invalidate──▶ invalidated
+  └──delete_draft_test()     └──invalidate──▶ invalidated
 ```
 
-- `draft` — editable freely; students never see it.
+- `draft` — editable freely; students never see it. Hard-delete via `delete_draft_test(test_id)` (`publish_tests` required; refuses non-draft; audit `test_draft_deleted`). Cascades draft composition (`test_questions` / audiences / prep). Not Content Bin soft-delete. Published/live tests are not deleted this way (close / invalidate instead).
 - `published` — frozen (see below); in the student **catalog** for its audience from `opens_at` (locked if not entitled). "Live" is **derived**: `status='published' AND now() BETWEEN opens_at AND closes_at` — never stored. Upcoming published tests list immediately, sorted by `opens_at` ascending. Optional **preparation guidelines** (`test_prep_guidelines`) are readable after `can_access_test` (including before the window opens and after submit while entitlement remains). Guideline rows stay attached in Test History; they are not a new attempt state.
 - `closed` — window over. Owned **score / result summary** stays visible. Paid **review content** (stems, selected keys, correct keys, explanations) follows [access-eligibility-analytics.md](access-eligibility-analytics.md) §11 (live entitlement + `show_review`; server-gated).
 - `archived` — hidden from student lists; history intact.

@@ -406,6 +406,17 @@ export async function publishTest(testId: string) {
   return actionRpcResult("action", error);
 }
 
+/** Hard-delete a draft test only — see public.delete_draft_test. */
+export async function deleteDraftTest(testId: string) {
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("delete_draft_test", {
+    p_test_id: testId,
+  });
+  if (error) return actionRpcResult("deleteDraftTest", error);
+  reval();
+  return {};
+}
+
 export async function closeTestNow(testId: string) {
   const supabase = await createClient();
   const { error } = await supabase.rpc("close_test_now", { p_test_id: testId });

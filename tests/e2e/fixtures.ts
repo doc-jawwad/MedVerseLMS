@@ -206,10 +206,7 @@ export async function teardownExamFixture(f: ExamFixture) {
     method: "DELETE",
     headers: authAdminHeaders(),
   });
-  await fetch(`${REST}/rest/v1/tests?id=eq.${f.testId}`, {
-    method: "DELETE",
-    headers: await svcHeaders(),
-  });
+  await deleteTestRowForE2e(f.testId);
 }
 
 export async function changeStudentYear(studentId: string, yearNumber: number) {
@@ -803,19 +800,26 @@ export async function teardownQuestionPoolFixture(
   extra?: { testId?: string }
 ) {
   if (extra?.testId) {
-    await fetch(`${REST}/rest/v1/tests?id=eq.${extra.testId}`, {
-      method: "DELETE",
-      headers: await svcHeaders(),
-    });
+    await deleteTestRowForE2e(extra.testId);
   }
 }
 
-export async function deletePublishedTest(testId: string) {
-  requireUuid(testId, "testId");
+/** E2E cleanup: tests_admin_delete is draft-only; reopen then hard-delete. */
+async function deleteTestRowForE2e(testId: string) {
+  await fetch(`${REST}/rest/v1/tests?id=eq.${testId}`, {
+    method: "PATCH",
+    headers: await svcHeaders(),
+    body: JSON.stringify({ status: "draft" }),
+  });
   await fetch(`${REST}/rest/v1/tests?id=eq.${testId}`, {
     method: "DELETE",
     headers: await svcHeaders(),
   });
+}
+
+export async function deletePublishedTest(testId: string) {
+  requireUuid(testId, "testId");
+  await deleteTestRowForE2e(testId);
 }
 
 /** Extra published test on year 1 for an existing fixture student (same tenant). */
