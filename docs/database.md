@@ -298,7 +298,7 @@ Admin CSV/XLSX import (`/admin/questions/import`) and `import_question_batch` us
 | `difficulty` | no | `easy`/`medium`/`hard` (blank → `medium`) |
 | `tags` | no | Pipe-separated (`\|`), not commas |
 
-Client validation must pass before the RPC runs. The RPC is **atomic**: a hard error rolls back the whole call. Rows matching an existing `content_hash` are `skipped_duplicate` and **never overwrite** existing questions. Template + ChatGPT generation prompt live in Admin Import UI (`src/lib/questions/csv-import.ts`).
+Client validation must pass before the RPC runs. The RPC is **atomic**: a hard error rolls back the whole call. Rows matching an existing `content_hash` are `skipped_duplicate` and **never overwrite** existing questions. Concurrent imports that race on the same missing book/chapter/topic reuse the winner’s taxonomy row (`ON CONFLICT` + re-select); a concurrent `content_hash` unique race is recorded as `skipped_duplicate` rather than aborting the batch. Template + ChatGPT generation prompt live in Admin Import UI (`src/lib/questions/csv-import.ts`).
 
 ## Stats (Phase 10)
 
