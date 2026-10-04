@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
@@ -29,6 +29,14 @@ import {
 } from "@/components/ui/select";
 
 /**
+ * Mobile file pickers often label CSV as text/plain, application/csv,
+ * or application/vnd.ms-excel. Keep accept broad; content validation remains
+ * the real gate (same Question Bank parser).
+ */
+const CSV_FILE_ACCEPT =
+  ".csv,text/csv,text/plain,application/csv,text/comma-separated-values,application/vnd.ms-excel";
+
+/**
  * Test Builder CSV import — reuses Question Bank parser + import_question_batch.
  * Imported rows stay associated via import_batches / import_rows; the draft's
  * question picker then surfaces them as a selectable set (Add imported set).
@@ -44,8 +52,10 @@ export function TestBuilderCsvImport({
 }) {
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
+  /** Synchronous lock — blocks double-tap before React re-render. */
+  const importLockRef = useRef(false);
   const [subjectId, setSubjectId] = useState(subjects[0]?.id ?? "");
-  const [pending, startTransition] = useTransition();
+  const [importing, setImporting] = useState(false);
   const [preview, setPreview] = useState<{
     filename: string;
     rows: ParsedCsvRow[];
@@ -55,14 +65,45 @@ export function TestBuilderCsvImport({
     hiddenErrorCount: number;
   } | null>(null);
 
+  function resetFileInput() {
+    if (fileRef.current) fileRef.current.value = "";
+  }
+
+  /**
+   * Open the native picker after clearing the prior value so choosing the
+   * same path again (common after fixing a CSV on mobile) still fires change.
+   */
+  function openFilePicker() {
+    if (importing) return;
+    resetFileInput();
+    fileRef.current?.click();
+  }
+
   async function onFile(file: File | null) {
     if (!file) return;
     if (!subjectId) {
       toast.error("Select a subject for the CSV rows.");
+      // Keep picker re-selectable even when subject is missing.
+      resetFileInput();
       return;
     }
+    const filename = file.name;
+    let text: string;
+    try {
+      // Read bytes before clearing the input — some mobile WebViews invalidate
+      // the File handle once the input value is reset.
+      text = await file.text();
+    } catch {
+      toast.error("Could not read that CSV file.");
+      resetFileInput();
+      return;
+    }
+    // Clear so a later re-pick of the same filename always emits change
+    // (iOS/Android often suppress change when the path/name is unchanged).
+    resetFileInput();
+
     const Papa = (await import("papaparse")).default;
-    Papa.parse<Record<string, string>>(file, {
+    Papa.parse<Record<string, string>>(text, {
       header: true,
       skipEmptyLines: true,
       transformHeader: (h) => h.trim().toLowerCase(),
@@ -72,7 +113,7 @@ export function TestBuilderCsvImport({
         const allErrors = flattenCsvErrors(headerErrors, rows);
         const { visible, hidden } = presentCsvFieldErrorsForUi(allErrors);
         setPreview({
-          filename: file.name,
+          filename,
           rows,
           errorCount: allErrors.length,
           fieldErrors: allErrors,
@@ -96,7 +137,7 @@ export function TestBuilderCsvImport({
     });
   }
 
-  function importCsvSet() {
+  async function importCsvSet() {
     if (!preview || preview.rows.length === 0) return;
     if (preview.errorCount > 0) {
       toast.error("Resolve CSV validation errors before importing.");
@@ -106,7 +147,10 @@ export function TestBuilderCsvImport({
       toast.error("Select a subject for the CSV rows.");
       return;
     }
-    startTransition(async () => {
+    if (importLockRef.current || importing) return;
+    importLockRef.current = true;
+    setImporting(true);
+    try {
       const batch = await createImportBatch(
         `test-builder:${preview.filename}`,
         preview.rows.length
@@ -160,11 +204,14 @@ export function TestBuilderCsvImport({
           ". Use Add imported set below."
       );
       setPreview(null);
-      if (fileRef.current) fileRef.current.value = "";
+      resetFileInput();
       // Surface the batch in the question picker (import_rows identity).
       router.push(`/admin/tests/${testId}?import_batch=${batchId}`);
       router.refresh();
-    });
+    } finally {
+      importLockRef.current = false;
+      setImporting(false);
+    }
   }
 
   if (subjects.length === 0) {
@@ -215,19 +262,22 @@ export function TestBuilderCsvImport({
               id="tb-csv-file"
               ref={fileRef}
               type="file"
-              accept=".csv,text/csv"
+              accept={CSV_FILE_ACCEPT}
               data-testid="test-builder-csv-file"
               className="sr-only"
-              onChange={(e) => onFile(e.target.files?.[0] ?? null)}
-              disabled={pending}
+              onChange={(e) => {
+                const file = e.target.files?.[0] ?? null;
+                void onFile(file);
+              }}
+              disabled={importing}
             />
             <Button
               type="button"
               size="sm"
               variant="secondary"
-              disabled={pending}
+              disabled={importing}
               data-testid="test-builder-csv-choose"
-              onClick={() => fileRef.current?.click()}
+              onClick={openFilePicker}
             >
               Choose CSV
             </Button>
@@ -249,20 +299,22 @@ export function TestBuilderCsvImport({
             <Button
               type="button"
               size="sm"
-              disabled={pending || preview.errorCount > 0}
+              disabled={importing || preview.errorCount > 0}
               data-testid="test-builder-csv-commit"
-              onClick={importCsvSet}
+              onClick={() => {
+                void importCsvSet();
+              }}
             >
-              {pending ? "Importing…" : "Import CSV set"}
+              {importing ? "Importing…" : "Import CSV set"}
             </Button>
             <Button
               type="button"
               size="sm"
               variant="ghost"
-              disabled={pending}
+              disabled={importing}
               onClick={() => {
                 setPreview(null);
-                if (fileRef.current) fileRef.current.value = "";
+                resetFileInput();
               }}
             >
               Clear
@@ -279,7 +331,7 @@ export function TestBuilderCsvImport({
                   type="button"
                   size="sm"
                   variant="outline"
-                  disabled={pending}
+                  disabled={importing}
                   data-testid="test-builder-csv-copy-errors"
                   onClick={async () => {
                     try {
