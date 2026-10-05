@@ -110,22 +110,32 @@ export async function MaterialLibraryPage({
     foldersQuery = foldersQuery.is("prof_session_day_id", null);
   }
 
+  // Folders first so materials + access checks stay scoped to this library page.
+  const { data: folders } = await foldersQuery;
+  const folderRows = (folders ?? []) as Folder[];
+  const folderIds = folderRows.map((f) => f.id);
+
   const [
-    { data: folders },
     { data: materials },
     { data: subjects },
     { data: accessible },
     { data: grants },
   ] = await Promise.all([
-    foldersQuery,
-    supabase
-      .from("materials")
-      .select("id, folder_id, title, description, file_type, kind")
-      .is("deleted_at", null)
-      .order("sort_order")
-      .order("title"),
+    folderIds.length === 0
+      ? Promise.resolve({ data: [] as Material[] })
+      : supabase
+          .from("materials")
+          .select("id, folder_id, title, description, file_type, kind")
+          .in("folder_id", folderIds)
+          .is("deleted_at", null)
+          .order("sort_order")
+          .order("title"),
     supabase.from("subjects").select("id, name").order("name"),
-    supabase.rpc("accessible_folder_ids"),
+    folderIds.length === 0
+      ? Promise.resolve({ data: [] as { id: string }[] })
+      : supabase.rpc("accessible_folder_ids_among", {
+          p_folder_ids: folderIds,
+        }),
     mode === "free"
       ? supabase
           .from("access_grants")
@@ -145,7 +155,7 @@ export async function MaterialLibraryPage({
   const subjectName = (id: string | null) =>
     subjects?.find((s) => s.id === id)?.name ?? "General";
 
-  let visibleFolders = (folders ?? []) as Folder[];
+  let visibleFolders = folderRows;
   if (subjectId) {
     visibleFolders = visibleFolders.filter((f) => f.subject_id === subjectId);
   }

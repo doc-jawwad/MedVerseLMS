@@ -1,5 +1,6 @@
 import "server-only";
 
+import { cache } from "react";
 import { notFound } from "next/navigation";
 import {
   findCategoryInSubject,
@@ -45,8 +46,9 @@ export type AcademicBrowseContext = {
 /**
  * Load academic browse context for the enrolled year (architecture §2d).
  * Other year URLs redirect at the page layer before calling this.
+ * Request-scoped memoization: nested Academic RSC segments share one tree load.
  */
-export async function loadAcademicBrowseForYear(
+export const loadAcademicBrowseForYear = cache(async function loadAcademicBrowseForYear(
   _yearNumber: number
 ): Promise<AcademicBrowseContext> {
   const { supabase, enrollment } = await requireStudent();
@@ -72,10 +74,10 @@ export async function loadAcademicBrowseForYear(
     year_name: enrollment.year_name,
     surface,
   };
-}
+});
 
 /** Prefer enrolled-year context (legacy loadAcademicBrowse callers). */
-export async function loadAcademicBrowse(
+export const loadAcademicBrowse = cache(async function loadAcademicBrowse(
   _surface?: AcademicTreeSurface
 ): Promise<AcademicBrowseContext> {
   const ctx = await getAcademicTreePageContext(
@@ -86,7 +88,7 @@ export async function loadAcademicBrowse(
     tree: unlockNavigationChrome(ctx.tree),
     surface: ctx.tree.surface,
   };
-}
+});
 
 /** UX: free students see the full hierarchy; locks apply to content leaves / Prof. Session. */
 function unlockNavigationChrome(tree: AcademicTree): AcademicTree {
