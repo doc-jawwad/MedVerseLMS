@@ -32,12 +32,27 @@ export type ImportChunkResult = {
 
 export async function createImportBatch(filename: string, totalRows: number) {
   const supabase = await createClient();
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+  if (userError || !user) {
+    return actionRpcResult(
+      "createImportBatch",
+      userError ?? { message: "Not authenticated" }
+    );
+  }
+  // Ownership is always the authenticated admin — never accept a client-supplied id.
   const { data, error } = await supabase
     .from("import_batches")
-    .insert({ filename, total_rows: totalRows })
+    .insert({
+      filename,
+      total_rows: totalRows,
+      created_by: user.id,
+    })
     .select("id")
     .single();
-  if (error) return actionRpcResult("action", error);
+  if (error) return actionRpcResult("createImportBatch", error);
   return { id: data.id as string };
 }
 
