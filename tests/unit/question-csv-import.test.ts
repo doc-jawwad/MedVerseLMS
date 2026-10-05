@@ -206,6 +206,41 @@ describe("parse + copy-all-errors + retry shape", () => {
     assert.match(visible[1]!, /Row 3/);
   });
 
+  // Day Practice CSV uses the same presentation helpers as Test Builder
+  // (presentCsvFieldError / presentCsvFieldErrorsForUi) — not formatCsvErrorsForCopy
+  // split into list items.
+  it("day-practice presentation: one invalid row stays actionable", () => {
+    const { rows, headerErrors } = parseQuestionCsvRecords([
+      { ...validRow, correct: "Z" },
+    ]);
+    const all = flattenCsvErrors(headerErrors, rows);
+    assert.equal(all.length, 1);
+    const { visible, hidden } = presentCsvFieldErrorsForUi(all);
+    assert.equal(hidden, 0);
+    assert.equal(visible.length, 1);
+    assert.match(visible[0]!, /^Row 2 · correct/);
+    assert.match(visible[0]!, /got "Z"/);
+    assert.ok(all[0]!.expected.length > 0);
+    assert.match(visible[0]!, /A|B|C|D|E/);
+  });
+
+  it("day-practice presentation: multiple invalid rows keep row/field/expected", () => {
+    const { rows, headerErrors } = parseQuestionCsvRecords([
+      { ...validRow, correct: "Z" },
+      { ...validRow, option_c: "" },
+    ]);
+    const all = flattenCsvErrors(headerErrors, rows);
+    assert.ok(all.length >= 2);
+    const { visible } = presentCsvFieldErrorsForUi(all);
+    assert.ok(visible.some((l) => /Row 2 · correct/i.test(l) && /got "Z"/.test(l)));
+    assert.ok(visible.some((l) => /Row 3 · option_c/i.test(l)));
+    // Copy format must still carry Expected for paste/fix workflows
+    const copy = formatCsvErrorsForCopy(all);
+    assert.match(copy, /Expected:/);
+    assert.match(copy, /Row 2/);
+    assert.match(copy, /Row 3/);
+  });
+
   it("correction/retry: fixing the row clears errors", () => {
     const bad = validateQuestionCsvRow({ ...validRow, correct: "Z" }, 2);
     assert.ok(bad.length > 0);

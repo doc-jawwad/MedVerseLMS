@@ -13,7 +13,10 @@ import {
   flattenCsvErrors,
   formatCsvErrorsForCopy,
   parseQuestionCsvRecords,
+  presentCsvFieldError,
+  presentCsvFieldErrorsForUi,
   toImportPayloadRow,
+  type CsvFieldError,
   type ParsedCsvRow,
 } from "@/lib/questions/csv-import";
 import { Button } from "@/components/ui/button";
@@ -30,6 +33,7 @@ import {
  * Prof. Session Day Practice MCQ CSV import.
  * Reuses Question Bank parser + import_question_batch, then merges inserted
  * IDs into this day's practice set (day-scoped junction only).
+ * Validation-error presentation matches Test Builder (presentCsvFieldError).
  */
 export function DayPracticeCsvImport({
   dayId,
@@ -50,7 +54,9 @@ export function DayPracticeCsvImport({
     filename: string;
     rows: ParsedCsvRow[];
     errorCount: number;
-    errors: string[];
+    fieldErrors: CsvFieldError[];
+    errorLines: string[];
+    hiddenErrorCount: number;
   } | null>(null);
 
   async function onFile(file: File | null) {
@@ -67,19 +73,21 @@ export function DayPracticeCsvImport({
         const records = (result.data ?? []) as Record<string, string>[];
         const { rows, headerErrors } = parseQuestionCsvRecords(records);
         const allErrors = flattenCsvErrors(headerErrors, rows);
-        const errorLines = formatCsvErrorsForCopy(allErrors)
-          .split("\n")
-          .map((s) => s.trim())
-          .filter(Boolean);
+        const { visible, hidden } = presentCsvFieldErrorsForUi(allErrors);
         setPreview({
           filename: file.name,
           rows,
           errorCount: allErrors.length,
-          errors: errorLines.slice(0, 12),
+          fieldErrors: allErrors,
+          errorLines: visible,
+          hiddenErrorCount: hidden,
         });
         if (allErrors.length > 0) {
+          const first = presentCsvFieldError(allErrors[0]!);
           toast.error(
-            `${allErrors.length} validation issue(s). Fix the CSV before importing.`
+            allErrors.length === 1
+              ? first
+              : `${allErrors.length} validation issue(s). First: ${first}`
           );
         } else {
           toast.message(
@@ -256,20 +264,61 @@ export function DayPracticeCsvImport({
               Clear
             </Button>
           </div>
-          {preview.errors.length > 0 ? (
-            <ul
-              className="max-h-40 list-disc overflow-y-auto rounded-md border bg-muted/30 px-5 py-2 text-xs text-destructive"
-              data-testid="day-practice-csv-errors"
-            >
-              {preview.errors.map((err) => (
-                <li key={err}>{err}</li>
-              ))}
-              {preview.errorCount > preview.errors.length ? (
-                <li>
-                  …and {preview.errorCount - preview.errors.length} more
-                </li>
-              ) : null}
-            </ul>
+          {preview.errorCount > 0 ? (
+            <div className="grid gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="text-xs font-medium text-destructive">
+                  Fix these CSV issues before importing — row, field, and
+                  expected value are listed below.
+                </p>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={pending}
+                  data-testid="day-practice-csv-copy-errors"
+                  onClick={async () => {
+                    try {
+                      await navigator.clipboard.writeText(
+                        formatCsvErrorsForCopy(preview.fieldErrors)
+                      );
+                      toast.message("Validation errors copied");
+                    } catch {
+                      toast.error("Could not copy errors");
+                    }
+                  }}
+                >
+                  Copy all errors
+                </Button>
+              </div>
+              <ul
+                className="max-h-48 list-disc overflow-y-auto rounded-md border bg-muted/30 px-5 py-2 text-xs text-destructive"
+                data-testid="day-practice-csv-errors"
+              >
+                {preview.errorLines.map((err, i) => {
+                  const src = preview.fieldErrors[i];
+                  return (
+                    <li
+                      key={
+                        src
+                          ? `${src.row}-${src.field}-${i}`
+                          : `line-${i}`
+                      }
+                      data-testid="day-practice-csv-error-item"
+                      data-row={src?.row}
+                      data-field={src?.field}
+                    >
+                      {err}
+                    </li>
+                  );
+                })}
+                {preview.hiddenErrorCount > 0 ? (
+                  <li data-testid="day-practice-csv-errors-more">
+                    …and {preview.hiddenErrorCount} more — use Copy all errors
+                  </li>
+                ) : null}
+              </ul>
+            </div>
           ) : null}
         </div>
       ) : null}

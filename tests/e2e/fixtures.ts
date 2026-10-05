@@ -804,6 +804,49 @@ export async function teardownQuestionPoolFixture(
   }
 }
 
+/** Draft Prof. Session day on Year 1 Block product subject (admin RPC). */
+export async function createDraftProfSessionDay(
+  name: string
+): Promise<{ dayId: string; yearId: string; subjectId: string }> {
+  const yearRes = await fetch(`${REST}/rest/v1/years?year_number=eq.1&select=id`, {
+    headers: await svcHeaders(),
+  }).then((r) => r.json());
+  const yearId = yearRes[0]?.id as string | undefined;
+  if (!yearId) throw new Error("year 1 missing");
+
+  const subjRes = await fetch(
+    `${REST}/rest/v1/subjects?year_id=eq.${yearId}&product_key=not.is.null&select=id,product_key&order=sort_order&limit=1`,
+    { headers: await svcHeaders() }
+  ).then((r) => r.json());
+  const subjectId = subjRes[0]?.id as string | undefined;
+  if (!subjectId) throw new Error("no product subject for year 1");
+
+  const created = await adminRpc("admin_create_prof_session_day", {
+    p_subject_id: subjectId,
+    p_name: name,
+    p_sort_order: null,
+  });
+  if (!created.ok || typeof created.json !== "string") {
+    throw new Error(
+      `admin_create_prof_session_day failed: ${created.status} ${created.text}`
+    );
+  }
+  return { dayId: created.json, yearId, subjectId };
+}
+
+/** Soft-delete day into Content Bin (shared contract). */
+export async function softDeleteProfSessionDayForE2e(dayId: string) {
+  const res = await adminRpc("soft_delete_content", {
+    p_entity_type: "prof_session_day",
+    p_entity_id: dayId,
+  });
+  if (!res.ok) {
+    throw new Error(
+      `soft_delete_content(prof_session_day) failed: ${res.status} ${res.text}`
+    );
+  }
+}
+
 /** E2E cleanup: tests_admin_delete is draft-only; reopen then hard-delete. */
 async function deleteTestRowForE2e(testId: string) {
   await fetch(`${REST}/rest/v1/tests?id=eq.${testId}`, {
