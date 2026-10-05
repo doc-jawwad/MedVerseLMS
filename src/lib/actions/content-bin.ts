@@ -11,6 +11,7 @@ import {
   type ContentBinBulkPurgeResult,
   type ContentBinPurgeOutcome,
 } from "@/lib/content-bin/purge-batch";
+import { contentBinPurgeErrorMessage } from "@/lib/content-bin/purge-errors";
 
 export type ContentBinItem = {
   entity_type: ContentBinEntityType;
@@ -100,13 +101,14 @@ export async function purgeContentFromBin(
     p_entity_id: entityId,
   });
   revalidateBinSurfaces();
-  if (error?.message?.includes("question_referenced_by_test")) {
-    return {
-      error:
-        "Retained because referenced by a test. Remove the question from the draft test (or wait until no test references remain) before permanent delete.",
-    };
+  if (error) {
+    const mapped = contentBinPurgeErrorMessage(error.message);
+    if (mapped !== "Something went wrong. Please try again.") {
+      return { error: mapped };
+    }
+    return actionRpcResult("purgeContentFromBin", error);
   }
-  return actionRpcResult("purgeContentFromBin", error);
+  return {};
 }
 
 export type ContentBinBulkItem = {

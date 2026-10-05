@@ -39,13 +39,25 @@ export function summarizePurgeOutcomes(
       (o.detail === "question_referenced_by_test" ||
         o.detail?.includes("question_referenced_by_test"))
   ).length;
-  const blockedOther = blocked - retainedByTest;
+  const folderNotEmpty = outcomes.filter(
+    (o) =>
+      o.outcome === "blocked" &&
+      (o.detail === "mcq_bank_folder_not_empty" ||
+        o.detail?.includes("mcq_bank_folder_not_empty") ||
+        o.detail === "subfolder_not_empty" ||
+        o.detail?.includes("subfolder_not_empty") ||
+        o.detail === "folder_has_live_descendants" ||
+        o.detail?.includes("folder_has_live_descendants"))
+  ).length;
+  const blockedOther = blocked - retainedByTest - folderNotEmpty;
   const parts: string[] = [];
   if (purged) parts.push(`Purged ${purged}`);
   if (retainedByTest)
     parts.push(
       `${retainedByTest} retained because referenced by test`
     );
+  if (folderNotEmpty)
+    parts.push(`${folderNotEmpty} blocked (still has live children)`);
   if (blockedOther) parts.push(`${blockedOther} blocked`);
   if (alreadyGone) parts.push(`${alreadyGone} already gone`);
   if (failed) parts.push(`${failed} failed`);
