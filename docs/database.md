@@ -56,7 +56,7 @@ Free students: locked empty Prof. Session in tree. Subscribed: published days + 
 
 Hierarchy (unchanged table chain): `years` → `subjects` → `books` (subject_id, name, sort_order) → `chapters` (book_id, name, sort_order, **denormalized subject_id, year_id**) → `topics` (chapter_id, name, sort_order, **denormalized book_id, subject_id, year_id**).
 
-`books` / `chapters` / `topics` remain **authoring taxonomy** for the Question Bank (CSV import), not student library folder trees.
+`books` / `chapters` / `topics` remain **authoring taxonomy** for the Question Bank (CSV import), not student library folder trees. Sibling names are unique **case-insensitively** (`unique` indexes on `(parent_id, lower(name))`); CSV import lookup and create-missing reuse the same rule. First writer’s display casing is kept.
 
 **Admin curriculum delete (SHIPPED):** `admin_delete_curriculum_node(kind, id)` — empty-node only (same protective pattern as empty MCQ Bank folder soft-delete). Refuses parents that still have taxonomy children, nodes that still have questions (including soft-deleted Bin rows — FK remains until `purge_content`), product subjects (`product_key` not null), and subjects still linked to tests / materials / MCQ folders / OSPE / Prof. Session / pearls / one-liners. Does **not** subtree-wipe and does **not** hard-delete questions via curriculum DELETE (that path hits immutable `question_versions`; questions leave via Content Bin + purge). Requires `manage_curriculum` + year scope.
 
@@ -292,13 +292,13 @@ Admin CSV/XLSX import (`/admin/questions/import`) and `import_question_batch` us
 | `correct` | yes | `A`/`B`/`C`/`D`/`E` → `correct_key` |
 | `explanation` | no | |
 | `reference` | no | |
-| `book` | yes | Matched case-insensitively under the chosen subject (optionally created) |
-| `chapter` | yes | Under the resolved book |
-| `topic` | yes | Under the resolved chapter |
+| `book` | yes | Matched case-insensitively under the chosen subject (optionally created); uniqueness is `(subject_id, lower(name))` |
+| `chapter` | yes | Matched case-insensitively under the resolved book; uniqueness is `(book_id, lower(name))` |
+| `topic` | yes | Matched case-insensitively under the resolved chapter; uniqueness is `(chapter_id, lower(name))` |
 | `difficulty` | no | `easy`/`medium`/`hard` (blank → `medium`) |
 | `tags` | no | Pipe-separated (`\|`), not commas |
 
-Client validation must pass before the RPC runs. The RPC is **atomic**: a hard error rolls back the whole call. Rows matching an existing `content_hash` are `skipped_duplicate` and **never overwrite** existing questions. Concurrent imports that race on the same missing book/chapter/topic reuse the winner’s taxonomy row (`ON CONFLICT` + re-select); a concurrent `content_hash` unique race is recorded as `skipped_duplicate` rather than aborting the batch. Template + ChatGPT generation prompt live in Admin Import UI (`src/lib/questions/csv-import.ts`).
+Client validation must pass before the RPC runs. The RPC is **atomic**: a hard error rolls back the whole call. Rows matching an existing `content_hash` are `skipped_duplicate` and **never overwrite** existing questions. Concurrent imports that race on the same missing book/chapter/topic (including case variants) reuse the winner’s taxonomy row (`ON CONFLICT (parent, lower(name))` + re-select); a concurrent `content_hash` unique race is recorded as `skipped_duplicate` rather than aborting the batch. Template + ChatGPT generation prompt live in Admin Import UI (`src/lib/questions/csv-import.ts`).
 
 ## Stats (Phase 10)
 

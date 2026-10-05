@@ -42,9 +42,9 @@ $$;
 ------------------------------------------------------------------
 select ok(
   (
-    select position('on conflict (subject_id, name) do nothing' in lower(prosrc)) > 0
-      and position('on conflict (book_id, name) do nothing' in lower(prosrc)) > 0
-      and position('on conflict (chapter_id, name) do nothing' in lower(prosrc)) > 0
+    select position('on conflict (subject_id, lower(name)) do nothing' in lower(prosrc)) > 0
+      and position('on conflict (book_id, lower(name)) do nothing' in lower(prosrc)) > 0
+      and position('on conflict (chapter_id, lower(name)) do nothing' in lower(prosrc)) > 0
       and position('questions_content_hash_unique' in lower(prosrc)) > 0
       and position('unique_violation' in lower(prosrc)) > 0
       and position('skipped_duplicate' in lower(prosrc)) > 0

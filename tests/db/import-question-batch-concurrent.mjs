@@ -160,7 +160,7 @@ async function cleanup(setup) {
     if (setup.bookNames?.length && setup.subjectId) {
       for (const name of setup.bookNames) {
         const books = await c.query(
-          `select id from public.books where subject_id = $1::uuid and name = $2`,
+          `select id from public.books where subject_id = $1::uuid and lower(name) = lower($2)`,
           [setup.subjectId, name]
         );
         for (const b of books.rows) {
@@ -322,7 +322,7 @@ async function main() {
       const bookCount = (
         await c.query(
           `select count(*)::int as n from public.books
-           where subject_id = $1::uuid and name = $2`,
+           where subject_id = $1::uuid and lower(name) = lower($2)`,
           [subject.id, sharedBook]
         )
       ).rows[0].n;
@@ -461,6 +461,114 @@ async function main() {
       }
     }
     check("identical content_hash concurrent resolves to skipped_duplicate", hashOk);
+
+    // ------------------------------------------------------------------
+    // Scenario D: concurrent case-variant taxonomy → one book/chapter/topic
+    // ------------------------------------------------------------------
+    let caseOk = false;
+    for (let attempt = 1; attempt <= 5; attempt++) {
+      const caseBase = `DbCase-${TAG}-t${attempt}`;
+      setup.bookNames.push(caseBase);
+      const ba = (
+        await c.query(
+          `insert into public.import_batches (filename, total_rows, created_by)
+           values ($1, 4, $2::uuid) returning id`,
+          [`case-a-${TAG}-${attempt}.csv`, adminA]
+        )
+      ).rows[0].id;
+      const bb = (
+        await c.query(
+          `insert into public.import_batches (filename, total_rows, created_by)
+           values ($1, 4, $2::uuid) returning id`,
+          [`case-b-${TAG}-${attempt}.csv`, adminB]
+        )
+      ).rows[0].id;
+      setup.batchIds.push(ba, bb);
+
+      const aRows = Array.from({ length: 4 }, (_, i) =>
+        row({
+          rowNumber: i + 2,
+          subjectId: subject.id,
+          book: caseBase,
+          chapter: `CaseCh-${TAG}`,
+          topic: `CaseTp-${TAG}`,
+          stem: `CaseTax A${attempt}-${i} ${Math.random().toString(36).slice(2)}`,
+        })
+      );
+      const bRows = Array.from({ length: 4 }, (_, i) =>
+        row({
+          rowNumber: i + 2,
+          subjectId: subject.id,
+          book: caseBase.toUpperCase(),
+          chapter: `casech-${TAG}`.toUpperCase(),
+          topic: `casetp-${TAG}`.toUpperCase(),
+          stem: `CaseTax B${attempt}-${i} ${Math.random().toString(36).slice(2)}`,
+        })
+      );
+
+      const [ra, rb] = await Promise.all([
+        importAs(adminA, ba, aRows, true),
+        importAs(adminB, bb, bRows, true),
+      ]);
+
+      const counts = (
+        await c.query(
+          `select
+             (select count(*)::int from public.books
+              where subject_id = $1::uuid and lower(name) = lower($2)) as books,
+             (select count(*)::int from public.chapters c
+              join public.books b on b.id = c.book_id
+              where b.subject_id = $1::uuid
+                and lower(b.name) = lower($2)
+                and lower(c.name) = lower($3)) as chapters,
+             (select count(*)::int from public.topics t
+              join public.chapters c on c.id = t.chapter_id
+              join public.books b on b.id = c.book_id
+              where b.subject_id = $1::uuid
+                and lower(b.name) = lower($2)
+                and lower(c.name) = lower($3)
+                and lower(t.name) = lower($4)) as topics`,
+          [subject.id, caseBase, `CaseCh-${TAG}`, `CaseTp-${TAG}`]
+        )
+      ).rows[0];
+
+      const aQs = ra.result?.question_ids || [];
+      const bQs = rb.result?.question_ids || [];
+      setup.questionIds.push(...aQs, ...bQs);
+
+      const bothOk = ra.ok && rb.ok && ra.result?.inserted === 4 && rb.result?.inserted === 4;
+      const oneEach =
+        counts.books === 1 && counts.chapters === 1 && counts.topics === 1;
+
+      check(`case-variant attempt ${attempt} both succeed`, bothOk, { ra, rb });
+      check(`case-variant attempt ${attempt} one taxonomy chain`, oneEach, counts);
+
+      if (bothOk && oneEach) {
+        caseOk = true;
+        const owners = await c.query(
+          `select id, created_by from public.questions where id = any($1::uuid[])`,
+          [[...aQs, ...bQs]]
+        );
+        const aOwned = owners.rows
+          .filter((q) => aQs.includes(q.id))
+          .every((q) => q.created_by === adminA);
+        const bOwned = owners.rows
+          .filter((q) => bQs.includes(q.id))
+          .every((q) => q.created_by === adminB);
+        check("case-variant created_by per importer", aOwned && bOwned, owners.rows);
+
+        const batchOwners = await c.query(
+          `select id, created_by from public.import_batches where id = any($1::uuid[])`,
+          [[ba, bb]]
+        );
+        const batchOk =
+          batchOwners.rows.find((r) => r.id === ba)?.created_by === adminA &&
+          batchOwners.rows.find((r) => r.id === bb)?.created_by === adminB;
+        check("case-variant batch ownership unchanged", batchOk, batchOwners.rows);
+        break;
+      }
+    }
+    check("case-variant concurrent taxonomy race resolved", caseOk);
   } finally {
     await c.end();
     try {
