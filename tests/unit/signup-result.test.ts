@@ -3,8 +3,11 @@ import { describe, it } from "node:test";
 import {
   classifySignUpResult,
   formatSignUpAuthErrorForLog,
+  isEmailSendRateLimited,
   isExplicitUserAlreadyRegistered,
   sanitizeAuthErrorMessageForLog,
+  SIGNUP_EMAIL_RATE_LIMIT_FAIL,
+  SIGNUP_GENERIC_FAIL,
 } from "../../src/lib/auth/signup-result.ts";
 
 describe("sanitizeAuthErrorMessageForLog", () => {
@@ -89,6 +92,27 @@ describe("isExplicitUserAlreadyRegistered", () => {
   });
 });
 
+describe("isEmailSendRateLimited", () => {
+  it("matches Auth code and 429 email-rate messages", () => {
+    assert.equal(
+      isEmailSendRateLimited({ code: "over_email_send_rate_limit" }),
+      true
+    );
+    assert.equal(
+      isEmailSendRateLimited({
+        status: 429,
+        message: "email rate limit exceeded",
+      }),
+      true
+    );
+    assert.equal(
+      isEmailSendRateLimited({ status: 429, message: "too many requests" }),
+      false
+    );
+    assert.equal(isEmailSendRateLimited(null), false);
+  });
+});
+
 describe("classifySignUpResult", () => {
   it("new email → needs_verification", () => {
     const result = classifySignUpResult({
@@ -134,7 +158,23 @@ describe("classifySignUpResult", () => {
     });
     assert.deepEqual(result, {
       outcome: "error",
-      message: "Could not create your account. Please try again.",
+      message: SIGNUP_GENERIC_FAIL,
+    });
+  });
+
+  it("email send rate limit → specific wait message", () => {
+    const result = classifySignUpResult({
+      user: null,
+      session: null,
+      error: {
+        code: "over_email_send_rate_limit",
+        status: 429,
+        message: "email rate limit exceeded",
+      },
+    });
+    assert.deepEqual(result, {
+      outcome: "error",
+      message: SIGNUP_EMAIL_RATE_LIMIT_FAIL,
     });
   });
 

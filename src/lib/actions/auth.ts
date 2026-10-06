@@ -5,7 +5,11 @@ import { createClient } from "@/lib/supabase/server";
 import {
   classifySignUpResult,
   formatSignUpAuthErrorForLog,
+  isEmailSendRateLimited,
+  isExplicitUserAlreadyRegistered,
+  SIGNUP_EMAIL_RATE_LIMIT_FAIL,
 } from "@/lib/auth/signup-result";
+import { reportServerException } from "@/lib/observability/report-server-exception";
 import { isBlockedAccountStatus } from "@/lib/auth/account-status";
 import {
   clearVerifyEmailCookie,
@@ -23,7 +27,6 @@ import { safeInternalPath } from "@/lib/http/safe-internal-path";
 export type AuthResult = { error?: string };
 
 const PROFILE_FAIL = "Could not finish signing in. Please try again.";
-const SIGNUP_FAIL = "Could not create your account. Please try again.";
 const PASSWORD_FAIL = "Could not update your password. Please try again.";
 const RESEND_FAIL = "Could not resend the code. Please try again.";
 
@@ -79,6 +82,12 @@ export async function signUp(
   // Observability only — client-facing classification stays sanitized below.
   if (error) {
     logServerError("signUp", formatSignUpAuthErrorForLog(error));
+    if (!isExplicitUserAlreadyRegistered(error)) {
+      reportServerException("signUp", formatSignUpAuthErrorForLog(error), {
+        code: error.code ?? null,
+        status: error.status ?? null,
+      });
+    }
   }
 
   const classified = classifySignUpResult({
@@ -192,7 +201,18 @@ export async function verifySignupCode(
 export async function resendSignupCode(email: string): Promise<AuthResult> {
   const supabase = await createClient();
   const { error } = await supabase.auth.resend({ type: "signup", email });
-  if (error) return clientActionFailed("resendSignupCode", error, RESEND_FAIL);
+  if (error) {
+    if (isEmailSendRateLimited(error)) {
+      logServerError("resendSignupCode", formatSignUpAuthErrorForLog(error));
+      reportServerException(
+        "resendSignupCode",
+        formatSignUpAuthErrorForLog(error),
+        { code: error.code ?? null, status: error.status ?? null }
+      );
+      return { error: SIGNUP_EMAIL_RATE_LIMIT_FAIL };
+    }
+    return clientActionFailed("resendSignupCode", error, RESEND_FAIL);
+  }
   return {};
 }
 

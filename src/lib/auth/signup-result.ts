@@ -55,6 +55,12 @@ export function formatSignUpAuthErrorForLog(error: SignUpErrorLike): string {
   return parts.length > 0 ? parts.join(" ") : "(empty Auth error)";
 }
 
+export const SIGNUP_GENERIC_FAIL =
+  "Could not create your account. Please try again.";
+
+export const SIGNUP_EMAIL_RATE_LIMIT_FAIL =
+  "Too many verification emails were sent just now. Wait a few minutes, then try again. If you already registered, check your inbox or wait before requesting another code.";
+
 export function isExplicitUserAlreadyRegistered(
   error: SignUpErrorLike
 ): boolean {
@@ -62,6 +68,17 @@ export function isExplicitUserAlreadyRegistered(
   if (error.code === "user_already_exists") return true;
   const message = (error.message ?? "").toLowerCase();
   return message.includes("user already registered");
+}
+
+export function isEmailSendRateLimited(error: SignUpErrorLike): boolean {
+  if (!error) return false;
+  if (error.code === "over_email_send_rate_limit") return true;
+  const message = (error.message ?? "").toLowerCase();
+  return (
+    error.status === 429 &&
+    (message.includes("email rate limit") ||
+      message.includes("over_email_send_rate_limit"))
+  );
 }
 
 export function classifySignUpResult(input: {
@@ -75,10 +92,13 @@ export function classifySignUpResult(input: {
     if (isExplicitUserAlreadyRegistered(error)) {
       return { outcome: "existing_verified" };
     }
+    if (isEmailSendRateLimited(error)) {
+      return { outcome: "error", message: SIGNUP_EMAIL_RATE_LIMIT_FAIL };
+    }
     // Never forward raw Auth/DB text to the browser.
     return {
       outcome: "error",
-      message: "Could not create your account. Please try again.",
+      message: SIGNUP_GENERIC_FAIL,
     };
   }
 
