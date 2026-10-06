@@ -1,7 +1,7 @@
 import { requireAdmin } from "@/lib/auth/require-user";
 import { requireAdminClass } from "@/lib/admin/require-admin-class";
 import { QuestionEditor } from "../question-editor";
-import { loadCurriculum } from "../curriculum-data";
+import { loadCurriculumEditor } from "../curriculum-data";
 
 export const metadata = { title: "New question — MedVerse Admin" };
 
@@ -27,7 +27,9 @@ export default async function NewQuestionPage({
         ? `/admin/questions/new?folderId=${folderId}`
         : "/admin/questions/new",
     children: async (year) => {
-      const curriculum = await loadCurriculum(supabase);
+      const curriculum = await loadCurriculumEditor(supabase, {
+        yearId: year.id,
+      });
 
       let placementLabel: string | null = null;
       let placementSubfolderId: string | undefined;

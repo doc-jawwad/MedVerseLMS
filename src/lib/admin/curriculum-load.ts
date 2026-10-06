@@ -14,9 +14,10 @@ export type CurriculumLoadOptions = {
 };
 
 /**
- * Full curriculum tree for editors that need cross-year navigation
- * (question editor). Prefer {@link loadCurriculumFilterCascade} on Test
- * Builder — shipping every topic into RSC is expensive.
+ * Year-scoped (or full) curriculum tree. Prefer
+ * {@link loadCurriculumEditor} for Question Editor and
+ * {@link loadCurriculumFilterCascade} for Test Builder filters —
+ * shipping every topic into RSC is expensive.
  */
 export async function loadCurriculum(
   supabase: SupabaseClient,
@@ -141,4 +142,65 @@ export async function loadCurriculumFilterCascade(
     chapters: chapters ?? [],
     topics: topics ?? [],
   };
+}
+
+export type CurriculumEditorLoadOptions = {
+  /** Question year (cascade filter). Years list remains complete. */
+  yearId: string;
+  subjectId?: string | null;
+  bookId?: string | null;
+  chapterId?: string | null;
+};
+
+/**
+ * Question Editor shell: all years + all subjects (small), plus cascade
+ * slices for the currently selected subject/book/chapter. Books/chapters/
+ * topics for other branches load on demand via listCurriculumChildren.
+ */
+export async function loadCurriculumEditor(
+  supabase: SupabaseClient,
+  options: CurriculumEditorLoadOptions
+): Promise<CurriculumTreeData> {
+  const { yearId, subjectId, bookId, chapterId } = options;
+
+  const yearsQuery = supabase
+    .from("years")
+    .select("id, year_number")
+    .order("year_number");
+  const subjectsQuery = supabase
+    .from("subjects")
+    .select("id, name, year_id")
+    .order("name");
+
+  const cascadePromise = subjectId
+    ? loadCurriculumFilterCascade(supabase, {
+        yearId,
+        subjectId,
+        bookId: bookId ?? undefined,
+        chapterId: chapterId ?? undefined,
+      })
+    : Promise.resolve({
+        books: [] as CurriculumTreeData["books"],
+        chapters: [] as CurriculumTreeData["chapters"],
+        topics: [] as CurriculumTreeData["topics"],
+      });
+
+  const [{ data: years }, { data: subjects }, cascade] = await Promise.all([
+    yearsQuery,
+    subjectsQuery,
+    cascadePromise,
+  ]);
+
+  return {
+    years: years ?? [],
+    subjects: subjects ?? [],
+    books: cascade.books,
+    chapters: cascade.chapters,
+    topics: cascade.topics,
+  };
+}
+
+/** UTF-8 JSON size of a curriculum tree (RSC prop payload proxy). */
+export function curriculumTreeJsonBytes(data: CurriculumTreeData): number {
+  return Buffer.byteLength(JSON.stringify(data), "utf8");
 }

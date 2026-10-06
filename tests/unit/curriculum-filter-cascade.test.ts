@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import fs from "node:fs";
+import path from "node:path";
 import {
+  curriculumTreeJsonBytes,
   loadCurriculum,
+  loadCurriculumEditor,
   loadCurriculumFilterCascade,
 } from "../../src/lib/admin/curriculum-load.ts";
 
@@ -155,5 +159,111 @@ describe("loadCurriculumFilterCascade", () => {
       data.topics.map((t) => t.id).sort(),
       ["t5a", "t5b"]
     );
+  });
+});
+
+describe("loadCurriculumEditor", () => {
+  const root = path.resolve(import.meta.dirname, "../..");
+
+  it("loads years+subjects only when no subject is selected", async () => {
+    const supabase = mockSupabase({
+      years: YEARS,
+      subjects: SUBJECTS,
+      books: BOOKS,
+      chapters: CHAPTERS,
+      topics: TOPICS,
+    });
+    const data = await loadCurriculumEditor(supabase, { yearId: "y5" });
+    assert.equal(data.years.length, 2);
+    assert.equal(data.subjects.length, 2);
+    assert.deepEqual(data.books, []);
+    assert.deepEqual(data.chapters, []);
+    assert.deepEqual(data.topics, []);
+  });
+
+  it("loads cascade slices for the selected branch only", async () => {
+    const supabase = mockSupabase({
+      years: YEARS,
+      subjects: SUBJECTS,
+      books: BOOKS,
+      chapters: CHAPTERS,
+      topics: TOPICS,
+    });
+    const data = await loadCurriculumEditor(supabase, {
+      yearId: "y5",
+      subjectId: "s5",
+      bookId: "b5",
+      chapterId: "c5",
+    });
+    assert.deepEqual(
+      data.books.map((b) => b.id),
+      ["b5"]
+    );
+    assert.deepEqual(
+      data.chapters.map((c) => c.id),
+      ["c5"]
+    );
+    assert.deepEqual(
+      data.topics.map((t) => t.id).sort(),
+      ["t5a", "t5b"]
+    );
+  });
+
+  it("keeps editor JSON far smaller than a full topic tree", async () => {
+    const manyTopics = [
+      ...TOPICS,
+      ...Array.from({ length: 14_997 }, (_, i) => ({
+        id: `tx${i}`,
+        name: `Topic name ${i} extra padding`,
+        chapter_id: "c-other",
+        year_id: "y5",
+      })),
+    ];
+    const tables = {
+      years: YEARS,
+      subjects: SUBJECTS,
+      books: BOOKS,
+      chapters: CHAPTERS,
+      topics: manyTopics,
+    };
+    const full = await loadCurriculum(mockSupabase(tables));
+    const createPage = await loadCurriculumEditor(mockSupabase(tables), {
+      yearId: "y5",
+    });
+    const editPage = await loadCurriculumEditor(mockSupabase(tables), {
+      yearId: "y5",
+      subjectId: "s5",
+      bookId: "b5",
+      chapterId: "c5",
+    });
+    const fullBytes = curriculumTreeJsonBytes(full);
+    const createBytes = curriculumTreeJsonBytes(createPage);
+    const editBytes = curriculumTreeJsonBytes(editPage);
+    assert.equal(full.topics.length, 15_000);
+    assert.equal(createPage.topics.length, 0);
+    assert.equal(editPage.topics.length, 2);
+    assert.ok(
+      createBytes * 50 < fullBytes,
+      `create payload ${createBytes} vs full ${fullBytes}`
+    );
+    assert.ok(
+      editBytes * 20 < fullBytes,
+      `edit payload ${editBytes} vs full ${fullBytes}`
+    );
+  });
+
+  it("Question Editor pages do not call unscoped loadCurriculum()", () => {
+    const neu = fs.readFileSync(
+      path.join(root, "src/app/(admin)/admin/questions/new/page.tsx"),
+      "utf8"
+    );
+    const edit = fs.readFileSync(
+      path.join(root, "src/app/(admin)/admin/questions/[id]/page.tsx"),
+      "utf8"
+    );
+    assert.match(neu, /loadCurriculumEditor/);
+    assert.match(edit, /loadCurriculumEditor/);
+    assert.doesNotMatch(neu, /loadCurriculum\(supabase\)/);
+    assert.doesNotMatch(edit, /loadCurriculum\(supabase\)/);
   });
 });

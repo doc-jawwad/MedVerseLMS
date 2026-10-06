@@ -12,7 +12,7 @@ export type CurriculumKind = "subjects" | "books" | "chapters" | "topics";
 
 export type CurriculumChildKind = "books" | "chapters" | "topics";
 
-/** On-demand children for cascading pickers (Test Builder inline MCQ). */
+/** On-demand children for cascading pickers (Test Builder + Question Editor). */
 export async function listCurriculumChildren(
   kind: CurriculumChildKind,
   parentId: string

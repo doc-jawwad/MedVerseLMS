@@ -4,7 +4,7 @@ import { requireAdmin } from "@/lib/auth/require-user";
 import { parseFromTestId } from "@/lib/tests/from-test-param";
 import { formatDateTime } from "@/lib/utils";
 import { QuestionEditor } from "../question-editor";
-import { loadCurriculum } from "../curriculum-data";
+import { loadCurriculumEditor } from "../curriculum-data";
 import { StatusControls } from "./status-controls";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -45,7 +45,12 @@ export default async function EditQuestionPage({
       .order("version_no", { ascending: false }),
   ]);
 
-  const curriculum = await loadCurriculum(supabase);
+  const curriculum = await loadCurriculumEditor(supabase, {
+    yearId: q.year_id,
+    subjectId: q.subject_id,
+    bookId: q.book_id,
+    chapterId: q.chapter_id,
+  });
 
   let fromTestTitle: string | null = null;
   if (fromTestId) {

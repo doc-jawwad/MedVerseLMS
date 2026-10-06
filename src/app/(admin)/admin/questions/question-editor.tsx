@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
@@ -9,6 +9,7 @@ import {
   updateQuestionMeta,
   type QuestionContent,
 } from "@/lib/actions/questions";
+import { listCurriculumChildren } from "@/lib/actions/curriculum";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -76,6 +77,18 @@ export function QuestionEditor({
   const [bookId, setBookId] = useState(initial?.book_id ?? "");
   const [chapterId, setChapterId] = useState(initial?.chapter_id ?? "");
   const [topicId, setTopicId] = useState(initial?.topic_id ?? "");
+  const [books, setBooks] = useState<{ id: string; name: string }[]>(
+    () => curriculum.books
+  );
+  const [chapters, setChapters] = useState<{ id: string; name: string }[]>(
+    () => curriculum.chapters
+  );
+  const [topics, setTopics] = useState<{ id: string; name: string }[]>(
+    () => curriculum.topics
+  );
+  const [loadingBooks, setLoadingBooks] = useState(false);
+  const [loadingChapters, setLoadingChapters] = useState(false);
+  const [loadingTopics, setLoadingTopics] = useState(false);
 
   const [stem, setStem] = useState(initial?.stem ?? "");
   const [options, setOptions] = useState<string[]>(
@@ -95,18 +108,75 @@ export function QuestionEditor({
     () => curriculum.subjects.filter((s) => s.year_id === yearId),
     [curriculum, yearId]
   );
-  const books = useMemo(
-    () => curriculum.books.filter((b) => b.subject_id === subjectId),
-    [curriculum, subjectId]
-  );
-  const chapters = useMemo(
-    () => curriculum.chapters.filter((c) => c.book_id === bookId),
-    [curriculum, bookId]
-  );
-  const topics = useMemo(
-    () => curriculum.topics.filter((t) => t.chapter_id === chapterId),
-    [curriculum, chapterId]
-  );
+
+  useEffect(() => {
+    if (!subjectId) {
+      setBooks([]);
+      setLoadingBooks(false);
+      return;
+    }
+    let cancelled = false;
+    setLoadingBooks(true);
+    void listCurriculumChildren("books", subjectId).then((res) => {
+      if (cancelled) return;
+      setLoadingBooks(false);
+      if (res.error) {
+        toast.error(res.error);
+        setBooks([]);
+        return;
+      }
+      setBooks(res.items);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [subjectId]);
+
+  useEffect(() => {
+    if (!bookId) {
+      setChapters([]);
+      setLoadingChapters(false);
+      return;
+    }
+    let cancelled = false;
+    setLoadingChapters(true);
+    void listCurriculumChildren("chapters", bookId).then((res) => {
+      if (cancelled) return;
+      setLoadingChapters(false);
+      if (res.error) {
+        toast.error(res.error);
+        setChapters([]);
+        return;
+      }
+      setChapters(res.items);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [bookId]);
+
+  useEffect(() => {
+    if (!chapterId) {
+      setTopics([]);
+      setLoadingTopics(false);
+      return;
+    }
+    let cancelled = false;
+    setLoadingTopics(true);
+    void listCurriculumChildren("topics", chapterId).then((res) => {
+      if (cancelled) return;
+      setLoadingTopics(false);
+      if (res.error) {
+        toast.error(res.error);
+        setTopics([]);
+        return;
+      }
+      setTopics(res.items);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [chapterId]);
 
   const filledOptions = KEYS.map((k, i) => ({ key: k, text: options[i].trim() }))
     .filter((o) => o.text !== "");
@@ -169,12 +239,75 @@ export function QuestionEditor({
       {/* form */}
       <div className="grid content-start gap-4">
         <div className="grid grid-cols-2 gap-2 xl:grid-cols-3">
-          <HierarchySelect label="Year" value={yearId} onChange={(v) => { setYearId(v); setSubjectId(""); setBookId(""); setChapterId(""); setTopicId(""); }}
-            items={curriculum.years.map((y) => ({ id: y.id, name: `Year ${y.year_number}` }))} />
-          <HierarchySelect label="Subject" value={subjectId} onChange={(v) => { setSubjectId(v); setBookId(""); setChapterId(""); setTopicId(""); }} items={subjects} disabled={!yearId} />
-          <HierarchySelect label="Book" value={bookId} onChange={(v) => { setBookId(v); setChapterId(""); setTopicId(""); }} items={books} disabled={!subjectId} />
-          <HierarchySelect label="Chapter" value={chapterId} onChange={(v) => { setChapterId(v); setTopicId(""); }} items={chapters} disabled={!bookId} />
-          <HierarchySelect label="Topic" value={topicId} onChange={setTopicId} items={topics} disabled={!chapterId} />
+          <HierarchySelect
+            label="Year"
+            testId="question-editor-year"
+            value={yearId}
+            onChange={(v) => {
+              setYearId(v);
+              setSubjectId("");
+              setBookId("");
+              setChapterId("");
+              setTopicId("");
+              setBooks([]);
+              setChapters([]);
+              setTopics([]);
+            }}
+            items={curriculum.years.map((y) => ({
+              id: y.id,
+              name: `Year ${y.year_number}`,
+            }))}
+          />
+          <HierarchySelect
+            label="Subject"
+            testId="question-editor-subject"
+            value={subjectId}
+            onChange={(v) => {
+              setSubjectId(v);
+              setBookId("");
+              setChapterId("");
+              setTopicId("");
+              setChapters([]);
+              setTopics([]);
+            }}
+            items={subjects}
+            disabled={!yearId}
+          />
+          <HierarchySelect
+            label="Book"
+            testId="question-editor-book"
+            value={bookId}
+            onChange={(v) => {
+              setBookId(v);
+              setChapterId("");
+              setTopicId("");
+              setTopics([]);
+            }}
+            items={books}
+            disabled={!subjectId || loadingBooks}
+            loading={loadingBooks}
+          />
+          <HierarchySelect
+            label="Chapter"
+            testId="question-editor-chapter"
+            value={chapterId}
+            onChange={(v) => {
+              setChapterId(v);
+              setTopicId("");
+            }}
+            items={chapters}
+            disabled={!bookId || loadingChapters}
+            loading={loadingChapters}
+          />
+          <HierarchySelect
+            label="Topic"
+            testId="question-editor-topic"
+            value={topicId}
+            onChange={setTopicId}
+            items={topics}
+            disabled={!chapterId || loadingTopics}
+            loading={loadingTopics}
+          />
         </div>
 
         <div className="grid gap-2">
@@ -321,19 +454,23 @@ function HierarchySelect({
   onChange,
   items,
   disabled,
+  loading,
+  testId,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
   items: { id: string; name: string }[];
   disabled?: boolean;
+  loading?: boolean;
+  testId?: string;
 }) {
   return (
     <div className="grid gap-1">
       <Label className="text-xs">{label}</Label>
       <Select value={value || undefined} onValueChange={onChange} disabled={disabled}>
-        <SelectTrigger className="h-8">
-          <SelectValue placeholder={label} />
+        <SelectTrigger className="h-8" data-testid={testId}>
+          <SelectValue placeholder={loading ? "Loading…" : label} />
         </SelectTrigger>
         <SelectContent>
           {items.map((i) => (

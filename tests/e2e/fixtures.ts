@@ -663,6 +663,7 @@ export async function forceAttemptExpiry(testId: string, studentId: string) {
 export type QuestionPoolFixture = {
   yearId: string;
   subjectId: string;
+  subjectName: string;
   bookId: string;
   chapterId: string;
   topicId: string;
@@ -686,10 +687,11 @@ export async function provisionQuestionPoolFixture(opts: {
   const yearId = yearRes[0].id;
 
   const subjRes = await fetch(
-    `${REST}/rest/v1/subjects?year_id=eq.${yearId}&select=id&limit=1`,
+    `${REST}/rest/v1/subjects?year_id=eq.${yearId}&select=id,name&limit=1`,
     { headers: await svcHeaders() }
   ).then((r) => r.json());
   const subjectId = subjRes[0].id;
+  const subjectName = String(subjRes[0].name);
 
   const bookRes = await fetch(`${REST}/rest/v1/books`, {
     method: "POST",
@@ -753,7 +755,16 @@ export async function provisionQuestionPoolFixture(opts: {
     questionIds.push(qid);
   }
 
-  return { yearId, subjectId, bookId: bookRes[0].id, chapterId: chapterRes[0].id, topicId, questionIds, tag };
+  return {
+    yearId,
+    subjectId,
+    subjectName,
+    bookId: bookRes[0].id,
+    chapterId: chapterRes[0].id,
+    topicId,
+    questionIds,
+    tag,
+  };
 }
 
 /** Draft test row only — Test Builder e2e adds questions through the admin UI. */
