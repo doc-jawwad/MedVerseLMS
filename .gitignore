@@ -68,3 +68,8 @@ next-env.d.ts
 # Host-filled VPS env (templates are *.env.example)
 deploy/**/*.env
 !deploy/**/*.env.example
+
+# Local one-off apply/verify/deploy artifacts (repo root only; never commit)
+/tmp-*
+/medverse-prod-*.tgz
+/medverse-stg-*.tgz
