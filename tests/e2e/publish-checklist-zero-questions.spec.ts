@@ -46,18 +46,23 @@ test.describe("publish checklist zero questions", () => {
 
       // Add one valid question — question-count check should pass.
       await page.getByPlaceholder("Search text…").fill(fixture.tag);
-      await page.getByRole("button", { name: "Search" }).click();
+      await page.getByRole("button", { name: "Search", exact: true }).click();
       const tick = page.getByTestId(`tick-question-${fixture.questionIds[0]}`);
       await expect(tick).toBeVisible({ timeout: 20_000 });
       await tick.click();
+      await page.getByTestId("add-selected-questions").click();
       await expect(
         page.locator('[data-testid="publish-checklist-item"][data-pass="true"]')
           .filter({ hasText: /question count/i })
       ).toBeVisible({ timeout: 20_000 });
 
-      await expect(page.getByTestId("publish-checklist-blocked")).toHaveCount(0);
       // Publish may remain disabled for other checklist items (e.g. audience),
       // but the zero-question block copy must be gone.
+      await expect(
+        page
+          .getByTestId("publish-checklist-blocked")
+          .filter({ hasText: /at least one question/i })
+      ).toHaveCount(0);
     } finally {
       await teardownQuestionPoolFixture(fixture, { testId });
     }

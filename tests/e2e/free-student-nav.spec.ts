@@ -89,8 +89,13 @@ test.describe("Free student navigation", () => {
     // Cross-year block deep links redirect to Academic home when enrolled elsewhere.
     // (block-12 is Year 4 — Staging Student is typically Year 1 or 2)
 
+    // SectionLock badge text also matches its wrapper; scope to main + exact.
+    const subscriptionRequiredBadge = page
+      .locator("main")
+      .getByText("subscription required", { exact: true });
+
     await page.goto("/academic/prof-session");
-    await expect(page.getByText(/subscription(?:\s+is)?\s+required/i)).toBeVisible({
+    await expect(subscriptionRequiredBadge.first()).toBeVisible({
       timeout: 15000,
     });
     await expect(
@@ -101,7 +106,7 @@ test.describe("Free student navigation", () => {
     ).toBeVisible();
 
     await page.goto("/mock-test");
-    await expect(page.getByText(/subscription(?:\s+is)?\s+required/i)).toBeVisible({
+    await expect(subscriptionRequiredBadge.first()).toBeVisible({
       timeout: 15000,
     });
     await expect(
@@ -109,7 +114,7 @@ test.describe("Free student navigation", () => {
     ).toBeVisible();
 
     await page.goto("/mcq-bank");
-    await expect(page.getByText(/subscription(?:\s+is)?\s+required/i)).toBeVisible({
+    await expect(subscriptionRequiredBadge.first()).toBeVisible({
       timeout: 15000,
     });
 
@@ -122,7 +127,7 @@ test.describe("Free student navigation", () => {
     await expect(page.getByRole("heading", { name: "Tests" })).toBeVisible({
       timeout: 15000,
     });
-    await expect(page.getByText(/subscription(?:\s+is)?\s+required/i)).toHaveCount(0);
+    await expect(subscriptionRequiredBadge).toHaveCount(0);
 
     // /performance merged into Dashboard — must redirect, not show a lock page
     await page.goto("/performance");

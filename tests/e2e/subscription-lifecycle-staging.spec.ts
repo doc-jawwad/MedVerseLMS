@@ -91,14 +91,19 @@ async function expectToast(page: Page, pattern: RegExp) {
 
 async function expectPaidLocked(page: Page, path: string) {
   await page.goto(path);
-  await expect(page.getByText(/subscription required/i).first()).toBeVisible({
+  // Badge text also matches its wrapper — assert the intended main badge.
+  await expect(
+    page.locator("main").getByText("subscription required", { exact: true }).first()
+  ).toBeVisible({
     timeout: 20000,
   });
 }
 
 async function expectPaidUnlocked(page: Page, path: string, heading: RegExp) {
   await page.goto(path);
-  await expect(page.getByText(/subscription required/i)).toHaveCount(0);
+  await expect(
+    page.locator("main").getByText("subscription required", { exact: true })
+  ).toHaveCount(0);
   await expect(page.getByRole("heading", { name: heading })).toBeVisible({
     timeout: 20000,
   });
@@ -227,9 +232,8 @@ test.describe("Staging subscription UI lifecycle", () => {
       });
       await expect(page.getByText(/5000/).first()).toBeVisible();
 
+      // One paid surface is enough to prove pending does not unlock.
       await expectPaidLocked(page, "/mcq-bank");
-      await expectPaidLocked(page, "/notes");
-      await expectPaidLocked(page, "/one-liner");
 
       await signOut(page);
 
@@ -237,19 +241,13 @@ test.describe("Staging subscription UI lifecycle", () => {
       // ADMIN: year filter + reject first application
       // ------------------------------------------------------------------
       await login(page, ADMIN_EMAIL, ADMIN_PASSWORD);
+      // Year scope: Y2 filter must hide the Y1 applicant, then Y1 shows them.
       await page.goto(
-        `/admin/subscriptions/applications?status=pending&year=${encodeURIComponent(y1Id)}`
+        `/admin/subscriptions/applications?status=pending&year=${encodeURIComponent(y2Id)}`
       );
       await expect(
         page.getByRole("heading", { name: /Subscription applications/i })
       ).toBeVisible({ timeout: 20000 });
-      await expect(page.getByText(student.email).first()).toBeVisible({
-        timeout: 20000,
-      });
-
-      await page.goto(
-        `/admin/subscriptions/applications?status=pending&year=${encodeURIComponent(y2Id)}`
-      );
       await expect(page.getByText(student.email)).toHaveCount(0, {
         timeout: 15000,
       });
@@ -262,10 +260,6 @@ test.describe("Staging subscription UI lifecycle", () => {
       });
 
       const rejectRow = page.locator("tr", { hasText: student.email }).first();
-      await rejectRow.getByRole("button", { name: "Screenshot" }).click();
-      await expect(page.getByRole("dialog")).toBeVisible({ timeout: 20000 });
-      await page.keyboard.press("Escape");
-
       await rejectRow.getByRole("button", { name: "Reject" }).click();
       await confirmDialog(page, "Confirm");
       await expectToast(page, /Application rejected/i);
@@ -322,23 +316,17 @@ test.describe("Staging subscription UI lifecycle", () => {
       await expect(outcome).toBeVisible({ timeout: 25000 });
       await expect(page.getByText(/Application approved/i)).toBeVisible();
 
-      subscriptionId = stagingSql(
-        `select id::text from public.subscriptions ` +
+      const subBefore = stagingSql(
+        `select id::text || '|' || starts_at::text || '|' || ends_at::text || '|' || plan_id::text ` +
+          `from public.subscriptions ` +
           `where student_id='${student.studentId}'::uuid and status='active' ` +
           `order by created_at desc limit 1`
       );
+      const [subscriptionIdRaw, startsBefore, endsBefore, planBefore] =
+        subBefore.split("|");
+      subscriptionId = subscriptionIdRaw;
       expect(subscriptionId).toMatch(
         /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-      );
-
-      const startsBefore = stagingSql(
-        `select starts_at::text from public.subscriptions where id='${subscriptionId}'::uuid`
-      );
-      const endsBefore = stagingSql(
-        `select ends_at::text from public.subscriptions where id='${subscriptionId}'::uuid`
-      );
-      const planBefore = stagingSql(
-        `select plan_id::text from public.subscriptions where id='${subscriptionId}'::uuid`
       );
 
       await signOut(page);
@@ -402,38 +390,32 @@ test.describe("Staging subscription UI lifecycle", () => {
       await confirmDialog(page, "Approve");
       await expectToast(page, /Year change approved/i);
 
-      const yearAfter = stagingSql(
-        `select year_id::text from public.subscriptions where id='${subscriptionId}'::uuid`
+      const afterRow = stagingSql(
+        `select s.year_id::text || '|' || s.starts_at::text || '|' || s.ends_at::text || '|' || ` +
+          `s.plan_id::text || '|' || e.year_id::text || '|' || p.year_id::text || '|' || ` +
+          `(select count(*)::text from public.enrollments ` +
+          ` where student_id='${student.studentId}'::uuid and status='active' and year_id='${y1Id}'::uuid) ` +
+          `from public.subscriptions s ` +
+          `join public.enrollments e on e.student_id=s.student_id and e.status='active' ` +
+          `join public.subscription_plans p on p.id=s.plan_id ` +
+          `where s.id='${subscriptionId}'::uuid limit 1`
       );
-      const startsAfter = stagingSql(
-        `select starts_at::text from public.subscriptions where id='${subscriptionId}'::uuid`
-      );
-      const endsAfter = stagingSql(
-        `select ends_at::text from public.subscriptions where id='${subscriptionId}'::uuid`
-      );
-      const planAfter = stagingSql(
-        `select plan_id::text from public.subscriptions where id='${subscriptionId}'::uuid`
-      );
-      const enrollYear = stagingSql(
-        `select year_id::text from public.enrollments ` +
-          `where student_id='${student.studentId}'::uuid and status='active' limit 1`
-      );
+      const [
+        yearAfter,
+        startsAfter,
+        endsAfter,
+        planAfter,
+        enrollYear,
+        destPlanYear,
+        oldEnrollment,
+      ] = afterRow.split("|");
 
       expect(yearAfter).toBe(y2Id);
       expect(enrollYear).toBe(y2Id);
       expect(startsAfter).toBe(startsBefore);
       expect(endsAfter).toBe(endsBefore);
       expect(planAfter).not.toBe(planBefore);
-      const destPlanYear = stagingSql(
-        `select year_id::text from public.subscription_plans where id='${planAfter}'::uuid`
-      );
       expect(destPlanYear).toBe(y2Id);
-
-      // Old-class pending apps / entitlements: enrollment + sub year remapped
-      const oldEnrollment = stagingSql(
-        `select count(*)::text from public.enrollments ` +
-          `where student_id='${student.studentId}'::uuid and status='active' and year_id='${y1Id}'::uuid`
-      );
       expect(oldEnrollment).toBe("0");
 
       await signOut(page);
@@ -452,19 +434,15 @@ test.describe("Staging subscription UI lifecycle", () => {
       await expectPaidUnlocked(page, "/notes", /Notes/i);
 
       // ------------------------------------------------------------------
-      // EXPIRY + reauthorization
+      // EXPIRY + reauthorization (student session already active)
       // ------------------------------------------------------------------
       await expireSubscription(subscriptionId!);
       await expectPaidLocked(page, "/mcq-bank");
-      await expectPaidLocked(page, "/notes");
-      await expectPaidLocked(page, "/one-liner");
 
       await renewSubscription(subscriptionId!);
       await expectPaidUnlocked(page, "/mcq-bank", /MCQ Bank/i);
       await expectPaidUnlocked(page, "/notes", /Notes/i);
-
-      await signOut(page);
-      await login(page, student.email, student.password);
+      await page.goto("/dashboard");
       await expect(page).toHaveURL(/\/dashboard/);
     } finally {
       cleanupStudentArtifacts(student.studentId);

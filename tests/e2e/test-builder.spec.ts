@@ -40,7 +40,7 @@ test.describe("Test Builder", () => {
       // (text search on the tag, since these are the only questions with it
       // in their stem) and multi-select the first two ---
       await page.getByPlaceholder("Search text…").fill(fixture.tag);
-      await page.getByRole("button", { name: "Search" }).click();
+      await page.getByRole("button", { name: "Search", exact: true }).click();
       await expect(page.getByTestId(`tick-question-${fixture.questionIds[0]}`)).toBeVisible();
 
       await page.getByTestId(`tick-question-${fixture.questionIds[0]}`).click();
