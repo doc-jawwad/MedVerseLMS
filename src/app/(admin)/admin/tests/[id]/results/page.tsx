@@ -5,6 +5,16 @@ import {
   adminHasAny,
   getAdminPermissionSet,
 } from "@/lib/admin/admin-nav";
+import {
+  attachAdminStudentDetails,
+  mapAdminLeaderboardProfiles,
+  type AdminLeaderboardProfileSource,
+  type TestLeaderboardRankRow,
+} from "@/lib/leaderboard/attach-admin-student-details";
+import {
+  accountStatusBadgeVariant,
+  accountStatusLabel,
+} from "@/lib/admin/student-account-ui";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -25,17 +35,6 @@ import {
 
 export const metadata = { title: "Test results — MedVerse Admin" };
 
-type LeaderRow = {
-  rank: number | null;
-  percentile: number | null;
-  student_id: string;
-  full_name: string;
-  score: number;
-  max_score: number;
-  percentage: number;
-  is_me: boolean;
-};
-
 export default async function TestResultsPage({
   params,
 }: {
@@ -44,6 +43,12 @@ export default async function TestResultsPage({
   const { supabase } = await requireAdmin();
   const perms = await getAdminPermissionSet();
   const canViewNames = adminHasAny(perms, ["view_students"]);
+  const canExpandDetails = adminHasAny(perms, [
+    "view_students",
+    "manage_students",
+    "activate_students",
+    "restrict_students",
+  ]);
   const { id } = await params;
 
   const { data: test } = await supabase
@@ -72,6 +77,24 @@ export default async function TestResultsPage({
             .eq("state", "in_progress"),
     ]);
 
+  const rankRows = (leaderboard ?? []) as TestLeaderboardRankRow[];
+  let detailsById = mapAdminLeaderboardProfiles([]);
+  if (canExpandDetails && rankRows.length > 0) {
+    const { data: profiles } = await supabase
+      .from("profiles")
+      .select(
+        "id, college_name, email, account_status, enrollments!enrollments_student_id_fkey(id, status, year_id, years(name))"
+      )
+      .in(
+        "id",
+        rankRows.map((r) => r.student_id)
+      );
+    detailsById = mapAdminLeaderboardProfiles(
+      (profiles ?? []) as AdminLeaderboardProfileSource[]
+    );
+  }
+  const adminRows = attachAdminStudentDetails(rankRows, detailsById);
+
   const s = summary as {
     registered: number;
     attempted: number;
@@ -81,6 +104,8 @@ export default async function TestResultsPage({
     highest_score: number;
     lowest_score: number;
   } | null;
+
+  const colCount = canExpandDetails ? 9 : 5;
 
   return (
     <div className="grid gap-6">
@@ -143,23 +168,73 @@ export default async function TestResultsPage({
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Leaderboard</CardTitle>
+          {canExpandDetails && (
+            <CardDescription>
+              Rank and marks are unchanged. Extra columns are admin-only
+              profile and class fields — not shown to students.
+            </CardDescription>
+          )}
         </CardHeader>
         <CardContent>
-          <Table>
+          <Table data-testid="admin-leaderboard">
             <TableHeader>
               <TableRow>
                 <TableHead>Rank</TableHead>
                 <TableHead>Student</TableHead>
+                {canExpandDetails && (
+                  <>
+                    <TableHead>College</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Class</TableHead>
+                    <TableHead>LMS access</TableHead>
+                  </>
+                )}
                 <TableHead>Score</TableHead>
                 <TableHead>Percentage</TableHead>
                 <TableHead>Percentile</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {((leaderboard ?? []) as LeaderRow[]).map((r) => (
-                <TableRow key={r.student_id}>
+              {adminRows.map((r) => (
+                <TableRow
+                  key={r.student_id}
+                  data-testid="admin-leaderboard-row"
+                  data-rank={r.rank ?? undefined}
+                >
                   <TableCell>#{r.rank}</TableCell>
-                  <TableCell>{r.full_name}</TableCell>
+                  <TableCell className="font-medium">
+                    {canExpandDetails ? (
+                      <Link
+                        href={`/admin/students/${r.student_id}`}
+                        className="hover:underline"
+                      >
+                        {r.full_name}
+                      </Link>
+                    ) : (
+                      r.full_name
+                    )}
+                  </TableCell>
+                  {canExpandDetails && (
+                    <>
+                      <TableCell>{r.college_name ?? "—"}</TableCell>
+                      <TableCell>{r.email ?? "—"}</TableCell>
+                      <TableCell>
+                        <div>{r.class_name ?? "—"}</div>
+                        {r.class_status && (
+                          <div className="text-xs text-muted-foreground">
+                            {r.class_status}
+                          </div>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant={accountStatusBadgeVariant(r.account_status)}
+                        >
+                          {accountStatusLabel(r.account_status)}
+                        </Badge>
+                      </TableCell>
+                    </>
+                  )}
                   <TableCell>
                     {r.score} / {r.max_score}
                   </TableCell>
@@ -169,10 +244,10 @@ export default async function TestResultsPage({
                   </TableCell>
                 </TableRow>
               ))}
-              {(leaderboard ?? []).length === 0 && (
+              {adminRows.length === 0 && (
                 <TableRow>
                   <TableCell
-                    colSpan={5}
+                    colSpan={colCount}
                     className="text-center text-muted-foreground"
                   >
                     No submissions yet.
