@@ -37,10 +37,15 @@ export async function GET(request: NextRequest) {
       }
 
       if (type === "signup") {
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("role, account_status")
-          .single();
+        const { data: claimsData } = await supabase.auth.getClaims();
+        const userId = claimsData?.claims?.sub as string | undefined;
+        const { data: profile } = userId
+          ? await supabase
+              .from("profiles")
+              .select("role, account_status")
+              .eq("id", userId)
+              .maybeSingle()
+          : { data: null };
         if (isBlockedAccountStatus(profile?.account_status)) {
           return NextResponse.redirect(
             `${origin}/pending?state=${profile?.account_status}`

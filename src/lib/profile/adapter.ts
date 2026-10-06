@@ -62,10 +62,13 @@ async function currentUser(supabase: Supabase) {
   return data.user ?? null;
 }
 
-async function loadEnrollment(supabase: Supabase) {
+async function loadEnrollment(supabase: Supabase, studentId: string) {
+  // Scope by student_id — unscoped status=active forces a full-table RLS
+  // filter (can_admin_select_enrollments per row).
   const { data } = await supabase
     .from("enrollments")
     .select("id, year_id, status, years(year_number, name)")
+    .eq("student_id", studentId)
     .eq("status", "active")
     .maybeSingle();
   if (!data) {
@@ -153,7 +156,7 @@ async function buildProfile(
       .eq("id", userId)
       .maybeSingle(),
     currentUser(supabase),
-    loadEnrollment(supabase),
+    loadEnrollment(supabase, userId),
   ]);
   if (!row) return null;
   const meta = (user?.user_metadata ?? {}) as Record<string, unknown>;
@@ -439,7 +442,7 @@ export function createSubscriptionClassAdapter(
       }
 
       // Compat fallback when get_class_lock_state is unavailable.
-      const enrollment = await loadEnrollment(sb);
+      const enrollment = await loadEnrollment(sb, user.id);
       const [{ data: live }, { data: apps }, { data: subs }] = await Promise.all([
         sb.rpc("has_live_subscription"),
         sb

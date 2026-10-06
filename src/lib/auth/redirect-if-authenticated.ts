@@ -22,10 +22,14 @@ export async function redirectIfAuthenticated(
     redirect(safeNext);
   }
 
+  const userId = data.claims.sub as string;
+  // Scope by id — unscoped select under admin RLS seq-scans all profiles
+  // evaluating can_admin_select_profiles() (prod: ~4s → <1ms).
   const { data: profile } = await supabase
     .from("profiles")
     .select("role")
-    .single();
+    .eq("id", userId)
+    .maybeSingle();
 
   redirect(profile?.role === "admin" ? "/admin" : "/dashboard");
 }

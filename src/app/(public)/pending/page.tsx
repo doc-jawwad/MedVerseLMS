@@ -67,6 +67,7 @@ export default async function PendingPage({
       const { data: enrollment } = await supabase
         .from("enrollments")
         .select("id")
+        .eq("student_id", userId)
         .eq("status", "active")
         .maybeSingle();
       if (enrollment) {

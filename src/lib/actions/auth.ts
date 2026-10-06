@@ -136,10 +136,15 @@ export async function signIn(
   const profileError = await ensureProfile(supabase);
   if (profileError) return { error: profileError };
 
+  const { data: claimsData } = await supabase.auth.getClaims();
+  const userId = claimsData?.claims?.sub as string | undefined;
+  if (!userId) return { error: PROFILE_FAIL };
+
   const { data: profile } = await supabase
     .from("profiles")
     .select("role, account_status")
-    .single();
+    .eq("id", userId)
+    .maybeSingle();
 
   if (isBlockedAccountStatus(profile?.account_status)) {
     await supabase.auth.signOut({ scope: "others" });
@@ -264,10 +269,15 @@ export async function updatePassword(
   const profileError = await ensureProfile(supabase);
   if (profileError) return { error: profileError };
 
+  const { data: claimsData } = await supabase.auth.getClaims();
+  const userId = claimsData?.claims?.sub as string | undefined;
+  if (!userId) return { error: PROFILE_FAIL };
+
   const { data: profile } = await supabase
     .from("profiles")
     .select("role, account_status")
-    .single();
+    .eq("id", userId)
+    .maybeSingle();
 
   if (isBlockedAccountStatus(profile?.account_status)) {
     await supabase.auth.signOut({ scope: "others" });

@@ -109,10 +109,13 @@ export const requireStudent = cache(async function requireStudent() {
     redirect("/admin");
   }
 
+  // Scope by student_id so RLS does not seq-scan every enrollment row
+  // evaluating can_admin_select_enrollments() (prod: ~1.6s → <1ms).
   const { data: enrollment } = await ssrSpan("auth.enrollments", () =>
     ctx.supabase
       .from("enrollments")
       .select("id, year_id, status, years(year_number, name)")
+      .eq("student_id", ctx.userId)
       .eq("status", "active")
       .maybeSingle()
   );
