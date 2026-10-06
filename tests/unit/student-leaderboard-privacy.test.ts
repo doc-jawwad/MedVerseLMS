@@ -23,6 +23,9 @@ describe("student leaderboard surfaces — privacy inventory", () => {
   it("student result board does not render admin-only fields", () => {
     const page = read("src/app/(student)/tests/[id]/result/page.tsx");
     assert.match(page, /rpc\("test_leaderboard"/);
+    assert.match(page, /test_leaderboard_projection/);
+    assert.match(page, /attachCollegeToResultLeaderboard/);
+    assert.match(page, /r\.college_name/);
     assert.match(page, /r\.full_name/);
     assert.match(page, /r\.score/);
     assert.doesNotMatch(page, /r\.email/);

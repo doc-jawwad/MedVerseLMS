@@ -7,6 +7,11 @@ import {
   type AttemptReviewPayloadIncoming,
 } from "@/lib/tests/attempt-review";
 import { parseOwnTestResult } from "@/lib/tests/own-test-result";
+import {
+  attachCollegeToResultLeaderboard,
+  type ResultLeaderboardRankRow,
+} from "@/lib/leaderboard/result-board";
+import { normalizeLeaderboardRpcRows } from "@/lib/leaderboard/load-last-completed-board";
 import { ReviewLockNotice } from "@/components/subscription/review-lock-notice";
 import { PageHeader } from "@/components/student/page-header";
 import { StudentPage } from "@/components/student/student-page";
@@ -52,27 +57,28 @@ export default async function ResultPage({
 
   const { test, attempt: submitted, invalidated } = own;
 
-  type LeaderRow = {
-    rank: number;
-    percentile: number | null;
-    full_name: string;
-    score: number;
-    max_score: number;
-    percentage: number;
-    is_me: boolean;
-  };
-  const [{ data: reviewData }, { data: lbData }] = await Promise.all([
-    ssrSpan("fetch.get_attempt_review", () =>
-      supabase.rpc("get_attempt_review", { p_attempt_id: submitted.id })
-    ),
-    ssrSpan("fetch.test_leaderboard", () =>
-      supabase.rpc("test_leaderboard", { p_test_id: id })
-    ),
-  ]);
+  const [{ data: reviewData }, { data: lbData }, { data: projectedData }] =
+    await Promise.all([
+      ssrSpan("fetch.get_attempt_review", () =>
+        supabase.rpc("get_attempt_review", { p_attempt_id: submitted.id })
+      ),
+      ssrSpan("fetch.test_leaderboard", () =>
+        supabase.rpc("test_leaderboard", { p_test_id: id })
+      ),
+      ssrSpan("fetch.test_leaderboard_projection", () =>
+        supabase.rpc("test_leaderboard_projection", {
+          p_test_id: id,
+          p_limit: 100,
+        })
+      ),
+    ]);
   const reviewState = ssrSpanSync("in_process.review_ui", () =>
     resultReviewUiState(reviewData as AttemptReviewPayloadIncoming | null)
   );
-  const leaderboard = (lbData as LeaderRow[] | null) ?? [];
+  const leaderboard = attachCollegeToResultLeaderboard(
+    (lbData as ResultLeaderboardRankRow[] | null) ?? [],
+    normalizeLeaderboardRpcRows(projectedData)
+  );
   ssrMarkPageFnEnd();
 
   return (
@@ -112,22 +118,28 @@ export default async function ResultPage({
       </p>
 
       {leaderboard.length > 0 && (
-        <Card className="shadow-none">
+        <Card className="shadow-none" data-testid="result-leaderboard">
           <CardHeader>
             <CardTitle className="text-base text-[var(--student-ink)]">Leaderboard</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-1">
-            {leaderboard.map((r) => (
+            {leaderboard.map((r, idx) => (
               <div
-                key={r.rank}
-                className={`flex items-center justify-between rounded-md px-2 py-1.5 text-sm ${
+                key={`${r.full_name}-${r.rank ?? "x"}-${idx}`}
+                className={`flex items-start justify-between gap-3 rounded-md px-2 py-1.5 text-sm ${
                   r.is_me ? "bg-accent font-medium" : ""
                 }`}
+                data-testid="result-leaderboard-row"
               >
-                <span>
-                  #{r.rank} {r.is_me ? "YOU" : r.full_name}
-                </span>
-                <span className="text-muted-foreground">
+                <div className="min-w-0">
+                  <p className="truncate">
+                    #{r.rank} {r.is_me ? "YOU" : r.full_name}
+                  </p>
+                  <p className="truncate text-xs font-normal text-muted-foreground">
+                    {r.college_name ?? "College not set"}
+                  </p>
+                </div>
+                <span className="shrink-0 tabular-nums text-muted-foreground">
                   {r.score}/{r.max_score} ({r.percentage}%)
                 </span>
               </div>

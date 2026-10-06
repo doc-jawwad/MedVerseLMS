@@ -58,13 +58,18 @@ test.describe("Student leaderboard privacy", () => {
       await login(page, fixture.email, fixture.password);
       await sitAndSubmit(page, fixture.testId);
 
-      await expect(page.getByText("Leaderboard")).toBeVisible();
+      await expect(page.getByTestId("result-leaderboard")).toBeVisible();
       await expect(page.getByText("# YOU")).toBeVisible();
+      await expect(page.getByTestId("result-leaderboard").getByText("College not set")).toBeVisible();
       await expect(page.getByText(/1\/1/)).toBeVisible();
       await expect(page.getByText(fixture.email)).toHaveCount(0);
       await expect(page.getByText("LMS access")).toHaveCount(0);
       await expect(page.getByText("Can use LMS")).toHaveCount(0);
       await expect(page.getByText("Current class")).toHaveCount(0);
+
+      await page.setViewportSize({ width: 390, height: 844 });
+      await expect(page.getByTestId("result-leaderboard")).toBeVisible();
+      await expect(page.getByTestId("result-leaderboard").getByText("College not set")).toBeVisible();
 
       await closeTestNow(fixture.testId);
       await page.goto("/dashboard");
