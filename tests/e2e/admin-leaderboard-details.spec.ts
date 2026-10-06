@@ -87,11 +87,12 @@ test.describe("Admin leaderboard expanded student details", () => {
       ).toBeVisible();
 
       const row = page.getByTestId("admin-leaderboard-row").first();
-      await expect(row).toHaveAttribute("data-rank", "1");
       await expect(row.getByText("E2E Student")).toBeVisible();
       await expect(row.getByText(fixture.email)).toBeVisible();
-      await expect(row.getByText("#1")).toBeVisible();
-      await expect(row.getByText(/\/ /)).toBeVisible();
+      await expect(row.getByText("1st Year MBBS")).toBeVisible();
+      await expect(row.getByText("Can use LMS")).toBeVisible();
+      await expect(row.getByText("1 / 1")).toBeVisible();
+      await expect(row.getByText("100%")).toBeVisible();
 
       await page.setViewportSize({ width: 390, height: 844 });
       await expect(page.getByTestId("admin-leaderboard")).toBeVisible();
