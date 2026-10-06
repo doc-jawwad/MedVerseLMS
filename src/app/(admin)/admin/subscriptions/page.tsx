@@ -21,6 +21,15 @@ import {
   subStatusVariant,
 } from "@/components/admin/subscription-admin-nav";
 import { SubscriptionActions } from "./subscription-actions";
+import {
+  adminSubscriptionMonthOptions,
+  adminSubscriptionsHref,
+  formatYearMonthLabel,
+  matchesAdminSubscriptionFilters,
+  parseYearMonth,
+  pktMonthUtcRange,
+  serialNumber,
+} from "@/lib/subscriptions/admin-list-query";
 
 export const metadata = { title: "Subscriptions — MedVerse Admin" };
 
@@ -33,29 +42,45 @@ type ProfileJoin = {
 export default async function AdminSubscriptionsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; q?: string; year?: string }>;
+  searchParams: Promise<{
+    status?: string;
+    q?: string;
+    year?: string;
+    month?: string;
+  }>;
 }) {
   const { supabase } = await requireAdmin();
   const perms = await getAdminSubscriptionPermissions();
   if (!perms.manageSubscriptions) {
     return <AdminPermissionDenied title="Subscriptions" />;
   }
-  const { status, q, year: searchYear } = await searchParams;
+  const { status, q, year: searchYear, month: monthParam } = await searchParams;
+  const selectedMonth = parseYearMonth(monthParam);
 
   return requireAdminClass({
     searchYear,
     next: "/admin/subscriptions",
     children: async (year) => {
-      const [{ data: subs, error }, { data: plans }, { data: enrollments }] =
+      const monthRange = selectedMonth
+        ? pktMonthUtcRange(selectedMonth.year, selectedMonth.month)
+        : null;
+      let subsQuery = supabase
+        .from("subscriptions")
+        .select(
+          "id, status, starts_at, ends_at, grace_days, paid_access_mode, student_id, plan_id, year_id, profiles!subscriptions_student_id_fkey(full_name, email, account_status), subscription_plans(name)"
+        )
+        .eq("year_id", year.id)
+        .order("ends_at", { ascending: false })
+        .limit(300);
+      if (monthRange) {
+        subsQuery = subsQuery
+          .gte("starts_at", monthRange.startIso)
+          .lt("starts_at", monthRange.endIso);
+      }
+
+      const [{ data: subs, error }, { data: plans }, { data: enrollments }, { data: liveSubs }] =
         await Promise.all([
-          supabase
-            .from("subscriptions")
-            .select(
-              "id, status, starts_at, ends_at, grace_days, paid_access_mode, student_id, plan_id, year_id, profiles!subscriptions_student_id_fkey(full_name, email, account_status), subscription_plans(name)"
-            )
-            .eq("year_id", year.id)
-            .order("ends_at", { ascending: false })
-            .limit(300),
+          subsQuery,
           supabase
             .from("subscription_plans")
             .select(
@@ -71,6 +96,12 @@ export default async function AdminSubscriptionsPage({
             )
             .eq("status", "active")
             .eq("year_id", year.id)
+            .limit(300),
+          supabase
+            .from("subscriptions")
+            .select("student_id, status, ends_at, grace_days")
+            .eq("year_id", year.id)
+            .eq("status", "active")
             .limit(300),
         ]);
 
@@ -93,20 +124,40 @@ export default async function AdminSubscriptionsPage({
             displayStatus = "grace";
           return { s, profile, plan, isLive, displayStatus };
         })
-        .filter((r) => {
-          if (status === "active" && !r.isLive) return false;
-          if (status === "expired" && r.displayStatus !== "expired") return false;
-          if (status === "deactivated" && r.s.status !== "deactivated")
-            return false;
-          if (!term) return true;
-          return (
-            r.profile?.full_name?.toLowerCase().includes(term) ||
-            r.profile?.email?.toLowerCase().includes(term)
-          );
-        });
+        .filter((r) =>
+          matchesAdminSubscriptionFilters({
+            statusFilter: status,
+            searchTerm: term,
+            isLive: r.isLive,
+            displayStatus: r.displayStatus,
+            rowStatus: r.s.status,
+            fullName: r.profile?.full_name,
+            email: r.profile?.email,
+          })
+        );
 
       const activePlans = (plans ?? []).filter((p) => p.is_active);
-      const yearQuery = `year=${encodeURIComponent(year.id)}`;
+      const monthValue = selectedMonth
+        ? `${selectedMonth.year}-${String(selectedMonth.month).padStart(2, "0")}`
+        : "";
+      const monthOptions = adminSubscriptionMonthOptions(
+        new Date(),
+        monthParam
+      );
+      const hrefFor = (next: {
+        status?: string;
+        q?: string | null;
+        month?: string | null;
+      }) =>
+        adminSubscriptionsHref({
+          yearId: year.id,
+          status: next.status !== undefined ? next.status : status,
+          q: next.q !== undefined ? next.q : q,
+          month: next.month !== undefined ? next.month : monthParam,
+        });
+      const monthLabel = selectedMonth
+        ? formatYearMonthLabel(selectedMonth.year, selectedMonth.month)
+        : null;
 
       return (
         <div className="grid gap-6">
@@ -120,37 +171,61 @@ export default async function AdminSubscriptionsPage({
 
           <SubscriptionAdminNav currentPath="/admin/subscriptions" />
 
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="flex gap-2 text-sm">
-              {["", "active", "expired", "deactivated"].map((s) => (
-                <Link
-                  key={s || "all"}
-                  href={
-                    s
-                      ? `/admin/subscriptions?status=${s}&${yearQuery}${q ? `&q=${encodeURIComponent(q)}` : ""}`
-                      : `/admin/subscriptions?${yearQuery}${q ? `&q=${encodeURIComponent(q)}` : ""}`
-                  }
-                  className={`rounded-md border px-3 py-1 ${
-                    (status ?? "") === s ? "bg-accent" : "hover:bg-accent/50"
-                  }`}
-                >
-                  {s || "all"}
-                </Link>
-              ))}
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex flex-wrap gap-2 text-sm">
+                {["", "active", "expired", "deactivated"].map((s) => (
+                  <Link
+                    key={s || "all"}
+                    href={hrefFor({ status: s })}
+                    className={`rounded-md border px-3 py-1 ${
+                      (status ?? "") === s ? "bg-accent" : "hover:bg-accent/50"
+                    }`}
+                  >
+                    {s || "all"}
+                  </Link>
+                ))}
+              </div>
+              <form className="flex w-full min-w-0 flex-wrap items-center gap-2 sm:ml-auto sm:w-auto">
+                <label className="flex min-w-0 flex-1 items-center gap-2 text-sm sm:flex-none">
+                  <span className="shrink-0 text-muted-foreground">Month</span>
+                  <select
+                    name="month"
+                    defaultValue={monthValue}
+                    className="h-8 min-w-0 flex-1 rounded-lg border border-input bg-transparent px-2 text-sm sm:w-48 sm:flex-none"
+                  >
+                    <option value="">All</option>
+                    {monthOptions.map((value) => {
+                      const parsed = parseYearMonth(value);
+                      return (
+                        <option key={value} value={value}>
+                          {parsed
+                            ? formatYearMonthLabel(parsed.year, parsed.month)
+                            : value}
+                        </option>
+                      );
+                    })}
+                  </select>
+                </label>
+                <Input
+                  name="q"
+                  placeholder="Search student…"
+                  defaultValue={q ?? ""}
+                  className="w-full sm:w-56"
+                />
+                <input type="hidden" name="year" value={year.id} />
+                {status && <input type="hidden" name="status" value={status} />}
+                <Button type="submit" variant="secondary">
+                  Apply
+                </Button>
+              </form>
             </div>
-            <form className="ml-auto flex gap-2">
-              <Input
-                name="q"
-                placeholder="Search student…"
-                defaultValue={q ?? ""}
-                className="w-56"
-              />
-              <input type="hidden" name="year" value={year.id} />
-              {status && <input type="hidden" name="status" value={status} />}
-              <Button type="submit" variant="secondary">
-                Search
-              </Button>
-            </form>
+            <p className="text-sm text-muted-foreground">
+              {rows.length}{" "}
+              {rows.length === 1 ? "subscription" : "subscriptions"}
+              {monthLabel ? ` started in ${monthLabel}` : ""}
+              {status || term ? " matching current filters" : ""}.
+            </p>
           </div>
 
           {error && (
@@ -163,6 +238,7 @@ export default async function AdminSubscriptionsPage({
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-12 text-right">#</TableHead>
                   <TableHead>Student</TableHead>
                   <TableHead>Account</TableHead>
                   <TableHead>Plan</TableHead>
@@ -173,8 +249,11 @@ export default async function AdminSubscriptionsPage({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {rows.map(({ s, profile, plan, isLive, displayStatus }) => (
+                {rows.map(({ s, profile, plan, isLive, displayStatus }, index) => (
                   <TableRow key={s.id}>
+                    <TableCell className="text-right tabular-nums text-muted-foreground">
+                      {serialNumber(index)}
+                    </TableCell>
                     <TableCell>
                       <Link
                         href={`/admin/students/${s.student_id}`}
@@ -223,7 +302,7 @@ export default async function AdminSubscriptionsPage({
                 ))}
                 {rows.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-muted-foreground">
+                    <TableCell colSpan={8} className="text-muted-foreground">
                       No subscriptions match for this class.
                     </TableCell>
                   </TableRow>
@@ -234,7 +313,7 @@ export default async function AdminSubscriptionsPage({
 
           {(() => {
             const liveStudentIds = new Set(
-              (subs ?? [])
+              (liveSubs ?? [])
                 .filter((s) =>
                   subscriptionIsLiveAt(s.status, s.ends_at, s.grace_days ?? 0)
                 )
