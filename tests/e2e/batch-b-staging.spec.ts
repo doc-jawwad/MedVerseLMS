@@ -137,7 +137,7 @@ test.describe("Batch B staging", () => {
       );
       const newUrl = page.url();
       expect(newUrl).not.toContain(fixture.testId);
-      await expect(page.getByTestId("test-syllabus")).toHaveValue(
+      await expect(page.getByTestId("test-syllabus").first()).toHaveValue(
         /Reuse syllabus body/
       );
 
@@ -164,10 +164,12 @@ test.describe("Batch B staging", () => {
 
       await login(page, fixture.email, fixture.password);
       await page.goto("/tests");
-      await expect(page.getByTestId("test-syllabus-panel")).toContainText(
-        "Student-visible syllabus line",
-        { timeout: 20000 }
-      );
+      await expect(
+        page
+          .getByTestId("test-syllabus-panel")
+          .filter({ hasText: "Student-visible syllabus line" })
+          .first()
+      ).toBeVisible({ timeout: 20000 });
     } finally {
       await teardownExamFixture(fixture);
     }
