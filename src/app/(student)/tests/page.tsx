@@ -73,7 +73,7 @@ export default async function StudentTestsPage() {
       supabase
         .from("tests")
         .select(
-          "id, title, status, opens_at, closes_at, duration_minutes, entitlement, subjects(name), question_count"
+          "id, title, status, opens_at, closes_at, duration_minutes, entitlement, syllabus, subjects(name), question_count"
         )
         .order("opens_at", { ascending: false })
     ),
@@ -278,6 +278,24 @@ export default async function StudentTestsPage() {
                           start it with your current access.
                         </p>
                       )}
+                      {typeof t.syllabus === "string" &&
+                        t.syllabus.trim() &&
+                        (state === "upcoming" ||
+                          state === "available" ||
+                          state === "locked") &&
+                        isEntitled && (
+                          <div
+                            className="rounded-lg border bg-muted/40 p-3"
+                            data-testid="test-syllabus-panel"
+                          >
+                            <p className="mb-1 text-xs font-semibold tracking-wide text-[var(--brand-teal-ink)] uppercase">
+                              Syllabus
+                            </p>
+                            <p className="whitespace-pre-wrap text-sm text-[var(--student-ink)]">
+                              {t.syllabus}
+                            </p>
+                          </div>
+                        )}
                       {prepByTest.get(t.id) &&
                         (state === "upcoming" ||
                           state === "available" ||

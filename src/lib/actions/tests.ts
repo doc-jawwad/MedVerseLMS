@@ -13,6 +13,7 @@ import { createClient } from "@/lib/supabase/server";
 import type { QuestionContent, QuestionMeta } from "@/lib/actions/questions";
 import {
   pickTestConfigUpdate,
+  TEST_SYLLABUS_MAX_CHARS,
   type TestConfig,
 } from "@/lib/tests/test-config-update";
 import {
@@ -21,6 +22,7 @@ import {
   type RandomSelectionFilter,
 } from "@/lib/tests/random-selection-scope";
 import { publishTestErrorMessage } from "@/lib/tests/publish-test-errors";
+import { lifecycleTestErrorMessage } from "@/lib/tests/lifecycle-test-errors";
 
 // Types only — "use server" modules must not re-export sync helpers/constants.
 export type { TestConfig } from "@/lib/tests/test-config-update";
@@ -31,14 +33,36 @@ function reval(testId?: string) {
   if (testId) revalidatePath(`/admin/tests/${testId}`);
 }
 
+function normalizeSyllabus(
+  syllabus: string | null | undefined
+): string | null | { error: string } {
+  if (syllabus == null) return null;
+  const trimmed = syllabus.trim();
+  if (!trimmed) return null;
+  if (trimmed.length > TEST_SYLLABUS_MAX_CHARS) {
+    return {
+      error: `Syllabus must be at most ${TEST_SYLLABUS_MAX_CHARS} characters.`,
+    };
+  }
+  return trimmed;
+}
+
 export async function createTest(config: TestConfig) {
   const selectedYearId = await readAdminSelectedYearId();
   if (!selectedYearId) {
     return { error: "Select a class before creating a test." };
   }
+  const syllabusNorm = normalizeSyllabus(config.syllabus);
+  if (typeof syllabusNorm === "object" && syllabusNorm && "error" in syllabusNorm) {
+    return syllabusNorm;
+  }
   // Class-first: create always binds to the selected admin class, not a
   // stale/empty Year control on the form.
-  const bound: TestConfig = { ...config, year_id: selectedYearId };
+  const bound: TestConfig = {
+    ...config,
+    year_id: selectedYearId,
+    syllabus: syllabusNorm,
+  };
   const supabase = await createClient();
   if (config.subject_id) {
     const { data: subject } = await supabase
@@ -72,6 +96,17 @@ export async function updateTestConfig(
           ? "Invalid test configuration field."
           : "No valid fields to update.",
     };
+  }
+  if (Object.prototype.hasOwnProperty.call(picked, "syllabus")) {
+    const syllabusNorm = normalizeSyllabus(picked.syllabus);
+    if (
+      typeof syllabusNorm === "object" &&
+      syllabusNorm &&
+      "error" in syllabusNorm
+    ) {
+      return syllabusNorm;
+    }
+    picked.syllabus = syllabusNorm;
   }
   const supabase = await createClient();
   const { error } = await supabase.from("tests").update(picked).eq("id", testId);
@@ -431,6 +466,35 @@ export async function closeTestNow(testId: string) {
   const { error } = await supabase.rpc("close_test_now", { p_test_id: testId });
   reval(testId);
   return actionRpcResult("action", error);
+}
+
+/** Unopened published → draft (zero attempts). See return_to_draft_test. */
+export async function returnToDraftTest(testId: string) {
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("return_to_draft_test", {
+    p_test_id: testId,
+  });
+  reval(testId);
+  revalidatePath("/tests");
+  if (!error) return {};
+  logServerError("returnToDraftTest", error.message);
+  return { error: lifecycleTestErrorMessage(error.message) };
+}
+
+/** Conducted test → new unscheduled draft. Source unchanged. */
+export async function reuseTestAsDraft(sourceTestId: string) {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("reuse_test_as_draft", {
+    p_source_test_id: sourceTestId,
+  });
+  if (error) {
+    logServerError("reuseTestAsDraft", error.message);
+    return { error: lifecycleTestErrorMessage(error.message) };
+  }
+  const newId = data as string;
+  reval();
+  reval(newId);
+  redirect(`/admin/tests/${newId}`);
 }
 
 export async function invalidateTest(testId: string, reason: string) {

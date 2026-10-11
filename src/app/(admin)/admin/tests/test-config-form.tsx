@@ -7,10 +7,12 @@ import {
   updateTestConfig,
   type TestConfig,
 } from "@/lib/actions/tests";
+import { TEST_SYLLABUS_MAX_CHARS } from "@/lib/tests/test-config-update";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -63,11 +65,13 @@ export function TestConfigForm({
   const [shuffleO, setShuffleO] = useState(initial?.shuffle_options ?? false);
   const [showReview, setShowReview] = useState(initial?.show_review ?? "after_close");
   const [minQuestions, setMinQuestions] = useState(initial?.min_questions ?? 1);
+  const [syllabus, setSyllabus] = useState(initial?.syllabus ?? "");
 
   const yearSubjects = subjects.filter((s) => s.year_id === yearId);
   const lockedYearLabel = years.find((y) => y.id === yearId);
 
   function buildConfig(): TestConfig {
+    const syllabusTrimmed = syllabus.trim();
     return {
       title: title.trim(),
       year_id: yearId,
@@ -82,6 +86,7 @@ export function TestConfigForm({
       show_review: showReview as TestConfig["show_review"],
       min_questions: Number(minQuestions),
       test_type: testType,
+      syllabus: syllabusTrimmed ? syllabusTrimmed : null,
     };
   }
 
@@ -202,6 +207,23 @@ export function TestConfigForm({
             <SelectItem value="never">Never</SelectItem>
           </SelectContent>
         </Select>
+      </div>
+
+      <div className="grid gap-2">
+        <Label htmlFor="test-syllabus">Syllabus (optional)</Label>
+        <Textarea
+          id="test-syllabus"
+          data-testid="test-syllabus"
+          value={syllabus}
+          onChange={(e) => setSyllabus(e.target.value)}
+          disabled={disabled}
+          className="min-h-28"
+          maxLength={TEST_SYLLABUS_MAX_CHARS}
+          placeholder="Plain-text topics students should cover. Visible before they start. Not answer keys."
+        />
+        <p className="text-xs text-muted-foreground">
+          {syllabus.trim().length}/{TEST_SYLLABUS_MAX_CHARS} characters. Frozen after publish.
+        </p>
       </div>
 
       {!readOnly && (

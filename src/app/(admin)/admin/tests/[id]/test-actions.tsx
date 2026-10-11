@@ -14,6 +14,8 @@ import {
   closeTestNow,
   invalidateTest,
   voidTestQuestion,
+  returnToDraftTest,
+  reuseTestAsDraft,
   type QuestionFilter,
 } from "@/lib/actions/tests";
 import { publishTestErrorMessage } from "@/lib/tests/publish-test-errors";
@@ -552,6 +554,126 @@ export function PublishButton({
             <Button variant="outline" onClick={() => setConfirm(false)}>Cancel</Button>
             <Button disabled={pending} onClick={runPublish}>
               Publish
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
+export function ReturnToDraftButton({
+  testId,
+  canManage,
+}: {
+  testId: string;
+  canManage: boolean;
+}) {
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+  const [open, setOpen] = useState(false);
+
+  if (!canManage) return null;
+
+  return (
+    <>
+      <Button
+        variant="outline"
+        size="sm"
+        disabled={pending}
+        data-testid="return-to-draft-button"
+        onClick={() => setOpen(true)}
+      >
+        Return to draft for edits
+      </Button>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Return this test to draft?</DialogTitle>
+            <DialogDescription>
+              Allowed only while the test is still unpublished to students
+              (opening time in the future) and has zero attempt history.
+              Question versions unfreeze so you can edit, then republish.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              disabled={pending}
+              data-testid="return-to-draft-confirm"
+              onClick={() => {
+                setOpen(false);
+                startTransition(async () => {
+                  const res = await returnToDraftTest(testId);
+                  if (res.error) toast.error(res.error);
+                  else {
+                    toast.success("Returned to draft");
+                    router.refresh();
+                  }
+                });
+              }}
+            >
+              Return to draft
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
+export function ReuseAsDraftButton({
+  testId,
+  canManage,
+}: {
+  testId: string;
+  canManage: boolean;
+}) {
+  const [pending, startTransition] = useTransition();
+  const [open, setOpen] = useState(false);
+
+  if (!canManage) return null;
+
+  return (
+    <>
+      <Button
+        variant="outline"
+        size="sm"
+        disabled={pending}
+        data-testid="reuse-as-draft-button"
+        onClick={() => setOpen(true)}
+      >
+        Reuse as new draft
+      </Button>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reuse as a new draft?</DialogTitle>
+            <DialogDescription>
+              Creates a new unscheduled draft with the same questions,
+              audience, config, and syllabus. The original test and all
+              results stay unchanged. Attempts and scores are not copied.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              disabled={pending}
+              data-testid="reuse-as-draft-confirm"
+              onClick={() => {
+                setOpen(false);
+                startTransition(async () => {
+                  const res = await reuseTestAsDraft(testId);
+                  if (res?.error) toast.error(res.error);
+                  // success redirects server-side to the new draft
+                });
+              }}
+            >
+              Create draft copy
             </Button>
           </DialogFooter>
         </DialogContent>

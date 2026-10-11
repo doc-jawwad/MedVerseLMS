@@ -4,15 +4,25 @@
 
 ```
 draft ──publish_test()──▶ published ──closes_at passes / close now──▶ closed ──▶ archived
-  │                          │
-  └──delete_draft_test()     └──invalidate──▶ invalidated
+  │                          │                              │
+  └──delete_draft_test()     ├──return_to_draft_test()──▶ draft (unopened, zero attempts only)
+                             │                              │
+                             └──invalidate──▶ invalidated   └──reuse_test_as_draft()──▶ new draft (source unchanged)
 ```
 
 - `draft` — editable freely; students never see it. Hard-delete via `delete_draft_test(test_id)` (`publish_tests` required; refuses non-draft; audit `test_draft_deleted`). Cascades draft composition (`test_questions` / audiences / prep). Not Content Bin soft-delete. Published/live tests are not deleted this way (close / invalidate instead).
-- `published` — frozen (see below); in the student **catalog** for its audience from `opens_at` (locked if not entitled). "Live" is **derived**: `status='published' AND now() BETWEEN opens_at AND closes_at` — never stored. Upcoming published tests list immediately, sorted by `opens_at` ascending. Optional **preparation guidelines** (`test_prep_guidelines`) are readable after `can_access_test` (including before the window opens and after submit while entitlement remains). Guideline rows stay attached in Test History; they are not a new attempt state.
+- `published` — frozen (see below); in the student **catalog** for its audience from `opens_at` (locked if not entitled). "Live" is **derived**: `status='published' AND now() BETWEEN opens_at AND closes_at` — never stored. Upcoming published tests list immediately, sorted by `opens_at` ascending. Optional **preparation guidelines** (`test_prep_guidelines`) and optional **syllabus** (`tests.syllabus`, plain text ≤ 8000 chars) are readable after catalog entitlement rules (prep still via `can_access_test` RPCs; syllabus is a non-secret catalog field on the test row). Guideline/syllabus rows stay attached in Test History; they are not a new attempt state.
 - `closed` — window over. Owned **score / result summary** stays visible. Paid **review content** (stems, selected keys, correct keys, explanations) follows [access-eligibility-analytics.md](access-eligibility-analytics.md) §11 (live entitlement + `show_review`; server-gated).
 - `archived` — hidden from student lists; history intact.
 - `invalidated` — kill switch; attempts marked invalidated; hidden from results.
+
+### Return to draft for edits — `return_to_draft_test(test_id)`
+
+Allowed only when **all** hold under a `tests … FOR UPDATE` lock (same serialization as new `start_attempt`): `status='published'`, `opens_at` non-null and `opens_at > now()`, and **zero** `test_attempts` rows for that test (any state, including invalidated). `publish_tests` required. On success: `status → draft`, clear frozen `test_questions.question_version_id` so the next `publish_test` re-freezes current versions; config/questions/syllabus/prep become editable again. Does **not** delete audience, questions, prep, syllabus, or grants. Concurrent `start_attempt` either inserts first (return-to-draft then refuses) or sees `draft` after the flip (start refuses). Audit `test_returned_to_draft`.
+
+### Reuse as new draft — `reuse_test_as_draft(source_test_id)`
+
+For a conducted source (`status` in `published|closed`, `closes_at` non-null and `closes_at ≤ now()`). Invalidated/draft/archived sources refused. Creates a **new** draft with copied year/subject/config/entitlement/syllabus/prep/audiences/questions (order + marks); `question_version_id` null until publish; `opens_at`/`closes_at` null. Never copies attempts, answers, scores, ranks, access grants, or audit history. Source row unchanged. Returns new `test_id`. Audit `test_reused_as_draft`.
 
 ## Pre-publication validation — `validate_test(test_id)` (its own component)
 
@@ -38,9 +48,9 @@ Student audience **Neither** is a UI gate on Publish (stay draft); it is not a s
 
 ## Publish = snapshot
 
-`publish_test(test_id)`: validate → set `question_version_id := questions.current_version_id` on every test_questions row → status 'published' → refresh `questions.used_in_test` cache → audit log. After publish, test config, `test_prep_guidelines.body_text`, and test_questions are immutable (triggers), except `voided`/`void_policy`. A test with student audience **Neither** must stay `draft` — unpublished tests are never catalogued. Free vs paid audience is `tests.entitlement` (`free` vs `any_subscription`), not a second access model. Subscription never removes `entitlement = 'free'`.
+`publish_test(test_id)`: validate → set `question_version_id := questions.current_version_id` on every test_questions row → status 'published' → refresh `questions.used_in_test` cache → audit log. After publish, test config (including `tests.syllabus`), `test_prep_guidelines.body_text`, and test_questions are immutable (triggers), except `voided`/`void_policy`. A test with student audience **Neither** must stay `draft` — unpublished tests are never catalogued. Free vs paid audience is `tests.entitlement` (`free` vs `any_subscription`), not a second access model. Subscription never removes `entitlement = 'free'`.
 
-Later edits to a question create new versions; **published tests keep the frozen version forever** — history is never rewritten. Attempt review and scoring read those frozen `question_versions` (via `test_questions.question_version_id` / attempt answer versions), not `questions.current_version_id`. Soft-deleting a question after it was already published does **not** rewrite history; Content Bin hard purge is refused while the `test_questions` reference exists. Re-freezing to a newer version is allowed only while `now() < opens_at`, via an explicit admin action (audit-logged).
+Later edits to a question create new versions; **published tests keep the frozen version forever** — history is never rewritten. Attempt review and scoring read those frozen `question_versions` (via `test_questions.question_version_id` / attempt answer versions), not `questions.current_version_id`. Soft-deleting a question after it was already published does **not** rewrite history; Content Bin hard purge is refused while the `test_questions` reference exists. Returning an **unopened** published test to draft (above) clears frozen version IDs so republish re-freezes; it is not a silent in-place re-freeze while remaining published.
 
 ## Previews
 

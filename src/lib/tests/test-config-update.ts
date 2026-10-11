@@ -2,6 +2,9 @@
  * Pure allowlist picker for updateTestConfig — kept free of "use server"
  * so unit tests can import without pulling the actions graph.
  */
+/** Max length matches tests_syllabus_length_chk (docs/test-rules.md). */
+export const TEST_SYLLABUS_MAX_CHARS = 8000;
+
 export type TestConfig = {
   title: string;
   year_id: string;
@@ -16,6 +19,8 @@ export type TestConfig = {
   show_review: "after_submit" | "after_close" | "never";
   min_questions: number;
   test_type: "formal" | "mock";
+  /** Optional plain-text syllabus; null clears. Frozen after publish. */
+  syllabus: string | null;
 };
 
 /** Columns updateTestConfig may write — never status/tenant/created_by/etc. */
@@ -33,6 +38,7 @@ export const TEST_CONFIG_UPDATE_KEYS = [
   "show_review",
   "min_questions",
   "test_type",
+  "syllabus",
 ] as const satisfies ReadonlyArray<keyof TestConfig>;
 
 const TEST_CONFIG_UPDATE_KEY_SET = new Set<string>(TEST_CONFIG_UPDATE_KEYS);

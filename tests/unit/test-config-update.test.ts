@@ -38,6 +38,21 @@ describe("pickTestConfigUpdate (L4)", () => {
   it("covers the documented mutable field set", () => {
     assert.ok(TEST_CONFIG_UPDATE_KEYS.includes("title"));
     assert.ok(TEST_CONFIG_UPDATE_KEYS.includes("test_type"));
+    assert.ok(TEST_CONFIG_UPDATE_KEYS.includes("syllabus"));
     assert.equal(TEST_CONFIG_UPDATE_KEYS.includes("status" as never), false);
   });
+
+  it("accepts syllabus updates", () => {
+    const picked = pickTestConfigUpdate({
+      syllabus: "Week 1: inflammation\nWeek 2: neoplasia",
+    });
+    assert.equal("error" in picked, false);
+    if (!("error" in picked)) {
+      assert.equal(
+        picked.syllabus,
+        "Week 1: inflammation\nWeek 2: neoplasia"
+      );
+    }
+  });
 });
+

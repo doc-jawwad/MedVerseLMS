@@ -23,6 +23,8 @@ import {
   QuestionFilterForm,
   QuestionMarksInput,
   RemoveQuestionButton,
+  ReuseAsDraftButton,
+  ReturnToDraftButton,
   VoidQuestionButton,
 } from "./test-actions";
 import {
@@ -299,6 +301,21 @@ export default async function TestDetailPage({
       ? `Year ${(years ?? []).find((y) => y.id === test.year_id)!.year_number}`
       : "this test year";
 
+  // UX gates only — RPCs re-check opens_at / attempts / closes_at under lock.
+  const opensAtMs = test.opens_at ? new Date(test.opens_at).getTime() : NaN;
+  const closesAtMs = test.closes_at ? new Date(test.closes_at).getTime() : NaN;
+  const nowMs = Date.now();
+  const showReturnToDraft =
+    canPublishTests &&
+    test.status === "published" &&
+    Number.isFinite(opensAtMs) &&
+    opensAtMs > nowMs;
+  const showReuseAsDraft =
+    canPublishTests &&
+    (test.status === "published" || test.status === "closed") &&
+    Number.isFinite(closesAtMs) &&
+    closesAtMs <= nowMs;
+
   const poolFilterLink = (patch: Record<string, string | undefined>) => {
     const merged = { ...filters, page: undefined, ...patch };
     const qs = Object.entries(merged)
@@ -331,6 +348,12 @@ export default async function TestDetailPage({
             <Button asChild variant="outline" size="sm">
               <Link href={`/admin/tests/${id}/results`}>Results</Link>
             </Button>
+          )}
+          {showReturnToDraft && (
+            <ReturnToDraftButton testId={id} canManage={canPublishTests} />
+          )}
+          {showReuseAsDraft && (
+            <ReuseAsDraftButton testId={id} canManage={canPublishTests} />
           )}
           {(test.status === "published" || test.status === "closed") && (
             <KillSwitchPanel testId={id} status={test.status} />
