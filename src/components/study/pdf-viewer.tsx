@@ -28,6 +28,7 @@ import {
   type OfflinePdfMeta,
 } from "@/lib/study/offline-pdf-store";
 import { requestCacheOfflineReader } from "@/lib/pwa/offline-shell";
+import { canUseOrientationLock } from "@/lib/pwa/prefer-portrait";
 import {
   clientRectsToPdfRects,
   createPdfHighlight,
@@ -70,17 +71,6 @@ type OfflineUi =
 function formatPct(loaded: number, total: number): string {
   if (total <= 0) return "0%";
   return `${Math.min(100, Math.round((loaded / total) * 100))}%`;
-}
-
-function canUseOrientationLock(): boolean {
-  try {
-    const orientation = screen.orientation as ScreenOrientation & {
-      lock?: (orientation: string) => Promise<void>;
-    };
-    return typeof orientation?.lock === "function";
-  } catch {
-    return false;
-  }
 }
 
 export function PdfViewer({

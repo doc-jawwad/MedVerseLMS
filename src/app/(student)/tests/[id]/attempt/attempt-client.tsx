@@ -31,6 +31,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { usePreferPortrait } from "@/lib/pwa/use-prefer-portrait";
 
 type StartPayload = {
   attempt_id: string;
@@ -85,6 +86,7 @@ const ERROR_COPY: Record<string, { title: string; body: string }> = {
 };
 
 export function AttemptClient({ testId }: { testId: string }) {
+  usePreferPortrait();
   const router = useRouter();
   const [supabase] = useState(() => createClient());
   const [payload, setPayload] = useState<StartPayload | null>(null);

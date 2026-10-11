@@ -99,15 +99,17 @@ export function LeaderboardBoardCard({
           return (
             <div
               key={`${row.student_id}-${row.rank}`}
-              className="flex items-center gap-3 rounded-xl border px-3 py-2.5"
+              className="grid grid-cols-[2rem_minmax(0,1fr)_auto] items-center gap-x-2 gap-y-1 rounded-xl border px-3 py-2.5 sm:grid-cols-[2rem_2.25rem_minmax(0,1fr)_auto] sm:gap-x-3"
               data-testid="leaderboard-row"
               data-rank={row.rank}
             >
-              <span className="w-7 shrink-0 text-center font-heading text-lg font-semibold text-[var(--student-ink)]">
+              <span className="text-center font-heading text-lg font-semibold text-[var(--student-ink)]">
                 {row.rank}
               </span>
-              <AvatarPlaceholder name={row.full_name} />
-              <div className="min-w-0 flex-1">
+              <span className="hidden sm:block">
+                <AvatarPlaceholder name={row.full_name} />
+              </span>
+              <div className="min-w-0">
                 <p className="truncate font-medium text-[var(--student-ink)]">
                   {row.full_name}
                   {isMe ? (
@@ -116,11 +118,14 @@ export function LeaderboardBoardCard({
                     </span>
                   ) : null}
                 </p>
-                <p className="truncate text-xs text-muted-foreground">
+                <p className="line-clamp-2 break-words text-xs text-muted-foreground sm:truncate sm:line-clamp-none">
                   {row.college_name?.trim() || "College not set"}
                 </p>
               </div>
-              <span className="shrink-0 font-semibold tabular-nums text-[var(--student-ink)]">
+              <span
+                className="shrink-0 justify-self-end font-semibold tabular-nums text-[var(--student-ink)]"
+                data-testid="leaderboard-score"
+              >
                 {row.score}
               </span>
             </div>

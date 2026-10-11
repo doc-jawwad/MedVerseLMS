@@ -34,6 +34,12 @@ import {
   practiceSessionPositionLabel,
   practiceSetEmptyCopy,
 } from "@/lib/practice/session-labels";
+import {
+  createPracticeAnswerCommitLedger,
+  mapPracticeAnswerRpcRow,
+  type PracticeAnswerRpcRow,
+} from "@/lib/practice/persist-practice-answer";
+import { usePreferPortrait } from "@/lib/pwa/use-prefer-portrait";
 
 const BATCH_SIZE = MCQ_FOLDER_PRACTICE_BATCH_SIZE;
 
@@ -85,6 +91,8 @@ export function PracticeMcqSession({
   backHref?: string;
 }) {
   const supabase = useRef(createClient()).current;
+  const commitLedger = useRef(createPracticeAnswerCommitLedger()).current;
+  usePreferPortrait();
   const [subjectIds, setSubjectIds] = useState<string[]>(
     scope.type === "subject" ? [scope.id] : []
   );
@@ -104,6 +112,8 @@ export function PracticeMcqSession({
   const [selected, setSelected] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<PracticeAnswerFeedback | null>(null);
   const [checking, setChecking] = useState(false);
+  const [savingNext, setSavingNext] = useState(false);
+  const [saveNotice, setSaveNotice] = useState<string | null>(null);
   const [folderProgress, setFolderProgress] =
     useState<McqBankContainerPracticeProgress | null>(null);
   const [startedWithItems, setStartedWithItems] = useState(false);
@@ -318,46 +328,103 @@ export function PracticeMcqSession({
     return true;
   }, [pendingIncorrectDropId]);
 
+  const persistSelected = useCallback(
+    async (revealFeedback: boolean): Promise<boolean> => {
+      if (!currentContent || !selected || !deck.current) return false;
+      setSaveNotice(null);
+      const { data, error: rpcError } = await supabase.rpc(
+        "submit_practice_answer",
+        {
+          p_question_version_id: currentContent.questionVersionId,
+          p_selected_key: selected,
+          p_reveal_feedback: revealFeedback,
+        }
+      );
+      if (rpcError) {
+        setSaveNotice(
+          revealFeedback
+            ? "Could not check that answer. Please try again."
+            : "Could not save that answer. Please try again."
+        );
+        return false;
+      }
+      const row = (data as PracticeAnswerRpcRow[] | null)?.[0];
+      const mapped = mapPracticeAnswerRpcRow(row, revealFeedback);
+      if (!mapped.ok) {
+        setSaveNotice(mapped.error);
+        return false;
+      }
+      const first = commitLedger.commit(
+        currentContent.questionVersionId,
+        selected,
+        mapped.isCorrect
+      );
+      if (first) {
+        await deck.markDoneAndRecord(mapped.isCorrect);
+      }
+      if (revealFeedback && mapped.feedback) {
+        setFeedback(mapped.feedback);
+        if (
+          isIncorrectScope &&
+          mapped.feedback.isCorrect &&
+          currentContent.itemId
+        ) {
+          setPendingIncorrectDropId(currentContent.itemId);
+        }
+      }
+      return true;
+    },
+    [currentContent, selected, deck, supabase, isIncorrectScope, commitLedger]
+  );
+
   const goNext = useCallback(() => {
     if (flushPendingIncorrectDrop()) return;
     deck.go("next");
   }, [deck, flushPendingIncorrectDrop]);
 
-  const checkAnswer = useCallback(async () => {
-    if (!currentContent || !selected || !deck.current) return;
-    setChecking(true);
-    const { data, error: rpcError } = await supabase.rpc(
-      "submit_practice_answer",
-      {
-        p_question_version_id: currentContent.questionVersionId,
-        p_selected_key: selected,
-      }
-    );
-    setChecking(false);
-    if (rpcError) {
-      setError("Could not check that answer. Please try again.");
+  const handleNext = useCallback(async () => {
+    if (savingNext || checking) return;
+    if (flushPendingIncorrectDrop()) return;
+    if (feedback) {
+      deck.go("next");
       return;
     }
-    const row = (data as {
-      is_correct: boolean;
-      correct_key: string;
-      explanation: string;
-      reference: string;
-    }[])[0];
-    const fb: PracticeAnswerFeedback = {
-      isCorrect: row.is_correct,
-      correctKey: row.correct_key.trim(),
-      explanation: row.explanation ?? "",
-      reference: row.reference ?? "",
-    };
-    setFeedback(fb);
-    await deck.markDoneAndRecord(fb.isCorrect);
-    // Defer deck removal until Next so feedback stays visible.
-    // Favorite flag is independent — submit_practice_answer only toggles incorrect.
-    if (isIncorrectScope && fb.isCorrect && currentContent.itemId) {
-      setPendingIncorrectDropId(currentContent.itemId);
+    if (selected && currentContent) {
+      if (!commitLedger.has(currentContent.questionVersionId)) {
+        setSavingNext(true);
+        const ok = await persistSelected(false);
+        setSavingNext(false);
+        if (!ok) return;
+      }
     }
-  }, [currentContent, selected, deck, supabase, isIncorrectScope]);
+    deck.go("next");
+  }, [
+    savingNext,
+    checking,
+    flushPendingIncorrectDrop,
+    feedback,
+    selected,
+    currentContent,
+    commitLedger,
+    persistSelected,
+    deck,
+  ]);
+
+  const checkAnswer = useCallback(async () => {
+    if (!currentContent || !selected || !deck.current || checking || savingNext)
+      return;
+    setChecking(true);
+    const ok = await persistSelected(true);
+    setChecking(false);
+    if (!ok) return;
+  }, [
+    currentContent,
+    selected,
+    deck,
+    checking,
+    savingNext,
+    persistSelected,
+  ]);
 
   if (error) {
     return (
@@ -508,7 +575,7 @@ export function PracticeMcqSession({
         deck.index < deck.filtered.length - 1 || Boolean(pendingIncorrectDropId)
       }
       onPrev={() => deck.go("previous")}
-      onNext={goNext}
+      onNext={() => void handleNext()}
     >
       {roundHint ? (
         <div
@@ -583,6 +650,12 @@ export function PracticeMcqSession({
             })}
           </div>
 
+          {saveNotice && (
+            <p className="text-sm text-destructive" data-testid="practice-save-error">
+              {saveNotice}
+            </p>
+          )}
+
           {feedback && (
             <div
               className={`rounded-2xl p-4 text-sm ${
@@ -614,18 +687,29 @@ export function PracticeMcqSession({
               <Button
                 type="button"
                 onClick={() => void checkAnswer()}
-                disabled={!selected || checking}
+                disabled={!selected || checking || savingNext}
+                data-testid="practice-check-answer"
               >
                 {checking ? "Checking…" : "Check answer"}
               </Button>
             ) : (
-              <Button type="button" onClick={goNext}>
+              <Button
+                type="button"
+                onClick={() => void handleNext()}
+                disabled={savingNext}
+                data-testid="practice-next-question"
+              >
                 {pendingIncorrectDropId ||
                 deck.index >= deck.filtered.length - 1
                   ? "Continue"
                   : "Next question"}
               </Button>
             )}
+            {!feedback && savingNext ? (
+              <span className="self-center text-sm text-muted-foreground">
+                Saving answer…
+              </span>
+            ) : null}
           </div>
         </article>
       )}

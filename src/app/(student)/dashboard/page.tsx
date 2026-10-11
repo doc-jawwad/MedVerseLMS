@@ -222,7 +222,7 @@ export default async function DashboardPage() {
             Incoming tests
           </CardTitle>
           <CardDescription>
-            Scheduled and currently open tests for your class. History lives under Tests.
+            Scheduled and currently open tests for your class. The Tests page lists upcoming, available, in-progress, and previous tests.
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-3 pt-4">

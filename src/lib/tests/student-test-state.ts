@@ -182,6 +182,10 @@ export function isIncomingDashboardTest(
   );
 }
 
+/**
+ * @deprecated Tests page shows the full catalog (§2). Kept for callers that
+ * still mean "previous + in-progress history slice".
+ */
 export function isHistoryTestsPageState(
   state: StudentTestListState
 ): boolean {
@@ -191,6 +195,39 @@ export function isHistoryTestsPageState(
     state === "not_eligible" ||
     state === "in_progress"
   );
+}
+
+/** Four student Tests-page sections (docs/access-eligibility-analytics.md §2). */
+export type StudentTestsPageSection =
+  | "upcoming"
+  | "available"
+  | "in_progress"
+  | "previous";
+
+export function studentTestsPageSection(
+  state: StudentTestListState
+): StudentTestsPageSection {
+  switch (state) {
+    case "upcoming":
+      return "upcoming";
+    case "available":
+    case "locked":
+      return "available";
+    case "in_progress":
+      return "in_progress";
+    case "result":
+    case "missed":
+    case "not_eligible":
+      return "previous";
+  }
+}
+
+/** Every classified catalog state appears on the Tests page. */
+export function isStudentTestsPageState(
+  state: StudentTestListState
+): boolean {
+  void state;
+  return true;
 }
 
 export function testPricingLabel(

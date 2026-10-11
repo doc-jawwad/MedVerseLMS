@@ -5,10 +5,11 @@ import {
   classifyCatalogTestStates,
   displayTestTitle,
   formatMcqCount,
-  isHistoryTestsPageState,
   studentTestListLabel,
+  studentTestsPageSection,
   testPricingLabel,
   type StudentTestListState,
+  type StudentTestsPageSection,
 } from "@/lib/tests/student-test-state";
 import { finalizeOwnExpiredAttempts } from "@/lib/tests/finalize-own-expired";
 import { Badge } from "@/components/ui/badge";
@@ -25,6 +26,8 @@ import { StudentPage } from "@/components/student/student-page";
 import { SectionHeading } from "@/components/student/section-heading";
 import { EmptyState } from "@/components/student/empty-state";
 import { StudyMarkdown } from "@/components/study/study-markdown";
+import { OpensCountdown } from "@/components/study/opens-countdown";
+import { ResourceLockNotice } from "@/components/subscription/resource-lock-notice";
 import {
   bindSsrTiming,
   ssrMarkPageFnEnd,
@@ -45,6 +48,13 @@ type AttemptRow = {
   rank: number | null;
   submitted_at: string | null;
 };
+
+const SECTIONS: { key: StudentTestsPageSection; label: string }[] = [
+  { key: "upcoming", label: "Upcoming" },
+  { key: "available", label: "Available" },
+  { key: "in_progress", label: "In progress" },
+  { key: "previous", label: "Previous" },
+];
 
 export default async function StudentTestsPage() {
   await bindSsrTiming("/tests");
@@ -97,10 +107,13 @@ export default async function StudentTestsPage() {
     ),
   ]);
 
-  const { rows, sections } = ssrSpanSync("in_process.classify", () => {
+  const entitled = new Set(
+    ((accessible ?? []) as { id: string }[]).map((row) => row.id)
+  );
+
+  const { rows } = ssrSpanSync("in_process.classify", () => {
     const attemptByTest = new Map<string, AttemptRow>();
     for (const a of (attempts ?? []) as AttemptRow[]) {
-      // Prefer submitted over in_progress if both somehow present (shouldn't).
       const prev = attemptByTest.get(a.test_id);
       if (!prev || a.state === "submitted") attemptByTest.set(a.test_id, a);
     }
@@ -123,16 +136,11 @@ export default async function StudentTestsPage() {
         t,
         attempt: attemptByTest.get(t.id) ?? null,
         state,
+        section: studentTestsPageSection(state),
       };
     });
 
-    return {
-      rows: rows.filter((r) => isHistoryTestsPageState(r.state)),
-      sections: [
-        { key: "in_progress" as const, label: "In progress" },
-        { key: "previous" as const, label: "Previous" },
-      ],
-    };
+    return { rows };
   });
 
   const prepByTest = new Map(
@@ -148,40 +156,46 @@ export default async function StudentTestsPage() {
     <StudentPage>
       <PageHeader
         title="Tests"
-        description="Completed, missed, and in-progress attempts. Incoming scheduled tests are on your Dashboard."
+        description="Upcoming, available, in-progress, and previous tests for your class. Locked tests keep their eligibility explanation."
       />
 
-      {sections.map((sec) => {
-        const items = rows.filter((r) =>
-          sec.key === "in_progress"
-            ? r.state === "in_progress"
-            : r.state === "result" ||
-              r.state === "missed" ||
-              r.state === "not_eligible"
-        );
+      {SECTIONS.map((sec) => {
+        const items = rows.filter((r) => r.section === sec.key);
         if (items.length === 0) return null;
         return (
-          <div key={sec.key} className="grid gap-3">
+          <div key={sec.key} className="grid gap-3" data-testid={`tests-section-${sec.key}`}>
             <SectionHeading title={sec.label} />
             <div className="grid gap-3 sm:grid-cols-2">
               {items.map(({ t, attempt, state }) => {
                 const s = t.subjects as unknown as { name: string } | null;
                 const qc = t.question_count;
                 const pricing = testPricingLabel(t.entitlement);
+                const isEntitled = entitled.has(t.id);
+                const canStart =
+                  state === "in_progress" ||
+                  (state === "available" && isEntitled);
+                const showSubscriptionLock =
+                  !isEntitled &&
+                  state !== "in_progress" &&
+                  (state === "locked" ||
+                    state === "available" ||
+                    state === "upcoming");
                 return (
-                  <Card key={t.id} className="surface-card border-border/80 shadow-none">
+                  <Card
+                    key={t.id}
+                    className="surface-card border-border/80 shadow-none"
+                    data-testid={`tests-card-${state}`}
+                  >
                     <CardHeader>
                       <div className="flex flex-wrap items-start justify-between gap-2">
                         <CardTitle className="text-base text-[var(--student-ink)]">
                           {displayTestTitle(t.title, pricing)}
                         </CardTitle>
                         <div className="flex shrink-0 flex-wrap gap-1">
-                          <Badge variant="outline">
-                            {pricing}
-                          </Badge>
+                          <Badge variant="outline">{pricing}</Badge>
                           <Badge
                             variant={
-                              state === "in_progress"
+                              state === "in_progress" || state === "available"
                                 ? "default"
                                 : state === "result"
                                   ? "secondary"
@@ -210,27 +224,35 @@ export default async function StudentTestsPage() {
                         )}
                       </p>
 
-                      {state === "in_progress" && (
+                      {state === "upcoming" && t.opens_at && (
+                        <OpensCountdown opensAt={t.opens_at} />
+                      )}
+
+                      {canStart && (
                         <Button asChild className="w-fit">
                           <Link href={`/tests/${t.id}/attempt`}>
-                            Resume test
+                            {state === "in_progress"
+                              ? "Resume test"
+                              : "Start test"}
                           </Link>
                         </Button>
                       )}
+                      {showSubscriptionLock && <ResourceLockNotice />}
+
                       {state === "result" &&
                         attempt?.state === "submitted" && (
-                        <div className="flex flex-wrap items-center gap-3">
-                          <span>
-                            {attempt.score}/{attempt.max_score} (
-                            {attempt.percentage}%)
-                          </span>
-                          <Button asChild variant="outline" size="sm">
-                            <Link href={`/tests/${t.id}/result`}>
-                              View result
-                            </Link>
-                          </Button>
-                        </div>
-                      )}
+                          <div className="flex flex-wrap items-center gap-3">
+                            <span>
+                              {attempt.score}/{attempt.max_score} (
+                              {attempt.percentage}%)
+                            </span>
+                            <Button asChild variant="outline" size="sm">
+                              <Link href={`/tests/${t.id}/result`}>
+                                View result
+                              </Link>
+                            </Button>
+                          </div>
+                        )}
                       {state === "result" &&
                         attempt?.state !== "submitted" && (
                           <p className="text-muted-foreground">
@@ -250,11 +272,19 @@ export default async function StudentTestsPage() {
                           window. A later subscription does not change that.
                         </p>
                       )}
+                      {state === "locked" && !showSubscriptionLock && (
+                        <p className="text-muted-foreground">
+                          This test is listed for your class but you cannot
+                          start it with your current access.
+                        </p>
+                      )}
                       {prepByTest.get(t.id) &&
                         (state === "upcoming" ||
                           state === "available" ||
+                          state === "locked" ||
                           state === "in_progress" ||
-                          state === "result") && (
+                          state === "result") &&
+                        isEntitled && (
                           <div className="rounded-lg border bg-muted/40 p-3">
                             <p className="mb-1 text-xs font-semibold tracking-wide text-[var(--brand-teal-ink)] uppercase">
                               Preparation
@@ -273,8 +303,8 @@ export default async function StudentTestsPage() {
 
       {rows.length === 0 && (
         <EmptyState
-          title="No test history yet"
-          description="Incoming scheduled tests appear on your Dashboard. Completed, missed, and in-progress attempts appear here."
+          title="No tests yet"
+          description="When a test is scheduled for your class, it will appear here under Upcoming or Available."
         />
       )}
     </StudentPage>

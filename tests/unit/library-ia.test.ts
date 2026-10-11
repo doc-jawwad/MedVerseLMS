@@ -80,7 +80,7 @@ describe("contact links", () => {
 });
 
 describe("test surface split", () => {
-  it("maps incoming vs history and FREE/PAID labels", () => {
+  it("maps incoming dashboard slice; history helper remains previous+in_progress", () => {
     assert.equal(isIncomingDashboardTest("upcoming"), true);
     assert.equal(isIncomingDashboardTest("available"), true);
     assert.equal(isIncomingDashboardTest("result"), false);
