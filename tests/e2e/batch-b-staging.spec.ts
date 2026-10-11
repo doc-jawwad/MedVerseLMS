@@ -131,7 +131,12 @@ test.describe("Batch B staging", () => {
       });
       await page.getByTestId("reuse-as-draft-button").click();
       await page.getByTestId("reuse-as-draft-confirm").click();
-      await page.waitForURL(/\/admin\/tests\/[0-9a-f-]{36}/, { timeout: 20000 });
+      await page.waitForURL(
+        (url) =>
+          /\/admin\/tests\/[0-9a-f-]{36}/i.test(url.pathname) &&
+          !url.pathname.includes(fixture.testId),
+        { timeout: 20000 }
+      );
       const newUrl = page.url();
       expect(newUrl).not.toContain(fixture.testId);
       await expect(page.getByTestId("test-syllabus")).toHaveValue(
