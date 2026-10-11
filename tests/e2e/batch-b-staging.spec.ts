@@ -126,11 +126,10 @@ test.describe("Batch B staging", () => {
 
       await login(page, ADMIN_EMAIL, ADMIN_PASSWORD);
       await page.goto(`/admin/tests/${fixture.testId}`);
-      await expect(page.getByTestId("reuse-as-draft-button")).toBeVisible({
-        timeout: 15000,
-      });
-      await page.getByTestId("reuse-as-draft-button").click();
-      await page.getByTestId("reuse-as-draft-confirm").click();
+      const reuseBtn = page.getByTestId("reuse-as-draft-button").first();
+      await expect(reuseBtn).toBeVisible({ timeout: 15000 });
+      await reuseBtn.click();
+      await page.getByTestId("reuse-as-draft-confirm").last().click();
       await page.waitForURL(
         (url) =>
           /\/admin\/tests\/[0-9a-f-]{36}/i.test(url.pathname) &&
