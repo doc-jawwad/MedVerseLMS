@@ -152,14 +152,13 @@ test.describe("Batch B staging", () => {
   });
 
   test("B3 student sees plain-text syllabus before start", async ({ page }) => {
-    const e2e = loadE2EEnv();
     const fixture = await provisionExamFixture({ questionCount: 1 });
     try {
       stagingSqlBypassTriggers(
         `update public.tests set opens_at = now() + interval '1 hour', closes_at = now() + interval '4 hours', syllabus = 'Student-visible syllabus line' where id = '${fixture.testId}'`
       );
 
-      await login(page, e2e.studentEmail, e2e.studentPassword);
+      await login(page, fixture.email, fixture.password);
       await page.goto("/tests");
       await expect(page.getByTestId("test-syllabus-panel")).toContainText(
         "Student-visible syllabus line",
