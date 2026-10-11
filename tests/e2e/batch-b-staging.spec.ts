@@ -19,7 +19,8 @@ async function login(page: Page, email: string, password: string) {
   await page.getByLabel("Email").fill(email);
   await page.getByLabel("Password").fill(password);
   await page.getByRole("button", { name: "Sign in" }).click();
-  await page.waitForURL(/\/dashboard/, { timeout: 30000 });
+  // Admins land on /admin; students on /dashboard.
+  await page.waitForURL(/\/(dashboard|admin)/, { timeout: 30000 });
 }
 
 function stagingSql(sql: string): string {
