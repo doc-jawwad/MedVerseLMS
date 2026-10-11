@@ -93,18 +93,17 @@ test.describe("Batch B staging", () => {
 
       await login(page, ADMIN_EMAIL, ADMIN_PASSWORD);
       await page.goto(`/admin/tests/${fixture.testId}`);
-      await expect(page.getByTestId("return-to-draft-button")).toBeVisible({
-        timeout: 15000,
-      });
-      await page.getByTestId("return-to-draft-button").click();
-      await page.getByTestId("return-to-draft-confirm").click();
+      const returnBtn = page.getByTestId("return-to-draft-button").first();
+      await expect(returnBtn).toBeVisible({ timeout: 15000 });
+      await returnBtn.click();
+      await page.getByTestId("return-to-draft-confirm").last().click();
       await expect(page.getByText("draft", { exact: true }).first()).toBeVisible({
         timeout: 15000,
       });
-      await expect(page.getByTestId("test-syllabus")).toHaveValue(
+      await expect(page.getByTestId("test-syllabus").first()).toHaveValue(
         /Batch B syllabus E2E/
       );
-      await expect(page.getByTestId("publish-test-button")).toBeVisible();
+      await expect(page.getByTestId("publish-test-button").first()).toBeVisible();
     } finally {
       await teardownExamFixture(fixture);
     }
