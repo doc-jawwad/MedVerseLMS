@@ -43,21 +43,20 @@ describe("password recovery routing", () => {
 });
 
 describe("auth confirm recovery must not depend on ensure_profile", () => {
-  it("confirm route skips ensure_profile for recovery", async () => {
-    const src = await import("node:fs").then((fs) =>
-      fs.readFileSync(
-        new URL("../../src/app/auth/confirm/route.ts", import.meta.url),
-        "utf8"
-      )
+  it("confirm route and handler never call ensure_profile", async () => {
+    const fs = await import("node:fs");
+    for (const rel of [
+      "../../src/app/auth/confirm/route.ts",
+      "../../src/lib/auth/recovery-confirm.ts",
+    ]) {
+      const src = fs.readFileSync(new URL(rel, import.meta.url), "utf8");
+      assert.doesNotMatch(src, /\.rpc\(/, rel);
+    }
+    const handler = fs.readFileSync(
+      new URL("../../src/lib/auth/recovery-confirm.ts", import.meta.url),
+      "utf8"
     );
-    assert.match(src, /isPasswordRecoveryOtpType/);
-    assert.match(src, /passwordRecoveryNextPath/);
-    const start = src.indexOf("if (isPasswordRecoveryOtpType(type))");
-    const end = src.indexOf('rpc("ensure_profile")');
-    assert.ok(start > 0 && end > start);
-    const recoveryIf = src.slice(start, end);
-    assert.match(recoveryIf, /return NextResponse\.redirect/);
-    assert.equal(recoveryIf.includes('rpc("ensure_profile")'), false);
+    assert.match(handler, /passwordRecoveryNextPath/);
   });
 
   it("requestPasswordReset passes redirectTo when origin is configured", async () => {
