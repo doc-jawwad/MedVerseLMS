@@ -209,6 +209,9 @@ async function main() {
       await c.query(`delete from public.questions where id = any($1::uuid[])`, [created.qids]);
     }
     for (const id of [created.studentId, created.adminId].filter(Boolean)) {
+      // Replica mode skips FK actions: do what audit_logs_actor_fk's
+      // ON DELETE SET NULL would do, so no orphaned actor_id is left behind.
+      await c.query(`update public.audit_logs set actor_id = null where actor_id = $1`, [id]);
       await c.query(`delete from public.enrollments where student_id = $1`, [id]);
       await c.query(`delete from public.admin_permissions where admin_id = $1`, [id]);
       await c.query(`delete from public.profiles where id = $1`, [id]);
