@@ -45,12 +45,17 @@ export type ExamFixture = {
   password: string;
   testId: string;
   studentId: string;
+  title: string;
 };
 
 export async function provisionExamFixture(opts: {
   questionCount?: number;
   durationMinutes?: number;
   negativeMark?: number;
+  /** Reattempts: tests.max_attempts (omitted = DB default 1). */
+  maxAttempts?: number;
+  /** tests.show_review (omitted = DB default after_close). */
+  showReview?: "after_submit" | "after_close" | "never";
 }): Promise<ExamFixture> {
   const suffix = Math.random().toString(36).slice(2, 10);
   const email = `e2e-${suffix}@test.invalid`;
@@ -160,6 +165,8 @@ export async function provisionExamFixture(opts: {
       duration_minutes: opts.durationMinutes ?? 60,
       negative_mark: opts.negativeMark ?? 0,
       min_questions: 1,
+      ...(opts.maxAttempts !== undefined ? { max_attempts: opts.maxAttempts } : {}),
+      ...(opts.showReview !== undefined ? { show_review: opts.showReview } : {}),
     }),
   }).then((r) => r.json());
   const testId = testRes[0].id;
@@ -198,7 +205,7 @@ export async function provisionExamFixture(opts: {
   // profiles/enrollments (required before subscription FK inserts).
   await ensureProfileForCredentials(email, password);
 
-  return { email, password, testId, studentId };
+  return { email, password, testId, studentId, title: `E2E Exam ${suffix}` };
 }
 
 export async function teardownExamFixture(f: ExamFixture) {
@@ -716,6 +723,77 @@ export async function closeTestNow(testId: string) {
   if (!res.ok) {
     throw new Error(`close_test_now failed: ${res.status} ${await res.text()}`);
   }
+}
+
+/** Admin invalidates one attempt (controlled retake / ranking recompute). */
+export async function invalidateAttemptAsAdmin(attemptId: string, reason: string) {
+  requireUuid(attemptId, "attemptId");
+  const res = await adminRpc("invalidate_attempt", {
+    p_attempt_id: attemptId,
+    p_reason: reason,
+  });
+  if (!res.ok) {
+    throw new Error(`invalidate_attempt failed: ${res.status} ${res.text}`);
+  }
+}
+
+/** Staging-only read-only scalar/rows query over the guarded SSH psql bridge. */
+async function stagingRows(sql: string): Promise<string[]> {
+  const sshHost = stagingSshHost();
+  if (e2e.target !== "staging" || !sshHost) {
+    throw new Error("stagingRows requires E2E_TARGET=staging and E2E_STAGING_SSH");
+  }
+  const { spawnSync } = await import("node:child_process");
+  const wrapped =
+    `sudo -n -u postgres env PGOPTIONS="-c default_transaction_read_only=on" ` +
+    `psql -d medverse_staging -Atq -v ON_ERROR_STOP=1 -c ${JSON.stringify(sql)}`;
+  const res = spawnSync("ssh", [sshHost, wrapped], { encoding: "utf8", shell: false });
+  if (res.status !== 0) {
+    throw new Error(`stagingRows failed: ${res.stderr || res.stdout || res.error}`);
+  }
+  return (res.stdout || "").split(/\r?\n/).filter((l) => l.trim().length > 0);
+}
+
+export type E2eAttemptRow = {
+  id: string;
+  state: string;
+  score: number | null;
+  rank: number | null;
+};
+
+/** The student's attempts on a test, oldest first (admin read via the guarded bridge). */
+export async function listAttemptsForE2e(
+  testId: string,
+  studentId: string
+): Promise<E2eAttemptRow[]> {
+  requireUuid(testId, "testId");
+  requireUuid(studentId, "studentId");
+  const lines = await stagingRows(
+    `select id||'|'||state||'|'||coalesce(score::text,'')||'|'||coalesce(rank::text,'') ` +
+      `from public.test_attempts where test_id='${testId}'::uuid and student_id='${studentId}'::uuid ` +
+      `and current_database()='medverse_staging' order by started_at, id`
+  );
+  return lines.map((l) => {
+    const [id, state, score, rank] = l.split("|");
+    return {
+      id,
+      state,
+      score: score === "" ? null : Number(score),
+      rank: rank === "" ? null : Number(rank),
+    };
+  });
+}
+
+/** Drain the coalesced ranking queue now (staging has no pg_cron tick). */
+export async function rankDirtyNow() {
+  const sshHost = stagingSshHost();
+  if (e2e.target !== "staging" || !sshHost) {
+    throw new Error("rankDirtyNow requires E2E_TARGET=staging and E2E_STAGING_SSH");
+  }
+  await stagingPsql(
+    sshHost,
+    `select public.rank_dirty_tests() where current_database()='medverse_staging';`
+  );
 }
 
 export async function provisionEnrolledStudent(): Promise<{
