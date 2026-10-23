@@ -18,6 +18,8 @@ export type TestConfig = {
   shuffle_options: boolean;
   show_review: "after_submit" | "after_close" | "never";
   min_questions: number;
+  /** Counted attempts per student; default 1. >= 1, no upper cap. Frozen after publish. */
+  max_attempts: number;
   test_type: "formal" | "mock";
   /** Optional plain-text syllabus; null clears. Frozen after publish. */
   syllabus: string | null;
@@ -37,6 +39,7 @@ export const TEST_CONFIG_UPDATE_KEYS = [
   "shuffle_options",
   "show_review",
   "min_questions",
+  "max_attempts",
   "test_type",
   "syllabus",
 ] as const satisfies ReadonlyArray<keyof TestConfig>;

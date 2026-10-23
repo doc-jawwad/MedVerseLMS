@@ -15,11 +15,16 @@ export type AttemptReviewItem = {
   void_policy: string | null;
 };
 
+/** Multi-attempt hold: review withheld until attempts are exhausted or the test closes. */
+export const REVIEW_AVAILABLE_AFTER_ATTEMPTS = "available_after_attempts" as const;
+
 export type AttemptReviewPayload = {
   allowed: boolean;
   reason?: string;
   items?: AttemptReviewItem[];
   closes_at?: string;
+  attempts_used?: number;
+  max_attempts?: number;
 };
 
 /** get_attempt_review copies question_versions.options; staging may store a key map. */
@@ -36,6 +41,7 @@ export type ResultReviewUi =
   | { kind: "entitlement_lock" }
   | { kind: "disabled" }
   | { kind: "after_close" }
+  | { kind: "after_attempts"; attemptsUsed: number | null; maxAttempts: number | null }
   | { kind: "none" };
 
 /**
@@ -74,6 +80,12 @@ export function sanitizeAttemptReview(
     allowed: false,
     reason: raw.reason,
     closes_at: raw.closes_at,
+    ...(typeof raw.attempts_used === "number"
+      ? { attempts_used: raw.attempts_used }
+      : {}),
+    ...(typeof raw.max_attempts === "number"
+      ? { max_attempts: raw.max_attempts }
+      : {}),
   };
 }
 
@@ -93,6 +105,13 @@ export function resultReviewUiState(
   }
   if (review.reason === "available_after_close") {
     return { kind: "after_close" };
+  }
+  if (review.reason === REVIEW_AVAILABLE_AFTER_ATTEMPTS) {
+    return {
+      kind: "after_attempts",
+      attemptsUsed: review.attempts_used ?? null,
+      maxAttempts: review.max_attempts ?? null,
+    };
   }
   return { kind: "none" };
 }

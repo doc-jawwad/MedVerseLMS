@@ -2,11 +2,14 @@ import Link from "next/link";
 import { requireStudent } from "@/lib/auth/require-user";
 import { formatDateTime } from "@/lib/utils";
 import {
+  attemptUsageLabel,
   classifyCatalogTestStates,
   displayTestTitle,
   formatMcqCount,
+  retakeHref,
   studentTestListLabel,
   studentTestsPageSection,
+  summarizeAttemptsByTest,
   testPricingLabel,
   type StudentTestListState,
   type StudentTestsPageSection,
@@ -73,7 +76,7 @@ export default async function StudentTestsPage() {
       supabase
         .from("tests")
         .select(
-          "id, title, status, opens_at, closes_at, duration_minutes, entitlement, syllabus, subjects(name), question_count"
+          "id, title, status, opens_at, closes_at, duration_minutes, entitlement, syllabus, max_attempts, subjects(name), question_count"
         )
         .order("opens_at", { ascending: false })
     ),
@@ -112,11 +115,8 @@ export default async function StudentTestsPage() {
   );
 
   const { rows } = ssrSpanSync("in_process.classify", () => {
-    const attemptByTest = new Map<string, AttemptRow>();
-    for (const a of (attempts ?? []) as AttemptRow[]) {
-      const prev = attemptByTest.get(a.test_id);
-      if (!prev || a.state === "submitted") attemptByTest.set(a.test_id, a);
-    }
+    const { displayByTest: attemptByTest, countedByTest } =
+      summarizeAttemptsByTest((attempts ?? []) as AttemptRow[]);
 
     // eslint-disable-next-line react-hooks/purity -- RSC renders once per request
     const nowMs = Date.now();
@@ -135,6 +135,7 @@ export default async function StudentTestsPage() {
       return {
         t,
         attempt: attemptByTest.get(t.id) ?? null,
+        counted: countedByTest.get(t.id) ?? 0,
         state,
         section: studentTestsPageSection(state),
       };
@@ -166,14 +167,16 @@ export default async function StudentTestsPage() {
           <div key={sec.key} className="grid gap-3" data-testid={`tests-section-${sec.key}`}>
             <SectionHeading title={sec.label} />
             <div className="grid gap-3 sm:grid-cols-2">
-              {items.map(({ t, attempt, state }) => {
+              {items.map(({ t, attempt, counted, state }) => {
                 const s = t.subjects as unknown as { name: string } | null;
                 const qc = t.question_count;
                 const pricing = testPricingLabel(t.entitlement);
                 const isEntitled = entitled.has(t.id);
+                const maxAttempts = t.max_attempts ?? 1;
                 const canStart =
                   state === "in_progress" ||
                   (state === "available" && isEntitled);
+                const canRetake = state === "retake_available" && isEntitled;
                 const showSubscriptionLock =
                   !isEntitled &&
                   state !== "in_progress" &&
@@ -195,7 +198,9 @@ export default async function StudentTestsPage() {
                           <Badge variant="outline">{pricing}</Badge>
                           <Badge
                             variant={
-                              state === "in_progress" || state === "available"
+                              state === "in_progress" ||
+                              state === "available" ||
+                              state === "retake_available"
                                 ? "default"
                                 : state === "result"
                                   ? "secondary"
@@ -237,9 +242,24 @@ export default async function StudentTestsPage() {
                           </Link>
                         </Button>
                       )}
+                      {canRetake && (
+                        <Button asChild className="w-fit">
+                          <Link href={retakeHref(t.id, counted)}>
+                            Retake test
+                          </Link>
+                        </Button>
+                      )}
+                      {attemptUsageLabel(state, counted, maxAttempts) && (
+                        <p
+                          className="text-muted-foreground"
+                          data-testid="tests-attempt-count"
+                        >
+                          {attemptUsageLabel(state, counted, maxAttempts)}
+                        </p>
+                      )}
                       {showSubscriptionLock && <ResourceLockNotice />}
 
-                      {state === "result" &&
+                      {(state === "result" || state === "retake_available") &&
                         attempt?.state === "submitted" && (
                           <div className="flex flex-wrap items-center gap-3">
                             <span>
@@ -301,6 +321,7 @@ export default async function StudentTestsPage() {
                           state === "available" ||
                           state === "locked" ||
                           state === "in_progress" ||
+                          state === "retake_available" ||
                           state === "result") &&
                         isEntitled && (
                           <div className="rounded-lg border bg-muted/40 p-3">

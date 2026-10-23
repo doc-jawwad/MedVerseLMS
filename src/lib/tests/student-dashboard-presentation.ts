@@ -18,6 +18,7 @@ export type DashboardAccessKind =
 export type CatalogStateCounts = {
   result: number;
   in_progress: number;
+  retake_available: number;
   available: number;
   locked: number;
   upcoming: number;
@@ -94,6 +95,7 @@ export function emptyCatalogStateCounts(): CatalogStateCounts {
   return {
     result: 0,
     in_progress: 0,
+    retake_available: 0,
     available: 0,
     locked: 0,
     upcoming: 0,
@@ -124,6 +126,7 @@ export function approximateCatalogEligibleCount(
   return (
     counts.result +
     counts.in_progress +
+    counts.retake_available +
     counts.available +
     counts.missed
   );

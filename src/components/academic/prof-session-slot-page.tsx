@@ -28,7 +28,10 @@ import {
 import { requireStudent } from "@/lib/auth/require-user";
 import { formatDateTime } from "@/lib/utils";
 import {
+  attemptUsageLabel,
   classifyCatalogTestStates,
+  retakeHref,
+  summarizeAttemptsByTest,
   displayTestTitle,
   formatMcqCount,
   studentTestListLabel,
@@ -200,6 +203,7 @@ type AttemptRow = {
   score: number | null;
   max_score: number | null;
   percentage: number | null;
+  submitted_at: string | null;
 };
 
 async function ProfSessionDayTestsSlot({
@@ -226,14 +230,14 @@ async function ProfSessionDayTestsSlot({
     supabase
       .from("tests")
       .select(
-        "id, title, status, opens_at, closes_at, duration_minutes, entitlement, subjects(name), question_count"
+        "id, title, status, opens_at, closes_at, duration_minutes, entitlement, max_attempts, subjects(name), question_count"
       )
       .eq("prof_session_day_id", dayId)
       .order("opens_at", { ascending: false }),
     supabase
       .from("test_attempts")
       .select(
-        "id, test_id, state, expires_at, score, max_score, percentage"
+        "id, test_id, state, expires_at, score, max_score, percentage, submitted_at"
       )
       .eq("student_id", userId)
       .neq("state", "invalidated"),
@@ -249,12 +253,10 @@ async function ProfSessionDayTestsSlot({
       .eq("grant_type", "test"),
   ]);
 
-  const attemptByTest = new Map<string, AttemptRow>();
-  for (const a of (attempts ?? []) as AttemptRow[]) {
-    const prev = attemptByTest.get(a.test_id);
-    if (!prev || a.state === "submitted") attemptByTest.set(a.test_id, a);
-  }
+  const { displayByTest: attemptByTest, countedByTest } =
+    summarizeAttemptsByTest((attempts ?? []) as AttemptRow[]);
 
+  // eslint-disable-next-line react-hooks/purity -- RSC renders once per request
   const nowMs = Date.now();
   const states = classifyCatalogTestStates({
     nowMs,
@@ -274,6 +276,7 @@ async function ProfSessionDayTestsSlot({
       closes_at: string | null;
       duration_minutes: number;
       entitlement: string;
+      max_attempts: number | null;
       subjects: { name: string } | null;
       question_count: number | null;
     }[]
@@ -282,6 +285,7 @@ async function ProfSessionDayTestsSlot({
     return {
       t,
       attempt: attemptByTest.get(t.id) ?? null,
+      counted: countedByTest.get(t.id) ?? 0,
       state,
     };
   });
@@ -309,7 +313,7 @@ async function ProfSessionDayTestsSlot({
         />
       ) : (
         <div className="grid gap-3 sm:grid-cols-2">
-          {rows.map(({ t, attempt, state }) => {
+          {rows.map(({ t, attempt, counted, state }) => {
             const s = t.subjects as unknown as { name: string } | null;
             const pricing = testPricingLabel(t.entitlement);
             const canStart =
@@ -318,6 +322,11 @@ async function ProfSessionDayTestsSlot({
                 ((accessible ?? []) as { id: string }[]).some(
                   (row) => row.id === t.id
                 ));
+            const isEntitled = ((accessible ?? []) as { id: string }[]).some(
+              (row) => row.id === t.id
+            );
+            // UX only: start_attempt re-checks limit, window and entitlement.
+            const canRetake = state === "retake_available" && isEntitled;
             const showLock =
               state === "locked" ||
               (state === "available" &&
@@ -338,7 +347,7 @@ async function ProfSessionDayTestsSlot({
                       <Badge variant="outline">{pricing}</Badge>
                       <Badge
                         variant={
-                          state === "in_progress"
+                          state === "in_progress" || state === "retake_available"
                             ? "default"
                             : state === "result"
                               ? "secondary"
@@ -375,7 +384,18 @@ async function ProfSessionDayTestsSlot({
                       </Link>
                     </Button>
                   )}
-                  {state === "result" && attempt?.state === "submitted" && (
+                  {canRetake && (
+                    <Button asChild className="w-fit">
+                      <Link href={retakeHref(t.id, counted)}>Retake test</Link>
+                    </Button>
+                  )}
+                  {attemptUsageLabel(state, counted, t.max_attempts) && (
+                    <p className="text-muted-foreground" data-testid="slot-attempt-count">
+                      {attemptUsageLabel(state, counted, t.max_attempts)}
+                    </p>
+                  )}
+                  {(state === "result" || state === "retake_available") &&
+                    attempt?.state === "submitted" && (
                     <div className="flex flex-wrap items-center gap-3">
                       <span>
                         {attempt.score}/{attempt.max_score} (

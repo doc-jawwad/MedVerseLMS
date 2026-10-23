@@ -65,6 +65,7 @@ export function TestConfigForm({
   const [shuffleO, setShuffleO] = useState(initial?.shuffle_options ?? false);
   const [showReview, setShowReview] = useState(initial?.show_review ?? "after_close");
   const [minQuestions, setMinQuestions] = useState(initial?.min_questions ?? 1);
+  const [maxAttempts, setMaxAttempts] = useState(initial?.max_attempts ?? 1);
   const [syllabus, setSyllabus] = useState(initial?.syllabus ?? "");
 
   const yearSubjects = subjects.filter((s) => s.year_id === yearId);
@@ -85,6 +86,7 @@ export function TestConfigForm({
       shuffle_options: shuffleO,
       show_review: showReview as TestConfig["show_review"],
       min_questions: Number(minQuestions),
+      max_attempts: Math.max(1, Math.trunc(Number(maxAttempts)) || 1),
       test_type: testType,
       syllabus: syllabusTrimmed ? syllabusTrimmed : null,
     };
@@ -163,6 +165,13 @@ export function TestConfigForm({
         <div className="grid gap-2">
           <Label>Minimum questions</Label>
           <Input type="number" min={1} value={minQuestions} onChange={(e) => setMinQuestions(Number(e.target.value))} disabled={disabled} />
+        </div>
+        <div className="grid gap-2">
+          <Label>Attempts allowed per student</Label>
+          <Input type="number" min={1} step={1} value={maxAttempts} onChange={(e) => setMaxAttempts(Number(e.target.value))} disabled={disabled} data-testid="test-max-attempts" />
+          <p className="text-xs text-muted-foreground">
+            1 = single attempt. Above 1, students may retake while the test is open; the best submitted score is ranked. Answer review stays hidden until attempts are used up or the test closes.
+          </p>
         </div>
         <div className="grid gap-2">
           <Label>Marks per question</Label>

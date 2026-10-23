@@ -182,7 +182,7 @@ Helpers: `can_view_test` (catalog) vs `can_access_test` (content); `resource_con
 
 ## Tests
 
-**tests** — `title`, `year_id`, `subject_id null`, `status text check in ('draft','published','closed','archived','invalidated') default 'draft'`, `opens_at`, `closes_at`, `duration_minutes int`, `marks_per_question numeric(6,2) default 1`, `negative_mark numeric(4,2) default 0`, `shuffle_questions bool default true`, `shuffle_options bool default false`, `show_review text check in ('after_submit','after_close','never') default 'after_close'`, `min_questions int default 1`, optional `syllabus text` (plain text, `char_length ≤ 8000`, frozen after publish like other config), `created_by`, plus entitlement columns (`free` / `any_subscription` / `plan`; existing rows backfilled `free`).
+**tests** — `title`, `year_id`, `subject_id null`, `status text check in ('draft','published','closed','archived','invalidated') default 'draft'`, `opens_at`, `closes_at`, `duration_minutes int`, `marks_per_question numeric(6,2) default 1`, `negative_mark numeric(4,2) default 0`, `shuffle_questions bool default true`, `shuffle_options bool default false`, `show_review text check in ('after_submit','after_close','never') default 'after_close'`, `min_questions int default 1`, `max_attempts int not null default 1 check (max_attempts >= 1)` (counted attempts per student; frozen after publish; [test-rules.md](test-rules.md)), optional `syllabus text` (plain text, `char_length ≤ 8000`, frozen after publish like other config), `created_by`, plus entitlement columns (`free` / `any_subscription` / `plan`; existing rows backfilled `free`).
 ("live" is derived: `status='published' and now() between opens_at and closes_at` — not a stored state.)
 Student-facing **Free / Both / Paid / Neither** audience in the test form maps onto these entitlement columns (not a new enum): Free and Both → `free` (subscription never removes free access; Both is the same access law as Free); Paid only → `any_subscription`; Neither → remain `draft` (unpublished tests are never in the student catalog). `test_audiences` remains year-cohort catalog membership.
 Draft hard-delete: `delete_draft_test(p_test_id)` (`publish_tests`, draft-only, audit `test_draft_deleted`). Admin table DELETE is also restricted to `status='draft'`. No `deleted_at` on tests — not a Content Bin entity. Lifecycle helpers: `return_to_draft_test` (unopened published, zero attempts) and `reuse_test_as_draft` (conducted → new draft); see [test-rules.md](test-rules.md).
@@ -198,15 +198,15 @@ Draft hard-delete: `delete_draft_test(p_test_id)` (`publish_tests`, draft-only, 
 
 **test_attempts** —
 - `test_id`, `student_id`, `state text check in ('in_progress','submitted','invalidated')`
-- **Partial unique index `(test_id, student_id) WHERE state != 'invalidated'`** — one live/submitted attempt; invalidated history preserved; controlled retake possible.
+- **Partial unique index `(test_id, student_id) WHERE state = 'in_progress'`** — at most one live attempt per student per test. The **attempt limit** is not an index: `start_attempt` checks counted attempts (`in_progress` + `submitted`) `< tests.max_attempts` under the new-start `tests … FOR UPDATE` lock. Invalidated attempts never count; all history preserved; controlled retake (admin invalidate) unchanged. Multiple `submitted` rows per (test, student) are allowed only up to `max_attempts`.
 - `started_at` (server), `expires_at` (server: `least(started_at + duration, closes_at)`), `submitted_at`, `submit_source check in ('student','auto','admin')`
 - `device_id uuid not null`, `session_id uuid` (auth session that started it)
 - `question_order uuid[]` (shuffled question_version_ids, persisted at start), `option_orders jsonb null`
 - `invalidated_reason text`, `invalidated_by uuid` (both required when state='invalidated')
-- results: `score numeric`, `raw_correct int`, `raw_wrong int`, `raw_blank int`, `percentage numeric`, `rank int`, `percentile numeric`
-- Indexes: (test_id, state), (student_id), partial (state) where in_progress, (test_id, score desc).
+- results: `score numeric`, `raw_correct int`, `raw_wrong int`, `raw_blank int`, `percentage numeric`, `rank int`, `percentile numeric`. `rank`/`percentile` are set only on each student’s **ranked** (best submitted) attempt; other submitted attempts store null ([test-rules.md](test-rules.md)).
+- Indexes: (test_id, state), (student_id), partial (state) where in_progress, (test_id, score desc), (test_id, student_id).
 - Students have NO direct UPDATE — RPC only.
-- Own historical **result summary** is `get_own_test_result(p_test_id)` (SECURITY DEFINER, `auth.uid()` + `state = 'submitted'`). It is not catalog `can_view_test`. Review items stay on `get_attempt_review` (owner requires `account_allows_lms()`; blocked accounts cannot read review; permissioned admins retain access).
+- Own historical **result summary** is `get_own_test_result(p_test_id)` (SECURITY DEFINER, `auth.uid()` + `state = 'submitted'`): the ranked attempt plus the caller’s own attempt history for that test. It is not catalog `can_view_test`. Review items stay on `get_attempt_review` (owner requires `account_allows_lms()`; blocked accounts cannot read review; permissioned admins retain access).
 
 **attempt_answers** — `attempt_id`, `question_version_id`, `selected_key char(1) null` (null = cleared), `marked_for_review bool default false`, `answered_at`, `time_spent_ms int`, `save_seq bigint`. **Unique (attempt_id, question_version_id)** → autosave = upsert with `save_seq` monotonic guard.
 

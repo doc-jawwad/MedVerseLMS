@@ -263,6 +263,8 @@ Until B is reliable, product copy may treat “no attempt + window already close
 
 **CONFIRMED PRODUCT LAW.** **NOT ELIGIBLE** is not **MISSED**. **MISSED** is not automatically a zero. **IN_PROGRESS** is not a score. **SUBMITTED** (including auto-submit of an empty paper) is a real submitted score. These four must never be collapsed.
 
+**Multiple attempts (`max_attempts > 1`, [test-rules.md](test-rules.md)).** Per (student, test), "Include" / "Ranked" above apply to the student’s **ranked attempt** only (best submitted). A student with any submitted attempt is SUBMITTED for that test even while a reattempt is `in_progress`. Per-test score analytics and counts use one row per (student, test) and count distinct students; reattempts never add extra rows to averages, Attempted counts, or participation.
+
 Admin-configurable “missed = 0” would apply **only** to eligible-missed, never to not-eligible. **OWNER DECISION** whether such a policy exists at all. Recommended default if unset: missed = absent from average, countable in participation.
 
 ---
@@ -336,7 +338,7 @@ Lifetime / historical analytics remain based on the student’s **historical sub
 | `student_weak_chapters` | Lifetime practice | practice answers, min 3 | No |
 | `average_rank` (inside summary) | Lifetime | mean of per-test `rank` among submitted | No — **not** a class cumulative board |
 | `test_leaderboard` | One test | submitted **and** caller `can_access_test` or admin | **Yes (view gate)** |
-| `get_attempt_review` | One attempt | owner/admin + `show_review` + live paid entitlement for review items | Review lock only |
+| `get_attempt_review` | One attempt | owner/admin + `show_review` + retake hold (`max_attempts > 1` only; [test-rules.md](test-rules.md)) + live paid entitlement for review items | Review lock only |
 | `test_summary` (admin) | One test | `registered` = **current** active enrollments in audience year; attempted/completed from attempts | Indirectly wrong denominator |
 | `admin_platform_summary` | Platform | `participation_pct` = current active enrollments with **any** submitted attempt ever | Wrong denominator |
 | `question_difficulty_report` | Platform | practice + test answers | No |
@@ -397,7 +399,7 @@ Do **not** create a duplicate analytics history or a “paid-only from activatio
 
 **CONFIRMED PRODUCT LAW — ranking:**
 
-- Population = `test_attempts` where `state = 'submitted'` for that `test_id`.
+- Population = each student’s **ranked attempt** (best `submitted` attempt) for that `test_id` — one row per student ([scoring-rules.md](scoring-rules.md)). With `max_attempts = 1` this is every submitted attempt.
 - `rank = RANK() OVER (ORDER BY score DESC, submitted_at ASC)`; earlier submit wins ties.
 - `percentile` per [scoring-rules.md](scoring-rules.md); `n ≤ 1` → `percentile` null, `rank` still 1.
 - Invalidated excluded.
@@ -552,13 +554,13 @@ Subscription expiry flips Start → lock. It does not flip history cards off. Ye
 3. Current subscription never rewrites historical eligibility.
 4. Not eligible never becomes a score of zero.
 5. Missed is not automatically a zero.
-6. Submitted attempts are the source of score analytics.
+6. Submitted attempts are the source of score analytics — one ranked (best submitted) attempt per (student, test).
 7. Current resource access is evaluated at read/start time (not cached in the JWT).
 8. Historical ownership of a result is independent from current ability to start the test.
 9. Navigation visibility does not equal entitlement.
 10. UI blur / lock / opacity never substitutes for server-side authorization.
 11. Fake attempts are never created to represent absence.
-12. Leaderboard **ranking** uses a clearly defined historical population (submitted attempts), not current subscription state.
+12. Leaderboard **ranking** uses a clearly defined historical population (each student’s ranked submitted attempt), not current subscription state.
 13. Deny restrictions win over grants and subscription; account block wins over all resource access.
 14. Catalog visibility (`can_view_*`) is not content entitlement (`can_access_*`) and is not window eligibility.
 15. Free entitlement survives subscribe, expire, and renew.
@@ -568,8 +570,8 @@ Subscription expiry flips Start → lock. It does not flip history cards off. Ye
 19. Auto-submit produces a real submitted attempt; a blank paper zero is not an ineligible zero.
 20. `recompute_test` (voids) may change scores/ranks of submitted attempts; subscription transitions must not.
 21. Secrets (Drive URL, signed object URL, `correct_key`, explanation, other students’ results beyond approved leaderboard view) never ride on catalog SELECT or blurred UI.
-22. One live class enrollment; one live subscription; one live/submitted attempt per test (invalidated history preserved).
-23. After paid expiry: **score / % / result summary KEEP**; **review content LOCK** (stems, selected keys, correct keys, explanations). Authorization is server-side. Renewal restores review only.
+22. One live class enrollment; one live subscription; at most one `in_progress` attempt per test and at most `tests.max_attempts` counted (`in_progress` + `submitted`) attempts per test (default 1; invalidated history preserved and never counted).
+23. After paid expiry: **score / % / result summary KEEP**; **review content LOCK** (stems, selected keys, correct keys, explanations). Authorization is server-side. Renewal restores review only. Independently, on multi-attempt tests review content is held until attempts are exhausted or the test closes ([test-rules.md](test-rules.md)).
 24. `close_test_now` stops admission **and** clamps live `in_progress` `expires_at` to `least(expires_at, now())`. Existing **30s / 60s** clocks apply to the clamped instant. No new grace. No force-submit. Resume-while-closed is same-device only.
 25. Latest MCQ selection wins via monotonic `save_seq`. Unanswered questions contribute zero on auto-submit (blank, not “wrong”).
 26. **NOT ELIGIBLE**, **MISSED**, **IN_PROGRESS**, and **SUBMITTED** are four distinct states and must not be collapsed.
@@ -647,7 +649,7 @@ Related UX choices (not access law): whether subscribed students hide a Resource
 
 **8J-D / 8J-E (done in code):** live timer accepts earlier server `expires_at` (never extends from stale local state); local draft / autosave / interrupt / resume / `save_seq` behavior per exam-engine validation.
 
-**8J-F (done in code):** student test-list state classification (`getStudentTestListState`) — In progress / Result / Available / Locked / Upcoming / Missed / Not eligible. Closed+no-attempt uses the documented overlap heuristic (free entitlement, subscription window overlap, test-grant overlap); defaults to Not eligible. No eligibility snapshot table.
+**8J-F (done in code):** student test-list state classification (`getStudentTestListState`) — In progress / Result / Available / Locked / Upcoming / Missed / Not eligible. Closed+no-attempt uses the documented overlap heuristic (free entitlement, subscription window overlap, test-grant overlap); defaults to Not eligible. No eligibility snapshot table. **Reattempts (spec, not yet in code):** adds **Retake available** — test live, ≥ 1 submitted counted attempt, no `in_progress`, counted attempts `< max_attempts`, and `can_access_test`; it shows the Result link plus a Retake action. In progress wins over Retake available; exhausted or closed shows Result. Derived label only — not an attempt state; `start_attempt` remains the authority ([test-rules.md](test-rules.md)).
 
 **8J-G (done in code):** student Dashboard / Performance **presentation** only — lifetime Attempted labels, catalog Missed vs Not eligible (reuses 8J-F), free/expired access banners + paid-feature lock CTA with no protected payload, Performance grain captions (lifetime / current-year / practice-only). Does **not** rewrite analytics RPCs, eligibility schema, or subscription architecture. Do not start **8J-H** in the same pass.
 

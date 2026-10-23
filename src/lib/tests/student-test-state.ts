@@ -8,6 +8,7 @@
 export type StudentTestListState =
   | "in_progress"
   | "result"
+  | "retake_available"
   | "available"
   | "locked"
   | "upcoming"
@@ -33,6 +34,16 @@ export type StudentTestStateInput = {
   /** Current can_access_test (content). Not historical eligibility. */
   currentlyEntitled: boolean;
   attemptState: AttemptStateForList;
+  /**
+   * tests.max_attempts (default 1). Reattempts are enabled iff > 1.
+   * docs/test-rules.md "Attempt limit and reattempts".
+   */
+  maxAttempts?: number;
+  /**
+   * Counted attempts (in_progress + submitted; invalidated never count).
+   * Defaults to 1 when attemptState is set, else 0.
+   */
+  countedAttempts?: number;
   /**
    * Server `test_attempts.expires_at`. Required to hide Resume after the
    * effective deadline; omitted/null is treated as still live.
@@ -131,15 +142,32 @@ export function isResumeEligibleInProgress(input: {
 }
 
 /**
+ * Derived display only (not an attempt state): another attempt is permitted
+ * right now. start_attempt remains the authority.
+ */
+export function isRetakeAvailable(input: StudentTestStateInput): boolean {
+  const max = input.maxAttempts ?? 1;
+  if (max <= 1) return false;
+  const counted =
+    input.countedAttempts ?? (input.attemptState === null ? 0 : 1);
+  if (counted < 1 || counted >= max) return false;
+  if (windowNotOpenYet(input) || windowIsClosed(input)) return false;
+  return input.currentlyEntitled;
+}
+
+/**
  * Deterministic test-list state.
  * Priority: attempt → current window → current access → historical heuristic.
+ * A live in_progress attempt wins over Retake available / Result.
  */
 export function getStudentTestListState(
   input: StudentTestStateInput
 ): StudentTestListState {
-  if (input.attemptState === "submitted") return "result";
   if (isResumeEligibleInProgress(input)) return "in_progress";
   if (input.attemptState === "in_progress") return "result";
+  if (input.attemptState === "submitted") {
+    return isRetakeAvailable(input) ? "retake_available" : "result";
+  }
 
   if (windowNotOpenYet(input) && !windowIsClosed(input)) {
     return "upcoming";
@@ -159,6 +187,7 @@ export function studentTestListSection(
 ): StudentTestListSection {
   switch (state) {
     case "available":
+    case "retake_available":
     case "locked":
     case "in_progress":
       return "available";
@@ -177,6 +206,7 @@ export function isIncomingDashboardTest(
   return (
     state === "upcoming" ||
     state === "available" ||
+    state === "retake_available" ||
     state === "locked" ||
     state === "in_progress"
   );
@@ -211,6 +241,7 @@ export function studentTestsPageSection(
     case "upcoming":
       return "upcoming";
     case "available":
+    case "retake_available":
     case "locked":
       return "available";
     case "in_progress":
@@ -268,6 +299,8 @@ export function studentTestListLabel(state: StudentTestListState): string {
       return "Result";
     case "available":
       return "Available";
+    case "retake_available":
+      return "Retake available";
     case "locked":
       return "Locked";
     case "upcoming":
@@ -285,6 +318,8 @@ export type CatalogTestForState = {
   opens_at: string | null;
   closes_at: string | null;
   entitlement: string | null;
+  /** tests.max_attempts; null/undefined = 1. */
+  max_attempts?: number | null;
 };
 
 export type CatalogAttemptForState = {
@@ -317,10 +352,19 @@ export function classifyCatalogTestStates(input: {
   grants: readonly CatalogGrantForState[];
 }): StudentTestListState[] {
   const entitled = new Set(input.accessibleIds);
+  // Per test: a live in_progress attempt wins; else any submitted; plus the
+  // counted total (invalidated rows are never passed in / never counted).
   const attemptByTest = new Map<string, CatalogAttemptForState>();
+  const countedByTest = new Map<string, number>();
   for (const a of input.attempts) {
+    if (a.state !== "in_progress" && a.state !== "submitted") continue;
+    countedByTest.set(a.test_id, (countedByTest.get(a.test_id) ?? 0) + 1);
     const prev = attemptByTest.get(a.test_id);
-    if (!prev || a.state === "submitted") attemptByTest.set(a.test_id, a);
+    if (!prev) {
+      attemptByTest.set(a.test_id, a);
+    } else if (a.state === "in_progress" && prev.state !== "in_progress") {
+      attemptByTest.set(a.test_id, a);
+    }
   }
 
   return input.tests.map((t) => {
@@ -358,6 +402,8 @@ export function classifyCatalogTestStates(input: {
       entitlement: t.entitlement ?? "free",
       currentlyEntitled: entitled.has(t.id),
       attemptState,
+      maxAttempts: t.max_attempts ?? 1,
+      countedAttempts: countedByTest.get(t.id) ?? 0,
       expiresAtMs: attempt?.expires_at
         ? new Date(attempt.expires_at).getTime()
         : null,
@@ -365,4 +411,66 @@ export function classifyCatalogTestStates(input: {
       grantOverlappedWindow,
     });
   });
+}
+
+/**
+ * Per-test attempt summary shared by every student test list (Tests page,
+ * professional-session slot page). Invalidated rows must not be passed in.
+ * - counted: in_progress + submitted attempts (the max_attempts count).
+ * - display: a live in_progress attempt wins; otherwise the ranked (best
+ *   submitted) attempt — highest score, earliest submit on ties.
+ */
+export function summarizeAttemptsByTest<
+  T extends {
+    test_id: string;
+    state: string;
+    score?: number | null;
+    submitted_at?: string | null;
+  },
+>(attempts: readonly T[]): {
+  displayByTest: Map<string, T>;
+  countedByTest: Map<string, number>;
+} {
+  const displayByTest = new Map<string, T>();
+  const countedByTest = new Map<string, number>();
+  for (const a of attempts) {
+    if (a.state !== "in_progress" && a.state !== "submitted") continue;
+    countedByTest.set(a.test_id, (countedByTest.get(a.test_id) ?? 0) + 1);
+    const prev = displayByTest.get(a.test_id);
+    if (!prev) {
+      displayByTest.set(a.test_id, a);
+    } else if (prev.state === "in_progress") {
+      continue;
+    } else if (a.state === "in_progress") {
+      displayByTest.set(a.test_id, a);
+    } else {
+      const aScore = Number(a.score ?? -Infinity);
+      const pScore = Number(prev.score ?? -Infinity);
+      if (
+        aScore > pScore ||
+        (aScore === pScore && (a.submitted_at ?? "") < (prev.submitted_at ?? ""))
+      ) {
+        displayByTest.set(a.test_id, a);
+      }
+    }
+  }
+  return { displayByTest, countedByTest };
+}
+
+/** "Attempt 2 of 3" while live, "Attempts used: 2 of 3" otherwise; null for single-attempt tests. */
+export function attemptUsageLabel(
+  state: StudentTestListState,
+  counted: number,
+  maxAttempts: number | null | undefined
+): string | null {
+  const max = maxAttempts ?? 1;
+  if (max <= 1) return null;
+  return state === "in_progress"
+    ? `Attempt ${counted} of ${max}`
+    : `Attempts used: ${counted} of ${max}`;
+}
+
+/** Retake link convention: ?attempt=N is the next counted-attempt number (start_attempt p_attempt_no). */
+export function retakeHref(testId: string, counted: number): string {
+  return `/tests/${testId}/attempt?attempt=${counted + 1}`;
 }
