@@ -1,9 +1,11 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 import {
   pickRandomQuestionIds,
   questionMatchesMcqBankScope,
   resolveMcqBankScope,
+  stemSearchPattern,
 } from "../../src/lib/tests/random-selection-scope.ts";
 
 const YEAR = "year-1";
@@ -247,5 +249,35 @@ describe("pickRandomQuestionIds", () => {
       }),
       []
     );
+  });
+});
+
+describe("random-add shares the visible pool's text/import filters", () => {
+  it("stemSearchPattern trims, lowercases, and ignores blank input", () => {
+    assert.equal(stemSearchPattern("  Femoral Nerve "), "%femoral nerve%");
+    assert.equal(stemSearchPattern("   "), null);
+    assert.equal(stemSearchPattern(undefined), null);
+  });
+
+  it("admin page and addRandomQuestions both apply q and import batch", () => {
+    const root = new URL("../../", import.meta.url);
+    const page = readFileSync(
+      new URL("src/app/(admin)/admin/tests/[id]/page.tsx", root),
+      "utf8"
+    );
+    const action = readFileSync(
+      new URL("src/lib/actions/tests.ts", root),
+      "utf8"
+    );
+    // Page hands q + import batch to AddRandomButton's filter.
+    assert.match(page, /q: filters\.q,\s*\n\s*import_batch_id: importBatchId/);
+    assert.match(page, /stemSearchPattern\(filters\.q\)/);
+    // Action applies both, via the same pattern helper and import_rows.
+    const body = action.slice(action.indexOf("export async function addRandomQuestions"));
+    assert.match(body, /stemSearchPattern\(filter\.q\)/);
+    assert.match(body, /ilike\("stem_normalized"/);
+    assert.match(body, /from\("import_rows"\)/);
+    assert.match(body, /\.in\("id", importedIds\)/);
+    assert.match(body, /importedIds\.length === 0\) return \{ added: 0 \}/);
   });
 });

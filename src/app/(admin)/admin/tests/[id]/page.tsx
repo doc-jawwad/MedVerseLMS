@@ -3,7 +3,10 @@ import { notFound } from "next/navigation";
 import { requireAdmin } from "@/lib/auth/require-user";
 import { getAdminPermissionSet } from "@/lib/admin/admin-nav";
 import { loadCurriculumFilterCascade } from "@/lib/admin/curriculum-load";
-import { resolveMcqBankScope } from "@/lib/tests/random-selection-scope";
+import {
+  resolveMcqBankScope,
+  stemSearchPattern,
+} from "@/lib/tests/random-selection-scope";
 import { TestConfigForm } from "../test-config-form";
 import {
   TestPrepGuidelinesForm,
@@ -200,6 +203,8 @@ export default async function TestDetailPage({
     chapter_id: filters.chapter,
     topic_id: filters.topic,
     difficulty: filters.difficulty,
+    q: filters.q,
+    import_batch_id: importBatchId ?? undefined,
     mcq_bank_product_subject_id: filters.bank,
     mcq_bank_folder_id: filters.folder,
     mcq_bank_subfolder_id: filters.subfolder,
@@ -260,8 +265,8 @@ export default async function TestDetailPage({
     if (filters.chapter) q = q.eq("chapter_id", filters.chapter);
     if (filters.topic) q = q.eq("topic_id", filters.topic);
     if (filters.difficulty) q = q.eq("difficulty", filters.difficulty);
-    if (filters.q?.trim())
-      q = q.ilike("stem_normalized", `%${filters.q.trim().toLowerCase()}%`);
+    const stemPattern = stemSearchPattern(filters.q);
+    if (stemPattern) q = q.ilike("stem_normalized", stemPattern);
     // Exact MCQ Bank scope — never broaden when bank/folder/subfolder is set.
     const skipMcqPool =
       mcqScope.kind === "invalid" ||

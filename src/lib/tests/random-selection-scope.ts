@@ -13,6 +13,10 @@ export type RandomSelectionFilter = {
   chapter_id?: string;
   topic_id?: string;
   difficulty?: string;
+  /** Stem text search — same `stem_normalized` ilike as the visible pool. */
+  q?: string;
+  /** CSV import set scope — same `import_rows.question_id` set as the pool. */
+  import_batch_id?: string;
   /** Product Block / Final-Year subject that owns the MCQ Bank. */
   mcq_bank_product_subject_id?: string;
   mcq_bank_folder_id?: string;
@@ -100,6 +104,15 @@ export function resolveMcqBankScope(opts: {
   }
 
   return { kind: "none" };
+}
+
+/**
+ * Normalised `stem_normalized` ilike pattern for the Search-text filter, or
+ * null when blank. Shared by the visible pool and random-add so they match.
+ */
+export function stemSearchPattern(q: string | null | undefined): string | null {
+  const t = q?.trim().toLowerCase();
+  return t ? `%${t}%` : null;
 }
 
 /** Fisher–Yates pick of up to `n` ids, skipping excluded; no duplicates. */

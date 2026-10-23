@@ -19,6 +19,7 @@ import {
 import {
   pickRandomQuestionIds,
   resolveMcqBankScope,
+  stemSearchPattern,
   type RandomSelectionFilter,
 } from "@/lib/tests/random-selection-scope";
 import { publishTestErrorMessage } from "@/lib/tests/publish-test-errors";
@@ -361,6 +362,28 @@ export async function addRandomQuestions(
 
   const excluded = new Set((existing ?? []).map((r) => r.question_id));
 
+  // CSV import set: same import_rows.question_id scope as the visible pool.
+  // Re-derived server-side from the batch id (never client-supplied ids). A
+  // requested batch that resolves to no questions adds nothing rather than
+  // silently broadening to the whole pool.
+  let importedIds: string[] | null = null;
+  const importBatchId = filter.import_batch_id?.trim();
+  if (importBatchId) {
+    const { data: batchRows } = await supabase
+      .from("import_rows")
+      .select("question_id")
+      .eq("batch_id", importBatchId)
+      .not("question_id", "is", null);
+    importedIds = [
+      ...new Set(
+        (batchRows ?? [])
+          .map((r) => r.question_id as string | null)
+          .filter((qid): qid is string => Boolean(qid))
+      ),
+    ];
+    if (importedIds.length === 0) return { added: 0 };
+  }
+
   let q = supabase
     .from("questions")
     .select("id")
@@ -372,6 +395,9 @@ export async function addRandomQuestions(
   if (filter.chapter_id) q = q.eq("chapter_id", filter.chapter_id);
   if (filter.topic_id) q = q.eq("topic_id", filter.topic_id);
   if (filter.difficulty) q = q.eq("difficulty", filter.difficulty);
+  const stemPattern = stemSearchPattern(filter.q);
+  if (stemPattern) q = q.ilike("stem_normalized", stemPattern);
+  if (importedIds) q = q.in("id", importedIds);
   if (mcqScope.kind === "subfolder") {
     q = q.eq("mcq_bank_subfolder_id", mcqScope.subfolderId);
   } else if (mcqScope.kind === "folder") {
