@@ -246,7 +246,7 @@ case "$mode" in
     ssh_preflight
     tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
     tar_name="medverse-${TARGET_SHORT}-random-scope.tar.gz"
-    git archive --format=tar "$TARGET_SHA" | gzip -n >"$tmp/$tar_name"
+    git -c core.autocrlf=false -c core.eol=lf archive --format=tar "$TARGET_SHA" | gzip -n >"$tmp/$tar_name"
     sum="$(sha256sum "$tmp/$tar_name" | cut -d' ' -f1)"
     ssh_cmd "mkdir -p ${INCOMING}"
     scp -o BatchMode=yes -o IdentitiesOnly=yes "$tmp/$tar_name" "$0" "${SSH_ALIAS}:${INCOMING}/"
