@@ -3,6 +3,8 @@
 export const START_ATTEMPT_ERROR_CODES = [
   // Prefer closed/stale attempt outcomes over device/session kick copy.
   "already_submitted",
+  "attempt_limit_reached",
+  "attempt_no_mismatch",
   "attempt_finalized",
   "attempt_expired",
   "test_window_closed",

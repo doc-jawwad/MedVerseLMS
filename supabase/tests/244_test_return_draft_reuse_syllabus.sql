@@ -266,7 +266,7 @@ select ok(
   'B1: return_to_draft_test locks tests FOR UPDATE'
 );
 select ok(
-  position('for update' in lower(pg_get_functiondef('public.start_attempt(uuid,uuid)'::regprocedure))) > 0,
+  position('for update' in lower(pg_get_functiondef('public.start_attempt(uuid,uuid,integer)'::regprocedure))) > 0,
   'B1: start_attempt locks tests FOR UPDATE for new starts'
 );
 

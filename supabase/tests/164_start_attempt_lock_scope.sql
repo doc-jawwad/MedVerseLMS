@@ -97,8 +97,8 @@ select public.publish_test((select id from t_future));
 select test_helpers.as_runner();
 
 select ok(
-  position('for update' in lower(pg_get_functiondef('public.start_attempt(uuid,uuid)'::regprocedure)))
-    > position('can_access_test' in lower(pg_get_functiondef('public.start_attempt(uuid,uuid)'::regprocedure))),
+  position('for update' in lower(pg_get_functiondef('public.start_attempt(uuid,uuid,integer)'::regprocedure)))
+    > position('can_access_test' in lower(pg_get_functiondef('public.start_attempt(uuid,uuid,integer)'::regprocedure))),
   'FOR UPDATE is after can_access_test in start_attempt'
 );
 

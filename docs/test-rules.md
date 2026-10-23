@@ -65,7 +65,40 @@ Later edits to a question create new versions; **published tests keep the frozen
 
 ## Attempt reset (controlled retake)
 
-Admin → `invalidate_attempt(attempt_id, reason)` — **reason required**, audit-logged. Old attempt + answers preserved forever; the partial unique index then allows one fresh attempt. Result views label history: "Attempt #1 — invalidated (device failure) / Attempt #2 — submitted, 82%".
+Admin → `invalidate_attempt(attempt_id, reason)` — **reason required**, audit-logged. Old attempt + answers preserved forever; the invalidated attempt stops counting toward `max_attempts` (below), so one fresh attempt becomes available while the test is open. Result views label history: "Attempt #1 — invalidated (device failure) / Attempt #2 — submitted, 82%".
+
+## Attempt limit and reattempts (`tests.max_attempts`)
+
+Per-test config `tests.max_attempts int not null default 1 check (max_attempts >= 1)`. **No upper cap** is defined; the only validation is `>= 1` (DB check constraint, also checked by the test form as UX). Existing tests are backfilled `1`, so their behavior is unchanged. Like other test config it is editable in `draft`, frozen after publish (`protect_published_test`), copied by `reuse_test_as_draft`, and editable again after `return_to_draft_test`. There is no separate "allow retake" flag: reattempts are **enabled** iff `max_attempts > 1`.
+
+- **Counted attempts** = the student's `test_attempts` rows for that test in state `in_progress` or `submitted`. `invalidated` attempts **never count** (same as the existing controlled-retake law). There is no attempt-count column; the count is derived.
+- **At most one `in_progress` attempt** per (test, student) at any time. A student cannot open attempt #2 while #1 is unfinished; an unfinished attempt is resumed (same-device law unchanged), never abandoned.
+- **Reattempt (new start after a submitted attempt)** is allowed only when **all** hold: `max_attempts > 1`; counted attempts `< max_attempts`; no `in_progress` attempt; and every existing **new-start** guard passes unchanged — student role, active session, live class enrollment, `account_status='active'`, `can_access_test` (free/paid/grant/deny law unchanged), `status='published'`, `now()` in `[opens_at, closes_at)`. Each reattempt is a **new row** with its own id, `device_id`, `started_at`, `expires_at = least(now() + duration, closes_at)`, `question_order` / `option_orders`, answers, `submit_source`, and score. Earlier rows are never updated, reset, or deleted to enable a retake.
+- **Closed / close-now / invalidated test:** no new attempt (first or reattempt). Resume of an existing `in_progress` attempt is unchanged.
+- **Explicit intent + duplicate safety:** see `start_attempt` `p_attempt_no` in [exam-state-machine.md](exam-state-machine.md). Rapid clicks, retries, and concurrent requests produce at most one new attempt; counts are checked under the existing `tests … FOR UPDATE` new-start lock.
+- **Error contract:** single-attempt tests keep `already_submitted`. Multi-attempt tests: `attempt_limit_reached` when exhausted; `attempt_no_mismatch` for a stale/duplicate `p_attempt_no`; `already_submitted` only for a `null` (legacy / reload-after-submit) call once an attempt exists. Existing codes (`attempt_locked_other_device`, window/entitlement errors) unchanged.
+- **Attempt numbering (display):** "Attempt #n" = order by `started_at` over **all** of the student's attempts on that test, including invalidated ones (as in the history label above). Not stored.
+
+### Ranked result and analytics with multiple attempts
+
+- **Ranked attempt** = the student's single best `submitted` attempt on that test: highest `score`, tie → earliest `submitted_at`, tie → lowest `id`. `invalidated` attempts are never candidates. `in_progress` attempts are never candidates.
+- `rank_test` ranks **one row per student** (the ranked attempt) using the unchanged RANK/percentile/tie-break formula; `n` = number of students with ≥ 1 submitted attempt. Non-ranked submitted attempts keep their score fields but store `rank = null`, `percentile = null`. With `max_attempts = 1` this is identical to today.
+- The ranked attempt can change when a better reattempt is submitted, when an attempt is invalidated, or after `recompute_test` (voids). All three already mark the test rank-dirty (submit/score) or re-rank (recompute); `invalidate_attempt` on a `submitted` attempt must also mark the test rank-dirty. Coalesced ranking timing is unchanged.
+- **Per-test student analytics** (dashboard averages, Attempted/Completed counts, subject performance, weak chapters, leaderboards, admin per-test participation) use **only the ranked attempt** per (student, test) and count **distinct students** — reattempts never inflate counts or averages. Full attempt history is shown only on the student's own result/history view and admin attempt views.
+### Review hold while reattempts remain (answer-key safety)
+
+`get_attempt_review` is the only student path that returns per-question review content (stems, selected keys, `correct_key`, explanation, reference). `get_own_test_result` returns aggregate score fields only and students have no `attempt_answers` SELECT, so the hold lives in `get_attempt_review` (server-side; UI lock is UX only).
+
+- **Applies only when `max_attempts > 1`.** Single-attempt tests keep exactly today’s review behavior (including after an admin invalidation retake).
+- For a **student** caller (permissioned admins unaffected), review of **any** of that student’s attempts on the test is **held** while `now() < tests.closes_at` **and** the student is not exhausted. **Exhausted** = counted attempts `≥ max_attempts` **and** no `in_progress` attempt. `close_test_now` sets `closes_at = now()`, so it lifts the hold.
+- Gate order in `get_attempt_review` (existing checks unchanged, one inserted): account/ownership → `state = 'submitted'` → `show_review` (`never` → `review_disabled`; `after_close` before close → `available_after_close`) → **retake hold** → paid entitlement (`review_locked_entitlement`) → items. Held response: `{ allowed: false, reason: 'available_after_attempts', closes_at, attempts_used, max_attempts }` with **no items** (same shape as the other deny reasons).
+- Effect: the hold only changes outcomes for `show_review = 'after_submit'` (`after_close` is already held until close; `never` stays disabled). Paid entitlement still applies after the hold lifts.
+- If an admin invalidates an attempt after the student was exhausted, the count drops and the hold re-applies for the remaining window; content the student already saw cannot be withdrawn — admins should treat invalidation on `after_submit` multi-attempt tests accordingly.
+- Score summary (`score`, `%`, raw correct/wrong/blank counts, rank on the ranked attempt) is **not** held — it is not review content (paid-expiry law in [access-eligibility-analytics.md](access-eligibility-analytics.md) §11 unchanged).
+
+### Student test-list states (derived display only — not attempt states)
+
+Existing 8J-F classification ([access-eligibility-analytics.md](access-eligibility-analytics.md)) adds one label: **Retake available** = test live, ≥ 1 submitted counted attempt, no `in_progress`, counted attempts `< max_attempts`, and `can_access_test`. Otherwise a test with a submitted attempt shows **Result** (Submitted), an `in_progress` attempt shows **In progress** (resume), and a closed window shows the closed/result states as today. The UI label is UX only; `start_attempt` is the authority.
 
 ## Test builder
 
@@ -89,7 +122,7 @@ Catalog vs content are separate ([permissions.md](permissions.md)):
 - Direct URL to start a test without entitlement fails in the RPC (not only in UI). Listing a locked test is allowed; starting it is not.
 - Deny restrictions win over grants and subscription. Account-level block (`restricted`/`suspended`/`deactivated`/`revoked`) overrides all resource access (exam disposition: [exam-state-machine.md](exam-state-machine.md)).
 - **Current** `can_access_test` is not historical window-eligibility. A later subscription does not make a closed paid test eligible. Missed vs not-eligible: [access-eligibility-analytics.md](access-eligibility-analytics.md).
-- **Owned historical result (`get_own_test_result`):** the student’s own `submitted` attempt. Catalog visibility is not required. Paid review remains `get_attempt_review` (8J-A).
+- **Owned historical result (`get_own_test_result`):** the student’s own **ranked** (best) `submitted` attempt, plus the student’s own attempt history for that test (attempt #, state, timestamps, score/percentage per attempt). Catalog visibility is not required. Paid review remains `get_attempt_review` (8J-A).
 
 ## Formal exam vs practice (SPEC FREEZE)
 

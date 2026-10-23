@@ -3,27 +3,35 @@ import { AttemptClient } from "./attempt-client";
 import { SectionLock } from "@/components/subscription/section-lock";
 import { getStudentHasLiveSubscription } from "@/lib/subscriptions/student-live-access";
 import { studentHasPaidLmsSections } from "@/lib/subscriptions/student-section-access";
-import { attemptPageUsesLiveAccessGate } from "@/lib/tests/attempt-access-gate";
+import {
+  attemptPageHasExistingAttempt,
+  attemptPageUsesLiveAccessGate,
+  parseAttemptNo,
+} from "@/lib/tests/attempt-access-gate";
 import { finalizeOwnExpiredAttempts } from "@/lib/tests/finalize-own-expired";
 
 export const metadata = { title: "Exam — MedVerse LMS" };
 
 export default async function AttemptPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ attempt?: string | string[] }>;
 }) {
   const { supabase, userId } = await requireStudent();
   const { id } = await params;
+  const attemptNo = parseAttemptNo((await searchParams).attempt);
   await finalizeOwnExpiredAttempts(supabase);
 
-  const { data: existing } = await supabase
+  // A student may hold several attempts on a multi-attempt test.
+  const { data: existingRows } = await supabase
     .from("test_attempts")
-    .select("id")
+    .select("id, state")
     .eq("student_id", userId)
     .eq("test_id", id)
-    .neq("state", "invalidated")
-    .maybeSingle();
+    .neq("state", "invalidated");
+  const existing = attemptPageHasExistingAttempt(existingRows ?? [], attemptNo);
 
   const hasLiveAccess = await getStudentHasLiveSubscription();
 
@@ -47,5 +55,5 @@ export default async function AttemptPage({
     }
   }
 
-  return <AttemptClient testId={id} />;
+  return <AttemptClient testId={id} attemptNo={attemptNo} />;
 }

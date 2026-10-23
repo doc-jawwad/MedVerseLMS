@@ -6,6 +6,8 @@ export type OwnTestResultTest = {
   closes_at: string;
   show_review: string;
   negative_mark: number | string;
+  /** Per-test attempt limit (1 = single attempt). */
+  max_attempts: number;
 };
 
 export type OwnTestResultAttempt = {
@@ -28,10 +30,28 @@ export type OwnTestResultInvalidated = {
   invalidated_reason: string | null;
 };
 
+/** One row of the caller's own attempt history for the test. */
+export type OwnTestResultHistoryRow = {
+  id: string;
+  attempt_no: number;
+  state: "in_progress" | "submitted" | "invalidated";
+  started_at: string | null;
+  submitted_at: string | null;
+  score: number | string | null;
+  max_score: number | string | null;
+  percentage: number | string | null;
+  is_ranked: boolean;
+};
+
 export type OwnTestResult = {
   test: OwnTestResultTest;
+  /** The ranked (best submitted) attempt. */
   attempt: OwnTestResultAttempt;
   invalidated: OwnTestResultInvalidated[];
+  /** Counted attempts (in_progress + submitted). */
+  attempts_used: number;
+  has_in_progress: boolean;
+  attempts: OwnTestResultHistoryRow[];
 };
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -74,6 +94,33 @@ export function parseOwnTestResult(raw: unknown): OwnTestResult | null {
     });
   }
 
+  const historyRaw = Array.isArray(root.attempts) ? root.attempts : [];
+  const attempts: OwnTestResultHistoryRow[] = [];
+  for (const row of historyRaw) {
+    const rec = asRecord(row);
+    const id = rec ? asId(rec.id) : null;
+    const state = rec?.state;
+    if (
+      !rec ||
+      !id ||
+      (state !== "in_progress" && state !== "submitted" && state !== "invalidated")
+    ) {
+      continue;
+    }
+    attempts.push({
+      id,
+      attempt_no: Number(rec.attempt_no) || attempts.length + 1,
+      state,
+      started_at: typeof rec.started_at === "string" ? rec.started_at : null,
+      submitted_at: typeof rec.submitted_at === "string" ? rec.submitted_at : null,
+      score: (rec.score as number | string | null) ?? null,
+      max_score: (rec.max_score as number | string | null) ?? null,
+      percentage: (rec.percentage as number | string | null) ?? null,
+      is_ranked: rec.is_ranked === true,
+    });
+  }
+  const maxAttemptsRaw = Number(testRaw.max_attempts);
+
   return {
     test: {
       id: testId,
@@ -85,6 +132,8 @@ export function parseOwnTestResult(raw: unknown): OwnTestResult | null {
         typeof testRaw.negative_mark === "string"
           ? testRaw.negative_mark
           : 0,
+      max_attempts:
+        Number.isInteger(maxAttemptsRaw) && maxAttemptsRaw >= 1 ? maxAttemptsRaw : 1,
     },
     attempt: {
       id: attemptId,
@@ -103,5 +152,10 @@ export function parseOwnTestResult(raw: unknown): OwnTestResult | null {
         typeof attemptRaw.submit_source === "string" ? attemptRaw.submit_source : null,
     },
     invalidated,
+    attempts_used: Number.isFinite(Number(root.attempts_used))
+      ? Number(root.attempts_used)
+      : 1,
+    has_in_progress: root.has_in_progress === true,
+    attempts,
   };
 }

@@ -76,7 +76,7 @@ export default async function DashboardPage() {
     supabase
       .from("tests")
       .select(
-        "id, title, subjects(name), duration_minutes, opens_at, closes_at, question_count, entitlement, status"
+        "id, title, subjects(name), duration_minutes, opens_at, closes_at, question_count, entitlement, status, max_attempts"
       ),
     supabase
       .from("test_attempts")
@@ -184,6 +184,10 @@ export default async function DashboardPage() {
     })),
     grants: grants ?? [],
   });
+  const countedByTest = new Map<string, number>();
+  for (const a of (myAttempts ?? []) as { test_id: string }[]) {
+    countedByTest.set(a.test_id, (countedByTest.get(a.test_id) ?? 0) + 1);
+  }
   const incomingTests = pickIncomingWithState(
     upcoming,
     incomingStates,
@@ -242,6 +246,7 @@ export default async function DashboardPage() {
               const canStart =
                 state === "in_progress" ||
                 (state === "available" && isEntitled);
+              const canRetake = state === "retake_available" && isEntitled;
               const showSubscriptionLock =
                 !isEntitled &&
                 state !== "in_progress" &&
@@ -285,6 +290,14 @@ export default async function DashboardPage() {
                     <Button asChild className="w-fit" size="sm">
                       <Link href={`/tests/${t.id}/attempt`}>
                         {state === "in_progress" ? "Resume test" : "Start test"}
+                      </Link>
+                    </Button>
+                  ) : canRetake ? (
+                    <Button asChild className="w-fit" size="sm">
+                      <Link
+                        href={`/tests/${t.id}/attempt?attempt=${(countedByTest.get(t.id) ?? 0) + 1}`}
+                      >
+                        Retake test
                       </Link>
                     </Button>
                   ) : showSubscriptionLock ? (

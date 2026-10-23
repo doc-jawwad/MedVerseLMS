@@ -23,22 +23,31 @@ in_progress ──admin invalidate──────▶ invalidated (reason + au
 submitted   ──admin invalidate──────▶ invalidated (reason + audit log; enables controlled retake)
 ```
 
+A **reattempt** is not a transition: it is a new row entering via `start_attempt` (`(none) → in_progress`) when the test’s `max_attempts` allows ([test-rules.md](test-rules.md)). Earlier attempts keep their terminal state.
+
 No other transition exists. Terminal states never change (except rescoring numbers on `submitted` via `recompute_test` — state itself never changes). Ranking **timing** may lag a coalesced job ([scoring-rules.md](scoring-rules.md)); that is not a new attempt state.
 
 ## RPC contracts (all SECURITY DEFINER; ownership + state + device checked)
 
 Auth identity is `auth.uid()` / `auth.jwt()` from the PostgREST-verified Cloud access token ([architecture.md](architecture.md), [permissions.md](permissions.md)). Device binding and save_seq are unchanged on VPS.
 
-### `start_attempt(p_test_id uuid, p_device_id uuid)`
-1. Always requires: student role, `is_active_session()`, live **class** enrollment on a **new** start. **New start** also requires `account_status = 'active'`, **`can_access_test`** (content entitlement — not catalog-only `can_view_test`), `now()` within `[opens_at, closes_at)`, test status `published`.
+### `start_attempt(p_test_id uuid, p_device_id uuid, p_attempt_no int default null)`
+1. Always requires: student role, `is_active_session()`, live **class** enrollment on a **new** start. **New start** (first attempt or reattempt) also requires `account_status = 'active'`, **`can_access_test`** (content entitlement — not catalog-only `can_view_test`), `now()` within `[opens_at, closes_at)`, test status `published`.
 2. **Resume** of an existing `in_progress` attempt skips `can_access_test`, published, and the live window (resume-while-closed after `close_test_now`; resume after paid expiry). Then run `finalize_if_expired`. Resume is **same-device only**. There is no separate interrupted state.
-3. `INSERT ... ON CONFLICT DO NOTHING` (partial unique (test_id, student_id) WHERE state != 'invalidated'), then SELECT the row:
-   - fresh insert → compute `expires_at = least(now() + duration, closes_at)` (**late-start effective deadline** — a late sit cannot outrun `closes_at`); persist server-shuffled `question_order` (+ option orders if enabled); return payload.
-   - existing `in_progress`, same device → **resume**: return question_order, saved answers, remaining time (from stored, possibly **clamped**, `expires_at`).
-   - existing `in_progress`, different device → raise `attempt_locked_other_device`.
-   - existing `submitted` at the start of the call → raise `already_submitted`.
-   - same-call lazy `finalize_if_expired` that converts `in_progress` → `submitted` → **return** `{ already_submitted: true, attempt_id, … }` so the submit commits. Raising here would roll the auto-submit back and `/result` would 404.
-4. Returns: `started_at`, `expires_at`, `server_now`, questions (via frozen versions, **without** correct_key/explanation), saved answers.
+3. **Attempt selection** (attempt limit: [test-rules.md](test-rules.md) “Attempt limit and reattempts”). `c` = counted attempts (`in_progress` + `submitted`; invalidated never count), read **after** taking the existing new-start `tests … FOR UPDATE` lock so concurrent new starts for the same test serialize and `c` cannot go stale before the INSERT. `p_attempt_no` is the counted-attempt number the caller intends to start (explicit retake intent). Existing callers send `null`.
+   - **Existing `in_progress`** (any `max_attempts`, any `p_attempt_no`):
+     - same device → **resume**: return question_order, saved answers, remaining time (from stored, possibly **clamped**, `expires_at`).
+     - different device → raise `attempt_locked_other_device`.
+     - same-call lazy `finalize_if_expired` that converts `in_progress` → `submitted` → **return** `{ already_submitted: true, attempt_id, … }` so the submit commits. Raising here would roll the auto-submit back and `/result` would 404.
+   - **`max_attempts = 1` (single-attempt; today’s contract, `p_attempt_no` ignored):** `c = 0` → new start; `c ≥ 1` → raise `already_submitted`.
+   - **`max_attempts > 1`, no `in_progress`** — evaluated in this order; every branch except "new start" creates no row:
+     1. `c = 0` and `p_attempt_no` is `null` or `1` → **new start**.
+     2. `c ≥ 1` and `p_attempt_no` is `null` → raise `already_submitted` (legacy caller, reload of the exam page after submit, lazy-finalize redirect path). A `null` call never starts a reattempt.
+     3. `c ≥ max_attempts` → raise `attempt_limit_reached` (attempts exhausted).
+     4. `p_attempt_no = c + 1` → **new start** (reattempt).
+     5. otherwise (`p_attempt_no ≤ c` duplicate/stale retry after that attempt already exists, or `> c + 1` after an invalidation changed the count) → raise `attempt_no_mismatch`; the client reloads list state.
+   - **New start**: run every new-start guard in step 1, then `INSERT ... ON CONFLICT DO NOTHING` on the partial unique `(test_id, student_id) WHERE state = 'in_progress'` and SELECT the row. Fresh insert → compute `expires_at = least(now() + duration, closes_at)` (**late-start effective deadline** — a late sit cannot outrun `closes_at`); persist server-shuffled `question_order` (+ option orders if enabled); return payload.
+4. Returns: `attempt_id`, attempt number, `max_attempts`, `started_at`, `expires_at`, `server_now`, questions (via frozen versions, **without** correct_key/explanation), saved answers.
 
 **8J-D:** the live countdown accepts an **earlier** server `expires_at` (close-now clamp) from `start_attempt` / `save_answer` responses and must never extend a deadline from stale local state. Full reload remounts from the resume payload. Server save/submit still enforce `test_attempts.expires_at`.
 
@@ -58,7 +67,7 @@ Finalizes all `in_progress` past `expires_at + 60s` (submit_source='auto'), scor
 Unanswered questions are **blank → zero contribution** ([scoring-rules.md](scoring-rules.md)). Auto-submit of a blank or partial paper is a real `submitted` score, not an ineligible zero ([access-eligibility-analytics.md](access-eligibility-analytics.md) §8). Academic grace remains **zero**; transport grace remains **30s**; the sweep remains **60s**. Close-now reuses these clocks on the clamped `expires_at` — it does not invent a new grace.
 
 ### Admin: `invalidate_attempt(p_attempt_id, p_reason text)`
-Reason mandatory. Sets state='invalidated', invalidated_reason, invalidated_by; audit-logged. Never deletes rows or answers. The partial unique index then permits one fresh attempt.
+Reason mandatory. Sets state='invalidated', invalidated_reason, invalidated_by; audit-logged. Never deletes rows or answers. The invalidated attempt stops counting toward `max_attempts`, so one fresh attempt becomes available while the test is open. Invalidating a `submitted` attempt marks the test rank-dirty (the student’s ranked attempt may change — [test-rules.md](test-rules.md)).
 
 ## Client protocol (UX layer — server rules above are authoritative regardless)
 
@@ -81,7 +90,8 @@ Reason mandatory. Sets state='invalidated', invalidated_reason, invalidated_by; 
 | Submission at closing time | server clock + transport grace (scoring-rules.md) |
 | Double-click submit / duplicate requests | idempotent submit; save_seq monotonic upsert |
 | Clock tampering | server timestamps only |
-| Double start | partial unique index |
+| Double start / retake double-click / stale retry | partial unique `in_progress` index (second concurrent call resumes the first’s row) + `p_attempt_no` check (`attempt_no_mismatch`) + counted-attempts check under the new-start `tests` lock |
+| Reattempt after submit | new row; earlier attempts untouched; `max_attempts` + window + entitlement enforced in `start_attempt` |
 | New portal login mid-exam | exam-session exemption (permissions.md) |
 | Admin sets account to restricted/suspended/deactivated/revoked mid-exam | **explicit disposition required** (section below) — do not invent a new attempt state |
 

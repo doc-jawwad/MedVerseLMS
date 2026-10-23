@@ -29,7 +29,7 @@ Per-question `void_policy` chosen by admin at void time, recorded in audit log:
 - `exclude` — question removed from max_score; answers to it ignored entirely.
 - `credit_all` — every attempt receives full marks for it regardless of answer; it stays in max_score.
 
-`recompute_test(test_id)` rescores every submitted attempt with current void flags, then re-ranks **once**. Historical answer rows are untouched.
+`recompute_test(test_id)` rescores every submitted attempt with current void flags, then re-ranks **once** (re-ranking re-selects each student’s ranked attempt, which may change). Historical answer rows are untouched.
 
 ## Ranking
 
@@ -37,11 +37,11 @@ Per-question `void_policy` chosen by admin at void time, recorded in audit log:
 
 ```
 rank       = RANK() OVER (ORDER BY score DESC, submitted_at ASC)   -- earlier submit wins ties
-percentile = round(100.0 × (n − rank) / (n − 1), 2)                -- n = submitted attempts, n > 1
+percentile = round(100.0 × (n − rank) / (n − 1), 2)                -- n = ranked attempts (one per student), n > 1
 ```
-Only `submitted` attempts rank; `invalidated` are excluded. Columns `test_attempts.rank` / `percentile` remain the only source anyone reads. Students who were **not eligible** during the window, and students who were eligible but never started, are **not** ranked and must **not** be stored as zero. Ranking population vs leaderboard **view** authorization: [access-eligibility-analytics.md](access-eligibility-analytics.md).
+Ranking population = each student’s **ranked attempt**: their best `submitted` attempt on the test (highest `score`, tie → earliest `submitted_at`, tie → lowest `id`; [test-rules.md](test-rules.md) “Attempt limit and reattempts”). With `max_attempts = 1` this is every submitted attempt, exactly as before. Other submitted attempts of the same student keep their score fields but store `rank = null`, `percentile = null`. `in_progress` and `invalidated` attempts are never ranked. Columns `test_attempts.rank` / `percentile` remain the only source anyone reads. Students who were **not eligible** during the window, and students who were eligible but never started, are **not** ranked and must **not** be stored as zero. Ranking population vs leaderboard **view** authorization: [access-eligibility-analytics.md](access-eligibility-analytics.md).
 
-**n ≤ 1 (unranked):** with only one submitted attempt there is no comparison group, so a percentile is not meaningful — neither 0 nor 100 describes anything real. `percentile` is `null` in this case (displayed as "—"), while `rank` is still `1`. This is an explicit exception to the formula above, not a value it happens to produce.
+**n ≤ 1 (unranked):** with only one ranked attempt (one student) there is no comparison group, so a percentile is not meaningful — neither 0 nor 100 describes anything real. `percentile` is `null` in this case (displayed as "—"), while `rank` is still `1`. This is an explicit exception to the formula above, not a value it happens to produce.
 
 ### When (coalesced ranking)
 

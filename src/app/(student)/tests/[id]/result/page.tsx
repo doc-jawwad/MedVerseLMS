@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { requireStudent } from "@/lib/auth/require-user";
+import Link from "next/link";
 import { formatDateTime } from "@/lib/utils";
 import {
   resultReviewUiState,
@@ -23,6 +24,7 @@ import {
   ssrSpanSync,
 } from "@/lib/observability/ssr-timing-rsc";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -55,7 +57,23 @@ export default async function ResultPage({
     notFound();
   }
 
-  const { test, attempt: submitted, invalidated } = own;
+  const {
+    test,
+    attempt: submitted,
+    invalidated,
+    attempts,
+    attempts_used: attemptsUsed,
+    has_in_progress: hasInProgress,
+  } = own;
+  // eslint-disable-next-line react-hooks/purity -- RSC renders once per request
+  const nowMs = Date.now();
+  const closesAtMs = test.closes_at ? new Date(test.closes_at).getTime() : 0;
+  // UX only: start_attempt is the authority (limit, window, entitlement).
+  const canRetake =
+    test.max_attempts > 1 &&
+    !hasInProgress &&
+    attemptsUsed < test.max_attempts &&
+    nowMs < closesAtMs;
 
   const [{ data: reviewData }, { data: lbData }, { data: projectedData }] =
     await Promise.all([
@@ -91,6 +109,44 @@ export default async function ResultPage({
           {a.invalidated_reason ? ` (${a.invalidated_reason})` : ""}.
         </p>
       ))}
+
+      {test.max_attempts > 1 && (
+        <Card className="shadow-none" data-testid="result-attempts">
+          <CardHeader>
+            <CardTitle className="text-base text-[var(--student-ink)]">
+              Your attempts ({attemptsUsed} of {test.max_attempts} used)
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-2 text-sm">
+            {attempts.map((h) => (
+              <p key={h.id} data-testid="result-attempt-row">
+                Attempt #{h.attempt_no} —{" "}
+                {h.state === "submitted"
+                  ? `submitted, ${h.percentage}%`
+                  : h.state === "invalidated"
+                    ? "invalidated"
+                    : "in progress"}
+                {h.is_ranked && " · counts for your rank"}
+              </p>
+            ))}
+            <p className="text-muted-foreground">
+              Your best submitted score is used for ranking.
+            </p>
+            {hasInProgress && (
+              <Button asChild className="w-fit" size="sm">
+                <Link href={`/tests/${id}/attempt`}>Resume attempt</Link>
+              </Button>
+            )}
+            {canRetake && (
+              <Button asChild className="w-fit" size="sm">
+                <Link href={`/tests/${id}/attempt?attempt=${attemptsUsed + 1}`}>
+                  Retake test
+                </Link>
+              </Button>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4" data-testid="result-summary">
         <StatTile label="Score" value={`${submitted.score} / ${submitted.max_score}`} />
@@ -167,6 +223,14 @@ export default async function ResultPage({
         <Card className="shadow-none">
           <CardContent className="pt-6 text-sm text-muted-foreground">
             {`Answers and explanations become visible after the test closes (${formatDateTime(test.closes_at)}).`}
+          </CardContent>
+        </Card>
+      )}
+
+      {reviewState.kind === "after_attempts" && (
+        <Card className="shadow-none" data-testid="result-review-held">
+          <CardContent className="pt-6 text-sm text-muted-foreground">
+            {`Answers and explanations stay hidden while you still have attempts left. They become visible after you use all ${test.max_attempts} attempts or when the test closes (${formatDateTime(test.closes_at)}).`}
           </CardContent>
         </Card>
       )}

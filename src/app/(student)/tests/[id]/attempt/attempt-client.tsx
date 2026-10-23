@@ -59,6 +59,14 @@ const ERROR_COPY: Record<string, { title: string; body: string }> = {
     title: "Already submitted",
     body: "You have already completed this test.",
   },
+  attempt_limit_reached: {
+    title: "No attempts left",
+    body: "You have used all attempts allowed for this test. Open your result to see your best score.",
+  },
+  attempt_no_mismatch: {
+    title: "Attempt already used",
+    body: "That attempt has already been used or is out of date. Go back to Tests to see your current attempts.",
+  },
   attempt_finalized: {
     title: "Attempt closed",
     body: "This attempt is no longer open. Open the result if it was submitted, or contact MedVerse if you need help.",
@@ -85,7 +93,14 @@ const ERROR_COPY: Record<string, { title: string; body: string }> = {
   },
 };
 
-export function AttemptClient({ testId }: { testId: string }) {
+export function AttemptClient({
+  testId,
+  attemptNo = null,
+}: {
+  testId: string;
+  /** `?attempt=N` retake intent → start_attempt p_attempt_no. Ignored on resume. */
+  attemptNo?: number | null;
+}) {
   usePreferPortrait();
   const router = useRouter();
   const [supabase] = useState(() => createClient());
@@ -205,6 +220,7 @@ export function AttemptClient({ testId }: { testId: string }) {
 
   const resyncClock = useCallback(async () => {
     if (!attemptIdRef.current || !deviceIdRef.current) return;
+    // Clock resync only resumes the live attempt; it never carries retake intent.
     const { data, error } = await supabase.rpc("start_attempt", {
       p_test_id: testId,
       p_device_id: deviceIdRef.current,
@@ -281,6 +297,7 @@ export function AttemptClient({ testId }: { testId: string }) {
       const { data, error } = await supabase.rpc("start_attempt", {
         p_test_id: testId,
         p_device_id: deviceIdRef.current,
+        ...(attemptNo != null ? { p_attempt_no: attemptNo } : {}),
       });
       if (startAttemptMeansAlreadySubmitted(error?.message, data)) {
         router.replace(`/tests/${testId}/result`);
@@ -334,7 +351,7 @@ export function AttemptClient({ testId }: { testId: string }) {
         void flushRef.current();
       }
     })();
-  }, [supabase, testId, router]);
+  }, [supabase, testId, router, attemptNo]);
 
   useEffect(() => {
     if (!payload) return;
