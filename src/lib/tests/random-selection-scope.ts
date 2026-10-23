@@ -115,6 +115,18 @@ export function stemSearchPattern(q: string | null | undefined): string | null {
   return t ? `%${t}%` : null;
 }
 
+/**
+ * A requested import batch that resolves to no questions (empty, unknown, or
+ * not visible) must yield an empty pool — never fall back to the full pool.
+ * Shared by the visible pool and random-add.
+ */
+export function importBatchYieldsEmptyPool(
+  batchRequested: boolean,
+  questionIds: readonly string[] | null | undefined
+): boolean {
+  return batchRequested && (questionIds?.length ?? 0) === 0;
+}
+
 /** Fisher–Yates pick of up to `n` ids, skipping excluded; no duplicates. */
 export function pickRandomQuestionIds(opts: {
   candidateIds: string[];

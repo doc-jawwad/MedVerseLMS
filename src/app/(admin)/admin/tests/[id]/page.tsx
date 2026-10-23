@@ -4,6 +4,7 @@ import { requireAdmin } from "@/lib/auth/require-user";
 import { getAdminPermissionSet } from "@/lib/admin/admin-nav";
 import { loadCurriculumFilterCascade } from "@/lib/admin/curriculum-load";
 import {
+  importBatchYieldsEmptyPool,
   resolveMcqBankScope,
   stemSearchPattern,
 } from "@/lib/tests/random-selection-scope";
@@ -269,6 +270,10 @@ export default async function TestDetailPage({
     if (stemPattern) q = q.ilike("stem_normalized", stemPattern);
     // Exact MCQ Bank scope — never broaden when bank/folder/subfolder is set.
     const skipMcqPool =
+      importBatchYieldsEmptyPool(
+        Boolean(importBatchId),
+        importedSet?.questionIds
+      ) ||
       mcqScope.kind === "invalid" ||
       (mcqScope.kind === "bank_folders" && mcqScope.folderIds.length === 0);
     if (skipMcqPool) {

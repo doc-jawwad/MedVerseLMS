@@ -18,6 +18,7 @@ import {
 } from "@/lib/tests/test-config-update";
 import {
   pickRandomQuestionIds,
+  importBatchYieldsEmptyPool,
   resolveMcqBankScope,
   stemSearchPattern,
   type RandomSelectionFilter,
@@ -381,7 +382,7 @@ export async function addRandomQuestions(
           .filter((qid): qid is string => Boolean(qid))
       ),
     ];
-    if (importedIds.length === 0) return { added: 0 };
+    if (importBatchYieldsEmptyPool(true, importedIds)) return { added: 0 };
   }
 
   let q = supabase

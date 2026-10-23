@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 import {
+  importBatchYieldsEmptyPool,
   pickRandomQuestionIds,
   questionMatchesMcqBankScope,
   resolveMcqBankScope,
@@ -278,6 +279,25 @@ describe("random-add shares the visible pool's text/import filters", () => {
     assert.match(body, /ilike\("stem_normalized"/);
     assert.match(body, /from\("import_rows"\)/);
     assert.match(body, /\.in\("id", importedIds\)/);
-    assert.match(body, /importedIds\.length === 0\) return \{ added: 0 \}/);
+    assert.match(body, /importBatchYieldsEmptyPool\(true, importedIds\)\) return \{ added: 0 \}/);
+  });
+
+  it("empty/unknown import batch yields an empty pool, not the full pool", () => {
+    assert.equal(importBatchYieldsEmptyPool(true, []), true);
+    assert.equal(importBatchYieldsEmptyPool(true, null), true);
+    assert.equal(importBatchYieldsEmptyPool(true, undefined), true);
+    assert.equal(importBatchYieldsEmptyPool(true, ["q1"]), false);
+    // No batch requested: full pool is unaffected.
+    assert.equal(importBatchYieldsEmptyPool(false, []), false);
+    assert.equal(importBatchYieldsEmptyPool(false, undefined), false);
+
+    const page = readFileSync(
+      new URL("../../src/app/(admin)/admin/tests/[id]/page.tsx", import.meta.url),
+      "utf8"
+    );
+    assert.match(
+      page,
+      /skipMcqPool =\s*importBatchYieldsEmptyPool\(\s*Boolean\(importBatchId\),\s*importedSet\?\.questionIds/
+    );
   });
 });
