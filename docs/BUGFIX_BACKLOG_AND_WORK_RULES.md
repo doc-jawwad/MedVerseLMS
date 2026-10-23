@@ -2,6 +2,8 @@
 
 Last updated: 2026-10-23
 
+Latest Issue 3 investigation: Cursor reported PARTIAL on 2026-10-23; no reproducible cross-Block mixing defect was established and no files were changed. Potential gaps: no server-side Block-purity validation for test contents; product currently allows Mixed tests and combining sources, so Block purity is not an approved invariant. A separate documented mismatch was identified: random-add ignores the visible pool's `q` text-search and `import_batch` filters although `docs/test-rules.md:107` says both share the same filter. Next: focus on verifying/fixing this documented filter mismatch with regression tests; do not impose Block purity without an approved requirement.
+
 This document is the source of truth for the user-reported MedVerse LMS issue queue and the working rules for addressing it. Keep it updated as issues are investigated, fixed, tested, and released. Do not replace this queue with a different checklist or drift into unrelated production-readiness work.
 
 ## Required workflow
@@ -26,7 +28,7 @@ Track confirmed issues as **Not started**, **Investigating**, **In progress**, *
 |---|---|---|
 | 1 | Students cannot reattempt tests. | Implementation and staging validation were reported for configurable `max_attempts` (default 1), preserving attempt history and using the best valid score for ranking. Work is on local feature branch `feat/test-reattempts`; it has not been pushed or deployed. Staging app release reported as `8563b25`, migration head `20261012120000`. Do not restart this work unless new evidence identifies a remaining defect. |
 | 2 | Test attempt and answer-key behavior is wrong. | **Unconfirmed — no action.** Jawwad confirmed no such issue has been reported. Do not investigate or change answer-key behavior unless a real report/evidence appears. |
-| 3 | Questions/tests are mixed across blocks. | **Investigating.** Next active item. Cursor should inspect the relevant implementation, docs, and tests read-only, identify the actual behavior and whether repository evidence establishes a defect, and report a minimal evidence-based next step. No code changes until a cause and intended behavior are established. |
+| 3 | Questions/tests are mixed across blocks. | **Investigating — partial findings, no confirmed cross-Block defect.** Cursor found no reproduction and changed nothing. Block-purity is not established as a product rule; Mixed tests and combined question sources are currently allowed. Concrete adjacent mismatch: `addRandomQuestions` reportedly ignores the visible pool's `q` and `import_batch` filters, despite `docs/test-rules.md:107` requiring shared filters. Next: verify this narrow documented mismatch and add regression coverage if confirmed; do not enforce Block purity without an approved requirement. |
 | 4 | Paid dashboard hides open tests. | Not started. |
 | 5 | Professional-session One-Liners need PDF support. | Not started. |
 | 6 | PDFs fail or remain stuck loading. | Not started. |
@@ -38,7 +40,7 @@ Track confirmed issues as **Not started**, **Investigating**, **In progress**, *
 
 ## Current handoff
 
-The active task is **Issue 3: questions/tests mixed across blocks**. Start with read-only inspection of block assignment, question selection, ordering, and test assembly, using existing tests and docs to establish intended behavior. Do not modify code, schema, or data unless evidence establishes the defect and its expected behavior. Issue 2 is not a confirmed bug and is not an active task.
+The active task remains **Issue 3**. Initial read-only investigation found no reproducible cross-Block mixing and no approved rule requiring Block-pure tests. Continue narrowly by verifying the documented random-add filter mismatch (`q` and `import_batch`) against the visible pool and `docs/test-rules.md:107`; if confirmed, implement only that focused correction with regression tests. Do not modify schema/data or impose Block purity. Issue 2 is unconfirmed and inactive.
 
 ## Reattempts implementation reference
 
