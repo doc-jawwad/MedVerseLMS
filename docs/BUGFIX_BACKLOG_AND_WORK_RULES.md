@@ -6,8 +6,8 @@ This document is the source of truth for the user-reported MedVerse LMS issue qu
 
 ## Required workflow
 
-1. Work through the reported issues **one at a time, in the listed order**, unless Jawwad explicitly reprioritizes them.
-2. Before each fix, inspect the relevant project documentation, implementation, and tests. Establish the actual defect and intended behavior from project evidence; do not invent requirements.
+1. Work through confirmed reported issues one at a time, in the listed order, unless Jawwad explicitly reprioritizes them.
+2. Before each fix, inspect relevant project documentation, implementation, and tests. Establish the actual defect and intended behavior from project evidence; do not invent requirements.
 3. Use Cursor for code implementation. ChatGPT coordinates and prepares Cursor-ready prompts; Claude is for content writing; Grok is for analysis/monitoring. Do not switch these roles without being asked.
 4. Keep prompts token-friendly, focused, and limited to the current issue. Do not combine unrelated fixes or refactor unrelated areas.
 5. Preserve existing functionality, data/history, authorization and permissions, and configured test time limits. Prefer the smallest safe change that fixes a demonstrated defect.
@@ -16,17 +16,17 @@ This document is the source of truth for the user-reported MedVerse LMS issue qu
 8. Do not mark an issue complete based only on code changes. Record its verification status and environment.
 9. Do not push branches, merge pull requests, deploy, run production writes/migrations, restart production services, or change shared infrastructure/permissions without Jawwad's explicit approval. Production promotion requires separate explicit approval.
 10. Do not repeat completed work, rerun broad checks without a reason, or divert into release checklists and unrelated deferred backlog while an item in this queue remains active.
-11. After the current issue is verified, update this document and move to the next issue in order.
+11. After the current issue is verified, update this document and move to the next confirmed issue.
 
 ## User-reported issue queue
 
-Track each issue as **Not started**, **Investigating**, **In progress**, **Fixed — verification pending**, **Verified**, or **Blocked**. Do not imply that a status is verified without evidence.
+Track confirmed issues as **Not started**, **Investigating**, **In progress**, **Fixed — verification pending**, **Verified**, or **Blocked**. Items with no confirmed defect should be labelled **Unconfirmed — no action** and must not trigger speculative code changes.
 
 | Order | Reported issue | Status / notes |
 |---|---|---|
 | 1 | Students cannot reattempt tests. | Implementation and staging validation were reported for configurable `max_attempts` (default 1), preserving attempt history and using the best valid score for ranking. Work is on local feature branch `feat/test-reattempts`; it has not been pushed or deployed. Staging app release reported as `8563b25`, migration head `20261012120000`. Do not restart this work unless new evidence identifies a remaining defect. |
-| 2 | Test attempt and answer-key behavior is wrong. | **Current active issue.** Investigate the actual behavior and expected rules from repository docs/code/tests; make a minimal fix and add regression coverage. Do not guess how answer keys or answer visibility should work. |
-| 3 | Questions/tests are mixed across blocks. | Next after issue 2 is verified. Investigate block assignment, selection, ordering, and test assembly from source evidence before changing behavior. |
+| 2 | Test attempt and answer-key behavior is wrong. | **Unconfirmed — no action.** Jawwad confirmed no such issue has been reported. Do not investigate or change answer-key behavior unless a real report/evidence appears. |
+| 3 | Questions/tests are mixed across blocks. | **Investigating.** Next active item. Cursor should inspect the relevant implementation, docs, and tests read-only, identify the actual behavior and whether repository evidence establishes a defect, and report a minimal evidence-based next step. No code changes until a cause and intended behavior are established. |
 | 4 | Paid dashboard hides open tests. | Not started. |
 | 5 | Professional-session One-Liners need PDF support. | Not started. |
 | 6 | PDFs fail or remain stuck loading. | Not started. |
@@ -38,7 +38,7 @@ Track each issue as **Not started**, **Investigating**, **In progress**, **Fixed
 
 ## Current handoff
 
-The active task is **Issue 2: test attempt and answer-key behavior**. Use the existing focused Cursor investigation/fix prompt from the current conversation. When Cursor returns results, assess them against the rules above. If the issue is verified, update the status here and begin issue 3. Do not jump ahead or substitute unrelated tasks.
+The active task is **Issue 3: questions/tests mixed across blocks**. Start with read-only inspection of block assignment, question selection, ordering, and test assembly, using existing tests and docs to establish intended behavior. Do not modify code, schema, or data unless evidence establishes the defect and its expected behavior. Issue 2 is not a confirmed bug and is not an active task.
 
 ## Reattempts implementation reference
 
@@ -58,7 +58,7 @@ Reported staging verification included reattempt E2E coverage, resume/reload, ex
 
 ## Update format
 
-For each issue, record:
+For each confirmed issue, record:
 - **Status**
 - **Root cause** (evidence-based)
 - **Change** (files/commit, if applicable)
