@@ -18,12 +18,13 @@ const REST = e2e.restUrl.replace(/\/$/, "");
 const SERVICE = e2e.serviceRoleKey;
 const ANON = e2e.anonKey;
 
-let adminJwtCache: { token: string; expMs: number } | null = null;
+let adminJwtCache: { token: string; userId: string; expMs: number } | null =
+  null;
 
-async function adminToken(): Promise<string> {
+async function adminSession(): Promise<{ token: string; userId: string }> {
   const now = Date.now();
   if (adminJwtCache && adminJwtCache.expMs > now + 60_000) {
-    return adminJwtCache.token;
+    return adminJwtCache;
   }
   const login = await fetch(`${AUTH}/auth/v1/token?grant_type=password`, {
     method: "POST",
@@ -35,9 +36,14 @@ async function adminToken(): Promise<string> {
   }
   adminJwtCache = {
     token: login.access_token as string,
+    userId: login.user?.id as string,
     expMs: now + 50 * 60_000,
   };
-  return adminJwtCache.token;
+  return adminJwtCache;
+}
+
+async function adminToken(): Promise<string> {
+  return (await adminSession()).token;
 }
 
 async function bearerHeaders(extra: Record<string, string> = {}) {
@@ -174,13 +180,17 @@ async function provision(): Promise<Fixture> {
     await makeQ(`${tag} wombat beta`),
   ];
 
+  // Policy requires created_by = auth.uid() (migration 20261005030000).
+  const { userId } = await adminSession();
   const [emptyBatch] = await insertRow<{ id: string }>("import_batches", {
     filename: `${tag}-empty.csv`,
+    created_by: userId,
   });
   const [populatedBatch] = await insertRow<{ id: string }>("import_batches", {
     filename: `${tag}-populated.csv`,
     total_rows: 2,
     inserted: 2,
+    created_by: userId,
   });
   // Populated batch holds one quokka + one wombat ("alpha" of each).
   await insertRow("import_rows", [
@@ -237,6 +247,34 @@ async function cleanup(f: Fixture) {
   });
 }
 
+/**
+ * Partial-setup safety net: soft-delete any live question in this spec's own
+ * `e2eimp*` stem namespace (a failed beforeAll leaves `fx` unset) and delete
+ * its `e2eimp*` import batches / draft tests.
+ */
+async function sweepOwnNamespace() {
+  const headers = await bearerHeaders();
+  await fetch(
+    `${REST}/rest/v1/questions?stem_normalized=like.e2eimp*&deleted_at=is.null`,
+    {
+      method: "PATCH",
+      headers,
+      body: JSON.stringify({
+        deleted_at: new Date().toISOString(),
+        purge_after: new Date(Date.now() + 7 * 86400_000).toISOString(),
+      }),
+    }
+  );
+  await fetch(`${REST}/rest/v1/import_batches?filename=like.e2eimp*`, {
+    method: "DELETE",
+    headers,
+  });
+  await fetch(`${REST}/rest/v1/tests?title=like.TB%20IMPTXT%20e2eimp*`, {
+    method: "DELETE",
+    headers,
+  });
+}
+
 async function loginAdmin(page: Page) {
   await page.goto("/login");
   await page.getByLabel("Email").fill(ADMIN_EMAIL);
@@ -277,6 +315,7 @@ test.describe.serial("Test Builder random: import-batch + text filters", () => {
   });
   test.afterAll(async () => {
     if (fx) await cleanup(fx);
+    await sweepOwnNamespace();
   });
 
   test("control: no import batch keeps the normal pool and random-add", async ({
