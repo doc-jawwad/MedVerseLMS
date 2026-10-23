@@ -1043,6 +1043,22 @@ export async function createDraftProfSessionDay(
   return { dayId: created.json, yearId, subjectId };
 }
 
+/** Publish a draft Prof. Session day so students can see it. */
+export async function publishProfSessionDayForE2e(dayId: string) {
+  requireUuid(dayId, "dayId");
+  const res = await adminRpc("admin_update_prof_session_day", {
+    p_day_id: dayId,
+    p_name: null,
+    p_sort_order: null,
+    p_status: "published",
+  });
+  if (!res.ok) {
+    throw new Error(
+      `admin_update_prof_session_day failed: ${res.status} ${res.text}`
+    );
+  }
+}
+
 /** Soft-delete day into Content Bin (shared contract). */
 export async function softDeleteProfSessionDayForE2e(dayId: string) {
   const res = await adminRpc("soft_delete_content", {
@@ -1054,6 +1070,33 @@ export async function softDeleteProfSessionDayForE2e(dayId: string) {
       `soft_delete_content(prof_session_day) failed: ${res.status} ${res.text}`
     );
   }
+}
+
+/** Attach a published test to a Prof. Session day (admin RPC; same year required). */
+export async function linkTestToProfSessionDay(testId: string, dayId: string) {
+  requireUuid(testId, "testId");
+  requireUuid(dayId, "dayId");
+  const res = await adminRpc("admin_set_test_prof_session_day", {
+    p_test_id: testId,
+    p_day_id: dayId,
+  });
+  if (!res.ok) {
+    throw new Error(
+      `admin_set_test_prof_session_day failed: ${res.status} ${res.text}`
+    );
+  }
+}
+
+/** product_key of the Year 1 Block subject used by createDraftProfSessionDay. */
+export async function profSessionProductKey(subjectId: string): Promise<string> {
+  requireUuid(subjectId, "subjectId");
+  const rows = await fetch(
+    `${REST}/rest/v1/subjects?id=eq.${subjectId}&select=product_key`,
+    { headers: await svcHeaders() }
+  ).then((r) => r.json());
+  const key = rows[0]?.product_key as string | undefined;
+  if (!key) throw new Error("subject has no product_key");
+  return key;
 }
 
 /** E2E cleanup: tests_admin_delete is draft-only; reopen then hard-delete. */
