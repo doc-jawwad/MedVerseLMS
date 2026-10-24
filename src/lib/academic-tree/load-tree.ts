@@ -10,6 +10,7 @@ import { structuralAcademicTreeAdapter } from "./adapter.ts";
 import { mapRpcTree } from "./map-rpc-tree.ts";
 import { searchAcademicTreeNames } from "./search.ts";
 import type { AcademicSearchHit } from "./types.ts";
+import { ssrSpan } from "@/lib/observability/ssr-timing-rsc";
 
 export { mapRpcTree, productKeyForSubjectName } from "./map-rpc-tree.ts";
 
@@ -46,9 +47,11 @@ export async function loadAcademicTree(args: {
   };
 
   try {
-    const { data, error } = await args.supabase.rpc("get_academic_tree", {
-      p_surface: args.surface,
-    });
+    const { data, error } = await ssrSpan("rpc.get_academic_tree", () =>
+      args.supabase.rpc("get_academic_tree", {
+        p_surface: args.surface,
+      })
+    );
 
     if (!error && data && typeof data === "object") {
       const mapped = mapRpcTree(data, input);
