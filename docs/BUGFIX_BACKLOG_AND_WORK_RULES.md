@@ -2,9 +2,7 @@
 
 Last updated: 2026-10-24
 
-Latest staging update: staging is running `16a74f42c0af8c41552c67f10b5f5fbc9275fb3f`; all 6 targeted scenarios in `tests/e2e/test-builder-random-import-text-filters.spec.ts` passed on staging. Staging `/api/health` returned 200. Deployment used detached unit `mv-staging-random-scope-deploy-16a74f4`; expected prior SHA `8563b25e0a0332d37810f29863bcc7d7a25784d8` was confirmed, activation completed, and production remained unchanged. Spec setup initially failed because the `import_batches` insert required `created_by = auth.uid()`; spec was corrected and committed as `464cc93`, with no app-code change in that commit. Cleanup check found zero live `e2eimp` questions, import batches, and draft tests; 8 soft-deleted fixture questions remain in Content Bin for scheduled purge in 7 days, and 2 fixture topics remain with books/chapters. Scenarios 2 and 3 validate UI zero-pool/disabled-button behavior, not the server-side zero-add guard. The filter-parity fix is verified on staging; the originally reported cross-Block mixing symptom remains unreproduced and open pending a concrete example. Nothing was pushed; production is unchanged. Issue 4 is deployed to staging at `0026cad1933a22b78e28819dcd7b8f8f8cf6afd1`; staging health returned 200 locally on the VPS and through the public URL from the VPS. Production remained unchanged. Browser verification is blocked because Jawwad confirmed Cloudflare is flagging/challenging his device or IP; staging also has no qualifying student data. No database writes, seeding, or migrations were performed.
-
-This document is the source of truth for the user-reported MedVerse LMS issue queue and the working rules for addressing it. Keep it updated as issues are investigated, fixed, tested, and released. Do not replace this queue with a different checklist or drift into unrelated production-readiness work.
+Latest staging update and historical verification notes are retained below. This document is the source of truth for the user-reported MedVerse LMS issue queue and the working rules for addressing it. Keep it updated as issues are investigated, fixed, tested, and released. Do not replace this queue with a different checklist or drift into unrelated production-readiness work.
 
 ## Required workflow
 
@@ -15,34 +13,37 @@ This document is the source of truth for the user-reported MedVerse LMS issue qu
 5. Preserve existing functionality, data/history, authorization and permissions, and configured test time limits. Prefer the smallest safe change that fixes a demonstrated defect.
 6. Add or update focused regression tests. Run relevant tests and required type/lint checks, then report the root cause, files changed, test evidence, and any unresolved uncertainty.
 7. If expected behavior is ambiguous in the repository, stop and ask for clarification or report the ambiguity instead of guessing.
-8. Do not mark an issue complete based only on code changes. Record its verification status and environment.
+8. Do not mark an issue technically verified based only on code changes or a user status instruction. Keep user-reported status distinct from independently verified evidence.
 9. Do not push branches, merge pull requests, deploy, run production writes/migrations, restart production services, or change shared infrastructure/permissions without Jawwad's explicit approval. Production promotion requires separate explicit approval.
 10. Do not repeat completed work, rerun broad checks without a reason, or divert into release checklists and unrelated deferred backlog while an item in this queue remains active.
 11. After the current issue is verified, update this document and move to the next confirmed issue.
 
 ## User-reported issue queue
 
-Track confirmed issues as **Not started**, **Investigating**, **In progress**, **Fixed — verification pending**, **Verified**, or **Blocked**. Items with no confirmed defect should be labelled **Unconfirmed — no action** and must not trigger speculative code changes.
+Status meanings: **Not started**, **Investigating**, **In progress**, **Fixed — verification pending**, **Verified**, **Blocked**, and **User-marked solved — verification not independently rechecked**. The last status records Jawwad's requested tracking state without claiming new verification evidence.
 
 | Order | Reported issue | Status / notes |
 |---|---|---|
-| 1 | Students cannot reattempt tests. | Implementation and staging validation were reported for configurable `max_attempts` (default 1), preserving attempt history and using the best valid score for ranking. Work is on local feature branch `feat/test-reattempts`; it has not been pushed or deployed. Staging app release reported as `8563b25`, migration head `20261012120000`. Do not restart this work unless new evidence identifies a remaining defect. |
-| 2 | Test attempt and answer-key behavior is wrong. | **Unconfirmed — no action.** Jawwad confirmed no such issue has been reported. Do not investigate or change answer-key behavior unless a real report/evidence appears. |
-| 3 | Questions/tests are mixed across blocks. | **Filter-parity fix verified on staging; original cross-Block symptom remains open/unreproduced.** Commits `3fc7224` and `16a74f4`; staging runs `16a74f42c0af8c41552c67f10b5f5fbc9275fb3f`. All 6 targeted scenarios in `tests/e2e/test-builder-random-import-text-filters.spec.ts` passed: no batch (4 shown/added), empty batch (0 shown/added), unknown batch (0 shown/added), populated batch (only 2 shown/added and persists after reload), text search parity, and batch+search intersection (1 question). Staging health returned 200; deploy confirmed prior SHA `8563b25e0a0332d37810f29863bcc7d7a25784d8`, activated target, and left production unchanged. Spec setup defect fixed in `464cc93` (`created_by = auth.uid()` required by RLS); no app code changed in that commit. Cleanup: zero live `e2eimp` questions, import batches, or draft tests; 8 soft-deleted fixture questions remain in Content Bin for purge in 7 days; 2 fixture topics remain with books/chapters. Empty/unknown batch cases verify the UI only, not the server-side zero-add guard. **Do not mark the original cross-Block report resolved:** no reproduction; await a concrete example. Do not impose Block purity without an approved requirement. |
-| 4 | Paid dashboard hides open tests. | **Fixed — verification pending; deployed to staging only.** Root cause: `deriveDashboardUpcomingFromCatalog` capped the published, not-yet-closed test catalog at 20 before the dashboard filtered to incoming states. Submitted/result-state tests could consume all 20 slots and hide a later open test. Commit `0026cad1933a22b78e28819dcd7b8f8f8cf6afd1` contains only the three fix/test files and remains local/unpushed. Staging was deployed from base `16a74f42c0af8c41552c67f10b5f5fbc9275fb3f`; release marker matches `0026cad`; guarded deployment reported activation complete and production unchanged. Staging `/api/health` returned 200 on VPS and public URL from VPS. Focused local tests 21/21, TypeScript and ESLint passed; full unit suite 798/799, with unrelated-looking `deploy-config.test.ts:157` failure not yet proven pre-existing. Scratch comparison reproduces old behavior (`[]`) vs fixed behavior (`['open']`) for 20 submitted + one open test. Browser regression remains unverified: Jawwad confirmed Cloudflare is flagging/challenging his device or IP, so do not ask him to repeat connectivity checks. Read-only staging query found only 6 published tests (all closed), 3 drafts, 2 total submitted attempts, and no student with 20 submitted in-window tests. No staging data was written, no migrations run, and no production changes. Next: browser smoke checks are blocked by the confirmed Cloudflare device/IP issue; do not request further connectivity checks. The full cap regression also requires a suitable test environment or separately approved staging data preparation. No data writes are authorized. |
-| 5 | Professional-session One-Liners need PDF support. | Not started. |
-| 6 | PDFs fail or remain stuck loading. | Not started. |
+| 1 | Students cannot reattempt tests. | Implementation and staging validation were reported for configurable `max_attempts` (default 1), preserving attempt history and using the best valid score for ranking. Work was reported on local feature branch `feat/test-reattempts`; it had not been pushed or deployed in the earlier tracker note. Staging app release reported as `8563b25`, migration head `20261012120000`. Do not restart this work unless new evidence identifies a remaining defect. |
+| 2 | Test-attempt and answer-key behavior is wrong. | **User-marked solved — verification not independently rechecked.** Jawwad explicitly requested that this issue remain marked solved. No new code/test evidence was checked as part of this tracker update. |
+| 3 | Questions/tests are mixed across blocks. | **User-marked solved — verification not independently rechecked.** Jawwad explicitly requested that this issue remain marked solved. Historical note: filter-parity changes were verified on staging, but the earlier tracker said the original cross-Block mixing symptom had not been reproduced. Reconcile only if this issue is reopened; do not silently erase that historical uncertainty. |
+| 4 | Paid dashboard hides open tests. | **Production deployed; post-deployment checks reported passing.** Production SHA `c56500802f23f1aa46370c5e16e9a8e811a279a4`; release `/opt/medverse/releases/20261024T082314Z-c565008-issue4-dashboard`. Unit tests 7/7 and old-vs-new reproduction passed; service active and public `/api/health` returned 200. Full live production browser regression was not rerun because it requires database writes. Rollback target: `ca817ec4d328749a7d2ee8f62e2f0dbe26137c31`. |
+| 5 | Professional-session One-Liners need PDF support. | Not started. This is the original backlog issue identity; do not confuse it with the later release task named “Issue #5” for continuous PDF touch scrolling. |
+| 6 | PDFs fail or remain stuck loading. | **User-marked solved — verification not independently rechecked.** Jawwad explicitly requested that this issue remain marked solved. |
 | 7 | PDF reader lacks previous/next navigation. | Not started. |
 | 8 | Professional-session content loads slowly. | Not started. Measure and identify the bottleneck before optimizing; preserve behavior and permissions. |
 | 9 | Samsung / non-Chrome browser problems. | Not started. Identify affected browser/device behavior and reproduce before fixing. |
-| 10 | Tests lack block-wise sections. | Not started. Confirm the intended section structure from existing product behavior/docs before implementation. |
+| 10 | Tests lack block-wise sections. | Not started. Keep this distinct from Issue 12: inspect existing test-builder/test-section behavior and confirm the intended structure before implementation. |
 | 11 | Linking content defaults to the wrong subject (Medicine). | Not started. Trace subject selection/defaulting and preserve valid existing mappings. |
+| 12 | Admins need manually organized groups for open tests. | **New feature request — requirements captured; implementation not started.** Admin creates and names blocks/subjects (or other groups), assigns tests to groups, and manually reorders tests. Students see currently open, not-yet-closed tests grouped and ordered accordingly. Closed tests must not appear in this open-test view. Define a safe fallback for ungrouped tests so they do not disappear. Preserve existing availability rules, attempt history, answer-key behavior, permissions, and test entitlements. Distinct from Issue 10: this is admin-managed organization of the student-facing open-test list, not merely sections inside a test or test builder. Before implementation, inspect existing schemas/UI and document dependencies, migration needs, and acceptance tests; do not make production changes without approval. |
 
 ## Current handoff
 
-Issue 3's filter-parity fix remains **verified on staging** at `16a74f42c0af8c41552c67f10b5f5fbc9275fb3f`; all six targeted E2E scenarios passed. Its original cross-Block mixing symptom remains open/unreproduced; await a concrete example and do not impose Block purity.
+Issue 4 (paid dashboard hiding open tests) is reported deployed to production at `c56500802f23f1aa46370c5e16e9a8e811a279a4`, with service and health checks passing. Focused unit tests passed 7/7 and the old-vs-new reproduction passed; live production browser regression was not rerun because it requires database writes.
 
-**Active issue: Issue 4 — Paid dashboard hides open tests.** Fix commit `0026cad1933a22b78e28819dcd7b8f8f8cf6afd1` is deployed to staging only. Root cause was cap-before-filter ordering; the local old-vs-new comparison and focused tests support the fix. Staging health is 200 and production remains unchanged. Browser verification remains pending because Jawwad confirmed Cloudflare is flagging/challenging his device or IP; do not ask for more connectivity checks. Staging has no suitable regression data (6 published tests, all closed; 2 total submitted attempts; no qualifying student). No data was written. The original regression needs a suitable test environment or separately approved staging data preparation. Do not push app code, deploy to production, or alter shared infrastructure without explicit approval.
+Jawwad has now instructed that Issues 2, 3, and 6 be tracked as solved. This tracker records that requested status but does not claim those three issues were independently reverified in this update.
+
+**Next backlog item:** Issue 5 — Professional-session One-Liners PDF support, following the original queue order. Issue 12 is captured as a new feature request and should not jump ahead unless Jawwad reprioritizes it. Before any code change, inspect the relevant repo docs, implementation, and tests; use Cursor for implementation and ChatGPT for coordination/review.
 
 ## Reattempts implementation reference
 
@@ -58,11 +59,11 @@ Reported migrations:
 - `supabase/migrations/20261012090000_test_max_attempts.sql`
 - `supabase/migrations/20261012120000_start_attempt_resume_race.sql`
 
-Reported staging verification included reattempt E2E coverage, resume/reload, exhaustion, review hold, best-attempt ranking, admin invalidation/history, closed-test refusal, two-tab race, class-change blocking, and single-attempt compatibility. A staging cleanup was reported completed on 2026-10-23. These are conversation-reported results and should not be represented as newly rerun by this documentation update.
+Reported staging verification included reattempt E2E coverage, resume/reload, exhaustion, review hold, best-attempt ranking, admin invalidation/history, closed-test refusal, two-tab race, class-change blocking, and single-attempt compatibility. A staging cleanup was reported completed on 2026-10-23. These are historical reported results and should not be represented as newly rerun by this documentation update.
 
 ## Update format
 
-For each confirmed issue, record:
+For each issue, record:
 - **Status**
 - **Root cause** (evidence-based)
 - **Change** (files/commit, if applicable)
@@ -70,4 +71,4 @@ For each confirmed issue, record:
 - **Remaining risk/blocker**
 - **Next issue**
 
-Only update statuses when supported by actual results. Keep this document concise and current so the active issue and the next step are unambiguous.
+Only mark technical verification when supported by actual results. Keep this document concise and current so the active issue and the next step are unambiguous.
