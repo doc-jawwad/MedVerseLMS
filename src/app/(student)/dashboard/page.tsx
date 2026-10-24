@@ -34,7 +34,10 @@ import { StudyMarkdown } from "@/components/study/study-markdown";
 import { sortByOpensAtAsc } from "@/lib/study/upcoming";
 import { DashboardAlerts } from "@/components/dashboard/dashboard-alerts";
 import { buildDashboardAlerts } from "@/lib/dashboard/build-alerts";
-import { deriveDashboardUpcomingFromCatalog } from "@/lib/dashboard/derive-upcoming-from-catalog";
+import {
+  deriveDashboardUpcomingFromCatalog,
+  pickIncomingWithState,
+} from "@/lib/dashboard/derive-upcoming-from-catalog";
 import { DashboardLeaderboardSection } from "@/components/dashboard/dashboard-leaderboard-section";
 import { DashboardHistoricalSection } from "@/components/dashboard/dashboard-historical-section";
 import { DashboardPaidSection } from "@/components/dashboard/dashboard-paid-section";
@@ -103,9 +106,12 @@ export default async function DashboardPage() {
     supabase.rpc("accessible_test_prep"),
   ]);
 
+  // Uncapped here: the cap is applied after state classification
+  // (pickIncomingWithState) so finished-but-still-open tests don't use up slots.
   const upcoming = deriveDashboardUpcomingFromCatalog(
     catalogTests ?? [],
-    nowMs
+    nowMs,
+    Number.POSITIVE_INFINITY
   );
 
   const paidDetails = studentHasPaidLmsSections(hasLiveAccess);
@@ -182,17 +188,19 @@ export default async function DashboardPage() {
   for (const a of (myAttempts ?? []) as { test_id: string }[]) {
     countedByTest.set(a.test_id, (countedByTest.get(a.test_id) ?? 0) + 1);
   }
-  const incomingTests = sortByOpensAtAsc(upcoming ?? [])
-    .map((t) => {
-      const idx = (upcoming ?? []).findIndex((row) => row.id === t.id);
-      return { t, state: incomingStates[idx]! };
-    })
-    .filter(({ state }) => isIncomingDashboardTest(state));
+  const incomingTests = pickIncomingWithState(
+    upcoming,
+    incomingStates,
+    isIncomingDashboardTest
+  );
+  const incomingSorted = sortByOpensAtAsc(
+    incomingTests.map((row) => ({ ...row, opens_at: row.t.opens_at }))
+  );
 
   const alerts = buildDashboardAlerts({
     accessKind: presentation.accessKind,
     accessBanner: presentation.accessBanner,
-    incoming: incomingTests.map(({ t, state }) => ({
+    incoming: incomingSorted.map(({ t, state }) => ({
       id: t.id,
       title: t.title,
       opens_at: t.opens_at,
@@ -230,8 +238,8 @@ export default async function DashboardPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-3 pt-4">
-          {incomingTests.length > 0 ? (
-            incomingTests.map(({ t, state }) => {
+          {incomingSorted.length > 0 ? (
+            incomingSorted.map(({ t, state }) => {
               const subj = t.subjects as unknown as { name: string } | null;
               const pricing = testPricingLabel(t.entitlement);
               const isEntitled = entitled.has(t.id);

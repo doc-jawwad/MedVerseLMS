@@ -46,3 +46,21 @@ export function deriveDashboardUpcomingFromCatalog<
 
   return filtered.slice(0, Math.max(0, limit));
 }
+
+/**
+ * Pair rows with their classified state, keep only incoming ones, THEN cap.
+ * Capping before the state filter lets already-finished (result) tests that are
+ * still inside their window consume the limit and push open tests off the list.
+ */
+export function pickIncomingWithState<T, S>(
+  rows: readonly T[],
+  states: readonly S[],
+  isIncoming: (state: S) => boolean,
+  limit = DASHBOARD_UPCOMING_LIMIT
+): { t: T; state: S }[] {
+  const out: { t: T; state: S }[] = [];
+  for (let i = 0; i < rows.length && out.length < limit; i++) {
+    if (isIncoming(states[i]!)) out.push({ t: rows[i]!, state: states[i]! });
+  }
+  return out;
+}
