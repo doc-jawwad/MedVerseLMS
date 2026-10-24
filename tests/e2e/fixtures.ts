@@ -209,6 +209,126 @@ export async function teardownExamFixture(f: ExamFixture) {
   await deleteTestRowForE2e(f.testId);
 }
 
+/**
+ * Issue #4 regression seed: N published in-window tests the student already
+ * submitted. Opens earlier than a later open test so the old pre-filter cap
+ * would hide that open test. Staging SSH only (direct attempt insert).
+ */
+export async function seedSubmittedInWindowFillersForDashboardCap(opts: {
+  studentId: string;
+  yearId: string;
+  count: number;
+  /** Base opens_at; fillers use base + i minutes. */
+  opensAtBaseMs: number;
+  tag: string;
+}): Promise<string[]> {
+  const sshHost = stagingSshHost();
+  if (e2e.target !== "staging" || !sshHost) {
+    throw new Error(
+      "seedSubmittedInWindowFillersForDashboardCap requires E2E_TARGET=staging and E2E_STAGING_SSH"
+    );
+  }
+  requireUuid(opts.studentId, "studentId");
+  requireUuid(opts.yearId, "yearId");
+  if (opts.count < 1 || opts.count > 40) {
+    throw new Error(`count out of range: ${opts.count}`);
+  }
+  if (!/^E2E_[A-Za-z0-9_]+$/.test(opts.tag)) {
+    throw new Error(`tag must be E2E_* alnum: ${opts.tag}`);
+  }
+
+  const closesAt = new Date(Date.now() + 4 * 3600_000).toISOString();
+  const values: string[] = [];
+  for (let i = 0; i < opts.count; i++) {
+    const opensAt = new Date(opts.opensAtBaseMs + i * 60_000).toISOString();
+    const title = `${opts.tag}_filler_${i}`.replace(/'/g, "''");
+    values.push(
+      `(gen_random_uuid(), '${title}', '${opts.yearId}'::uuid, ` +
+        `'published', '${opensAt}'::timestamptz, '${closesAt}'::timestamptz, ` +
+        `60, 0, 1, 'free')`
+    );
+  }
+
+  // Insert published tests + audiences + submitted attempts in one shot.
+  // question_order may be empty: dashboard listing only needs attempt state.
+  const sql =
+    `with ins as (` +
+    `  insert into public.tests ` +
+    `    (id, title, year_id, status, opens_at, closes_at, duration_minutes, ` +
+    `     negative_mark, min_questions, entitlement) ` +
+    `  values ${values.join(",")} ` +
+    `  returning id` +
+    `), aud as (` +
+    `  insert into public.test_audiences (test_id, year_id) ` +
+    `  select id, '${opts.yearId}'::uuid from ins` +
+    `), att as (` +
+    `  insert into public.test_attempts ` +
+    `    (test_id, student_id, state, expires_at, submitted_at, submit_source, ` +
+    `     device_id, question_order, score, max_score) ` +
+    `  select id, '${opts.studentId}'::uuid, 'submitted', ` +
+    `         now() + interval '1 hour', now(), 'student', ` +
+    `         gen_random_uuid(), array[]::uuid[], 1, 1 ` +
+    `  from ins ` +
+    `  where current_database()='medverse_staging'` +
+    `) select id::text from ins;`;
+
+  const out = await stagingPsql(sshHost, sql);
+  const ids = out
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter((l) =>
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(l)
+    );
+  if (ids.length !== opts.count) {
+    throw new Error(
+      `seedSubmittedInWindowFillersForDashboardCap expected ${opts.count} ids, got ${ids.length}: ${out}`
+    );
+  }
+  return ids;
+}
+
+/** Soft-delete Issue #4 filler tests (and cascade attempts). */
+export async function teardownDashboardCapFillers(testIds: string[]) {
+  const sshHost = stagingSshHost();
+  if (e2e.target === "staging" && sshHost && testIds.length > 0) {
+    for (const testId of testIds) requireUuid(testId, "testId");
+    const list = testIds.map((id) => `'${id}'::uuid`).join(",");
+    await stagingPsql(
+      sshHost,
+      `update public.tests set status='draft' where id in (${list}) ` +
+        `and current_database()='medverse_staging'; ` +
+        `delete from public.tests where id in (${list}) ` +
+        `and current_database()='medverse_staging';`
+    );
+    return;
+  }
+  for (const testId of testIds) {
+    requireUuid(testId, "testId");
+    await deleteTestRowForE2e(testId);
+  }
+}
+
+/** Year id for a test (staging SSH). */
+export async function yearIdForTestE2e(testId: string): Promise<string> {
+  requireUuid(testId, "testId");
+  const sshHost = stagingSshHost();
+  if (e2e.target !== "staging" || !sshHost) {
+    throw new Error("yearIdForTestE2e requires E2E_TARGET=staging and E2E_STAGING_SSH");
+  }
+  const out = await stagingPsql(
+    sshHost,
+    `select year_id::text from public.tests where id='${testId}'::uuid ` +
+      `and current_database()='medverse_staging';`
+  );
+  const m = out.match(
+    /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i
+  );
+  if (!m) {
+    throw new Error(`yearIdForTestE2e: no year for ${testId}: ${out}`);
+  }
+  return m[0];
+}
+
 export async function changeStudentYear(studentId: string, yearNumber: number) {
   const yearRes = await fetch(
     `${REST}/rest/v1/years?year_number=eq.${yearNumber}&select=id`,

@@ -5,7 +5,12 @@ import path from "node:path";
 import {
   DASHBOARD_UPCOMING_LIMIT,
   deriveDashboardUpcomingFromCatalog,
+  pickIncomingWithState,
 } from "../../src/lib/dashboard/derive-upcoming-from-catalog.ts";
+import {
+  classifyCatalogTestStates,
+  isIncomingDashboardTest,
+} from "../../src/lib/tests/student-test-state.ts";
 
 /**
  * Dashboard Performance v2 — single /tests fetch + in-memory upcoming derive.
@@ -160,5 +165,54 @@ describe("deriveDashboardUpcomingFromCatalog", () => {
       catalog.map((t) => t.id),
       before
     );
+  });
+});
+
+describe("pickIncomingWithState", () => {
+  it("caps after the incoming filter so finished tests do not push open tests off", () => {
+    const nowMs = Date.parse("2026-10-03T12:00:00.000Z");
+    // 20 older tests the student already submitted (still inside window),
+    // followed by one open paid test that opened later.
+    const catalog = [
+      ...Array.from({ length: DASHBOARD_UPCOMING_LIMIT }, (_, i) => ({
+        id: `done${i}`,
+        status: "published",
+        opens_at: new Date(Date.UTC(2026, 8, 1 + i)).toISOString(),
+        closes_at: "2026-12-01T00:00:00.000Z",
+        entitlement: "any_subscription",
+      })),
+      {
+        id: "open-paid",
+        status: "published",
+        opens_at: "2026-10-02T00:00:00.000Z",
+        closes_at: "2026-12-01T00:00:00.000Z",
+        entitlement: "any_subscription",
+      },
+    ];
+    const upcoming = deriveDashboardUpcomingFromCatalog(
+      catalog,
+      nowMs,
+      Number.POSITIVE_INFINITY
+    );
+    const states = classifyCatalogTestStates({
+      nowMs,
+      tests: upcoming,
+      attempts: upcoming
+        .filter((t) => t.id.startsWith("done"))
+        .map((t) => ({ test_id: t.id, state: "submitted" })),
+      accessibleIds: upcoming.map((t) => t.id),
+      subscriptions: [],
+      grants: [],
+    });
+    const picked = pickIncomingWithState(
+      upcoming,
+      states,
+      isIncomingDashboardTest
+    );
+    assert.deepEqual(
+      picked.map((p) => p.t.id),
+      ["open-paid"]
+    );
+    assert.equal(picked[0]!.state, "available");
   });
 });
