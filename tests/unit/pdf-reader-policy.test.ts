@@ -62,8 +62,12 @@ describe("protected pdf reader policy", () => {
     assert.match(src, /createOpfsPdfRangeTransport/);
     assert.match(src, /requestCacheOfflineReader/);
     assert.match(src, /contentRevision/);
-    assert.match(src, /TextLayer/);
-    assert.match(src, /pdf-text-layer/);
+    const slot = readFileSync(
+      join("src", "components", "study", "pdf-page-slot.tsx"),
+      "utf8"
+    );
+    assert.match(slot, /TextLayer/);
+    assert.match(slot, /pdf-text-layer/);
     assert.match(progress, /mv-pdf-page:/);
     assert.match(progress, /pdf_reading_progress/);
     // Must not use pdfjs url-mode (broken against coerced leading 206).

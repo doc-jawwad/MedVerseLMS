@@ -55,9 +55,26 @@
   opacity: 0.45;
 }
 
+.pdf-page-column {
+  /* Pages stack vertically; zoomed pages scroll horizontally, never clip left. */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: max-content;
+  min-width: 100%;
+  padding-block: 8px;
+}
+
+/* Live pinch feedback without re-decoding every page on each touchmove. */
+.pdf-page-column.is-pinch-preview {
+  transform-origin: center top;
+  will-change: transform;
+}
+
 .pdf-page-stage {
   position: relative;
-  margin-inline: auto;
+  flex: none;
   background: white;
   box-shadow: 0 1px 2px rgb(0 0 0 / 0.08);
 }
@@ -75,6 +92,11 @@
 .pdf-viewer-root {
   /* Fill the student reading surface on phones */
   width: 100%;
+}
+
+/* Fixed height so the page column scrolls inside the viewer (one-finger swipe). */
+.pdf-viewer-root:not(.pdf-viewer-root--fs) {
+  height: 75dvh;
 }
 
 .pdf-viewer-root--fs {
@@ -105,7 +127,7 @@
   }
 
   .pdf-read-page .pdf-viewer-root {
-    min-height: calc(100dvh - 7.5rem - env(safe-area-inset-bottom));
+    height: calc(100dvh - 7.5rem - env(safe-area-inset-bottom));
     border-radius: 0;
     border-left: none;
     border-right: none;

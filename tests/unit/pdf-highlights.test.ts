@@ -51,7 +51,13 @@ describe("pdf reader ux wiring", () => {
     assert.match(viewer, /createOnlinePdfRangeTransport/);
     assert.match(viewer, /disableAutoFetch:\s*true/);
     assert.doesNotMatch(viewer, /getDocument\(\{\s*url:\s*sourceUrl/);
-    assert.match(viewer, /TextLayer/);
+    assert.match(
+      fs.readFileSync(
+        path.join(root, "src/components/study/pdf-page-slot.tsx"),
+        "utf8"
+      ),
+      /TextLayer/
+    );
     assert.match(viewer, /createPdfHighlight/);
     assert.match(viewer, /listPdfHighlights/);
     assert.match(viewer, /onTouchStart=\{onPinchStart\}/);
