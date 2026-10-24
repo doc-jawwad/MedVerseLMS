@@ -115,6 +115,12 @@ export async function MaterialLibraryPage({
   const folderRows = (folders ?? []) as Folder[];
   const folderIds = folderRows.map((f) => f.id);
 
+  // Subject names: when the caller already scoped to one subject (Prof. Session
+  // day Guidelines/LoS), avoid loading the entire subjects table.
+  const subjectsQuery = subjectId
+    ? supabase.from("subjects").select("id, name").eq("id", subjectId)
+    : supabase.from("subjects").select("id, name").order("name");
+
   const [
     { data: materials },
     { data: subjects },
@@ -130,7 +136,7 @@ export async function MaterialLibraryPage({
           .is("deleted_at", null)
           .order("sort_order")
           .order("title"),
-    supabase.from("subjects").select("id, name").order("name"),
+    subjectsQuery,
     folderIds.length === 0
       ? Promise.resolve({ data: [] as { id: string }[] })
       : supabase.rpc("accessible_folder_ids_among", {
