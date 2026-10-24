@@ -24,10 +24,10 @@ Status meanings: **Not started**, **Investigating**, **In progress**, **Fixed �
 
 | Order | Reported issue | Status / notes |
 |---|---|---|
-| 1 | Students cannot reattempt tests. | Implementation and staging validation were reported for configurable `max_attempts` (default 1), preserving attempt history and using the best valid score for ranking. Work was reported on local feature branch `feat/test-reattempts`; it had not been pushed or deployed in the earlier tracker note. Staging app release reported as `8563b25`, migration head `20261012120000`. Do not restart this work unless new evidence identifies a remaining defect. |
+| 1 | Students cannot reattempt tests. | **On production (per Jawwad's instruction).** Reattempt support uses configurable `max_attempts` (default 1), preserves attempt history, and uses the best valid score for ranking. Historical implementation references: branch `feat/test-reattempts`; commits `0bdb147`, `3a85a5c`, `8563b25`, `8d32548`, `7469e78`; staging release `8563b25`, migration head `20261012120000`. Production status is recorded from Jawwad's instruction; no fresh production audit was run in this tracker update. |
 | 2 | Test-attempt and answer-key behavior is wrong. | **User-marked solved — verification not independently rechecked.** Jawwad explicitly requested that this issue remain marked solved. No new code/test evidence was checked as part of this tracker update. |
 | 3 | Questions/tests are mixed across blocks. | **User-marked solved — verification not independently rechecked.** Jawwad explicitly requested that this issue remain marked solved. Historical note: filter-parity changes were verified on staging, but the earlier tracker said the original cross-Block mixing symptom had not been reproduced. Reconcile only if this issue is reopened; do not silently erase that historical uncertainty. |
-| 4 | Paid dashboard hides open tests. | **Production deployed; post-deployment checks reported passing.** Production SHA `c56500802f23f1aa46370c5e16e9a8e811a279a4`; release `/opt/medverse/releases/20261024T082314Z-c565008-issue4-dashboard`. Unit tests 7/7 and old-vs-new reproduction passed; service active and public `/api/health` returned 200. Full live production browser regression was not rerun because it requires database writes. Rollback target: `ca817ec4d328749a7d2ee8f62e2f0dbe26137c31`. |
+| 4 | Paid dashboard hides open tests. | **On production (per Jawwad's instruction); deployment evidence recorded.** Production SHA `c56500802f23f1aa46370c5e16e9a8e811a279a4`; release `/opt/medverse/releases/20261024T082314Z-c565008-issue4-dashboard`. Unit tests 7/7 and old-vs-new reproduction passed; service active and public `/api/health` returned 200. Full live production browser regression was not rerun because it requires database writes. Rollback target: `ca817ec4d328749a7d2ee8f62e2f0dbe26137c31`. |
 | 5 | Professional-session One-Liners need PDF support. | Not started. This is the original backlog issue identity; do not confuse it with the later release task named “Issue #5” for continuous PDF touch scrolling. |
 | 6 | PDFs fail or remain stuck loading. | **User-marked solved — verification not independently rechecked.** Jawwad explicitly requested that this issue remain marked solved. |
 | 7 | PDF reader lacks previous/next navigation. | Not started. |
@@ -39,11 +39,11 @@ Status meanings: **Not started**, **Investigating**, **In progress**, **Fixed �
 
 ## Current handoff
 
-Issue 4 (paid dashboard hiding open tests) is reported deployed to production at `c56500802f23f1aa46370c5e16e9a8e811a279a4`, with service and health checks passing. Focused unit tests passed 7/7 and the old-vs-new reproduction passed; live production browser regression was not rerun because it requires database writes.
+Issues 1 (reattempt tests) and 4 (open tests hidden from paid-student dashboards) are to be treated as **on production**, per Jawwad's instruction. Issue 4's recorded production SHA is `c56500802f23f1aa46370c5e16e9a8e811a279a4`; service and health checks were reported passing. Focused unit tests passed 7/7 and the old-vs-new reproduction passed; live production browser regression was not rerun because it requires database writes.
 
 Jawwad has now instructed that Issues 2, 3, and 6 be tracked as solved. This tracker records that requested status but does not claim those three issues were independently reverified in this update.
 
-**Next backlog item:** Issue 5 — Professional-session One-Liners PDF support, following the original queue order. Issue 12 is captured as a new feature request and should not jump ahead unless Jawwad reprioritizes it. Before any code change, inspect the relevant repo docs, implementation, and tests; use Cursor for implementation and ChatGPT for coordination/review.
+**Next backlog item:** Issue 5 — Professional-session One-Liners PDF support, following the original queue order. Issue 12 remains recorded as a new feature request and should not jump ahead unless Jawwad reprioritizes it. Before any code change, inspect the relevant repo docs, implementation, and tests; use Cursor for implementation and ChatGPT for coordination/review.
 
 ## Reattempts implementation reference
 
