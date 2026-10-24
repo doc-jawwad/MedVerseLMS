@@ -33,9 +33,8 @@ Status meanings: **Not started**, **Investigating**, **In progress**, **Fixed �
 | 7 | PDF reader lacks previous/next navigation. | Not started. |
 | 8 | Professional-session content loads slowly. | Not started. Measure and identify the bottleneck before optimizing; preserve behavior and permissions. |
 | 9 | Samsung / non-Chrome browser problems. | Not started. Identify affected browser/device behavior and reproduce before fixing. |
-| 10 | Tests lack block-wise sections. | Not started. Keep this distinct from Issue 12: inspect existing test-builder/test-section behavior and confirm the intended structure before implementation. |
-| 11 | Linking content defaults to the wrong subject (Medicine). | Not started. Trace subject selection/defaulting and preserve valid existing mappings. |
-| 12 | Admins need manually organized groups for open tests. | **New feature request — requirements captured; implementation not started.** Admin creates and names blocks/subjects (or other groups), assigns tests to groups, and manually reorders tests. Students see currently open, not-yet-closed tests grouped and ordered accordingly. Closed tests must not appear in this open-test view. Define a safe fallback for ungrouped tests so they do not disappear. Preserve existing availability rules, attempt history, answer-key behavior, permissions, and test entitlements. Distinct from Issue 10: this is admin-managed organization of the student-facing open-test list, not merely sections inside a test or test builder. Before implementation, inspect existing schemas/UI and document dependencies, migration needs, and acceptance tests; do not make production changes without approval. |
+| 10 | Linking content defaults to the wrong subject (Medicine). | Not started. Trace subject selection/defaulting and preserve valid existing mappings. |
+| 11 | Admins need manually organized groups for open tests. | **Feature request — requirements captured; implementation not started.** Admin creates and names blocks/subjects (or other groups), assigns tests to groups, and manually reorders tests. Students see currently open, not-yet-closed tests grouped and ordered accordingly. Closed tests must not appear in this open-test view. Define a safe fallback for ungrouped tests so they do not disappear. Preserve existing availability rules, attempt history, answer-key behavior, permissions, and test entitlements. Before implementation, inspect existing schemas/UI and document dependencies, migration needs, and acceptance tests; do not make production changes without approval. |
 
 ## Current handoff
 
@@ -43,7 +42,7 @@ Issues 1 (reattempt tests) and 4 (open tests hidden from paid-student dashboards
 
 Jawwad has now instructed that Issues 2, 3, and 6 be tracked as solved. This tracker records that requested status but does not claim those three issues were independently reverified in this update.
 
-**Next backlog item:** Issue 5 — Professional-session One-Liners PDF support, following the original queue order. Issue 12 remains recorded as a new feature request and should not jump ahead unless Jawwad reprioritizes it. Before any code change, inspect the relevant repo docs, implementation, and tests; use Cursor for implementation and ChatGPT for coordination/review.
+**Next backlog item:** Issue 5 — Professional-session One-Liners PDF support, following the original queue order. Issue 11 remains recorded as a feature request and should not jump ahead unless Jawwad reprioritizes it. Before any code change, inspect the relevant repo docs, implementation, and tests; use Cursor for implementation and ChatGPT for coordination/review.
 
 ## Reattempts implementation reference
 
