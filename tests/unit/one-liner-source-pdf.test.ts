@@ -29,6 +29,16 @@ describe("Prof. Session one_liner optional source PDF", () => {
       mig,
       /select 1 from public\.one_liners ol where ol\.r2_object_key/
     );
+
+    const subMig = fs.readFileSync(
+      path.join(
+        root,
+        "supabase/migrations/20261024140000_one_liner_pdf_require_live_subscription.sql"
+      ),
+      "utf8"
+    );
+    assert.match(subMig, /has_live_subscription\(\)/);
+    assert.match(subMig, /authorize_one_liner_object/);
   });
 
   it("CMS editor and student slot wire PDF attach and open link", () => {

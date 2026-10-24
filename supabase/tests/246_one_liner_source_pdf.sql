@@ -1,7 +1,8 @@
--- Optional source PDF on one_liners: grants, authorize, admin RPC, purge enqueue.
+-- Optional source PDF on one_liners: grants, authorize (enrollment + live sub),
+-- admin RPC, purge enqueue.
 
 begin;
-select plan(12);
+select plan(13);
 
 select test_helpers.as_runner();
 select * into temp curriculum from test_helpers.make_curriculum();
@@ -50,16 +51,44 @@ select ok(
   '3. authenticated can SELECT has_source_pdf'
 );
 
+-- Enrolled but no live subscription → deny (Prof. Session surface lock)
+select test_helpers.as_user((select id from t_student));
+select throws_ok(
+  format(
+    $$ select public.authorize_one_liner_object(%L::uuid) $$,
+    (select column1::text from t_liner_id limit 1)
+  ),
+  'P0001',
+  'one_liner_object_denied',
+  '4. enrolled student without live subscription cannot authorize PDF'
+);
+
+select test_helpers.as_user((select id from t_admin));
+select public.create_subscription_plan(
+  p_name => 'OL PDF Plan',
+  p_year_id => (select year_id from curriculum),
+  p_price => 0,
+  p_description => 'fixture',
+  p_duration_days => 30,
+  p_is_complimentary => true
+) as id into temp t_plan;
+grant select on t_plan to anon, authenticated;
+
+select public.activate_subscription(
+  (select id from t_student),
+  (select id from t_plan)
+);
+
 select test_helpers.as_user((select id from t_student));
 select is(
   public.authorize_one_liner_object((select column1 from t_liner_id limit 1)),
   'study-content/test/one-liner-pdf.pdf',
-  '4. enrolled student can authorize published one_liner PDF'
+  '5. enrolled + live-subscription student can authorize published one_liner PDF'
 );
 
 select ok(
   (select has_source_pdf from public.one_liners where id = (select column1 from t_liner_id limit 1)),
-  '5. student catalog can read has_source_pdf'
+  '6. student catalog can read has_source_pdf'
 );
 
 select test_helpers.as_user((select id from t_admin));
@@ -75,7 +104,7 @@ select throws_ok(
   ),
   'P0001',
   'one_liner_object_denied',
-  '6. student cannot authorize draft one_liner PDF'
+  '7. student cannot authorize draft one_liner PDF'
 );
 
 select test_helpers.as_user((select id from t_admin));
@@ -86,13 +115,13 @@ where id = (select column1 from t_liner_id limit 1);
 select is(
   public.authorize_one_liner_object((select column1 from t_liner_id limit 1)),
   'study-content/test/one-liner-pdf.pdf',
-  '7. admin can authorize one_liner PDF'
+  '8. admin can authorize one_liner PDF'
 );
 
 select ok(
   (public.get_one_liner_for_admin((select column1 from t_liner_id limit 1)) ->> 'r2_object_key')
     = 'study-content/test/one-liner-pdf.pdf',
-  '8. get_one_liner_for_admin returns r2_object_key'
+  '9. get_one_liner_for_admin returns r2_object_key'
 );
 
 select test_helpers.as_user((select id from t_student));
@@ -103,7 +132,7 @@ select throws_ok(
   ),
   'P0001',
   'permission_denied',
-  '9. student cannot call get_one_liner_for_admin'
+  '10. student cannot call get_one_liner_for_admin'
 );
 
 -- Soft-delete + purge enqueues when unreferenced
@@ -120,7 +149,7 @@ select throws_ok(
   ),
   'P0001',
   'one_liner_object_denied',
-  '10. authorize refuses soft-deleted one_liner'
+  '11. authorize refuses soft-deleted one_liner'
 );
 
 select public.purge_content(
@@ -135,12 +164,12 @@ select ok(
     where object_key = 'study-content/test/one-liner-pdf.pdf'
       and entity_type = 'one_liner'
   ),
-  '11. purge_content enqueues one_liner R2 key'
+  '12. purge_content enqueues one_liner R2 key'
 );
 
 select ok(
   public.r2_object_still_referenced('study-content/test/one-liner-pdf.pdf') = false,
-  '12. after purge, key is no longer referenced'
+  '13. after purge, key is no longer referenced'
 );
 
 select * from finish();
