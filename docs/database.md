@@ -266,7 +266,7 @@ Student catalog SELECT must **not** expose `drive_url`, `body_text`, or R2 keys.
 
 **Legacy (retained, not student chrome):** `pearl_points` Q&A rows + optional item PDF (`authorize_pearl_object` / `/api/pearls/[id]`) remain in schema for admin archive / Content Bin. Do **not** present Pearl Points as a parallel student category. Do **not** blindly migrate Q&A rows into PDF folders.
 
-**Prof. Session day One-Liners** remain on table `one_liners` (day-scoped title/body; no Block chrome duplicate). Do not drop or silently merge into `pearl_points` or into `library_type = 'one_liner'` folders.
+**Prof. Session day One-Liners** remain on table `one_liners` (day-scoped title/body + **optional** private source PDF; no Block chrome duplicate). Optional PDF uses the same `study-content/` R2 family as pearls (`r2_object_key` / `r2_content_type` / `r2_byte_size`, generated `has_source_pdf`), `authorize_one_liner_object(id)`, and Next.js private stream `/api/one-liners/[id]`. Student catalog SELECT grants exclude R2 key columns (flag only). Do not drop or silently merge into `pearl_points` or into `library_type = 'one_liner'` folders.
 
 ## Pearl points (legacy name)
 

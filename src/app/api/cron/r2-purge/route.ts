@@ -65,6 +65,15 @@ export async function GET(request: NextRequest) {
     if (pearl.error) throw new Error(pearl.error.message || "ref_check_pearl");
     if ((pearl.count ?? 0) > 0) return true;
 
+    const oneLiner = await supabase
+      .from("one_liners")
+      .select("id", { count: "exact", head: true })
+      .eq("r2_object_key", objectKey);
+    if (oneLiner.error) {
+      throw new Error(oneLiner.error.message || "ref_check_one_liner");
+    }
+    if ((oneLiner.count ?? 0) > 0) return true;
+
     const avatar = await supabase
       .from("profiles")
       .select("id", { count: "exact", head: true })

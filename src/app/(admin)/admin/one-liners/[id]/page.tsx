@@ -16,12 +16,22 @@ export default async function EditOneLinerPage({
 
   const { data: item } = await supabase
     .from("one_liners")
-    .select("id, title, body, status, year_id, subject_id, subjects(name)")
+    .select(
+      "id, title, body, status, year_id, subject_id, has_source_pdf, subjects(name)"
+    )
     .eq("id", id)
     .is("deleted_at", null)
     .maybeSingle();
 
   if (!item) notFound();
+
+  const { data: adminMeta } = await supabase.rpc("get_one_liner_for_admin", {
+    p_one_liner_id: id,
+  });
+  const meta = (adminMeta ?? {}) as {
+    has_source_pdf?: boolean;
+    r2_byte_size?: number | null;
+  };
 
   const { data: subjects } = await supabase
     .from("subjects")
@@ -51,6 +61,11 @@ export default async function EditOneLinerPage({
         yearId={item.year_id}
         subjects={subjects ?? []}
         linerId={item.id}
+        hasSourcePdf={Boolean(
+          meta.has_source_pdf ??
+            (item as { has_source_pdf?: boolean }).has_source_pdf
+        )}
+        sourcePdfBytes={meta.r2_byte_size ?? null}
         initial={{
           title: item.title,
           body: item.body,
