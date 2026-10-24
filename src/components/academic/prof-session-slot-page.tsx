@@ -142,14 +142,19 @@ async function ProfSessionOneLinersSlot({
   const { supabase } = await requireStudent();
   const { data } = await supabase
     .from("one_liners")
-    .select("id, title, body")
+    .select("id, title, body, has_source_pdf")
     .eq("prof_session_day_id", dayId)
     .eq("status", "published")
     .is("deleted_at", null)
     .order("sort_order")
     .order("title");
 
-  const rows = (data ?? []) as { id: string; title: string; body: string }[];
+  const rows = (data ?? []) as {
+    id: string;
+    title: string;
+    body: string;
+    has_source_pdf?: boolean;
+  }[];
 
   return (
     <StudentPage>
@@ -183,6 +188,17 @@ async function ProfSessionOneLinersSlot({
                 <p className="mt-1 text-sm text-muted-foreground whitespace-pre-wrap">
                   {row.body}
                 </p>
+              ) : null}
+              {row.has_source_pdf ? (
+                <a
+                  href={`/api/one-liners/${row.id}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-2 inline-flex text-sm font-medium text-[var(--brand-teal-ink)] underline-offset-4 hover:underline"
+                  data-testid="one-liner-source-pdf-link"
+                >
+                  Open source PDF
+                </a>
               ) : null}
             </li>
           ))}

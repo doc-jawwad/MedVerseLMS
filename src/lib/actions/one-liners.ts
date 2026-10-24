@@ -1,9 +1,24 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { actionRpcResult } from "@/lib/errors/safe-action-error";
+import {
+  actionRpcResult,
+  clientActionFailed,
+  toClientActionError,
+} from "@/lib/errors/safe-action-error";
 import { createClient } from "@/lib/supabase/server";
 import { moveContentToBin } from "@/lib/actions/content-bin";
+import { allocateStudyObjectKey } from "@/lib/actions/study-content";
+import { deleteR2Object, putR2Object } from "@/lib/r2/presign";
+import {
+  isStudyPdfMeta,
+  STUDY_PDF_CONTENT_TYPE,
+} from "@/lib/study/upload-rules";
+import {
+  discardKeysAfterAttachUpdate,
+  discardKeysAfterClearUpdate,
+  interpretMaybeSingleUpdate,
+} from "@/lib/study/one-liner-source-pdf-update";
 
 export type OneLinerInput = {
   year_id: string;
@@ -13,8 +28,22 @@ export type OneLinerInput = {
   status?: "draft" | "published";
 };
 
-function reval() {
+function reval(id?: string) {
   revalidatePath("/admin/one-liners");
+  revalidatePath("/admin/prof-session");
+  revalidatePath("/academic");
+  if (id) revalidatePath(`/admin/one-liners/${id}`);
+}
+
+async function discardStudyKey(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  key: string
+) {
+  const { error } = await supabase.rpc("authorize_study_object_discard", {
+    p_object_key: key,
+  });
+  if (error) return;
+  await deleteR2Object({ key });
 }
 
 export async function createOneLiner(input: OneLinerInput) {
@@ -26,7 +55,7 @@ export async function createOneLiner(input: OneLinerInput) {
     p_body: input.body,
     p_status: input.status ?? "draft",
   });
-  reval();
+  reval(typeof data === "string" ? data : undefined);
   if (error) return actionRpcResult("createOneLiner", error);
   return { id: data as string };
 }
@@ -43,8 +72,7 @@ export async function updateOneLiner(
     p_subject_id: input.subject_id ?? null,
     p_status: input.status ?? null,
   });
-  reval();
-  revalidatePath(`/admin/one-liners/${id}`);
+  reval(id);
   return actionRpcResult("updateOneLiner", error);
 }
 
@@ -54,4 +82,135 @@ export async function setOneLinerStatus(id: string, status: "draft" | "published
 
 export async function moveOneLinerToBin(id: string) {
   return moveContentToBin("one_liner", id);
+}
+
+/** Optional private PDF source for a Prof. Session one-liner (study-content/ R2). */
+export async function attachOneLinerSourcePdf(
+  oneLinerId: string,
+  formData: FormData
+) {
+  if (!oneLinerId) return { error: "Invalid one-liner." };
+  const file = formData.get("pdf");
+  if (!(file instanceof File) || file.size === 0) {
+    return { error: "pdf_empty" };
+  }
+  const metaErr = isStudyPdfMeta(file);
+  if (metaErr) return { error: metaErr };
+
+  const supabase = await createClient();
+  const { data: adminRow, error: loadErr } = await supabase.rpc(
+    "get_one_liner_for_admin",
+    { p_one_liner_id: oneLinerId }
+  );
+  if (loadErr || !adminRow) {
+    return actionRpcResult("attachOneLinerSourcePdf.load", loadErr);
+  }
+  const existing = adminRow as { r2_object_key?: string | null };
+
+  const allocated = await allocateStudyObjectKey();
+  if ("error" in allocated && allocated.error) return allocated;
+  if (!("key" in allocated)) return { error: "study_object_denied" };
+  const key = allocated.key;
+
+  const uploaded = await putR2Object({
+    key,
+    body: Buffer.from(await file.arrayBuffer()),
+    contentType: STUDY_PDF_CONTENT_TYPE,
+  });
+  if (uploaded.error) {
+    await discardStudyKey(supabase, key);
+    return clientActionFailed("attachOneLinerSourcePdf.put", uploaded.error);
+  }
+
+  const previousKey =
+    typeof existing.r2_object_key === "string" ? existing.r2_object_key : null;
+
+  const { data: updated, error } = await supabase
+    .from("one_liners")
+    .update({
+      r2_object_key: key,
+      r2_content_type: STUDY_PDF_CONTENT_TYPE,
+      r2_byte_size: file.size,
+    })
+    .eq("id", oneLinerId)
+    .select("id")
+    .maybeSingle();
+
+  const interpreted = interpretMaybeSingleUpdate(updated, error);
+  if (!interpreted.ok) {
+    for (const discardKey of discardKeysAfterAttachUpdate({
+      updateOk: false,
+      newKey: key,
+      previousKey,
+    })) {
+      await discardStudyKey(supabase, discardKey);
+    }
+    return {
+      error: toClientActionError(
+        interpreted.reason === "zero_rows"
+          ? "one_liner_not_updated"
+          : (interpreted.error ?? "one_liner_not_updated"),
+        "attachOneLinerSourcePdf.update"
+      ),
+    };
+  }
+
+  for (const discardKey of discardKeysAfterAttachUpdate({
+    updateOk: true,
+    newKey: key,
+    previousKey,
+  })) {
+    await discardStudyKey(supabase, discardKey);
+  }
+
+  reval(oneLinerId);
+  return {};
+}
+
+export async function clearOneLinerSourcePdf(oneLinerId: string) {
+  if (!oneLinerId) return { error: "Invalid one-liner." };
+  const supabase = await createClient();
+  const { data: adminRow, error: loadErr } = await supabase.rpc(
+    "get_one_liner_for_admin",
+    { p_one_liner_id: oneLinerId }
+  );
+  if (loadErr || !adminRow) {
+    return actionRpcResult("clearOneLinerSourcePdf.load", loadErr);
+  }
+  const existing = adminRow as { r2_object_key?: string | null };
+  const previousKey =
+    typeof existing.r2_object_key === "string" ? existing.r2_object_key : null;
+
+  const { data: updated, error } = await supabase
+    .from("one_liners")
+    .update({
+      r2_object_key: null,
+      r2_content_type: null,
+      r2_byte_size: null,
+    })
+    .eq("id", oneLinerId)
+    .select("id")
+    .maybeSingle();
+
+  const interpreted = interpretMaybeSingleUpdate(updated, error);
+  if (!interpreted.ok) {
+    // Zero-row / error: do not discard the previous object.
+    return {
+      error: toClientActionError(
+        interpreted.reason === "zero_rows"
+          ? "one_liner_not_updated"
+          : (interpreted.error ?? "one_liner_not_updated"),
+        "clearOneLinerSourcePdf.update"
+      ),
+    };
+  }
+
+  for (const discardKey of discardKeysAfterClearUpdate({
+    updateOk: true,
+    previousKey,
+  })) {
+    await discardStudyKey(supabase, discardKey);
+  }
+  reval(oneLinerId);
+  return {};
 }
