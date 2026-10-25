@@ -74,9 +74,18 @@ export default async function AdminTestsPage({
             )}
           </p>
         </div>
-        <Button asChild className="h-9">
-          <Link href="/admin/tests/new">Create test</Link>
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          {canDeleteDraft && (
+            <Button asChild variant="outline" className="h-9">
+              <Link href={`/admin/tests/open-list?year=${year.id}`}>
+                Open-test groups
+              </Link>
+            </Button>
+          )}
+          <Button asChild className="h-9">
+            <Link href="/admin/tests/new">Create test</Link>
+          </Button>
+        </div>
       </div>
 
       <div className="overflow-x-auto rounded-xl border border-border/80 bg-card">
