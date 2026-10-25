@@ -1,6 +1,6 @@
 ﻿# MedVerse LMS — Reported Bug Backlog and Work Rules
 
-Last updated: 2026-10-25 (Issue 8 user-closed SSR deferred; Issue 11 implemented locally — verification pending)
+Last updated: 2026-10-25 (Issue 10 Fixed — verification pending; Issue 11 Verified preserved; Issue 8 closure preserved)
 
 Latest staging update and historical verification notes are retained below. This document is the source of truth for the user-reported MedVerse LMS issue queue and the working rules for addressing it. Keep it updated as issues are investigated, fixed, tested, and released. Do not replace this queue with a different checklist or drift into unrelated production-readiness work.
 
@@ -32,28 +32,39 @@ Status meanings: **Not started**, **Investigating**, **In progress**, **Fixed �
 | 6 | PDFs fail or remain stuck loading. | **User-marked solved — verification not independently rechecked.** Jawwad explicitly requested that this issue remain marked solved. |
 | 7 | PDF reader lacks previous/next navigation. | **User-marked solved — verification not independently rechecked.** Jawwad explicitly requested that this issue be marked resolved. No implementation, test, or production evidence was supplied or independently checked as part of this tracker update. |
 | 8 | Professional-session content loads slowly. | **Closed — user-approved (auth SSR compare deferred); not independently Verified for end-to-end SSR.** Jawwad closed Issue 8 with the authenticated SSR before/after vs `5cbebe3` **explicitly deferred**. Staging RPC evidence retained: `e272f02` / `20261025T050539Z-e272f02-issue8` / DB `20261024180000`; re-seeded then cleaned (baseline 2/3/47/33/4/2). **Among under seed:** 13.5→4.0 ms cold/warm vs pre-fix 34.1/29.1 ms; tree 58/35 ms, 30613 chars; free locked. Auth SSR under seed recorded **post-only** for `e272f02` (not a fair before/after). TLS outliers ≠ SSR. pgTAP 240=6/6, 241=5/5. Prod untouched. **Do not claim** end-to-end SSR improvement was verified. |
-| 9 | Samsung / non-Chrome browser problems. | Not started. Identify affected browser/device behavior and reproduce before fixing. |
-| 10 | Linking content defaults to the wrong subject (Medicine). | Not started. Trace subject selection/defaulting and preserve valid existing mappings. |
-| 11 | Admins need manually organized groups for open tests. | **Fixed — verification pending.** Year-scoped `test_open_list_groups` + `test_open_list_placements` (presentation only; not curriculum Blocks). Admin UI `/admin/tests/open-list` (`publish_tests`). Student Dashboard Incoming groups after existing incoming filters; ungrouped → “Other tests”; closed stay out. Local evidence: unit `group-incoming-open-tests` 4/4 + Issue 4 dashboard merge still 7/7; pgTAP `247_test_open_list_groups` 15/15; `tsc --noEmit` clean; eslint on touched files clean. Migration `20261025120000` applied on **local** only — not pushed to staging/production. No staging browser verify yet. |
+| 9 | Samsung / non-Chrome browser problems. | **User-marked solved — verification not independently rechecked.** Jawwad requested this tracking state. No new browser/device evidence was independently rechecked as part of this tracker update. |
+| 10 | Linking content defaults to the wrong subject (Medicine). | **Fixed — verification pending.** Root cause: Prof. Session day Practice CSV used `subjects[0]` (Final Year `sort_order` → Medicine) instead of the day’s `subject_id`. Fix: `resolveLinkingSubjectDefault` + `preferredSubjectId={subjectId}` on `DayPracticeCsvImport`. Existing question/folder/day mappings untouched (UI default only). Unit `linking-subject-default` 5/5. Branch `fix/issue-10-linking-subject-default` off `32d0f27`. Not deployed; no staging browser verify yet. Prod untouched. |
+| 11 | Admins need manually organized groups for open tests. | **Verified on staging (2026-10-25).** Release `20261025T064327Z-32d0f27-issue11` / SHA `32d0f27a21537d052e3443dde3756731e22db7e3` (parent `e272f02`); staging DB head `20261025120000`. Browser smoke `ok`: admin create/rename/reorder/assign/delete; student Incoming group heading before “Other tests”; open A/B visible; closed fixture absent; cleanup leftover groups=0 tests=0. Regressions: unit 11/11 (grouping+Issue4 merge); pgTAP 247=15/15; Issue1/4/5/8 markers retained; unauth open-list 307; health 200. Prod untouched (`1714065` / DB `20261024140000`). |
 
 ## Current handoff
 
-Issue 8 is **Closed — user-approved (auth SSR compare deferred)**. Measured staging RPC improvements are preserved; end-to-end authenticated SSR was **not** independently verified.
+Issue 10 is **Fixed — verification pending** (local unit + wiring; needs staging deploy approval + short admin CSV smoke on a non-Medicine day). Issue 11 remains **Verified on staging**. Issue 8 remains **Closed — user-approved (auth SSR compare deferred)** — unchanged. Issue 9 is **User-marked solved — verification not independently rechecked**.
 
-**Active backlog item:** Issue 11 — **Fixed — verification pending** (local unit/pgTAP/typecheck; needs staging migration + deploy approval and a short admin/student browser check before Verified). Issues 9 and 10 remain Not started.
+**Active item:** Issue 10 — staging verify after deploy approval. Production promotion of Issues 10/11 requires separate approval.
 
-Jawwad has instructed that Issues 2, 3, 6, and 7 be tracked as solved. This tracker records that requested status but does not claim those issues were independently reverified in this update.
+Jawwad has instructed that Issues 2, 3, 6, 7, and 9 be tracked as solved. This tracker records that requested status but does not claim those issues were independently reverified in this update.
 
 ## Issue 11 implementation reference
 
+- **Status:** Verified on staging (2026-10-25)
+- **Architecture:** Year-scoped presentation tables + SECURITY DEFINER admin RPCs; Dashboard Incoming overlay after `pickIncomingWithState`; does not touch `can_view_test` / `can_access_test` / attempts / answer keys.
+- **Staging release:** `20261025T064327Z-32d0f27-issue11` / `32d0f27a21537d052e3443dde3756731e22db7e3` / DB `20261025120000`. Branch `fix/issue-11-open-list-groups-staging` (parent `e272f02`).
+- **Migration:** `supabase/migrations/20261025120000_test_open_list_groups.sql` applied to `medverse_staging` only (rehearsal + `apply-staging-schema.sh`). Prod DB head remains `20261024140000`.
+- **Browser smoke:** `scripts/_staging_issue11_browser_smoke_results.json` — admin create/rename/reorder/assign/delete ok; student group heading + Other tests + closed excluded; tagged fixtures cleaned.
+- **Automated:** unit grouping+Issue4 merge 11/11; pgTAP 247=15/15; staging markers Issue1/5/8 + RLS tables present; health 200.
+- **Remaining risk:** not on production; no production browser verify claimed.
+- **Next issue:** Issue 10 — linking content subject default (Medicine).
+
+## Issue 10 implementation reference
+
 - **Status:** Fixed — verification pending (local only; not Verified on staging)
-- **Architecture:** New presentation tables + SECURITY DEFINER admin RPCs; Dashboard Incoming overlay after `pickIncomingWithState`; does not touch `can_view_test` / `can_access_test` / attempts / answer keys.
-- **Migration:** `supabase/migrations/20261025120000_test_open_list_groups.sql` (local applied; staging/prod not migrated)
-- **Docs:** `database.md`, `permissions.md`, `test-rules.md`, `access-eligibility-analytics.md` Layer 12 note
-- **App:** `src/lib/dashboard/group-incoming-open-tests.ts`, `src/lib/actions/test-open-list.ts`, `src/app/(admin)/admin/tests/open-list/*`, dashboard Incoming sections, tests list link
-- **Tests:** unit 4/4 grouping + Issue 4 merge still pass; pgTAP 247 = 15/15; tsc clean
-- **Remaining:** staging migrate + deploy authorization; admin create/assign/reorder + student Incoming headings smoke; confirm ungrouped fallback with mixed inventory
-- **Next after Verified:** Issue 9 (Samsung / non-Chrome) unless Jawwad reprioritizes
+- **Root cause:** `DayPracticeCsvImport` initialized subject with `subjects[0]?.id`. Day page loads year subjects ordered by `sort_order` then `name`, so Final Year first option is Medicine. Day `subject_id` was already used for folders/one-liners but was not passed into CSV import.
+- **Intended behavior (repo evidence):** day-scoped linking should default taxonomy subject to the day subject (same as `createOneLiner` / `addProfSessionDayFolder` on that page). Explicit admin override remains available via the subject Select. Do not bulk-rewrite existing `questions.subject_id` rows.
+- **Change:** `src/lib/admin/linking-subject-default.ts`; `day-practice-csv-import.tsx` uses `resolveLinkingSubjectDefault({ subjects, preferredSubjectId })`; `day-content-admin.tsx` passes `preferredSubjectId={subjectId}`.
+- **Out of scope (left unchanged):** Test Builder CSV / MCQ classify / Prof. Session list still use first-option defaults where there is no day context; those surfaces do not match the Medicine-by-`sort_order` linking bug as clearly.
+- **Verification:** `node --experimental-strip-types --import ./tests/unit/shims/register-server-only.mjs --test tests/unit/linking-subject-default.test.ts` → 5/5. ESLint clean on new/changed CSV + helper files. Pre-existing: `day-content-admin` `react-hooks/set-state-in-effect` and repo `tsc` `LayoutProps` in `layout.tsx` (unrelated).
+- **Remaining:** staging deploy approval; admin smoke — open non-Medicine day → CSV Import subject shows that day (not Medicine); explicit Medicine still selectable; reload keeps day default. No DB migration.
+- **Next after Verified:** queue otherwise user-marked solved / closed / verified; await Jawwad for next confirmed item or production promotion.
 
 ## Issue 8 implementation reference
 
