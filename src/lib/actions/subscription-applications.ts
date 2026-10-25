@@ -267,6 +267,7 @@ export async function uploadPaymentScreenshot(
   const fileError = validatePaymentScreenshotFile({
     type: file.type,
     size: file.size,
+    name: file.name,
   });
   if (fileError) return { error: fileError };
 

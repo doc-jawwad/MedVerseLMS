@@ -275,7 +275,11 @@ describe("student subscription error messages", () => {
     );
     assert.match(
       studentSubscriptionErrorMessage("invalid_screenshot_size"),
-      /5 MB/i
+      /10 MB/i
+    );
+    assert.match(
+      studentSubscriptionErrorMessage("heic_not_supported"),
+      /HEIC/i
     );
     assert.equal(
       studentSubscriptionErrorMessage("relation does not exist"),
@@ -299,13 +303,21 @@ describe("application and file validation (subscription UI)", () => {
     assert.equal(
       validatePaymentScreenshotFile({
         type: "image/jpeg",
-        size: 5 * 1024 * 1024 + 1,
+        size: 10 * 1024 * 1024 + 1,
       }),
       "invalid_screenshot_size"
     );
     assert.equal(
       validatePaymentScreenshotFile({ type: "application/pdf", size: 100 }),
       "invalid_screenshot_type"
+    );
+    assert.equal(
+      validatePaymentScreenshotFile({
+        type: "",
+        size: 100,
+        name: "proof.jpg",
+      }),
+      null
     );
   });
 });

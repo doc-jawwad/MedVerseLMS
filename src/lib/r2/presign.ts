@@ -160,12 +160,21 @@ export async function putR2Object(options: {
     config: options.config,
   });
   if ("error" in signed) return signed;
-  const res = await fetch(signed.url, {
-    method: "PUT",
-    body: new Uint8Array(options.body),
-  });
-  if (!res.ok) return { error: "r2_upload_failed" };
-  return {};
+  const contentType =
+    options.contentType?.trim() || "application/octet-stream";
+  try {
+    // Content-Type is not in the signed header set (host-only) — safe to send.
+    const res = await fetch(signed.url, {
+      method: "PUT",
+      body: new Uint8Array(options.body),
+      headers: { "Content-Type": contentType },
+    });
+    if (!res.ok) return { error: "r2_upload_failed" };
+    return {};
+  } catch {
+    // Network / TLS / DNS failures must not throw out of Server Actions.
+    return { error: "r2_upload_failed" };
+  }
 }
 
 /** Best-effort delete of a private payment-proof object. 404 is treated as success. */

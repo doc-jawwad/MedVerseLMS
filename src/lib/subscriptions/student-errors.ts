@@ -14,8 +14,10 @@ const MESSAGES: Record<string, string> = {
     "This application can no longer be edited because it has already been reviewed.",
   invalid_screenshot_type:
     "Upload a JPEG, PNG, or WebP screenshot (other file types are not allowed).",
+  heic_not_supported:
+    "iPhone HEIC photos are not supported. Export or share the screenshot as JPEG or PNG, then upload again.",
   invalid_screenshot_size:
-    "The screenshot must be between 1 byte and 5 MB.",
+    "The screenshot must be between 1 byte and 10 MB.",
   invalid_screenshot_object_key:
     "The payment screenshot could not be attached. Please try uploading again.",
   screenshot_access_denied:
@@ -26,6 +28,8 @@ const MESSAGES: Record<string, string> = {
     "That payment screenshot cannot be discarded.",
   r2_not_configured:
     "Payment screenshot uploads are temporarily unavailable. Contact your academy admin.",
+  r2_upload_failed:
+    "Could not upload the screenshot. Please try again.",
   plan_required: "Select a subscription plan for your class before submitting.",
   plan_not_found: "No active subscription plan is available right now.",
   plan_inactive: "That subscription plan is not currently available.",

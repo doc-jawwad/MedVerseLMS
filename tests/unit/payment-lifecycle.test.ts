@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { isPrivatePaymentScreenshotKey } from "../../src/lib/payments/application.ts";
-import { deleteR2Object, presignR2Object, type R2Config } from "../../src/lib/r2/presign.ts";
+import {
+  deleteR2Object,
+  presignR2Object,
+  putR2Object,
+  type R2Config,
+} from "../../src/lib/r2/presign.ts";
 
 const config: R2Config = {
   accountId: "testaccount",
@@ -59,5 +64,64 @@ describe("deleteR2Object signing (F5)", () => {
       config,
     });
     assert.equal(result.error, "invalid_object_key");
+  });
+});
+
+describe("putR2Object (payment proof upload)", () => {
+  it("sends Content-Type on PUT and returns success on 200", async () => {
+    const originalFetch = globalThis.fetch;
+    let sawContentType: string | null = null;
+    globalThis.fetch = (async (_url, init) => {
+      const headers = new Headers(init?.headers);
+      sawContentType = headers.get("Content-Type");
+      return new Response(null, { status: 200 });
+    }) as typeof fetch;
+    try {
+      const result = await putR2Object({
+        key,
+        body: Buffer.from("webp-bytes"),
+        contentType: "image/webp",
+        config,
+      });
+      assert.deepEqual(result, {});
+      assert.equal(sawContentType, "image/webp");
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  it("maps thrown fetch failures to r2_upload_failed instead of throwing", async () => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = (async () => {
+      throw new TypeError("fetch failed");
+    }) as typeof fetch;
+    try {
+      const result = await putR2Object({
+        key,
+        body: Buffer.from("webp-bytes"),
+        contentType: "image/webp",
+        config,
+      });
+      assert.equal(result.error, "r2_upload_failed");
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  it("maps non-OK HTTP status to r2_upload_failed", async () => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = (async () =>
+      new Response("nope", { status: 403 })) as typeof fetch;
+    try {
+      const result = await putR2Object({
+        key,
+        body: Buffer.from("webp-bytes"),
+        contentType: "image/webp",
+        config,
+      });
+      assert.equal(result.error, "r2_upload_failed");
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
   });
 });
