@@ -155,6 +155,7 @@ export function SubscriptionApplyForm({
     const err = validatePaymentScreenshotFile({
       type: next.type,
       size: next.size,
+      name: next.name,
     });
     if (err) {
       setFileError(studentSubscriptionErrorMessage(err));
@@ -191,6 +192,7 @@ export function SubscriptionApplyForm({
       const err = validatePaymentScreenshotFile({
         type: file.type,
         size: file.size,
+        name: file.name,
       });
       if (err) {
         setFormError(studentSubscriptionErrorMessage(err));

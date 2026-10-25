@@ -1,4 +1,5 @@
-export const PAYMENT_SCREENSHOT_MAX_BYTES = 5 * 1024 * 1024;
+/** Original upload ceiling — server still re-encodes to optimized WebP. */
+export const PAYMENT_SCREENSHOT_MAX_BYTES = 10 * 1024 * 1024;
 
 export const PAYMENT_SCREENSHOT_CONTENT_TYPES = [
   "image/jpeg",
@@ -8,6 +9,20 @@ export const PAYMENT_SCREENSHOT_CONTENT_TYPES = [
 
 export type PaymentScreenshotContentType =
   (typeof PAYMENT_SCREENSHOT_CONTENT_TYPES)[number];
+
+const EXT_TO_CONTENT_TYPE: Record<string, PaymentScreenshotContentType> = {
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".png": "image/png",
+  ".webp": "image/webp",
+};
+
+const HEIC_CONTENT_TYPES = new Set([
+  "image/heic",
+  "image/heif",
+  "image/heic-sequence",
+  "image/heif-sequence",
+]);
 
 export type ApplicationStatus = "pending" | "approved" | "rejected" | "cancelled";
 
@@ -55,19 +70,58 @@ export function isPrivatePaymentScreenshotKey(
   return true;
 }
 
+/**
+ * Resolve a usable content type for payment screenshots.
+ * Mobile browsers often send empty MIME, `image/jpg`, or `application/octet-stream`.
+ * Returns `"heic"` when the picker clearly selected an HEIC/HEIF photo (not convertible
+ * in our sharp build without libheif — surface a dedicated student error instead).
+ */
+export function resolvePaymentScreenshotContentType(
+  type?: string | null,
+  name?: string | null
+): PaymentScreenshotContentType | "heic" | null {
+  const raw = (type ?? "").trim().toLowerCase();
+  const fileName = (name ?? "").trim().toLowerCase();
+
+  if (
+    HEIC_CONTENT_TYPES.has(raw) ||
+    fileName.endsWith(".heic") ||
+    fileName.endsWith(".heif")
+  ) {
+    return "heic";
+  }
+
+  if (raw === "image/jpg" || raw === "image/pjpeg") {
+    return "image/jpeg";
+  }
+
+  if (
+    PAYMENT_SCREENSHOT_CONTENT_TYPES.includes(
+      raw as PaymentScreenshotContentType
+    )
+  ) {
+    return raw as PaymentScreenshotContentType;
+  }
+
+  // Android / Samsung / Files app: missing or generic MIME — trust extension.
+  if (raw === "" || raw === "application/octet-stream") {
+    for (const [ext, contentType] of Object.entries(EXT_TO_CONTENT_TYPE)) {
+      if (fileName.endsWith(ext)) return contentType;
+    }
+  }
+
+  return null;
+}
+
 export function validatePaymentScreenshotFile(file: {
   type?: string | null;
   size?: number | null;
+  name?: string | null;
 }): string | null {
-  const type = file.type ?? "";
+  const resolved = resolvePaymentScreenshotContentType(file.type, file.name);
+  if (resolved === "heic") return "heic_not_supported";
+  if (!resolved) return "invalid_screenshot_type";
   const size = file.size ?? 0;
-  if (
-    !PAYMENT_SCREENSHOT_CONTENT_TYPES.includes(
-      type as PaymentScreenshotContentType
-    )
-  ) {
-    return "invalid_screenshot_type";
-  }
   if (size <= 0 || size > PAYMENT_SCREENSHOT_MAX_BYTES) {
     return "invalid_screenshot_size";
   }
