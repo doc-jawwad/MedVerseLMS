@@ -13,6 +13,11 @@ select test_helpers.make_limited_admin('Initplan Editor', array['edit_questions'
 select test_helpers.make_limited_admin('Initplan NoQ', array['manage_curriculum']) as id into temp t_noq;
 select test_helpers.make_student((select year_id from curriculum), 'Initplan Student') as id into temp t_stu;
 
+-- Test fixtures are created by the runner role; after switching to
+-- authenticated, their IDs must remain readable. Grant TEMP tables only.
+grant select on curriculum, t_q, t_main, t_edit, t_noq, t_stu
+  to anon, authenticated;
+
 select is(
   (select q.year_id from public.questions q where q.id = (select qid from t_q)),
   (select s.year_id from public.questions q join public.subjects s on s.id = q.subject_id
