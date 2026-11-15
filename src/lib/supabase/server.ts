@@ -1,16 +1,21 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { supabaseAuthCookieOptions } from "@/lib/supabase/auth-cookie-options";
-import { supabaseFetch } from "@/lib/supabase/postgrest-fetch";
+import {
+  createInternalRestFetch,
+  supabaseFetch,
+} from "@/lib/supabase/postgrest-fetch";
 
-// When SUPABASE_DIRECT_URL is set, rewrite server-side auth calls to bypass
-// the Cloudflare proxy loopback (VPS cannot reach itself via Cloudflare on
-// /auth/v1/* without a 522). PostgREST calls are unaffected and still route
-// through the local PostgREST instance via the Caddy proxy.
+// Server-side routing (browser-facing URL is unchanged):
+// - SUPABASE_DIRECT_URL: /auth/ bypasses the Cloudflare loopback (522 on the VPS).
+// - POSTGREST_INTERNAL_URL: /rest/v1 goes straight to loopback PostgREST instead
+//   of hairpinning Cloudflare -> Caddy -> PostgREST. Same JWT + RLS; no-op if unset.
 function makeServerFetch(): typeof fetch {
   const directUrl = process.env.SUPABASE_DIRECT_URL;
   const proxyUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  if (!directUrl || !proxyUrl) return supabaseFetch;
+  const internalRest = process.env.POSTGREST_INTERNAL_URL;
+  if (!proxyUrl || (!directUrl && !internalRest)) return supabaseFetch;
+  const restFetch = createInternalRestFetch(proxyUrl, internalRest);
   return (input, init) => {
     const url =
       typeof input === "string"
@@ -18,7 +23,7 @@ function makeServerFetch(): typeof fetch {
         : input instanceof URL
           ? input.href
           : input.url;
-    if (url.startsWith(proxyUrl + "/auth/")) {
+    if (directUrl && url.startsWith(proxyUrl + "/auth/")) {
       const rewritten = directUrl + url.slice(proxyUrl.length);
       input =
         typeof input === "string"
@@ -27,7 +32,9 @@ function makeServerFetch(): typeof fetch {
             ? new URL(rewritten)
             : new Request(rewritten, input);
     }
-    return supabaseFetch(input, init);
+    // Auth (rewritten above or not) and everything non-REST pass through;
+    // /rest/v1 is sent to loopback PostgREST when POSTGREST_INTERNAL_URL is set.
+    return restFetch(input, init);
   };
 }
 

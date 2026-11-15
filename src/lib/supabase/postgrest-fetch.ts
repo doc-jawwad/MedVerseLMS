@@ -68,3 +68,54 @@ export function fetchWithoutApiKeyBearerOnPostgrest(
 
 export const supabaseFetch: typeof fetch =
   fetchWithoutApiKeyBearerOnPostgrest();
+
+/**
+ * Server-side only. Rewrites `${publicUrl}/rest/v1/...` to the loopback
+ * PostgREST (`POSTGREST_INTERNAL_URL`, e.g. http://127.0.0.1:3001), mirroring
+ * Caddy's `uri strip_prefix /rest/v1`. Skips Cloudflare + Caddy so Next.js
+ * does not hairpin through the public hostname for every query (504 source in
+ * the 2026-11-15 incident). Only /rest/v1 is rewritten: /auth/v1 and storage
+ * are untouched. Returns null when not applicable (unset env, other path/host).
+ * Authorization/apikey headers are forwarded unchanged, so JWT validation and
+ * RLS behave exactly as through Caddy.
+ */
+export function rewriteRestToInternal(
+  url: string,
+  publicUrl: string | undefined,
+  internalUrl: string | undefined
+): string | null {
+  const pub = publicUrl?.trim().replace(/\/$/, "");
+  const internal = internalUrl?.trim().replace(/\/$/, "");
+  if (!pub || !internal) return null;
+  const prefix = `${pub}/rest/v1`;
+  if (url !== prefix && !url.startsWith(`${prefix}/`) && !url.startsWith(`${prefix}?`)) {
+    return null;
+  }
+  return internal + url.slice(prefix.length);
+}
+
+/**
+ * fetch that sends /rest/v1 to loopback PostgREST. Order matters: header
+ * sanitising (drop non-JWT Bearer) runs against the original public URL, then
+ * the URL is rewritten. Non-REST requests pass through to plain fetch.
+ */
+export function createInternalRestFetch(
+  publicUrl: string | undefined,
+  internalUrl: string | undefined,
+  fetchImpl: typeof fetch = fetch
+): typeof fetch {
+  if (!publicUrl?.trim() || !internalUrl?.trim()) return supabaseFetch;
+  const rewriting: typeof fetch = (input, init) => {
+    const rewritten = rewriteRestToInternal(
+      requestUrl(input),
+      publicUrl,
+      internalUrl
+    );
+    if (!rewritten) return fetchImpl(input, init);
+    return fetchImpl(
+      input instanceof Request ? new Request(rewritten, input) : rewritten,
+      init
+    );
+  };
+  return fetchWithoutApiKeyBearerOnPostgrest(rewriting);
+}
