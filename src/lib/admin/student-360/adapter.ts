@@ -1,6 +1,8 @@
 import "server-only";
 
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { resolveAdminStudentContact } from "@/lib/admin/student-360/contact";
 import { getAdminPermissionSet } from "@/lib/admin/admin-nav";
 import {
   student360SectionsForPermissions,
@@ -210,6 +212,19 @@ export function createAdminStudentDetailAdapter(
           );
         }
       }
+
+      // After the permissioned admin profile RPC succeeds, fetch only the
+      // signup contact field for viewers authorized to access student biodata.
+      // The Auth service key stays server-only; no full metadata is returned.
+      biodata.contact_number = await resolveAdminStudentContact({
+        canReadBiodata: visible.includes("biodata"),
+        profileContact: biodata.contact_number,
+        loadAuthMetadata: async () => {
+          const { data, error } = await createAdminClient().auth.admin.getUserById(studentId);
+          if (error) throw error;
+          return data.user?.user_metadata ?? null;
+        },
+      });
 
       const public_identity = toLeaderboardSafeIdentity({
         id: studentId,
