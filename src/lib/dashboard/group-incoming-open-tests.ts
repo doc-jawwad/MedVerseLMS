@@ -115,3 +115,26 @@ export function groupIncomingOpenTests<
 
   return sections;
 }
+
+/**
+ * Tests page overlay (Upcoming / Available sections only). When no item in the
+ * section belongs to a known group the original order is returned untouched
+ * (single untitled section), so ungrouped behavior is unchanged.
+ */
+export function groupTestsPageSection<
+  T extends { id: string; opens_at?: string | null },
+>(args: {
+  items: T[];
+  groups: OpenListGroupMeta[];
+  placements: OpenListPlacementMeta[];
+}): { sections: IncomingOpenListSection<T>[]; showHeadings: boolean } {
+  const sections = groupIncomingOpenTests(args);
+  const showHeadings = sections.some((s) => s.groupId != null);
+  if (!showHeadings) {
+    return {
+      sections: [{ groupId: null, title: "", items: args.items }],
+      showHeadings: false,
+    };
+  }
+  return { sections, showHeadings };
+}

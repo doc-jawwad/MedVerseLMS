@@ -26,6 +26,11 @@ import {
 } from "@/components/ui/card";
 import { PageHeader } from "@/components/student/page-header";
 import { StudentPage } from "@/components/student/student-page";
+import {
+  groupTestsPageSection,
+  type OpenListGroupMeta,
+  type OpenListPlacementMeta,
+} from "@/lib/dashboard/group-incoming-open-tests";
 import { SectionHeading } from "@/components/student/section-heading";
 import { EmptyState } from "@/components/student/empty-state";
 import { StudyMarkdown } from "@/components/study/study-markdown";
@@ -71,6 +76,8 @@ export default async function StudentTestsPage() {
     { data: subscriptions },
     { data: grants },
     { data: prepRows },
+    { data: openListGroups },
+    { data: openListPlacements },
   ] = await Promise.all([
     ssrSpan("fetch.tests", () =>
       supabase
@@ -78,6 +85,7 @@ export default async function StudentTestsPage() {
         .select(
           "id, title, status, opens_at, closes_at, duration_minutes, entitlement, syllabus, max_attempts, subjects(name), question_count"
         )
+        .in("status", ["published", "closed"])
         .order("opens_at", { ascending: false })
     ),
     ssrSpan("fetch.test_attempts", () =>
@@ -107,6 +115,18 @@ export default async function StudentTestsPage() {
     ),
     ssrSpan("fetch.accessible_test_prep", () =>
       supabase.rpc("accessible_test_prep")
+    ),
+    // Presentation only (Issue 11); RLS limits both to the enrolled year / visible tests.
+    ssrSpan("fetch.open_list_groups", () =>
+      supabase
+        .from("test_open_list_groups")
+        .select("id, name, sort_order")
+        .order("sort_order", { ascending: true })
+    ),
+    ssrSpan("fetch.open_list_placements", () =>
+      supabase
+        .from("test_open_list_placements")
+        .select("test_id, group_id, sort_order")
     ),
   ]);
 
@@ -161,13 +181,32 @@ export default async function StudentTestsPage() {
       />
 
       {SECTIONS.map((sec) => {
-        const items = rows.filter((r) => r.section === sec.key);
-        if (items.length === 0) return null;
+        const sectionRows = rows.filter((r) => r.section === sec.key);
+        if (sectionRows.length === 0) return null;
+        const grouped =
+          sec.key === "upcoming" || sec.key === "available"
+            ? groupTestsPageSection({
+                items: sectionRows.map((r) => ({ ...r, id: r.t.id, opens_at: r.t.opens_at })),
+                groups: (openListGroups ?? []) as OpenListGroupMeta[],
+                placements: (openListPlacements ?? []) as OpenListPlacementMeta[],
+              })
+            : null;
+        const sectionBlocks = grouped
+          ? grouped.sections
+          : [{ groupId: null, title: "", items: sectionRows }];
+        const showGroupHeadings = grouped?.showHeadings ?? false;
         return (
           <div key={sec.key} className="grid gap-3" data-testid={`tests-section-${sec.key}`}>
             <SectionHeading title={sec.label} />
+            {sectionBlocks.map((block) => (
+            <div key={block.groupId ?? "ungrouped"} className="grid gap-3">
+            {showGroupHeadings ? (
+              <h3 className="font-heading text-sm font-semibold tracking-wide text-ink" data-testid="tests-group-heading">
+                {block.title}
+              </h3>
+            ) : null}
             <div className="grid gap-3 sm:grid-cols-2">
-              {items.map(({ t, attempt, counted, state }) => {
+              {block.items.map(({ t, attempt, counted, state }) => {
                 const s = t.subjects as unknown as { name: string } | null;
                 const qc = t.question_count;
                 const pricing = testPricingLabel(t.entitlement);
@@ -336,6 +375,8 @@ export default async function StudentTestsPage() {
                 );
               })}
             </div>
+            </div>
+            ))}
           </div>
         );
       })}
