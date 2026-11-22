@@ -36,13 +36,8 @@ export default async function AdminProfSessionDayPage({
   const subjectName =
     (day.subjects as unknown as { name: string } | null)?.name ?? "Subject";
 
-  const { data: yearRow } = await supabase
-    .from("years")
-    .select("id, year_number, name")
-    .eq("id", yearId)
-    .maybeSingle();
-
   const [
+    { data: yearRow },
     { data: practiceIds },
     { data: questions },
     { data: yearSubjects },
@@ -50,13 +45,21 @@ export default async function AdminProfSessionDayPage({
     { data: oneLiners },
     { data: folders },
   ] = await Promise.all([
+    supabase
+      .from("years")
+      .select("id, year_number, name")
+      .eq("id", yearId)
+      .maybeSingle(),
     supabase.rpc("list_day_practice_question_ids", { p_day_id: dayId }),
     supabase
       .from("questions")
       .select(
-        "id, difficulty, status, subjects!inner(year_id, name), question_versions!questions_current_version_fk(stem)"
+        "id, difficulty, status, subjects(name), question_versions!questions_current_version_fk(stem)"
       )
-      .eq("subjects.year_id", yearId)
+      // questions.year_id is trigger-synced from the topic (sync_question_ancestors),
+      // so it equals subjects.year_id; filtering it avoids the subjects inner join
+      // and uses questions_year_live_created_idx.
+      .eq("year_id", yearId)
       .eq("status", "approved")
       .is("deleted_at", null)
       .order("created_at", { ascending: false })
@@ -97,7 +100,7 @@ export default async function AdminProfSessionDayPage({
   const questionOptions: DayQuestionOption[] = ((questions ?? []) as {
     id: string;
     difficulty: string;
-    subjects: { year_id: string; name: string } | { year_id: string; name: string }[] | null;
+    subjects: { name: string } | { name: string }[] | null;
     question_versions: { stem: string } | { stem: string }[] | null;
   }[]).map((q) => {
     const ver = Array.isArray(q.question_versions)

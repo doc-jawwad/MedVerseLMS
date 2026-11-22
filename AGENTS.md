@@ -10,6 +10,8 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 # MedVerse LMS project rules
 
+- **Only live user-reported issue tracker:** https://github.com/doc-jawwad/MedVerseLMS/issues/11. Supersedes the removed historical numbered bug backlog; do not recreate or use old statuses. Preserve prior PR and git evidence, and verify current production behavior before marking a problem solved.
+
 - `docs/` is canonical: architecture.md, database.md, permissions.md, access-eligibility-analytics.md, exam-state-machine.md, scoring-rules.md, test-rules.md, deployment.md, and `docs/validation/` (append-only sign-off archive). **Do not invent alternative attempt states, transitions, grace periods, or access rules — change the doc first (with approval), then the code.** Staging phase sign-offs in `docs/validation/` do **not** authorize production deployment.
 - All schema changes go through `supabase/migrations/*.sql` — never dashboard-only changes.
 - Everything security/correctness-critical is enforced in Postgres (RLS deny-by-default, constraints, security-definer RPCs). App checks are UX only.

@@ -61,6 +61,38 @@ begin
 end;
 $$;
 
+-- Schema-adaptive synthetic user. Normal Supabase Auth (auth.users has GoTrue
+-- columns such as instance_id): insert a full auth row so handle_new_user()
+-- creates the profile, then set role/is_main_admin. VPS Cloud-Auth stub
+-- (auth.users = id,email,raw_user_meta_data; no instance_id): insert the
+-- equivalent public.profiles row directly. Fixture rows live inside each
+-- suite's BEGIN/ROLLBACK; no product table, grant or policy is changed.
+create or replace function test_helpers.create_user(
+  p_id uuid, p_name text, p_role text default 'student', p_main boolean default false
+)
+returns void language plpgsql as $$
+begin
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema = 'auth' and table_name = 'users' and column_name = 'instance_id'
+  ) then
+    insert into auth.users
+      (id, instance_id, aud, role, email, encrypted_password, email_confirmed_at,
+       created_at, updated_at, raw_app_meta_data, raw_user_meta_data)
+    values
+      (p_id, '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated',
+       p_id || '@test.invalid', '', now(), now(), now(), '{}',
+       jsonb_build_object('full_name', p_name));
+    if p_role <> 'student' or p_main then
+      update public.profiles set role = p_role, is_main_admin = p_main where id = p_id;
+    end if;
+  else
+    insert into public.profiles (id, email, full_name, role, account_status, is_main_admin)
+    values (p_id, p_id || '@test.invalid', p_name, p_role, 'active', p_main);
+  end if;
+end;
+$$;
+
 -- Create a real (transaction-scoped) auth.users row so handle_new_user()
 -- fires normally, then an active enrollment in the given year.
 create or replace function test_helpers.make_student(p_year_id uuid, p_name text default 'Test Student')
@@ -68,13 +100,7 @@ returns uuid language plpgsql as $$
 declare v_id uuid := gen_random_uuid();
 begin
   perform test_helpers.as_runner();
-  insert into auth.users
-    (id, instance_id, aud, role, email, encrypted_password, email_confirmed_at,
-     created_at, updated_at, raw_app_meta_data, raw_user_meta_data)
-  values
-    (v_id, '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated',
-     v_id || '@test.invalid', '', now(), now(), now(), '{}',
-     jsonb_build_object('full_name', p_name));
+  perform test_helpers.create_user(v_id, p_name, 'student', false);
   insert into public.enrollments (student_id, year_id, status)
   values (v_id, p_year_id, 'active');
   return v_id;
@@ -176,16 +202,7 @@ returns uuid language plpgsql as $$
 declare v_id uuid := gen_random_uuid();
 begin
   perform test_helpers.as_runner();
-  insert into auth.users
-    (id, instance_id, aud, role, email, encrypted_password, email_confirmed_at,
-     created_at, updated_at, raw_app_meta_data, raw_user_meta_data)
-  values
-    (v_id, '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated',
-     v_id || '@test.invalid', '', now(), now(), now(), '{}',
-     jsonb_build_object('full_name', p_name));
-  update public.profiles
-  set role = 'admin', is_main_admin = true
-  where id = v_id;
+  perform test_helpers.create_user(v_id, p_name, 'admin', true);
   return v_id;
 end;
 $$;
@@ -200,16 +217,7 @@ returns uuid language plpgsql as $$
 declare v_id uuid := gen_random_uuid();
 begin
   perform test_helpers.as_runner();
-  insert into auth.users
-    (id, instance_id, aud, role, email, encrypted_password, email_confirmed_at,
-     created_at, updated_at, raw_app_meta_data, raw_user_meta_data)
-  values
-    (v_id, '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated',
-     v_id || '@test.invalid', '', now(), now(), now(), '{}',
-     jsonb_build_object('full_name', p_name));
-  update public.profiles
-  set role = 'admin', is_main_admin = false
-  where id = v_id;
+  perform test_helpers.create_user(v_id, p_name, 'admin', false);
   insert into public.admin_permissions (admin_id, permission_code)
   select v_id, c from unnest(coalesce(p_codes, '{}')) as c
   where c is not null and btrim(c) <> '';
