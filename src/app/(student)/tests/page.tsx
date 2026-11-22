@@ -28,6 +28,7 @@ import { PageHeader } from "@/components/student/page-header";
 import { StudentPage } from "@/components/student/student-page";
 import {
   groupTestsPageSection,
+  orderUpcomingTestsSoonestFirst,
   type OpenListGroupMeta,
   type OpenListPlacementMeta,
 } from "@/lib/dashboard/group-incoming-open-tests";
@@ -181,8 +182,12 @@ export default async function StudentTestsPage() {
       />
 
       {SECTIONS.map((sec) => {
-        const sectionRows = rows.filter((r) => r.section === sec.key);
-        if (sectionRows.length === 0) return null;
+        const matchingRows = rows.filter((r) => r.section === sec.key);
+        if (matchingRows.length === 0) return null;
+        const sectionRows =
+          sec.key === "upcoming"
+            ? orderUpcomingTestsSoonestFirst(matchingRows)
+            : matchingRows;
         const grouped =
           sec.key === "upcoming" || sec.key === "available"
             ? groupTestsPageSection({

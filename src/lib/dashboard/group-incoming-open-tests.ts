@@ -117,6 +117,19 @@ export function groupIncomingOpenTests<
 }
 
 /**
+ * Upcoming defaults to the nearest opening date first, even when ungrouped.
+ * The general catalog query stays newest-first for Previous results; explicit
+ * admin placement ordering inside known groups still takes precedence.
+ */
+export function orderUpcomingTestsSoonestFirst<
+  T extends { t: { opens_at: string | null } },
+>(items: readonly T[]): T[] {
+  return [...items].sort(
+    (a, b) => opensAtMs(a.t.opens_at) - opensAtMs(b.t.opens_at)
+  );
+}
+
+/**
  * Tests page overlay (Upcoming / Available sections only). When no item in the
  * section belongs to a known group the original order is returned untouched
  * (single untitled section), so ungrouped behavior is unchanged.

@@ -1,12 +1,32 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { groupTestsPageSection } from "../../src/lib/dashboard/group-incoming-open-tests.ts";
+import {
+  groupTestsPageSection,
+  orderUpcomingTestsSoonestFirst,
+} from "../../src/lib/dashboard/group-incoming-open-tests.ts";
 
 const items = [
   { id: "a", opens_at: "2026-12-03T00:00:00Z" },
   { id: "b", opens_at: "2026-12-01T00:00:00Z" },
   { id: "c", opens_at: "2026-12-02T00:00:00Z" },
 ];
+
+describe("orderUpcomingTestsSoonestFirst", () => {
+  it("shows the next scheduled test first without changing the source list", () => {
+    const rows = [
+      { id: "later", t: { opens_at: "2026-12-10T00:00:00Z" } },
+      { id: "soonest", t: { opens_at: "2026-12-01T00:00:00Z" } },
+      { id: "middle", t: { opens_at: "2026-12-05T00:00:00Z" } },
+    ];
+    const ordered = orderUpcomingTestsSoonestFirst(rows);
+    assert.deepEqual(ordered.map((row) => row.id), [
+      "soonest", "middle", "later",
+    ]);
+    assert.deepEqual(rows.map((row) => row.id), [
+      "later", "soonest", "middle",
+    ]);
+  });
+});
 
 describe("groupTestsPageSection", () => {
   it("keeps original order and no headings when nothing is grouped", () => {
