@@ -19,6 +19,12 @@ import {
   SubscriptionAdminNav,
   subStatusVariant,
 } from "@/components/admin/subscription-admin-nav";
+import {
+  ADMIN_SUBSCRIPTION_SEARCH_STUDENT_LIMIT,
+  adminStudentNameEmailOrFilter,
+  adminSubscriptionStudentScope,
+  normalizeAdminStudentSearchTerm,
+} from "@/lib/subscriptions/admin-list-query";
 import { ApplicationActions } from "../application-actions";
 
 export const metadata = { title: "Subscription applications — MedVerse Admin" };
@@ -42,27 +48,45 @@ export default async function AdminApplicationsPage({
     searchYear,
     next: "/admin/subscriptions/applications",
     children: async (year) => {
-      let query = supabase
-        .from("subscription_applications")
-        .select(
-          "id, status, amount, currency, created_at, reviewed_at, review_note, student_id, plan_id, year_id, profiles!subscription_applications_student_id_fkey(full_name, email), subscription_plans(name)"
-        )
-        .eq("year_id", year.id)
-        .order("created_at", { ascending: false })
-        .limit(300);
-
-      if (filter && filter !== "all") query = query.eq("status", filter);
-
-      const { data, error } = await query;
-      const term = q?.toLowerCase().trim();
-      const rows = (data ?? []).filter((a) => {
-        if (!term) return true;
-        const p = a.profiles as unknown as ProfileJoin | null;
-        return (
-          p?.full_name?.toLowerCase().includes(term) ||
-          p?.email?.toLowerCase().includes(term)
-        );
+      const term = normalizeAdminStudentSearchTerm(q);
+      let matchedStudentIds: string[] | null = null;
+      if (term) {
+        const { data: matchedProfiles } = await supabase
+          .from("profiles")
+          .select("id")
+          .eq("role", "student")
+          .or(adminStudentNameEmailOrFilter(term))
+          .limit(ADMIN_SUBSCRIPTION_SEARCH_STUDENT_LIMIT);
+        matchedStudentIds = (matchedProfiles ?? []).map((p) => p.id as string);
+      }
+      const studentScope = adminSubscriptionStudentScope({
+        searchTerm: term,
+        matchedStudentIds,
       });
+
+      let query =
+        studentScope.kind === "empty"
+          ? null
+          : supabase
+              .from("subscription_applications")
+              .select(
+                "id, status, amount, currency, created_at, reviewed_at, review_note, student_id, plan_id, year_id, profiles!subscription_applications_student_id_fkey(full_name, email), subscription_plans(name)"
+              )
+              .eq("year_id", year.id)
+              .order("created_at", { ascending: false })
+              .limit(studentScope.limit);
+
+      if (query && studentScope.kind === "byIds") {
+        query = query.in("student_id", studentScope.studentIds);
+      }
+      if (query && filter && filter !== "all") {
+        query = query.eq("status", filter);
+      }
+
+      const { data, error } = query
+        ? await query
+        : { data: [] as never[], error: null };
+      const rows = data ?? [];
       const yearQuery = `year=${encodeURIComponent(year.id)}`;
 
       return (

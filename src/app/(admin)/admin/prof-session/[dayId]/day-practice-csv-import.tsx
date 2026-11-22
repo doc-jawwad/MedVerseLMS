@@ -28,27 +28,36 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { resolveLinkingSubjectDefault } from "@/lib/admin/linking-subject-default";
 
 /**
  * Prof. Session Day Practice MCQ CSV import.
  * Reuses Question Bank parser + import_question_batch, then merges inserted
  * IDs into this day's practice set (day-scoped junction only).
  * Validation-error presentation matches Test Builder (presentCsvFieldError).
+ *
+ * Subject default follows the day context (preferredSubjectId). Do not use
+ * subjects[0] — Final Year sort_order puts Medicine first and mis-tags other days.
  */
 export function DayPracticeCsvImport({
   dayId,
   linkedPracticeIds,
   subjects,
+  preferredSubjectId,
   onAttached,
 }: {
   dayId: string;
   linkedPracticeIds: string[];
   subjects: { id: string; name: string }[];
+  /** Day's subject_id — preferred default for CSV taxonomy rows. */
+  preferredSubjectId?: string | null;
   onAttached?: (ids: string[]) => void;
 }) {
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
-  const [subjectId, setSubjectId] = useState(subjects[0]?.id ?? "");
+  const [subjectId, setSubjectId] = useState(() =>
+    resolveLinkingSubjectDefault({ subjects, preferredSubjectId })
+  );
   const [pending, startTransition] = useTransition();
   const [preview, setPreview] = useState<{
     filename: string;
@@ -206,9 +215,16 @@ export function DayPracticeCsvImport({
       <div className="grid gap-2 sm:grid-cols-2 sm:items-end">
         <div className="grid gap-1">
           <Label htmlFor="day-csv-subject">Subject for CSV rows</Label>
-          <Select value={subjectId} onValueChange={setSubjectId}>
-            <SelectTrigger id="day-csv-subject">
-              <SelectValue placeholder="Subject" />
+          <Select
+            value={subjectId || undefined}
+            onValueChange={setSubjectId}
+          >
+            <SelectTrigger
+              id="day-csv-subject"
+              data-testid="day-practice-csv-subject"
+              data-subject-id={subjectId || ""}
+            >
+              <SelectValue placeholder="Select subject" />
             </SelectTrigger>
             <SelectContent>
               {subjects.map((s) => (

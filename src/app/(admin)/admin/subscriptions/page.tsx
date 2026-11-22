@@ -22,10 +22,14 @@ import {
 } from "@/components/admin/subscription-admin-nav";
 import { SubscriptionActions } from "./subscription-actions";
 import {
+  ADMIN_SUBSCRIPTION_SEARCH_STUDENT_LIMIT,
+  adminStudentNameEmailOrFilter,
   adminSubscriptionMonthOptions,
+  adminSubscriptionStudentScope,
   adminSubscriptionsHref,
   formatYearMonthLabel,
   matchesAdminSubscriptionFilters,
+  normalizeAdminStudentSearchTerm,
   parseYearMonth,
   pktMonthUtcRange,
   serialNumber,
@@ -64,49 +68,99 @@ export default async function AdminSubscriptionsPage({
       const monthRange = selectedMonth
         ? pktMonthUtcRange(selectedMonth.year, selectedMonth.month)
         : null;
-      let subsQuery = supabase
-        .from("subscriptions")
-        .select(
-          "id, status, starts_at, ends_at, grace_days, paid_access_mode, student_id, plan_id, year_id, profiles!subscriptions_student_id_fkey(full_name, email, account_status), subscription_plans(name)"
-        )
-        .eq("year_id", year.id)
-        .order("ends_at", { ascending: false })
-        .limit(300);
-      if (monthRange) {
+      const term = normalizeAdminStudentSearchTerm(q);
+
+      let matchedStudentIds: string[] | null = null;
+      if (term) {
+        const { data: matchedProfiles } = await supabase
+          .from("profiles")
+          .select("id")
+          .eq("role", "student")
+          .or(adminStudentNameEmailOrFilter(term))
+          .limit(ADMIN_SUBSCRIPTION_SEARCH_STUDENT_LIMIT);
+        matchedStudentIds = (matchedProfiles ?? []).map((p) => p.id as string);
+      }
+      const studentScope = adminSubscriptionStudentScope({
+        searchTerm: term,
+        matchedStudentIds,
+      });
+      const searchAppliedInQuery = studentScope.kind === "byIds";
+
+      let subsQuery =
+        studentScope.kind === "empty"
+          ? null
+          : supabase
+              .from("subscriptions")
+              .select(
+                "id, status, starts_at, ends_at, grace_days, paid_access_mode, student_id, plan_id, year_id, profiles!subscriptions_student_id_fkey(full_name, email, account_status), subscription_plans(name)"
+              )
+              .eq("year_id", year.id)
+              .order("ends_at", { ascending: false })
+              .limit(studentScope.limit);
+      if (subsQuery && studentScope.kind === "byIds") {
+        subsQuery = subsQuery.in("student_id", studentScope.studentIds);
+      }
+      if (subsQuery && monthRange) {
         subsQuery = subsQuery
           .gte("starts_at", monthRange.startIso)
           .lt("starts_at", monthRange.endIso);
       }
 
-      const [{ data: subs, error }, { data: plans }, { data: enrollments }, { data: liveSubs }] =
-        await Promise.all([
-          subsQuery,
-          supabase
-            .from("subscription_plans")
-            .select(
-              "id, name, duration_days, is_active, year_id, is_complimentary"
-            )
-            .eq("year_id", year.id)
-            .order("sort_order")
-            .order("name"),
-          supabase
-            .from("enrollments")
-            .select(
-              "student_id, status, year_id, profiles!enrollments_student_id_fkey(full_name, email, account_status, role)"
-            )
-            .eq("status", "active")
-            .eq("year_id", year.id)
-            .limit(300),
-          supabase
-            .from("subscriptions")
-            .select("student_id, status, ends_at, grace_days")
-            .eq("year_id", year.id)
-            .eq("status", "active")
-            .limit(300),
-        ]);
+      let enrollmentsQuery =
+        studentScope.kind === "empty"
+          ? null
+          : supabase
+              .from("enrollments")
+              .select(
+                "student_id, status, year_id, profiles!enrollments_student_id_fkey(full_name, email, account_status, role)"
+              )
+              .eq("status", "active")
+              .eq("year_id", year.id)
+              .limit(studentScope.limit);
+      if (enrollmentsQuery && studentScope.kind === "byIds") {
+        enrollmentsQuery = enrollmentsQuery.in(
+          "student_id",
+          studentScope.studentIds
+        );
+      }
+
+      let liveSubsQuery =
+        studentScope.kind === "empty"
+          ? null
+          : supabase
+              .from("subscriptions")
+              .select("student_id, status, ends_at, grace_days")
+              .eq("year_id", year.id)
+              .eq("status", "active")
+              .limit(studentScope.limit);
+      if (liveSubsQuery && studentScope.kind === "byIds") {
+        liveSubsQuery = liveSubsQuery.in(
+          "student_id",
+          studentScope.studentIds
+        );
+      }
+
+      const [
+        { data: subs, error },
+        { data: plans },
+        { data: enrollments },
+        { data: liveSubs },
+      ] = await Promise.all([
+        subsQuery ?? Promise.resolve({ data: [] as never[], error: null }),
+        supabase
+          .from("subscription_plans")
+          .select(
+            "id, name, duration_days, is_active, year_id, is_complimentary"
+          )
+          .eq("year_id", year.id)
+          .order("sort_order")
+          .order("name"),
+        enrollmentsQuery ??
+          Promise.resolve({ data: [] as never[], error: null }),
+        liveSubsQuery ?? Promise.resolve({ data: [] as never[], error: null }),
+      ]);
 
       const nowIso = new Date().toISOString();
-      const term = q?.toLowerCase().trim();
       const rows = (subs ?? [])
         .map((s) => {
           const profile = s.profiles as unknown as ProfileJoin | null;
@@ -128,6 +182,7 @@ export default async function AdminSubscriptionsPage({
           matchesAdminSubscriptionFilters({
             statusFilter: status,
             searchTerm: term,
+            searchAppliedInQuery,
             isLive: r.isLive,
             displayStatus: r.displayStatus,
             rowStatus: r.s.status,
@@ -329,10 +384,7 @@ export default async function AdminSubscriptionsPage({
               .filter(
                 (e) =>
                   e.profile?.role !== "admin" &&
-                  !liveStudentIds.has(e.studentId) &&
-                  (!term ||
-                    e.profile?.full_name?.toLowerCase().includes(term) ||
-                    e.profile?.email?.toLowerCase().includes(term))
+                  !liveStudentIds.has(e.studentId)
               )
               .slice(0, 50);
 

@@ -108,6 +108,60 @@ export function serialNumber(indexInFilteredPage: number, pageOffset = 0): numbe
   return pageOffset + indexInFilteredPage + 1;
 }
 
+/** Browse lists (no search) stay capped; search scopes by matched student ids instead. */
+export const ADMIN_SUBSCRIPTION_BROWSE_LIMIT = 300;
+export const ADMIN_SUBSCRIPTION_SEARCH_STUDENT_LIMIT = 100;
+export const ADMIN_SUBSCRIPTION_SEARCH_ROW_LIMIT = 500;
+
+export function normalizeAdminStudentSearchTerm(
+  q: string | undefined | null
+): string | undefined {
+  const term = q?.trim().toLowerCase();
+  return term || undefined;
+}
+
+/** Escape LIKE wildcards so user input is matched literally. */
+export function escapeIlikePattern(raw: string): string {
+  return raw.replace(/\\/g, "\\\\").replace(/%/g, "\\%").replace(/_/g, "\\_");
+}
+
+/**
+ * PostgREST `or` filter for student name/email contains-search.
+ * Values are double-quoted so commas/parens in the term do not split the list.
+ */
+export function adminStudentNameEmailOrFilter(term: string): string {
+  const pattern = `%${escapeIlikePattern(term)}%`;
+  const quoted = `"${pattern.replace(/"/g, '\\"')}"`;
+  return `full_name.ilike.${quoted},email.ilike.${quoted}`;
+}
+
+export type AdminSubscriptionStudentScope =
+  | { kind: "browse"; limit: number }
+  | { kind: "byIds"; studentIds: string[]; limit: number }
+  | { kind: "empty" };
+
+/**
+ * Decide how subscription/enrollment queries should constrain students.
+ * Search must resolve matching profile ids in the DB first — never filter only
+ * the browse window after `.limit(browse)`.
+ */
+export function adminSubscriptionStudentScope(opts: {
+  searchTerm: string | undefined;
+  /** Profile ids from a name/email query; ignored when there is no search term. */
+  matchedStudentIds?: string[] | null;
+}): AdminSubscriptionStudentScope {
+  if (!opts.searchTerm) {
+    return { kind: "browse", limit: ADMIN_SUBSCRIPTION_BROWSE_LIMIT };
+  }
+  const ids = opts.matchedStudentIds ?? [];
+  if (ids.length === 0) return { kind: "empty" };
+  return {
+    kind: "byIds",
+    studentIds: ids,
+    limit: ADMIN_SUBSCRIPTION_SEARCH_ROW_LIMIT,
+  };
+}
+
 export function matchesAdminSubscriptionFilters(opts: {
   statusFilter: string | undefined;
   searchTerm: string | undefined;
@@ -116,11 +170,17 @@ export function matchesAdminSubscriptionFilters(opts: {
   rowStatus: string;
   fullName: string | null | undefined;
   email: string | null | undefined;
+  /**
+   * When true, name/email were already applied via DB student-id scope —
+   * only status filters run here.
+   */
+  searchAppliedInQuery?: boolean;
 }): boolean {
   const status = opts.statusFilter ?? "";
   if (status === "active" && !opts.isLive) return false;
   if (status === "expired" && opts.displayStatus !== "expired") return false;
   if (status === "deactivated" && opts.rowStatus !== "deactivated") return false;
+  if (opts.searchAppliedInQuery) return true;
   const term = opts.searchTerm?.toLowerCase().trim();
   if (!term) return true;
   return Boolean(

@@ -1,10 +1,16 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  ADMIN_SUBSCRIPTION_BROWSE_LIMIT,
+  ADMIN_SUBSCRIPTION_SEARCH_ROW_LIMIT,
+  adminStudentNameEmailOrFilter,
   adminSubscriptionMonthOptions,
+  adminSubscriptionStudentScope,
   adminSubscriptionsHref,
+  escapeIlikePattern,
   formatYearMonthLabel,
   matchesAdminSubscriptionFilters,
+  normalizeAdminStudentSearchTerm,
   parseYearMonth,
   pktMonthUtcRange,
   serialNumber,
@@ -111,6 +117,91 @@ describe("admin subscription list filters and serials", () => {
 
   it("counts matching rows (empty month = zero)", () => {
     assert.equal(apply("expired", "nope").length, 0);
+  });
+
+  it("skips name/email when search was already applied in the query", () => {
+    const kept = matchesAdminSubscriptionFilters({
+      statusFilter: undefined,
+      searchTerm: "nobody",
+      searchAppliedInQuery: true,
+      isLive: true,
+      displayStatus: "active",
+      rowStatus: "active",
+      fullName: "Ali Khan",
+      email: "ali@example.com",
+    });
+    assert.equal(kept, true);
+    const droppedByStatus = matchesAdminSubscriptionFilters({
+      statusFilter: "expired",
+      searchTerm: "nobody",
+      searchAppliedInQuery: true,
+      isLive: true,
+      displayStatus: "active",
+      rowStatus: "active",
+      fullName: "Ali Khan",
+      email: "ali@example.com",
+    });
+    assert.equal(droppedByStatus, false);
+  });
+});
+
+describe("admin subscription DB student search scope", () => {
+  it("normalizes blank search terms to undefined", () => {
+    assert.equal(normalizeAdminStudentSearchTerm(undefined), undefined);
+    assert.equal(normalizeAdminStudentSearchTerm("  "), undefined);
+    assert.equal(normalizeAdminStudentSearchTerm(" Ali "), "ali");
+  });
+
+  it("escapes LIKE wildcards and builds a quoted or-filter", () => {
+    assert.equal(escapeIlikePattern("a%b_c\\d"), "a\\%b\\_c\\\\d");
+    assert.equal(
+      adminStudentNameEmailOrFilter("ali"),
+      'full_name.ilike."%ali%",email.ilike."%ali%"'
+    );
+    assert.equal(
+      adminStudentNameEmailOrFilter('a,b"c'),
+      'full_name.ilike."%a,b\\"c%",email.ilike."%a,b\\"c%"'
+    );
+  });
+
+  it("uses browse limit when there is no search", () => {
+    assert.deepEqual(
+      adminSubscriptionStudentScope({ searchTerm: undefined }),
+      { kind: "browse", limit: ADMIN_SUBSCRIPTION_BROWSE_LIMIT }
+    );
+  });
+
+  it("returns empty when search matches no students (does not fall back to browse)", () => {
+    assert.deepEqual(
+      adminSubscriptionStudentScope({
+        searchTerm: "ghost",
+        matchedStudentIds: [],
+      }),
+      { kind: "empty" }
+    );
+    assert.deepEqual(
+      adminSubscriptionStudentScope({
+        searchTerm: "ghost",
+        matchedStudentIds: null,
+      }),
+      { kind: "empty" }
+    );
+  });
+
+  it("scopes by matched student ids so search is not limited to the browse window", () => {
+    const scope = adminSubscriptionStudentScope({
+      searchTerm: "ali",
+      matchedStudentIds: ["s1", "s2"],
+    });
+    assert.deepEqual(scope, {
+      kind: "byIds",
+      studentIds: ["s1", "s2"],
+      limit: ADMIN_SUBSCRIPTION_SEARCH_ROW_LIMIT,
+    });
+    assert.ok(
+      scope.kind === "byIds" &&
+        scope.limit > ADMIN_SUBSCRIPTION_BROWSE_LIMIT
+    );
   });
 });
 

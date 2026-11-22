@@ -17,11 +17,16 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import {
   buildStructuralAcademicTree,
-  hrefForAcademicSearchHit,
   searchAcademicTreeNames,
   type AcademicSearchHit,
   type AcademicTreeSurface,
 } from "@/lib/academic-tree";
+import {
+  filterSearchHitsForAccess,
+  mapAcademicSearchRpcRows,
+  resolveAcademicSearchHits,
+  type AcademicSearchRpcRow,
+} from "@/lib/academic-tree/search-resolve";
 
 type GlobalSearchProps = {
   /** Prefer resources for free students; library when subscribed. */
@@ -35,18 +40,11 @@ type GlobalSearchProps = {
   className?: string;
 };
 
-type RpcHit = {
-  kind: AcademicSearchHit["kind"];
-  id: string;
-  name: string;
-  path_labels?: string[];
-  locked?: boolean;
-};
-
 /**
  * Global name search for class / block / category / folder / day.
  * Prefer `search_academic_tree` (authoritative). Fall back to structural
  * client search when the RPC is unavailable (e.g. admin without enrollment).
+ * Tree names only — never MCQs, PDFs, or item payloads.
  */
 export function GlobalSearch({
   surface,
@@ -76,11 +74,28 @@ export function GlobalSearch({
   );
 
   const structuralHits = useMemo(
-    () => searchAcademicTreeNames({ query, tree: structuralTree, limit: 20 }),
-    [query, structuralTree]
+    () =>
+      filterSearchHitsForAccess({
+        hits: searchAcademicTreeNames({
+          query,
+          tree: structuralTree,
+          limit: 20,
+        }),
+        surface,
+        hasLiveSubscription,
+      }),
+    [query, structuralTree, surface, hasLiveSubscription]
   );
 
-  const hits = rpcHits ?? structuralHits;
+  const hits = useMemo(
+    () =>
+      filterSearchHitsForAccess({
+        hits: resolveAcademicSearchHits({ rpcHits, structuralHits }),
+        surface,
+        hasLiveSubscription,
+      }),
+    [rpcHits, structuralHits, surface, hasLiveSubscription]
+  );
 
   useEffect(() => {
     if (!open) return;
@@ -100,18 +115,12 @@ export function GlobalSearch({
           const { data, error } = await supabase.rpc("search_academic_tree", {
             p_query: q,
             p_limit: 20,
+            p_surface: surface,
           });
           if (cancelled) return;
           if (error) {
-            const msg = (error.message ?? "").toLowerCase();
-            const compat =
-              msg.includes("could not find the function") ||
-              msg.includes("does not exist") ||
-              msg.includes("pgrst202") ||
-              msg.includes("42883") ||
-              msg.includes("no_active_enrollment");
-            // Compat only when RPC missing / admin without enrollment.
-            setRpcHits(compat ? null : []);
+            // Degrade to structural chrome (access-filtered). Never blank the UI.
+            setRpcHits(null);
             return;
           }
           const rows = Array.isArray(data)
@@ -119,52 +128,19 @@ export function GlobalSearch({
             : data &&
                 typeof data === "object" &&
                 Array.isArray((data as { hits?: unknown }).hits)
-              ? ((data as { hits: unknown[] }).hits as RpcHit[])
+              ? ((data as { hits: unknown[] }).hits as AcademicSearchRpcRow[])
               : null;
           if (!rows) {
             setRpcHits(null);
             return;
           }
-          const mapped: AcademicSearchHit[] = (
-            rows as Array<RpcHit & { product_key?: string }>
-          ).map((row) => {
-            const path_labels = Array.isArray(row.path_labels)
-              ? row.path_labels.map(String)
-              : [yearName, row.name];
-            const rawKind = String(row.kind ?? "");
-            const kind: AcademicSearchHit["kind"] =
-              rawKind === "class" ||
-              rawKind === "block" ||
-              rawKind === "category" ||
-              rawKind === "folder" ||
-              rawKind === "day" ||
-              rawKind === "prof_session"
-                ? rawKind
-                : rawKind === "prof_session_day"
-                  ? "day"
-                  : "folder";
-            const product_key =
-              typeof row.product_key === "string" ? row.product_key : null;
-            const partial = {
-              kind,
-              id: String(row.id),
-              name: String(row.name),
-              path_labels,
-              locked: Boolean(row.locked),
-              class_name: yearName,
-              product_key,
-            };
-            return {
-              kind: partial.kind,
-              id: partial.id,
-              name: partial.name,
-              path_labels: partial.path_labels,
-              locked: partial.locked,
-              class_name: partial.class_name,
-              href: hrefForAcademicSearchHit(partial, surface),
-            };
+          const mapped = mapAcademicSearchRpcRows({
+            rows: rows as AcademicSearchRpcRow[],
+            yearName,
+            surface,
           });
-          setRpcHits(mapped);
+          // Empty RPC must not block structural fallback (One Liner naming, etc.).
+          setRpcHits(mapped.length > 0 ? mapped : null);
         } catch {
           if (!cancelled) setRpcHits(null);
         } finally {
@@ -281,7 +257,7 @@ export function GlobalSearch({
               <p className="px-2 py-6 text-center text-sm text-muted-foreground">
                 Tree names only — not MCQs, PDFs, or video text.
               </p>
-            ) : rpcPending && rpcHits === null ? (
+            ) : rpcPending && rpcHits === null && hits.length === 0 ? (
               <p className="px-2 py-6 text-center text-sm text-muted-foreground">
                 Searching…
               </p>

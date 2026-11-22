@@ -52,7 +52,7 @@ Companion analyses (not canonical): subscription-vs-dashboard canvas; eligibilit
 | 9 | **Current resource access** | `can_access_*` / `resource_content_allowed` / exam window | Start test, open file, fetch practice **now**. |
 | 10 | **Navigation visibility** | Which menu items the shell shows as active vs locked | UX over live subscription. Free **active:** Dashboard (incl. Top 3 leaderboard card), Tests (full catalog sections), **Resources** (same academic tree; unlocked nodes only), Contact Us, Career Counselling, Get iMD, My Subscription, My Account. Full library is a separate subscribed surface over the same rows (no duplicate free copies). Locked nodes must not load paid item payloads. **Notes** remains its own category. **Not content entitlement.** |
 | 11 | **Catalog visibility** | `can_view_*` — listed, including locked paid | See the item. Unpublished tests stay hidden. |
-| 12 | **Dashboard visibility** | Which cards, locks, previews, and history links render | UX over 9–11 plus owned history. Must not leak secrets. |
+| 12 | **Dashboard visibility** | Which cards, locks, previews, and history links render | UX over 9–11 plus owned history. Must not leak secrets. Admin **open-list groups** (`test_open_list_*`) reorder/group **Incoming** tests only after existing incoming filters; they must not weaken layers 1–11 or hide ungrouped open tests. |
 
 **CONFIRMED PRODUCT LAW — precedence for current use of a resource** (active account only):
 

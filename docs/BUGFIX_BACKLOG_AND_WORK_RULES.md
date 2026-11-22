@@ -1,6 +1,6 @@
 ﻿# MedVerse LMS — Reported Bug Backlog and Work Rules
 
-Last updated: 2026-10-24 (Issue 8 local commit; staging not authorized)
+Last updated: 2026-10-25 (Issue 10 Fixed — verification pending; Issue 11 Verified preserved; Issue 8 closure preserved)
 
 Latest staging update and historical verification notes are retained below. This document is the source of truth for the user-reported MedVerse LMS issue queue and the working rules for addressing it. Keep it updated as issues are investigated, fixed, tested, and released. Do not replace this queue with a different checklist or drift into unrelated production-readiness work.
 
@@ -31,36 +31,53 @@ Status meanings: **Not started**, **Investigating**, **In progress**, **Fixed �
 | 5 | Professional-session One-Liners need PDF support. | **On production (release verified 2026-10-24; retained under Issue 1 app `1714065`).** Optional private source PDF on Prof. Session `one_liners` (pearl pattern). First Issue 5 ship app SHA `8745ef419297349a1f5791a53308fdd18e4208ff` (`/opt/medverse/releases/20261024T153422Z-8745ef4-issue5-olpdf`); migration max remains `20261024140000` (`20261024120000` + `20261024140000`); pre-migration backup `medverse/production/pre-migration/20261024T153136Z.dump.enc` (upload verified, 38135824 bytes). Post–Issue 1 verify reconfirmed `r2_object_key`, `authorize_one_liner_object`/`has_live_subscription`, and slot-page `has_source_pdf`. Known remaining limitation (out of Issue 5 scope): student title/body SELECT remains enrollment-only under existing RLS. |
 | 6 | PDFs fail or remain stuck loading. | **User-marked solved — verification not independently rechecked.** Jawwad explicitly requested that this issue remain marked solved. |
 | 7 | PDF reader lacks previous/next navigation. | **User-marked solved — verification not independently rechecked.** Jawwad explicitly requested that this issue be marked resolved. No implementation, test, or production evidence was supplied or independently checked as part of this tracker update. |
-| 8 | Professional-session content loads slowly. | **Fixed — verification pending (local commit only; not pushed/deployed).** Branch `fix/issue-8-prof-session-content-load` based on `1714065`. Independent review: SAFE for staging after explicit approval. Migration `20261024180000` (scoped `among` + slim day JSON); app subjects query scope + `ssrSpan`. Pre-commit AUTOMATED: unit 4/4; pgTAP 240+241 = 11/11. Full unit suite still has 2 **unrelated** failures (backup Cloud PGHOST; CRON_SECRET unset)—not claimed passing. User-facing multi-second delay still not reproduced locally. Keep in progress until staging before/after SSR TTFB + RPC timings (plan in Issue 8 reference). |
-| 9 | Samsung / non-Chrome browser problems. | Not started. Identify affected browser/device behavior and reproduce before fixing. |
-| 10 | Linking content defaults to the wrong subject (Medicine). | Not started. Trace subject selection/defaulting and preserve valid existing mappings. |
-| 11 | Admins need manually organized groups for open tests. | **Feature request — requirements captured; implementation not started.** Admin creates and names blocks/subjects (or other groups), assigns tests to groups, and manually reorders tests. Students see currently open, not-yet-closed tests grouped and ordered accordingly. Closed tests must not appear in this open-test view. Define a safe fallback for ungrouped tests so they do not disappear. Preserve existing availability rules, attempt history, answer-key behavior, permissions, and test entitlements. Before implementation, inspect existing schemas/UI and document dependencies, migration needs, and acceptance tests; do not make production changes without approval. |
+| 8 | Professional-session content loads slowly. | **Closed — user-approved (auth SSR compare deferred); not independently Verified for end-to-end SSR.** Jawwad closed Issue 8 with the authenticated SSR before/after vs `5cbebe3` **explicitly deferred**. Staging RPC evidence retained: `e272f02` / `20261025T050539Z-e272f02-issue8` / DB `20261024180000`; re-seeded then cleaned (baseline 2/3/47/33/4/2). **Among under seed:** 13.5→4.0 ms cold/warm vs pre-fix 34.1/29.1 ms; tree 58/35 ms, 30613 chars; free locked. Auth SSR under seed recorded **post-only** for `e272f02` (not a fair before/after). TLS outliers ≠ SSR. pgTAP 240=6/6, 241=5/5. Prod untouched. **Do not claim** end-to-end SSR improvement was verified. |
+| 9 | Samsung / non-Chrome browser problems. | **User-marked solved — verification not independently rechecked.** Jawwad requested this tracking state. No new browser/device evidence was independently rechecked as part of this tracker update. |
+| 10 | Linking content defaults to the wrong subject (Medicine). | **Fixed — verification pending.** Root cause: Prof. Session day Practice CSV used `subjects[0]` (Final Year `sort_order` → Medicine) instead of the day’s `subject_id`. Fix: `resolveLinkingSubjectDefault` + `preferredSubjectId={subjectId}` on `DayPracticeCsvImport`. Existing question/folder/day mappings untouched (UI default only). Unit `linking-subject-default` 5/5. Branch `fix/issue-10-linking-subject-default` off `32d0f27`. Not deployed; no staging browser verify yet. Prod untouched. |
+| 11 | Admins need manually organized groups for open tests. | **Verified on staging (2026-10-25).** Release `20261025T064327Z-32d0f27-issue11` / SHA `32d0f27a21537d052e3443dde3756731e22db7e3` (parent `e272f02`); staging DB head `20261025120000`. Browser smoke `ok`: admin create/rename/reorder/assign/delete; student Incoming group heading before “Other tests”; open A/B visible; closed fixture absent; cleanup leftover groups=0 tests=0. Regressions: unit 11/11 (grouping+Issue4 merge); pgTAP 247=15/15; Issue1/4/5/8 markers retained; unauth open-list 307; health 200. Prod untouched (`1714065` / DB `20261024140000`). |
 
 ## Current handoff
 
-Issue 8 is **committed locally** on `fix/issue-8-prof-session-content-load` (base `1714065`); **not pushed, not deployed**. Status remains Fixed — verification pending until explicit staging authorization and before/after performance measurements. Issues 1/4/5 remain on that base. Staging tip unchanged until an approved Issue 8 ship.
+Issue 10 is **Fixed — verification pending** (local unit + wiring; needs staging deploy approval + short admin CSV smoke on a non-Medicine day). Issue 11 remains **Verified on staging**. Issue 8 remains **Closed — user-approved (auth SSR compare deferred)** — unchanged. Issue 9 is **User-marked solved — verification not independently rechecked**.
 
-Jawwad has instructed that Issues 2, 3, 6, and 7 be tracked as solved. This tracker records that requested status but does not claim those issues were independently reverified in this update.
+**Active item:** Issue 10 — staging verify after deploy approval. Production promotion of Issues 10/11 requires separate approval.
 
-**Active backlog item:** Issue 8 — in progress (local commit done; awaiting staging authorization + measurements). Next after Issue 8 closes: Issue 9. Issue 11 remains a feature request.
+Jawwad has instructed that Issues 2, 3, 6, 7, and 9 be tracked as solved. This tracker records that requested status but does not claim those issues were independently reverified in this update.
+
+## Issue 11 implementation reference
+
+- **Status:** Verified on staging (2026-10-25)
+- **Architecture:** Year-scoped presentation tables + SECURITY DEFINER admin RPCs; Dashboard Incoming overlay after `pickIncomingWithState`; does not touch `can_view_test` / `can_access_test` / attempts / answer keys.
+- **Staging release:** `20261025T064327Z-32d0f27-issue11` / `32d0f27a21537d052e3443dde3756731e22db7e3` / DB `20261025120000`. Branch `fix/issue-11-open-list-groups-staging` (parent `e272f02`).
+- **Migration:** `supabase/migrations/20261025120000_test_open_list_groups.sql` applied to `medverse_staging` only (rehearsal + `apply-staging-schema.sh`). Prod DB head remains `20261024140000`.
+- **Browser smoke:** `scripts/_staging_issue11_browser_smoke_results.json` — admin create/rename/reorder/assign/delete ok; student group heading + Other tests + closed excluded; tagged fixtures cleaned.
+- **Automated:** unit grouping+Issue4 merge 11/11; pgTAP 247=15/15; staging markers Issue1/5/8 + RLS tables present; health 200.
+- **Remaining risk:** not on production; no production browser verify claimed.
+- **Next issue:** Issue 10 — linking content subject default (Medicine).
+
+## Issue 10 implementation reference
+
+- **Status:** Fixed — verification pending (local only; not Verified on staging)
+- **Root cause:** `DayPracticeCsvImport` initialized subject with `subjects[0]?.id`. Day page loads year subjects ordered by `sort_order` then `name`, so Final Year first option is Medicine. Day `subject_id` was already used for folders/one-liners but was not passed into CSV import.
+- **Intended behavior (repo evidence):** day-scoped linking should default taxonomy subject to the day subject (same as `createOneLiner` / `addProfSessionDayFolder` on that page). Explicit admin override remains available via the subject Select. Do not bulk-rewrite existing `questions.subject_id` rows.
+- **Change:** `src/lib/admin/linking-subject-default.ts`; `day-practice-csv-import.tsx` uses `resolveLinkingSubjectDefault({ subjects, preferredSubjectId })`; `day-content-admin.tsx` passes `preferredSubjectId={subjectId}`.
+- **Out of scope (left unchanged):** Test Builder CSV / MCQ classify / Prof. Session list still use first-option defaults where there is no day context; those surfaces do not match the Medicine-by-`sort_order` linking bug as clearly.
+- **Verification:** `node --experimental-strip-types --import ./tests/unit/shims/register-server-only.mjs --test tests/unit/linking-subject-default.test.ts` → 5/5. ESLint clean on new/changed CSV + helper files. Pre-existing: `day-content-admin` `react-hooks/set-state-in-effect` and repo `tsc` `LayoutProps` in `layout.tsx` (unrelated).
+- **Remaining:** staging deploy approval; admin smoke — open non-Medicine day → CSV Import subject shows that day (not Medicine); explicit Medicine still selectable; reload keeps day default. No DB migration.
+- **Next after Verified:** queue otherwise user-marked solved / closed / verified; await Jawwad for next confirmed item or production promotion.
 
 ## Issue 8 implementation reference
 
-- **Status:** Fixed — verification pending (local commit; independent review PASS for staging eligibility; staging not authorized)
-- **Root cause:** Wasted work on the Prof. Session student path — full-year folder-access re-eval inside `accessible_folder_ids_among`, unused per-day aggregates inside `get_academic_tree`, and unscoped subjects fetch on day Guidelines/LoS. Multi-second end-to-end slowness not reproduced locally.
-- **Change:** `supabase/migrations/20261024180000_prof_session_content_load_perf.sql`; `src/components/library/material-library-page.tsx`; `src/lib/academic-tree/load-tree.ts`; tests `241_prof_session_content_load_perf.sql`, `tests/unit/prof-session-content-load.test.ts`
-- **Independent review (2026-10-24, STATIC + AUTOMATED recheck):** Safe to proceed to staging with approval. No required code changes found for access/ordering/Issue 1–4–5 preservation. Optional coverage gaps (not blockers): explicit `among(null)` / empty-array cases; MANUAL Academic Notes page smoke (also uses `among`); no browser E2E latency assertion. `LOADTEST_SSR_TIMING` is gated to `MEDVERSE_ENV=loadtest` only — do not enable on staging/production; use browser TTFB + DB RPC timings instead.
-- **Verification so far:** unit 4/4; pgTAP 240+241 (11/11); local before/after micro-benchmarks (among scoped vs full; tree payload 18505→15157). Full unit suite 2 unrelated failures noted, not attributed to Issue 8.
-- **Staging verification plan (requires explicit deploy approval; no prod writes):**
-  1. **Inventory (read-only):** published `prof_session_days`, day-scoped folders/materials, one_liners, day practice links, product subjects for the paid test student’s year.
-  2. **Baseline (current staging SHA, before Issue 8):** paid subscribed student — cold+warm TTFB/p50/p95 for `/academic/prof-session`, `…/mcq-bank`, `…/mcq-bank/{day}`, `…/{day}/guidelines`, `…/los`, `…/one-liners`, `…/practice-mcqs`, `…/test-mcq`. Same routes as free student (expect SectionLock / empty days, not content leak).
-  3. **Baseline DB/RPC (impersonated paid JWT, read-only):** wall time for `get_academic_tree('library')`, `accessible_folder_ids()`, `accessible_folder_ids_among(day_folder_ids)` (2–N ids from a real Guidelines day); payload size / day keys for one subject’s days.
-  4. **Ship Issue 8 to staging only** (app + `20261024180000`); confirm migration head and Issue 1/4/5 markers retained.
-  5. **After:** repeat steps 2–3. Correctness smoke: slot chrome order; paid Guidelines unlock; free denied; Issue 5 one-liner PDF authorize still subscription-gated; Issue 4 `pickIncomingWithState` still on dashboard; Issue 1 `max_attempts` / start path unchanged.
-  6. **Declare user-facing improvement only if** guidelines/day-list TTFB p50 (and preferably p95) drop materially vs baseline under the same inventory; RPC times for `among` and tree should move in the same direction. If SSR TTFB is flat while RPC improves, record “wasted work removed; user symptom not confirmed fixed.”
-- **Evidence still required before Status = Verified:** staging before/after SSR TTFB with realistic content volume (MANUAL or scripted against staging); matching RPC timings; correctness smokes above. Local unit/pgTAP alone are insufficient.
-- **Remaining risk/blocker:** Staging/production RTT and auth waterfall may dominate; uncommitted Issue 8 files must be committed before any ship; no push/deploy without Jawwad approval.
-- **Next issue:** Issue 9 after Issue 8 staging (then prod) verification, or Jawwad reprioritizes
+- **Status:** Closed — user-approved (auth SSR compare deferred); **not** independently Verified for end-to-end SSR
+- **Root cause:** Wasted work on Prof. Session path — full-year re-eval in `accessible_folder_ids_among`, unused day aggregates in `get_academic_tree`, unscoped subjects fetch on Guidelines/LoS.
+- **Staging release:** `20261025T050539Z-e272f02-issue8` / `e272f020c49a132e0e1ee1a0b39312aa663756b3` / DB `20261024180000`. Prod `1714065` / DB `20261024140000` untouched.
+- **Seed (2026-10-25 re-run):** `ISSUE8_SEED_` via `issue8_seed.owned_rows`; post-seed 10/283/477/313/24/32; cleanup restored **2/3/47/33/4/2**; `owned_rows=0`; `seed_named=0`.
+- **RPC under seed on e272f02** (`/tmp/issue8_measure_SEEDED_E272F02.txt`): among cold/warm **13.5 / 4.0 ms** (pre-fix seed baseline was **34.1 / 29.1 ms**); `get_academic_tree` 58 / 35 ms, payload **30613** chars; `accessible_folder_ids` ~26 ms; free `locked=true`; among scoped / tree slim markers true.
+- **Auth SSR:** post-only under seed on `e272f02` (paid med ~621 ms). **No fair `5cbebe3` pair** — deferred by user decision (shared `:3010` only). Not claimed as Verified SSR improvement.
+- **Regressions:** pgTAP 241=5/5, 240=6/6; Issue 1/4/5 markers present.
+- **`LOADTEST_SSR_TIMING`:** not enabled.
+- **Closure note:** User-approved close ≠ independently Verified end-to-end SSR. RPC staging evidence stands; SSR before/after remains deferred.
+- **Next issue (per Jawwad):** Issue 11 — open-test groups.
 
 ## Reattempts implementation reference
 

@@ -194,6 +194,12 @@ Draft hard-delete: `delete_draft_test(p_test_id)` (`publish_tests`, draft-only, 
 
 **test_questions** — `test_id`, `question_id`, `question_version_id` (**frozen at publish**), `position int`, `marks numeric null` (override), `voided bool default false`, `void_policy text check in ('exclude','credit_all') null`. Unique (test_id, question_id). Immutable after publish except `voided`/`void_policy` (trigger-enforced).
 
+**test_open_list_groups** — year-scoped **dashboard presentation** groups for Incoming / open tests (not curriculum Blocks/`subjects`). Columns: `id`, `tenant_id`, `year_id` → `years`, `name` (trim non-empty), `sort_order int`, timestamps. Unique `(year_id, lower(trim(name)))`. Editable while tests are published (independent of `protect_published_test`). Admin writes via `publish_tests` + `admin_can_access_year` RPCs only.
+
+**test_open_list_placements** — at most one row per `test_id` (`UNIQUE`). Columns: `test_id` → `tests` (`ON DELETE CASCADE`), denormalized `year_id` (must match `tests.year_id` and, when set, `group_id.year_id`), nullable `group_id` → `test_open_list_groups` (`ON DELETE SET NULL`), `sort_order int` within `(year_id, group_id)`. `group_id IS NULL` or missing row = **ungrouped** fallback (never hide an otherwise-incoming test). Presentation only — does not change `can_view_test` / `can_access_test`, attempt history, answer keys, or entitlements. `reuse_test_as_draft` must **not** copy placements. Student SELECT allowed for groups in the enrolled year and placements where `can_view_test(test_id)`.
+
+Admin RPCs: `admin_create_test_open_list_group`, `admin_rename_test_open_list_group`, `admin_delete_test_open_list_group`, `admin_reorder_test_open_list_groups`, `admin_assign_test_open_list_placement`, `admin_reorder_test_open_list_placements` — all `publish_tests` + year scope; audit-logged.
+
 ## Attempts
 
 **test_attempts** —

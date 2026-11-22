@@ -1,9 +1,11 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  PAYMENT_SCREENSHOT_MAX_BYTES,
   canStudentEditApplication,
   isPrivatePaymentScreenshotKey,
   isTerminalApplicationStatus,
+  resolvePaymentScreenshotContentType,
   screenshotObjectKeyLooksPublic,
   validatePaymentAmount,
   validatePaymentScreenshotFile,
@@ -40,7 +42,7 @@ describe("amount validation", () => {
 });
 
 describe("upload/file validation", () => {
-  it("accepts jpeg/png/webp within 5MB", () => {
+  it("accepts jpeg/png/webp within the size ceiling", () => {
     assert.equal(
       validatePaymentScreenshotFile({ type: "image/jpeg", size: 1024 }),
       null
@@ -55,9 +57,67 @@ describe("upload/file validation", () => {
     );
   });
 
-  it("rejects pdf, empty, and oversized files", () => {
+  it("accepts mobile MIME aliases and empty/octet-stream with image extensions", () => {
+    assert.equal(
+      resolvePaymentScreenshotContentType("image/jpg", "shot.jpg"),
+      "image/jpeg"
+    );
+    assert.equal(
+      resolvePaymentScreenshotContentType("image/pjpeg", "shot.jpg"),
+      "image/jpeg"
+    );
+    assert.equal(
+      resolvePaymentScreenshotContentType("", "JazzCash.png"),
+      "image/png"
+    );
+    assert.equal(
+      resolvePaymentScreenshotContentType(
+        "application/octet-stream",
+        "receipt.JPEG"
+      ),
+      "image/jpeg"
+    );
+    assert.equal(
+      validatePaymentScreenshotFile({
+        type: "",
+        size: 2048,
+        name: "easypaisa.webp",
+      }),
+      null
+    );
+    assert.equal(
+      validatePaymentScreenshotFile({
+        type: "application/octet-stream",
+        size: 2048,
+        name: "proof.jpg",
+      }),
+      null
+    );
+  });
+
+  it("rejects HEIC with a dedicated code and still rejects pdf/empty/oversized", () => {
+    assert.equal(
+      validatePaymentScreenshotFile({
+        type: "image/heic",
+        size: 1024,
+        name: "IMG_001.HEIC",
+      }),
+      "heic_not_supported"
+    );
+    assert.equal(
+      validatePaymentScreenshotFile({
+        type: "",
+        size: 1024,
+        name: "receipt.heif",
+      }),
+      "heic_not_supported"
+    );
     assert.equal(
       validatePaymentScreenshotFile({ type: "application/pdf", size: 1024 }),
+      "invalid_screenshot_type"
+    );
+    assert.equal(
+      validatePaymentScreenshotFile({ type: "", size: 1024, name: "notes.txt" }),
       "invalid_screenshot_type"
     );
     assert.equal(
@@ -67,9 +127,16 @@ describe("upload/file validation", () => {
     assert.equal(
       validatePaymentScreenshotFile({
         type: "image/jpeg",
-        size: 5 * 1024 * 1024 + 1,
+        size: PAYMENT_SCREENSHOT_MAX_BYTES + 1,
       }),
       "invalid_screenshot_size"
+    );
+    assert.equal(
+      validatePaymentScreenshotFile({
+        type: "image/jpeg",
+        size: PAYMENT_SCREENSHOT_MAX_BYTES,
+      }),
+      null
     );
   });
 });

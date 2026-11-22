@@ -6,6 +6,11 @@ import {
   classDisplayName,
   blocksForYearNumber,
   hrefForAcademicSearchHit,
+  resolveAcademicSearchHits,
+  filterSearchHitsForAccess,
+  mapAcademicSearchRpcRows,
+  isSearchRpcCompatError,
+  type AcademicSearchHit,
 } from "../../src/lib/academic-tree/index.ts";
 import {
   THEME_STORAGE_KEY,
@@ -136,6 +141,172 @@ describe("theme persistence", () => {
     assert.equal(isThemeMode("dark"), true);
     assert.equal(isThemeMode("system"), true);
     assert.equal(isThemeMode("neon"), false);
+  });
+});
+
+describe("search resolve + access filter", () => {
+  const tree = buildStructuralAcademicTree({
+    surface: "resources",
+    year_id: "year-1",
+    year_number: 1,
+    year_name: "1st Year MBBS",
+    has_live_subscription: false,
+  });
+
+  it("empty RPC falls back to structural (One Liner naming)", () => {
+    const structural = searchAcademicTreeNames({
+      query: "One Liner",
+      tree,
+      limit: 20,
+    });
+    assert.ok(
+      structural.some((h) => h.kind === "category" && h.name === "One Liner"),
+      "structural chrome uses One Liner"
+    );
+    assert.deepEqual(
+      resolveAcademicSearchHits({ rpcHits: [], structuralHits: structural }),
+      structural
+    );
+    assert.deepEqual(
+      resolveAcademicSearchHits({ rpcHits: null, structuralHits: structural }),
+      structural
+    );
+  });
+
+  it("non-empty RPC wins over structural", () => {
+    const structural = searchAcademicTreeNames({ query: "Block", tree });
+    const rpc: AcademicSearchHit[] = [
+      {
+        kind: "block",
+        id: "rpc-block",
+        name: "Block 1",
+        path_labels: ["1st Year MBBS", "Block 1"],
+        locked: false,
+        class_name: "1st Year MBBS",
+        href: "/academic/block-1",
+      },
+    ];
+    assert.deepEqual(
+      resolveAcademicSearchHits({ rpcHits: rpc, structuralHits: structural }),
+      rpc
+    );
+  });
+
+  it("free/resources filters out Prof. Session and locked folders", () => {
+    const paidTree = buildStructuralAcademicTree({
+      surface: "library",
+      year_id: "year-1",
+      year_number: 1,
+      year_name: "1st Year MBBS",
+      has_live_subscription: true,
+    });
+    const raw = searchAcademicTreeNames({
+      query: "Prof",
+      tree: paidTree,
+      limit: 20,
+    });
+    assert.ok(raw.some((h) => h.kind === "prof_session"));
+
+    const freeHits = filterSearchHitsForAccess({
+      hits: [
+        ...raw,
+        {
+          kind: "folder",
+          id: "locked-folder",
+          name: "Paid Notes Pack",
+          path_labels: ["1st Year MBBS", "Block 1", "Notes", "Paid Notes Pack"],
+          locked: true,
+          class_name: "1st Year MBBS",
+          href: "/academic/block-1/notes",
+        },
+      ],
+      surface: "resources",
+      hasLiveSubscription: false,
+    });
+    assert.equal(
+      freeHits.filter((h) => h.kind === "prof_session" || h.kind === "day")
+        .length,
+      0
+    );
+    assert.equal(
+      freeHits.filter((h) => h.path_labels.includes("Prof. Session")).length,
+      0
+    );
+    assert.equal(freeHits.filter((h) => h.kind === "folder" && h.locked).length, 0);
+  });
+
+  it("paid/library keeps Prof. Session chrome", () => {
+    const paidTree = buildStructuralAcademicTree({
+      surface: "library",
+      year_id: "year-1",
+      year_number: 1,
+      year_name: "1st Year MBBS",
+      has_live_subscription: true,
+    });
+    const raw = searchAcademicTreeNames({
+      query: "Prof",
+      tree: paidTree,
+      limit: 20,
+    });
+    const paidHits = filterSearchHitsForAccess({
+      hits: raw,
+      surface: "library",
+      hasLiveSubscription: true,
+    });
+    assert.ok(paidHits.some((h) => h.kind === "prof_session"));
+  });
+
+  it("maps RPC One Liner category rows onto /academic block hrefs", () => {
+    const mapped = mapAcademicSearchRpcRows({
+      rows: [
+        {
+          kind: "category",
+          id: "subj:one_liner",
+          name: "One Liner",
+          product_key: "block-1",
+          path_labels: ["1st Year MBBS", "Block 1", "One Liner"],
+          locked: false,
+        },
+        {
+          kind: "prof_session_day",
+          id: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+          name: "Foundations Day",
+          product_key: "block-1",
+          path_labels: [
+            "1st Year MBBS",
+            "Prof. Session",
+            "Block 1",
+            "MCQ Bank",
+            "Foundations Day",
+          ],
+          locked: false,
+        },
+      ],
+      yearName: "1st Year MBBS",
+      surface: "library",
+    });
+    assert.equal(mapped[0]!.href, "/academic/block-1/one-liner");
+    assert.equal(mapped[0]!.name, "One Liner");
+    assert.equal(mapped[1]!.kind, "day");
+    assert.match(mapped[1]!.href, /\/academic\/prof-session\/block-1\/mcq-bank\//);
+  });
+
+  it("structural search never matches stems or item text", () => {
+    assert.equal(
+      searchAcademicTreeNames({
+        query: "which of the following",
+        tree,
+      }).length,
+      0
+    );
+  });
+
+  it("treats enrollment/auth RPC errors as compat for fallback", () => {
+    assert.equal(isSearchRpcCompatError("no_active_enrollment"), true);
+    assert.equal(isSearchRpcCompatError("not_authenticated"), true);
+    assert.equal(isSearchRpcCompatError("account_not_eligible"), true);
+    assert.equal(isSearchRpcCompatError("invalid_surface"), true);
+    assert.equal(isSearchRpcCompatError("could not find the function"), true);
   });
 });
 

@@ -58,6 +58,15 @@ export {
 
 export { searchAcademicTreeNames } from "./search.ts";
 
+export {
+  ACADEMIC_SEARCH_KINDS,
+  filterSearchHitsForAccess,
+  isSearchRpcCompatError,
+  mapAcademicSearchRpcRows,
+  resolveAcademicSearchHits,
+  type AcademicSearchRpcRow,
+} from "./search-resolve.ts";
+
 export { hrefForAcademicSearchHit } from "./hit-href.ts";
 
 export { mapRpcTree, productKeyForSubjectName } from "./map-rpc-tree.ts";

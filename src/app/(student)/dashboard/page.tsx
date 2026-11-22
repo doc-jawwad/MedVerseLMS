@@ -38,6 +38,7 @@ import {
   deriveDashboardUpcomingFromCatalog,
   pickIncomingWithState,
 } from "@/lib/dashboard/derive-upcoming-from-catalog";
+import { groupIncomingOpenTests } from "@/lib/dashboard/group-incoming-open-tests";
 import { DashboardLeaderboardSection } from "@/components/dashboard/dashboard-leaderboard-section";
 import { DashboardHistoricalSection } from "@/components/dashboard/dashboard-historical-section";
 import { DashboardPaidSection } from "@/components/dashboard/dashboard-paid-section";
@@ -71,6 +72,8 @@ export default async function DashboardPage() {
     { data: applications },
     { data: grants },
     { data: prepRows },
+    { data: openListGroups },
+    { data: openListPlacements },
   ] = await Promise.all([
     getStudentHasLiveSubscription(),
     supabase
@@ -104,6 +107,15 @@ export default async function DashboardPage() {
       .eq("student_id", userId)
       .eq("grant_type", "test"),
     supabase.rpc("accessible_test_prep"),
+    supabase
+      .from("test_open_list_groups")
+      .select("id, name, sort_order")
+      .eq("year_id", enrollment.year_id)
+      .order("sort_order", { ascending: true }),
+    supabase
+      .from("test_open_list_placements")
+      .select("test_id, group_id, sort_order")
+      .eq("year_id", enrollment.year_id),
   ]);
 
   // Uncapped here: the cap is applied after state classification
@@ -197,6 +209,27 @@ export default async function DashboardPage() {
     incomingTests.map((row) => ({ ...row, opens_at: row.t.opens_at }))
   );
 
+  // Presentation overlay only (Issue 11). Membership still from pickIncomingWithState.
+  const incomingForGrouping = incomingSorted.map((row) => ({
+    ...row,
+    id: row.t.id as string,
+    opens_at: row.t.opens_at as string | null,
+  }));
+  const incomingSections = groupIncomingOpenTests({
+    items: incomingForGrouping,
+    groups: (openListGroups ?? []).map((g) => ({
+      id: g.id as string,
+      name: g.name as string,
+      sort_order: g.sort_order as number,
+    })),
+    placements: (openListPlacements ?? []).map((p) => ({
+      test_id: p.test_id as string,
+      group_id: (p.group_id as string | null) ?? null,
+      sort_order: p.sort_order as number,
+    })),
+  });
+  const showOpenListHeadings = incomingSections.some((s) => s.groupId != null);
+
   const alerts = buildDashboardAlerts({
     accessKind: presentation.accessKind,
     accessBanner: presentation.accessBanner,
@@ -238,74 +271,92 @@ export default async function DashboardPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-3 pt-4">
-          {incomingSorted.length > 0 ? (
-            incomingSorted.map(({ t, state }) => {
-              const subj = t.subjects as unknown as { name: string } | null;
-              const pricing = testPricingLabel(t.entitlement);
-              const isEntitled = entitled.has(t.id);
-              const canStart =
-                state === "in_progress" ||
-                (state === "available" && isEntitled);
-              const canRetake = state === "retake_available" && isEntitled;
-              const showSubscriptionLock =
-                !isEntitled &&
-                state !== "in_progress" &&
-                (state === "locked" ||
-                  state === "available" ||
-                  state === "upcoming");
-              return (
-                <div
-                  key={t.id}
-                  className="grid gap-2 rounded-xl border border-border/80 bg-card/60 p-3.5"
-                >
-                  <div className="flex flex-wrap items-start justify-between gap-2">
-                    <p className="font-heading text-lg font-semibold text-ink">
-                      {displayTestTitle(t.title, pricing)}
-                    </p>
-                    <StatusBadge tone={pricing === "FREE" ? "info" : "muted"}>
-                      {pricing}
-                    </StatusBadge>
-                  </div>
-                  <p className="text-sm text-muted-foreground">
-                    {subj?.name && `${subj.name} · `}
-                    {formatMcqCount(t.question_count)} · {t.duration_minutes}{" "}
-                    minutes
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    {t.opens_at && <>Opens {formatDateTime(t.opens_at)} · </>}
-                    {t.closes_at && <>Closes {formatDateTime(t.closes_at)}</>}
-                  </p>
-                  {state === "upcoming" && t.opens_at && (
-                    <OpensCountdown opensAt={t.opens_at} />
-                  )}
-                  {isEntitled && prepByTest.get(t.id) && (
-                    <div className="rounded-lg border bg-muted/40 p-3">
-                      <p className="mb-1 text-xs font-semibold tracking-wide text-brand-ink uppercase">
-                        Preparation
+          {incomingSections.length > 0 ? (
+            incomingSections.map((section) => (
+              <div key={section.groupId ?? "ungrouped"} className="grid gap-3">
+                {showOpenListHeadings ? (
+                  <h3 className="font-heading text-sm font-semibold tracking-wide text-ink">
+                    {section.title}
+                  </h3>
+                ) : null}
+                {section.items.map(({ t, state }) => {
+                  const subj = t.subjects as unknown as { name: string } | null;
+                  const pricing = testPricingLabel(t.entitlement);
+                  const isEntitled = entitled.has(t.id);
+                  const canStart =
+                    state === "in_progress" ||
+                    (state === "available" && isEntitled);
+                  const canRetake =
+                    state === "retake_available" && isEntitled;
+                  const showSubscriptionLock =
+                    !isEntitled &&
+                    state !== "in_progress" &&
+                    (state === "locked" ||
+                      state === "available" ||
+                      state === "upcoming");
+                  return (
+                    <div
+                      key={t.id}
+                      className="grid gap-2 rounded-xl border border-border/80 bg-card/60 p-3.5"
+                    >
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <p className="font-heading text-lg font-semibold text-ink">
+                          {displayTestTitle(t.title, pricing)}
+                        </p>
+                        <StatusBadge
+                          tone={pricing === "FREE" ? "info" : "muted"}
+                        >
+                          {pricing}
+                        </StatusBadge>
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        {subj?.name && `${subj.name} · `}
+                        {formatMcqCount(t.question_count)} ·{" "}
+                        {t.duration_minutes} minutes
                       </p>
-                      <StudyMarkdown source={prepByTest.get(t.id)!} />
+                      <p className="text-sm text-muted-foreground">
+                        {t.opens_at && (
+                          <>Opens {formatDateTime(t.opens_at)} · </>
+                        )}
+                        {t.closes_at && (
+                          <>Closes {formatDateTime(t.closes_at)}</>
+                        )}
+                      </p>
+                      {state === "upcoming" && t.opens_at && (
+                        <OpensCountdown opensAt={t.opens_at} />
+                      )}
+                      {isEntitled && prepByTest.get(t.id) && (
+                        <div className="rounded-lg border bg-muted/40 p-3">
+                          <p className="mb-1 text-xs font-semibold tracking-wide text-brand-ink uppercase">
+                            Preparation
+                          </p>
+                          <StudyMarkdown source={prepByTest.get(t.id)!} />
+                        </div>
+                      )}
+                      {canStart ? (
+                        <Button asChild className="w-fit" size="sm">
+                          <Link href={`/tests/${t.id}/attempt`}>
+                            {state === "in_progress"
+                              ? "Resume test"
+                              : "Start test"}
+                          </Link>
+                        </Button>
+                      ) : canRetake ? (
+                        <Button asChild className="w-fit" size="sm">
+                          <Link
+                            href={`/tests/${t.id}/attempt?attempt=${(countedByTest.get(t.id) ?? 0) + 1}`}
+                          >
+                            Retake test
+                          </Link>
+                        </Button>
+                      ) : showSubscriptionLock ? (
+                        <ResourceLockNotice />
+                      ) : null}
                     </div>
-                  )}
-                  {canStart ? (
-                    <Button asChild className="w-fit" size="sm">
-                      <Link href={`/tests/${t.id}/attempt`}>
-                        {state === "in_progress" ? "Resume test" : "Start test"}
-                      </Link>
-                    </Button>
-                  ) : canRetake ? (
-                    <Button asChild className="w-fit" size="sm">
-                      <Link
-                        href={`/tests/${t.id}/attempt?attempt=${(countedByTest.get(t.id) ?? 0) + 1}`}
-                      >
-                        Retake test
-                      </Link>
-                    </Button>
-                  ) : showSubscriptionLock ? (
-                    <ResourceLockNotice />
-                  ) : null}
-                </div>
-              );
-            })
+                  );
+                })}
+              </div>
+            ))
           ) : (
             <EmptyState
               title="Nothing incoming right now"

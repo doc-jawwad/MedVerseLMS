@@ -450,6 +450,7 @@ export function ProfSessionDayContentAdmin({
             dayId={dayId}
             linkedPracticeIds={Array.from(selectedPractice)}
             subjects={yearSubjects}
+            preferredSubjectId={subjectId}
             onAttached={(ids) => setSelectedPractice(new Set(ids))}
           />
         )}
