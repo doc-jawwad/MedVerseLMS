@@ -34,4 +34,29 @@ describe("groupTestsPageSection", () => {
     assert.deepEqual(r.sections[0].items.map((i) => i.id), ["b", "a"]);
     assert.deepEqual(r.sections[1].items.map((i) => i.id), ["c"]);
   });
+
+  it("keeps input (descending) order for ungrouped tests beside groups; manual order overrides", () => {
+    const desc = [
+      { id: "a", opens_at: "2026-12-03T00:00:00Z" },
+      { id: "c", opens_at: "2026-12-02T00:00:00Z" },
+      { id: "b", opens_at: "2026-12-01T00:00:00Z" },
+      { id: "d", opens_at: "2026-11-30T00:00:00Z" },
+    ];
+    const groups = [{ id: "g1", name: "G", sort_order: 1 }];
+    const r = groupTestsPageSection({
+      items: desc,
+      groups,
+      placements: [{ test_id: "d", group_id: "g1", sort_order: 1 }],
+    });
+    assert.deepEqual(r.sections[1].items.map((i) => i.id), ["a", "c", "b"]);
+    const m = groupTestsPageSection({
+      items: desc,
+      groups,
+      placements: [
+        { test_id: "d", group_id: "g1", sort_order: 1 },
+        { test_id: "b", group_id: null, sort_order: 1 },
+      ],
+    });
+    assert.deepEqual(m.sections[1].items.map((i) => i.id), ["b", "a", "c"]);
+  });
 });
