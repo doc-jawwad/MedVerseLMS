@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import fs from "node:fs";
 import path from "node:path";
+import { confirmPdfHighlightDeleted } from "../../src/lib/study/pdf-highlight-delete-result.ts";
 import {
   mergeNearbyRects,
   normalizeHighlightRects,
@@ -39,6 +40,23 @@ describe("pdf highlight geometry", () => {
     assert.equal(boxes.length, 1);
     assert.equal(boxes[0].width, 30);
     assert.equal(boxes[0].height, 20);
+  });
+});
+
+describe("PDF highlight delete confirmation", () => {
+  it("accepts a matching deleted-row response", () => {
+    assert.doesNotThrow(() =>
+      confirmPdfHighlightDeleted([{ id: "own" }], "own")
+    );
+  });
+
+  it("rejects zero deleted rows and mismatching returned IDs", () => {
+    assert.throws(() => confirmPdfHighlightDeleted([], "own"), /highlight_not_deleted/);
+    assert.throws(() => confirmPdfHighlightDeleted(null, "own"), /highlight_not_deleted/);
+    assert.throws(() =>
+      confirmPdfHighlightDeleted([{ id: "other" }], "own"),
+      /highlight_not_deleted/
+    );
   });
 });
 
