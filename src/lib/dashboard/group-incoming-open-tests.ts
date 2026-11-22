@@ -115,3 +115,68 @@ export function groupIncomingOpenTests<
 
   return sections;
 }
+
+/**
+ * Tests page overlay (Upcoming / Available sections only). When no item in the
+ * section belongs to a known group the original order is returned untouched
+ * (single untitled section), so ungrouped behavior is unchanged.
+ */
+export function groupTestsPageSection<
+  T extends { id: string; opens_at?: string | null },
+>(args: {
+  items: T[];
+  groups: OpenListGroupMeta[];
+  placements: OpenListPlacementMeta[];
+}): { sections: IncomingOpenListSection<T>[]; showHeadings: boolean } {
+  const sections = groupIncomingOpenTests(args);
+  const showHeadings = sections.some((s) => s.groupId != null);
+  if (!showHeadings) {
+    // No grouped tests here: keep the caller's order, except explicit manual
+    // order on ungrouped placements (group_id null) which still applies.
+    return {
+      sections: [
+        {
+          groupId: null,
+          title: "",
+          items: applyManualOrderKeepingInputOrder(args.items, args.placements),
+        },
+      ],
+      showHeadings: false,
+    };
+  }
+  return {
+    sections: sections.map((s) =>
+      s.groupId == null
+        ? {
+            ...s,
+            items: applyManualOrderKeepingInputOrder(
+              args.items.filter((i) => s.items.some((x) => x.id === i.id)),
+              args.placements
+            ),
+          }
+        : s
+    ),
+    showHeadings,
+  };
+}
+
+/** Items with an explicit manual sort_order first (ascending); the rest keep input order. */
+function applyManualOrderKeepingInputOrder<T extends { id: string }>(
+  items: T[],
+  placements: OpenListPlacementMeta[]
+): T[] {
+  const manual = new Map(
+    placements
+      .filter((p) => p.group_id == null)
+      .map((p) => [p.test_id, p.sort_order] as const)
+  );
+  const withIdx = items.map((item, idx) => ({ item, idx }));
+  withIdx.sort((a, b) => {
+    const ao = manual.get(a.item.id);
+    const bo = manual.get(b.item.id);
+    if (ao != null && bo != null && ao !== bo) return ao - bo;
+    if ((ao != null) !== (bo != null)) return ao != null ? -1 : 1;
+    return a.idx - b.idx;
+  });
+  return withIdx.map((x) => x.item);
+}
