@@ -31,7 +31,7 @@ grant select on curriculum, t_student, t_student_b, t_main, t_zero, t_academic,
 ------------------------------------------------------------------
 select is(
   (select count(*)::int from public.permissions),
-  16,
+  17,
   'all approved permission codes are seeded'
 );
 
@@ -125,7 +125,7 @@ select throws_ok(
 );
 select throws_ok(
   format('update public.profiles set is_main_admin = true where id = %L', (select id from t_student)),
-  'is_main_admin changes require admin',
+  'is_main_admin changes require Main Admin',
   'student cannot set is_main_admin'
 );
 select throws_ok(
