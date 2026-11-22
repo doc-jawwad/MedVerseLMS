@@ -9,6 +9,8 @@ const MESSAGES: Record<string, string> = {
   test_not_found: "That test was not found.",
   "only draft tests can be published":
     "Only draft tests can be published.",
+  test_question_year_mismatch:
+    "Some questions belong to another class/year. Remove or replace them in the draft before publishing.",
 };
 
 /**
