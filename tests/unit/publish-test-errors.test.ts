@@ -29,6 +29,13 @@ describe("publishTestErrorMessage", () => {
     );
   });
 
+  it("explains wrong-year questions without exposing internals", () => {
+    assert.equal(
+      publishTestErrorMessage("test_question_year_mismatch"),
+      "Some questions belong to another class/year. Remove or replace them in the draft before publishing."
+    );
+  });
+
   it("falls back safely for internals", () => {
     assert.equal(
       publishTestErrorMessage(

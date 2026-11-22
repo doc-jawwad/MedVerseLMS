@@ -44,6 +44,8 @@ Checklist order:
 
 Student audience **Neither** is a UI gate on Publish (stay draft); it is not a separate `validate_test` row.
 
+**Question-year consistency (future-prevention guard):** `test_questions` attachment and the `draft → published` status transition enforce `questions.year_id = tests.year_id`. Test audience groups are a presentation overlay, not a substitute for this content invariant. Departmental question subjects may differ from the product Block/clinical `tests.subject_id`, so subject-ID equality is **not** required. A mismatched draft cannot publish even if its links predate the guard; a failed publish rolls back frozen versions. The guard does not change historical published question links, scores or attempts, which require separate reviewed remediation.
+
 **Soft-deleted questions (Content Bin):** a question with `deleted_at is not null` may still appear on a **draft** test (admins can remove it deliberately; there is no automatic detach). It must **not** pass publish: `validate_test` fails “no soft-deleted questions”, and `publish_test` refuses. This is a **prevention rule for future publishing only** — it does not rewrite already-published tests or their frozen history. Hard purge of Bin questions that still have any `test_questions` reference remains blocked (`question_referenced_by_test`); see [database.md](database.md) Content bin retention.
 
 ## Publish = snapshot
