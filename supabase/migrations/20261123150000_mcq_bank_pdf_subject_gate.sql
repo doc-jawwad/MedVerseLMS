@@ -19,7 +19,9 @@
 -- folders (mcq_bank_access_is_subject_level) and enforces the class/year check
 -- (admin_can_access_year) for materials_folder and pearl_point for admins that
 -- hold manage_materials without grant_resource_access (as ospe_station already
--- does). No data rewrite of existing shadow rows (they become inert).
+-- does). Universal career_counseling_series folders (year_id NULL by design)
+-- keep the existing manage_materials / grant_resource_access path and are not
+-- year-scoped. No data rewrite of existing shadow rows (they become inert).
 -- Rollback: docs/validation/mcq-bank-subject-gate-rollback-20261123.sql
 
 -- ---------------------------------------------------------------------------
@@ -302,16 +304,42 @@ begin
     perform public.require_permission('grant_resource_access');
   end if;
 
+  -- Year/class scope for manage_materials-only admins. Career Counseling Series
+  -- folders are universal (year_id NULL by design); they require manage_materials
+  -- or grant_resource_access (checked above) and are not assigned-class scoped.
   if p_kind = 'ospe_station' then
     select year_id into v_year from public.ospe_stations where id = p_id;
+    if v_year is null then
+      raise exception 'resource not found';
+    end if;
+    if public.has_permission('manage_materials')
+       and not public.has_permission('grant_resource_access')
+       and not public.admin_can_access_year(v_year) then
+      raise exception 'permission_denied';
+    end if;
   elsif p_kind = 'materials_folder' then
     select year_id, library_type into v_year, v_library_type
     from public.material_folders where id = p_id;
+    if v_library_type is null then
+      raise exception 'resource not found';
+    end if;
+    if v_library_type = 'career_counseling_series' then
+      if v_year is not null then
+        raise exception 'invalid_ccs_year_scope';
+      end if;
+      -- universal hub: no admin_can_access_year gate
+    else
+      if v_year is null then
+        raise exception 'resource not found';
+      end if;
+      if public.has_permission('manage_materials')
+         and not public.has_permission('grant_resource_access')
+         and not public.admin_can_access_year(v_year) then
+        raise exception 'permission_denied';
+      end if;
+    end if;
   elsif p_kind = 'pearl_point' then
     select year_id into v_year from public.pearl_points where id = p_id;
-  end if;
-
-  if p_kind in ('ospe_station', 'materials_folder', 'pearl_point') then
     if v_year is null then
       raise exception 'resource not found';
     end if;

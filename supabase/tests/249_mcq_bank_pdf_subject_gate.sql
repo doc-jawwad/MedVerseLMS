@@ -1,7 +1,8 @@
 -- Issue #11 / Batch 2: MCQ Bank PDFs follow subject-level authorization (D1a).
+-- Includes CCS universal-folder entitlement regression (NULL year_id).
 -- Synthetic fixtures only; transaction-scoped.
 begin;
-select plan(46);
+select plan(53);
 
 select test_helpers.as_runner();
 select * into temp c1 from test_helpers.make_curriculum();   -- paid subject
@@ -111,6 +112,23 @@ select test_helpers.as_runner();
 -- A year-3 notes folder + pearl for cross-class admin tests
 insert into public.material_folders (id, year_id, name, library_type, content_surface, entitlement)
 values ('c1000000-0000-4000-8000-000000000009', (select y3 from t_y3), 'MCQGATE_Y3_NOTES', 'notes', 'academic', 'free');
+
+-- Universal Career Counseling Series folder (year_id NULL by design)
+insert into public.material_folders
+  (id, year_id, subject_id, name, library_type, content_surface, entitlement, parent_id)
+values
+  ('c1000000-0000-4000-8000-00000000000a', null, null, 'MCQGATE_CCS_UNIVERSAL',
+   'career_counseling_series', 'academic', 'free', null);
+
+-- Year-scoped pearl for class-isolation negative test (subject must share pearl year)
+insert into public.subjects (year_id, name)
+values ((select y3 from t_y3), 'MCQGATE Y3 Pearl Subj');
+insert into public.pearl_points
+  (id, year_id, subject_id, prompt, answer, explanation, entitlement, status)
+values
+  ('c3000000-0000-4000-8000-000000000001', (select y3 from t_y3),
+   (select id from public.subjects where year_id = (select y3 from t_y3) and name = 'MCQGATE Y3 Pearl Subj'),
+   'MCQGATE_Y3_PEARL', 'answer', '', 'free', 'published');
 
 
 -- ===== 1-8: eligible enrolled non-subscriber ===============================
@@ -251,23 +269,45 @@ select test_helpers.as_user((select id from s_free));
 select alike(test_helpers.try_authorize('c2000000-0000-4000-8000-000000000001'), 'DENIED:%',
   '43 subject Paid re-locks MCQ PDF');
 
--- ===== 44-46: grants / security posture ====================================
+-- ===== 44-50: CCS universal + year/pearl negatives + unknown IDs ==========
+select test_helpers.as_user((select id from a_mat));
+select is(test_helpers.try_set_ent('materials_folder', 'c1000000-0000-4000-8000-00000000000a', 'any_subscription'),
+  'OK', '44 Y1-only manage_materials admin can set universal CCS entitlement');
+select is(
+  (select entitlement from public.material_folders
+    where id = 'c1000000-0000-4000-8000-00000000000a'),
+  'any_subscription', '45 CCS entitlement persisted after NULL-year update');
+select test_helpers.as_user((select id from a_main));
+select is(test_helpers.try_set_ent('materials_folder', 'c1000000-0000-4000-8000-00000000000a', 'free'),
+  'OK', '46 main admin can round-trip CCS entitlement back to Free');
+select test_helpers.as_user((select id from a_mat));
+select is(test_helpers.try_set_ent('pearl_point', 'c3000000-0000-4000-8000-000000000001', 'any_subscription'),
+  'permission_denied', '47 manage_materials admin denied on another class pearl');
+select is(test_helpers.try_set_ent('materials_folder', 'c1000000-0000-4000-8000-0000000000ff', 'free'),
+  'resource not found', '48 unknown materials_folder id denied');
+select is(test_helpers.try_set_ent('pearl_point', 'c3000000-0000-4000-8000-0000000000ff', 'free'),
+  'resource not found', '49 unknown pearl_point id denied');
+select test_helpers.as_user((select id from s_free));
+select is(test_helpers.try_set_ent('materials_folder', 'c1000000-0000-4000-8000-00000000000a', 'free'),
+  'permission_denied', '50 student cannot change CCS entitlement');
+
+-- ===== 51-53: grants / security posture ====================================
 select test_helpers.as_runner();
 select is(
   (select count(*)::int from information_schema.routine_privileges
     where specific_schema = 'public' and routine_name = 'set_resource_entitlement'
       and grantee in ('anon', 'PUBLIC')),
-  0, '44 set_resource_entitlement not executable by anon/public');
+  0, '51 set_resource_entitlement not executable by anon/public');
 select is(
   has_function_privilege('authenticated', 'public.accessible_folder_ids_among(uuid[])', 'execute')
     and has_function_privilege('authenticated', 'public.accessible_folder_ids()', 'execute')
     and has_function_privilege('authenticated', 'public.can_access_material_folder(uuid)', 'execute'),
-  true, '45 authenticated keeps execute on the folder access functions');
+  true, '52 authenticated keeps execute on the folder access functions');
 select is(
   (select count(*)::int from public.material_folders
     where library_type = 'mcq_bank' and entitlement = 'free'
       and id in ('c1000000-0000-4000-8000-000000000001', 'c1000000-0000-4000-8000-000000000002')),
-  2, '46 shadow folder rows were not rewritten');
+  2, '53 shadow folder rows were not rewritten');
 
 select * from finish();
 rollback;
