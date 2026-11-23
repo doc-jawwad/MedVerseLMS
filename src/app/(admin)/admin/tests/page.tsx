@@ -146,12 +146,21 @@ export default async function AdminTestsPage({
                           )}
                         </>
                       ) : (
-                        <Link
-                          href={`/admin/tests/${t.id}/results`}
-                          className="text-sm text-muted-foreground hover:underline"
-                        >
-                          Results
-                        </Link>
+                        <>
+                          <Link
+                            href={`/admin/tests/${t.id}`}
+                            className="text-sm text-primary hover:underline"
+                            aria-label={`Manage ${t.title}`}
+                          >
+                            Manage
+                          </Link>
+                          <Link
+                            href={`/admin/tests/${t.id}/results`}
+                            className="text-sm text-muted-foreground hover:underline"
+                          >
+                            Results
+                          </Link>
+                        </>
                       )}
                     </div>
                   </TableCell>
