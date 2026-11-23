@@ -28,10 +28,14 @@ from scope_fixture f cross join public.years y where f.k='test' and y.year_numbe
 insert into public.test_attempts(test_id,student_id,state,expires_at,submitted_at,submit_source,device_id,question_order,score,max_score,percentage,raw_correct,raw_wrong,raw_blank)
 select t.id,s.id,'submitted',now(),now(),'student',gen_random_uuid(),'{}'::uuid[],1,1,100,1,0,0
 from scope_fixture t cross join scope_fixture s where t.k='test' and s.k in ('same','cross');
+create temp table scope_question as
+select test_helpers.make_question(topic_id) as id from test_helpers.make_curriculum();
 insert into public.practice_answers(student_id,question_version_id,selected_key,is_correct,subject_id,chapter_id,topic_id)
 select f.id,qv.id,'A',true,q.subject_id,q.chapter_id,q.topic_id
-from scope_fixture f cross join lateral (select * from public.question_versions limit 1) qv
-join public.questions q on q.id=qv.question_id where f.k in ('same','cross');
+from scope_fixture f cross join scope_question fixture
+join public.questions q on q.id=fixture.id
+join public.question_versions qv on qv.id=q.current_version_id
+where f.k in ('same','cross');
 select set_config('request.jwt.claims',jsonb_build_object('sub',(select id from scope_fixture where k='limited'),'role','authenticated')::text,true);
 set local role authenticated;
 select ok(public.admin_can_read_student_class((select id from scope_fixture where k='same')),'assigned class positive');

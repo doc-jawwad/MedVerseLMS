@@ -348,7 +348,7 @@ select lives_ok(
   '32 update_own_profile'
 );
 select is(
-  (select college_name from public.profiles where id = (select id from t_paid)),
+  (select college_name from public.get_own_profile()),
   'KEMU',
   '33 college persisted'
 );
@@ -359,7 +359,7 @@ select is(
 );
 select lives_ok($$select public.allocate_avatar_object_key()$$, '34 allocate avatar');
 select ok(
-  (select avatar_object_key from public.profiles where id = (select id from t_paid))
+  (select avatar_object_key from public.get_own_profile())
     like 'study-content/avatars/%',
   '35 avatar key prefix'
 );
