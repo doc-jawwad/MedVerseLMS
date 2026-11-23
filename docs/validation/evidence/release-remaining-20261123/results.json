@@ -1,0 +1,449 @@
+{
+  "environment": "staging.medversepk.com",
+  "appSha": "e14b718555c6de88b9b82fa12ecc28eca2c4b0a8",
+  "dbMigration": "20261123150000",
+  "roles": [
+    {
+      "role": "view",
+      "target": "same",
+      "biodata": true,
+      "denied": false,
+      "renderedClass": 1,
+      "analytics": true
+    },
+    {
+      "role": "view",
+      "target": "cross",
+      "biodata": true,
+      "denied": false,
+      "renderedClass": 3,
+      "analytics": true
+    },
+    {
+      "role": "view",
+      "directCrossClassReads": {
+        "profiles": {
+          "status": 200,
+          "rows": 1,
+          "columns": [
+            "id",
+            "email",
+            "college_name",
+            "last_login_at",
+            "avatar_object_key"
+          ]
+        },
+        "enrollments": {
+          "status": 200,
+          "rows": 2,
+          "columns": [
+            "id",
+            "tenant_id",
+            "student_id",
+            "year_id",
+            "status",
+            "approved_by",
+            "approved_at",
+            "expires_at",
+            "created_at",
+            "updated_at"
+          ]
+        },
+        "subscriptions": {
+          "status": 200,
+          "rows": 0,
+          "columns": []
+        },
+        "subscription_applications": {
+          "status": 200,
+          "rows": 0,
+          "columns": []
+        }
+      }
+    },
+    {
+      "role": "restricted",
+      "target": "same",
+      "biodata": false,
+      "denied": false,
+      "renderedClass": null,
+      "analytics": false
+    },
+    {
+      "role": "restricted",
+      "target": "cross",
+      "biodata": false,
+      "denied": false,
+      "renderedClass": null,
+      "analytics": false
+    },
+    {
+      "role": "restricted",
+      "directCrossClassReads": {
+        "profiles": {
+          "status": 200,
+          "rows": 1,
+          "columns": [
+            "id",
+            "email",
+            "college_name",
+            "last_login_at",
+            "avatar_object_key"
+          ]
+        },
+        "enrollments": {
+          "status": 200,
+          "rows": 0,
+          "columns": []
+        },
+        "subscriptions": {
+          "status": 200,
+          "rows": 0,
+          "columns": []
+        },
+        "subscription_applications": {
+          "status": 200,
+          "rows": 0,
+          "columns": []
+        }
+      }
+    },
+    {
+      "role": "analytics",
+      "target": "same",
+      "biodata": false,
+      "denied": false,
+      "renderedClass": null,
+      "analytics": true
+    },
+    {
+      "role": "analytics",
+      "target": "cross",
+      "biodata": false,
+      "denied": false,
+      "renderedClass": null,
+      "analytics": true
+    },
+    {
+      "role": "analytics",
+      "directCrossClassReads": {
+        "profiles": {
+          "status": 200,
+          "rows": 0,
+          "columns": []
+        },
+        "enrollments": {
+          "status": 200,
+          "rows": 0,
+          "columns": []
+        },
+        "subscriptions": {
+          "status": 200,
+          "rows": 0,
+          "columns": []
+        },
+        "subscription_applications": {
+          "status": 200,
+          "rows": 0,
+          "columns": []
+        }
+      }
+    },
+    {
+      "role": "finance",
+      "target": "same",
+      "biodata": false,
+      "denied": false,
+      "renderedClass": 1,
+      "analytics": false
+    },
+    {
+      "role": "finance",
+      "target": "cross",
+      "biodata": false,
+      "denied": false,
+      "renderedClass": 3,
+      "analytics": false
+    },
+    {
+      "role": "finance",
+      "directCrossClassReads": {
+        "profiles": {
+          "status": 200,
+          "rows": 1,
+          "columns": [
+            "id",
+            "email",
+            "college_name",
+            "last_login_at",
+            "avatar_object_key"
+          ]
+        },
+        "enrollments": {
+          "status": 200,
+          "rows": 2,
+          "columns": [
+            "id",
+            "tenant_id",
+            "student_id",
+            "year_id",
+            "status",
+            "approved_by",
+            "approved_at",
+            "expires_at",
+            "created_at",
+            "updated_at"
+          ]
+        },
+        "subscriptions": {
+          "status": 200,
+          "rows": 0,
+          "columns": []
+        },
+        "subscription_applications": {
+          "status": 200,
+          "rows": 0,
+          "columns": []
+        }
+      }
+    },
+    {
+      "role": "subscriptions",
+      "target": "same",
+      "biodata": false,
+      "denied": false,
+      "renderedClass": 1,
+      "analytics": false
+    },
+    {
+      "role": "subscriptions",
+      "target": "cross",
+      "biodata": false,
+      "denied": false,
+      "renderedClass": 3,
+      "analytics": false
+    },
+    {
+      "role": "subscriptions",
+      "directCrossClassReads": {
+        "profiles": {
+          "status": 200,
+          "rows": 1,
+          "columns": [
+            "id",
+            "email",
+            "college_name",
+            "last_login_at",
+            "avatar_object_key"
+          ]
+        },
+        "enrollments": {
+          "status": 200,
+          "rows": 2,
+          "columns": [
+            "id",
+            "tenant_id",
+            "student_id",
+            "year_id",
+            "status",
+            "approved_by",
+            "approved_at",
+            "expires_at",
+            "created_at",
+            "updated_at"
+          ]
+        },
+        "subscriptions": {
+          "status": 200,
+          "rows": 0,
+          "columns": []
+        },
+        "subscription_applications": {
+          "status": 200,
+          "rows": 0,
+          "columns": []
+        }
+      }
+    },
+    {
+      "role": "payment_settings",
+      "target": "same",
+      "biodata": false,
+      "denied": true,
+      "renderedClass": null,
+      "analytics": false
+    },
+    {
+      "role": "payment_settings",
+      "target": "cross",
+      "biodata": false,
+      "denied": true,
+      "renderedClass": null,
+      "analytics": false
+    },
+    {
+      "role": "payment_settings",
+      "directCrossClassReads": {
+        "profiles": {
+          "status": 200,
+          "rows": 0,
+          "columns": []
+        },
+        "enrollments": {
+          "status": 200,
+          "rows": 0,
+          "columns": []
+        },
+        "subscriptions": {
+          "status": 200,
+          "rows": 0,
+          "columns": []
+        },
+        "subscription_applications": {
+          "status": 200,
+          "rows": 0,
+          "columns": []
+        }
+      }
+    },
+    {
+      "role": "none",
+      "target": "same",
+      "biodata": false,
+      "denied": true,
+      "renderedClass": null,
+      "analytics": false
+    },
+    {
+      "role": "none",
+      "target": "cross",
+      "biodata": false,
+      "denied": true,
+      "renderedClass": null,
+      "analytics": false
+    },
+    {
+      "role": "none",
+      "directCrossClassReads": {
+        "profiles": {
+          "status": 200,
+          "rows": 0,
+          "columns": []
+        },
+        "enrollments": {
+          "status": 200,
+          "rows": 0,
+          "columns": []
+        },
+        "subscriptions": {
+          "status": 200,
+          "rows": 0,
+          "columns": []
+        },
+        "subscription_applications": {
+          "status": 200,
+          "rows": 0,
+          "columns": []
+        }
+      }
+    }
+  ],
+  "pdf": [
+    {
+      "name": "ordinary_folder_paid_denies_free_student",
+      "pass": true
+    },
+    {
+      "name": "ordinary_folder_paid_to_free_reentry_without_reload",
+      "pass": true
+    },
+    {
+      "name": "actual_pdf_opened",
+      "pass": true,
+      "detail": {
+        "painted": {
+          "width": 1271,
+          "height": 1645
+        },
+        "responses": [
+          {
+            "url": "/api/study-content/35182e79-9576-4864-8725-7473072427d5",
+            "status": 200
+          },
+          {
+            "url": "/api/study-content/35182e79-9576-4864-8725-7473072427d5",
+            "status": 206
+          },
+          {
+            "url": "/api/study-content/35182e79-9576-4864-8725-7473072427d5",
+            "status": 200
+          },
+          {
+            "url": "/api/study-content/35182e79-9576-4864-8725-7473072427d5",
+            "status": 206
+          },
+          {
+            "url": "/api/study-content/35182e79-9576-4864-8725-7473072427d5",
+            "status": 200
+          },
+          {
+            "url": "/api/study-content/35182e79-9576-4864-8725-7473072427d5",
+            "status": 206
+          }
+        ]
+      }
+    },
+    {
+      "name": "highlight_persists_after_reopen",
+      "pass": true
+    },
+    {
+      "name": "highlight_delete_and_reopen",
+      "pass": true
+    }
+  ],
+  "groups": [
+    {
+      "name": "group_order",
+      "pass": true
+    },
+    {
+      "name": "manual_order",
+      "pass": true
+    },
+    {
+      "name": "ungrouped_nearest_first",
+      "pass": true
+    },
+    {
+      "name": "wrong_year_absent",
+      "pass": true
+    },
+    {
+      "name": "all_five_upcoming",
+      "pass": true
+    }
+  ],
+  "contact": [
+    {
+      "role": "view_students",
+      "pass": true,
+      "contactVisible": true
+    },
+    {
+      "role": "restrict_students",
+      "pass": true,
+      "contactVisible": false
+    },
+    {
+      "role": "view_analytics",
+      "pass": true,
+      "contactVisible": false
+    },
+    {
+      "role": "manage_subscriptions",
+      "pass": true,
+      "contactVisible": false
+    }
+  ]
+}
