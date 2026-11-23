@@ -25,6 +25,7 @@ import {
 } from "@/lib/profile/validation";
 import { getR2Config, presignR2Object, studyContentPrefix } from "@/lib/r2/presign";
 import { avatarProxyUrl } from "@/lib/profile/avatar-url";
+import { authMetadataPatch } from "@/lib/profile/auth-metadata-patch";
 
 type Supabase = Awaited<ReturnType<typeof createClient>>;
 
@@ -191,12 +192,7 @@ async function mergeUserMetadata(
 ): Promise<string | null> {
   const user = await currentUser(supabase);
   if (!user) return "not_authenticated";
-  const next = { ...(user.user_metadata ?? {}) };
-  for (const [k, v] of Object.entries(patch)) {
-    if (v == null || v === "") delete next[k];
-    else next[k] = v;
-  }
-  const { error } = await supabase.auth.updateUser({ data: next });
+  const { error } = await supabase.auth.updateUser({ data: authMetadataPatch(patch) });
   if (error) return error.message;
   return null;
 }
