@@ -79,7 +79,7 @@ export default async function StudentProfilePage({
                 className="h-full w-full object-cover"
               />
             ) : (
-              d.biodata.full_name
+              (d.biodata.full_name ?? "")
                 .split(/\s+/)
                 .slice(0, 2)
                 .map((p) => p[0]?.toUpperCase() ?? "")
@@ -91,29 +91,34 @@ export default async function StudentProfilePage({
               Student 360
             </p>
             <h1 className="text-2xl font-semibold text-[var(--student-ink)]">
-              {d.biodata.full_name}
+              {d.biodata.full_name ?? "Student"}
             </h1>
             <p className="text-sm text-muted-foreground">
-              {d.class.year_name ?? "No class"} ·{" "}
-              {accountStatusLabel(d.biodata.account_status)}
+              {sections.has("class") ? (d.class.year_name ?? "No class") : "—"} ·{" "}
+              {d.biodata.account_status
+                ? accountStatusLabel(d.biodata.account_status)
+                : "—"}
             </p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Leaderboard-safe identity: name, college
-              {d.public_identity.college_name
-                ? ` (${d.public_identity.college_name})`
-                : ""}
-              , avatar — never phone, email, or payment.
-            </p>
+            {sections.has("biodata") && (
+              <p className="mt-1 text-xs text-muted-foreground">
+                Leaderboard-safe identity: name, college
+                {d.public_identity.college_name
+                  ? ` (${d.public_identity.college_name})`
+                  : ""}
+                , avatar — never phone, email, or payment.
+              </p>
+            )}
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {adminHasAny(perms, [
-            "manage_students",
-            "activate_students",
-            "restrict_students",
-            "grant_resource_access",
-            "manage_year_changes",
-          ]) && (
+          {d.biodata.account_status &&
+            adminHasAny(perms, [
+              "manage_students",
+              "activate_students",
+              "restrict_students",
+              "grant_resource_access",
+              "manage_year_changes",
+            ]) && (
             <StudentManageActions
               studentId={id}
               yearId={yearId}
@@ -139,8 +144,8 @@ export default async function StudentProfilePage({
             </CardDescription>
           </CardHeader>
           <CardContent className="grid gap-2 text-sm sm:grid-cols-2">
-            <Row label="Name">{d.biodata.full_name}</Row>
-            <Row label="Email">{d.biodata.email}</Row>
+            <Row label="Name">{d.biodata.full_name ?? "—"}</Row>
+            <Row label="Email">{d.biodata.email ?? "—"}</Row>
             <Row label="Contact">{d.biodata.contact_number ?? "—"}</Row>
             <Row label="College">{d.biodata.college_name ?? "—"}</Row>
             <Row label="LMS access">

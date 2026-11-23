@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import {
@@ -43,6 +44,10 @@ import {
   type NotesPdfMoveDestination,
 } from "@/lib/admin/notes-pdf-move";
 import { filterNotesFolderSubjects } from "@/lib/admin/notes-folder-edit";
+import {
+  SUBJECT_ACCESS_ADMIN_HREF,
+  folderEntitlementIsSubjectLevel,
+} from "@/lib/admin/folder-entitlement-control";
 
 type Year = { id: string; year_number: number; name?: string };
 type Subject = { id: string; name: string; year_id: string };
@@ -271,11 +276,23 @@ function FolderCard({
               </Button>
             </>
           ) : null}
-          <EntitlementSelect
-            kind="materials_folder"
-            id={folder.id}
-            value={folder.entitlement}
-          />
+          {folderEntitlementIsSubjectLevel(libraryType) ? (
+            <p className="text-xs text-muted-foreground">
+              Access follows subject: Free / Paid.{" "}
+              <Link
+                href={SUBJECT_ACCESS_ADMIN_HREF}
+                className="font-medium underline underline-offset-2"
+              >
+                Change it on the subject
+              </Link>
+            </p>
+          ) : (
+            <EntitlementSelect
+              kind="materials_folder"
+              id={folder.id}
+              value={folder.entitlement}
+            />
+          )}
           <Button
             variant="ghost"
             size="sm"
