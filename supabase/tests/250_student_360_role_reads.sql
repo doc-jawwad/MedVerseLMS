@@ -1,7 +1,7 @@
 -- Student 360 least-privilege: which reads each admin role can perform (RLS/RPC), synthetic data.
 -- Mirrors src/lib/admin/student-360/adapter.ts; a failing row here means the section map is wrong.
 begin;
-select plan(12);
+select plan(14);
 select test_helpers.as_runner();
 select * into temp c from test_helpers.make_curriculum();
 select test_helpers.make_student((select year_id from c), 'P Stud') as id into temp s;
@@ -75,11 +75,13 @@ select test_helpers.as_runner();
 select test_helpers.make_student((select id from public.years where year_number = 3), 'P Stud Y3') as id into temp s3;
 grant select on s3 to authenticated;
 select test_helpers.as_user((select id from a_msub));
--- Finance rows ARE year-scoped (subs/apps = 0 for another class). NOTE (pre-existing
--- RLS, not changed here): profiles/enrollments SELECT for manage_subscriptions is not
--- year-scoped, so enroll/profile = 1. Student 360 never exposes biodata for this role.
 select is(test_helpers.probe360((select id from s3)),
-  '{"rpc":false,"apps":0,"subs":0,"enroll":1,"profile":1,"attempts":0,"practice":0}'::jsonb,
-  '12 finance reads are year-scoped; profile/enrollment visibility is pre-existing');
+  '{"rpc":false,"apps":0,"subs":0,"enroll":0,"profile":0,"attempts":0,"practice":0}'::jsonb,
+  '12 finance cannot read cross-class profiles or enrollment history');
+select throws_ok('select email from public.profiles', '42501', null,
+  '13 finance cannot select private profile fields even in class');
+select test_helpers.as_user((select id from a_restr));
+select throws_ok('select * from public.profiles', '42501', null,
+  '14 restricted administrator cannot select a private profile payload');
 select * from finish();
 rollback;

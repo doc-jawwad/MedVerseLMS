@@ -21,7 +21,7 @@ export default async function AdminLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { profile, userId } = await requireAdmin();
+  const { profile } = await requireAdmin();
   const perms = await getAdminPermissionSet();
   const nav = filterAdminNav(perms);
   const [yearList, selectedYearId] = await Promise.all([
@@ -52,7 +52,7 @@ export default async function AdminLayout({
 
   return (
     <div className="flex h-svh overflow-hidden canvas-atmosphere">
-      <SessionWatch userId={userId} />
+      <SessionWatch />
       <aside className="hidden h-full w-64 shrink-0 flex-col overflow-y-auto border-r border-sidebar-border bg-sidebar p-4 text-sidebar-foreground md:flex">
         <div className="mb-6">
           <Logo />

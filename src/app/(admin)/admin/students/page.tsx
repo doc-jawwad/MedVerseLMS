@@ -1,3 +1,4 @@
+import { readDirectoryBiodata } from "@/lib/admin/student-360/read-directory-biodata";
 import { requireAdmin } from "@/lib/auth/require-user";
 import {
   adminHasAny,
@@ -34,9 +35,7 @@ export const metadata = { title: "Students — MedVerse Admin" };
 type ProfileRow = {
   id: string;
   full_name: string | null;
-  email: string | null;
   account_status: string | null;
-  last_login_at: string | null;
   created_at: string;
   enrollments: EnrollmentRow[] | null;
 };
@@ -65,7 +64,7 @@ export default async function StudentsPage({
       .from("profiles")
       .select(
         // Disambiguate: enrollments also has approved_by → profiles (PGRST201).
-        "id, full_name, email, account_status, last_login_at, created_at, enrollments!enrollments_student_id_fkey(id, status, year_id, years(name))"
+        "id, full_name, account_status, created_at, enrollments!enrollments_student_id_fkey(id, status, year_id, years(name))"
       )
       .eq("role", "student")
       .order("full_name", { ascending: true })
@@ -80,13 +79,19 @@ export default async function StudentsPage({
     (liveAttempts ?? []).map((a) => a.student_id as string)
   );
 
+  const eligibleRows = ((profiles ?? []) as ProfileRow[]).filter((p) =>
+    matchesAccountFilter(p.account_status, account)
+  );
+  const canViewBiodata = perms.has("view_students");
+  const biodata = canViewBiodata
+    ? await readDirectoryBiodata(supabase, eligibleRows.map((p) => p.id))
+    : null;
   const term = q?.toLowerCase().trim();
-  const rows = ((profiles ?? []) as ProfileRow[]).filter((p) => {
-    if (!matchesAccountFilter(p.account_status, account)) return false;
+  const rows = eligibleRows.filter((p) => {
     if (!term) return true;
     return (
       p.full_name?.toLowerCase().includes(term) ||
-      p.email?.toLowerCase().includes(term)
+      biodata?.get(p.id)?.email?.toLowerCase().includes(term)
     );
   });
 
@@ -97,7 +102,7 @@ export default async function StudentsPage({
         <form className="flex gap-2">
           <Input
             name="q"
-            placeholder="Search name or email…"
+            placeholder={canViewBiodata ? "Search name or email…" : "Search name…"}
             defaultValue={q ?? ""}
             className="w-full min-w-0 sm:w-64"
           />
@@ -129,7 +134,7 @@ export default async function StudentsPage({
           <TableHeader>
             <TableRow>
               <TableHead>Name</TableHead>
-              <TableHead>Email</TableHead>
+              {canViewBiodata && <TableHead>Email</TableHead>}
               <TableHead>Class</TableHead>
               <TableHead>LMS access</TableHead>
               <TableHead>Registered</TableHead>
@@ -139,7 +144,7 @@ export default async function StudentsPage({
           <TableBody>
             {rows.length === 0 && (
               <TableRow>
-                <TableCell colSpan={6} className="text-center text-muted-foreground">
+                <TableCell colSpan={canViewBiodata ? 6 : 5} className="text-center text-muted-foreground">
                   No students found.
                 </TableCell>
               </TableRow>
@@ -154,7 +159,7 @@ export default async function StudentsPage({
                       {p.full_name}
                     </Link>
                   </TableCell>
-                  <TableCell>{p.email}</TableCell>
+                  {canViewBiodata && <TableCell>{biodata?.get(p.id)?.email ?? "—"}</TableCell>}
                   <TableCell>
                     <div>{classYear}</div>
                     <div className="text-xs text-muted-foreground">

@@ -125,14 +125,9 @@ export function escapeIlikePattern(raw: string): string {
   return raw.replace(/\\/g, "\\\\").replace(/%/g, "\\%").replace(/_/g, "\\_");
 }
 
-/**
- * PostgREST `or` filter for student name/email contains-search.
- * Values are double-quoted so commas/parens in the term do not split the list.
- */
-export function adminStudentNameEmailOrFilter(term: string): string {
-  const pattern = `%${escapeIlikePattern(term)}%`;
-  const quoted = `"${pattern.replace(/"/g, '\\"')}"`;
-  return `full_name.ilike.${quoted},email.ilike.${quoted}`;
+/** Escape LIKE wildcards before querying the safe name column. */
+export function adminStudentNamePattern(term: string): string {
+  return `%${escapeIlikePattern(term)}%`;
 }
 
 export type AdminSubscriptionStudentScope =
@@ -147,7 +142,7 @@ export type AdminSubscriptionStudentScope =
  */
 export function adminSubscriptionStudentScope(opts: {
   searchTerm: string | undefined;
-  /** Profile ids from a name/email query; ignored when there is no search term. */
+  /** Profile ids from a name query; ignored when there is no search term. */
   matchedStudentIds?: string[] | null;
 }): AdminSubscriptionStudentScope {
   if (!opts.searchTerm) {
@@ -169,9 +164,8 @@ export function matchesAdminSubscriptionFilters(opts: {
   displayStatus: string;
   rowStatus: string;
   fullName: string | null | undefined;
-  email: string | null | undefined;
   /**
-   * When true, name/email were already applied via DB student-id scope —
+   * When true, name were already applied via DB student-id scope —
    * only status filters run here.
    */
   searchAppliedInQuery?: boolean;
@@ -183,8 +177,5 @@ export function matchesAdminSubscriptionFilters(opts: {
   if (opts.searchAppliedInQuery) return true;
   const term = opts.searchTerm?.toLowerCase().trim();
   if (!term) return true;
-  return Boolean(
-    opts.fullName?.toLowerCase().includes(term) ||
-      opts.email?.toLowerCase().includes(term)
-  );
+  return Boolean(opts.fullName?.toLowerCase().includes(term));
 }

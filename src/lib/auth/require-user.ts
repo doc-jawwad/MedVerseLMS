@@ -14,10 +14,8 @@ import { ssrSpan } from "@/lib/observability/ssr-timing-rsc";
 export type SessionProfile = {
   id: string;
   full_name: string;
-  email: string;
   role: "admin" | "student";
   account_status: AccountStatus;
-  active_session_id: string | null;
   is_main_admin: boolean;
 };
 
@@ -55,29 +53,30 @@ export const requireUser = cache(async function requireUser() {
   const userId = claims.sub as string;
   const sessionId = (claims.session_id as string | undefined) ?? null;
 
-  const { data: profile } = await ssrSpan("auth.profiles", () =>
-    supabase
-      .from("profiles")
-      .select(
-        "id, full_name, email, role, account_status, active_session_id, is_main_admin"
-      )
-      .eq("id", userId)
-      .single()
-  );
+  const [{ data: profile }, { data: sessionReplaced, error: sessionError }] = await Promise.all([
+    ssrSpan("auth.profiles", () =>
+      supabase
+        .from("profiles")
+        .select("id, full_name, role, account_status, is_main_admin")
+        .eq("id", userId)
+        .single()
+    ),
+    ssrSpan("auth.session_replaced", () =>
+      supabase.rpc("current_session_id", { p_require_token_session: false })
+    ),
+  ]);
 
-  if (!profile) redirect("/login");
+  if (!profile || sessionError) redirect("/login");
 
   const sessionProfile: SessionProfile = {
     id: profile.id,
     full_name: profile.full_name,
-    email: profile.email,
     role: profile.role,
     account_status: profile.account_status,
-    active_session_id: profile.active_session_id,
     is_main_admin: Boolean(profile.is_main_admin),
   };
 
-  if (sessionProfile.active_session_id && sessionProfile.active_session_id !== sessionId) {
+  if (sessionReplaced) {
     const { data: exempt } = await ssrSpan("auth.session_kick_check", () =>
       supabase.rpc("owns_live_attempt_session")
     );

@@ -215,33 +215,24 @@ export async function promoteStudentToAdmin(input: {
   const mainGate = requireMainAdminForFullAccess(gate, input.makeMainAdmin);
   if (mainGate) return { error: mainGate };
 
-  const { data: matches, error: lookupError } = await gate.supabase
-    .from("profiles")
-    .select("id, role, email")
-    .ilike("email", email)
-    .limit(3);
-  if (lookupError) return clientActionFailed("promoteStudentToAdmin.lookup", lookupError);
-  const exact = (matches ?? []).filter(
-    (p) => (p.email ?? "").toLowerCase() === email
+  const { data: promotedId, error: promotionError } = await gate.supabase.rpc(
+    "set_admin_role",
+    { p_email: email }
   );
-  if (exact.length === 0) return { error: "profile not found" };
-  if (exact.length > 1) {
-    return { error: "More than one profile uses that email. Promote is not safe." };
+  if (promotionError || typeof promotedId !== "string") {
+    if (promotionError?.message === "profile not found") return { error: "profile not found" };
+    if (promotionError?.message === "ambiguous profile email") {
+      return { error: "More than one profile uses that email. Promote is not safe." };
+    }
+    if (promotionError?.message === "That account is already an admin.") {
+      return { error: promotionError.message };
+    }
+    return clientActionFailed("admins.promote", promotionError);
   }
-  const profile = exact[0];
-  if (profile.role === "admin") {
-    return { error: "That account is already an admin." };
-  }
-
-  const promoted = await gate.supabase.rpc("set_admin_role", {
-    p_user_id: profile.id,
-    p_is_admin: true,
-  });
-  if (promoted.error) return clientActionFailed("admins.promote", promoted.error);
 
   if (input.makeMainAdmin) {
     const main = await gate.supabase.rpc("set_main_admin", {
-      p_user_id: profile.id,
+      p_user_id: promotedId,
       p_is_main: true,
     });
     if (main.error) {
@@ -249,7 +240,7 @@ export async function promoteStudentToAdmin(input: {
       return clientActionFailed("admins.setMain", main.error);
     }
   } else {
-    const grantError = await grantCodes(gate.supabase, profile.id, codes);
+    const grantError = await grantCodes(gate.supabase, promotedId, codes);
     if (grantError) {
       revalidateAdmins();
       return { error: grantError };
@@ -257,7 +248,7 @@ export async function promoteStudentToAdmin(input: {
   }
 
   revalidateAdmins();
-  return { id: profile.id };
+  return { id: promotedId };
 }
 
 export async function setAdminPermissions(

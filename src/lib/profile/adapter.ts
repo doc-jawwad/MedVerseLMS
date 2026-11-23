@@ -151,10 +151,8 @@ async function buildProfile(
 ): Promise<StudentProfile | null> {
   const [{ data: row }, user, enrollment] = await Promise.all([
     supabase
-      .from("profiles")
-      .select("id, full_name, email, college_name, avatar_object_key")
-      .eq("id", userId)
-      .maybeSingle(),
+      .rpc("get_own_profile")
+      .maybeSingle<Pick<StudentProfile, "id" | "full_name" | "email" | "college_name" | "avatar_object_key">>(),
     currentUser(supabase),
     loadEnrollment(supabase, userId),
   ]);

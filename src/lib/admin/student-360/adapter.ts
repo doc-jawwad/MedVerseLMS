@@ -37,6 +37,9 @@ type AdminProfileRpc = {
     full_name: string;
     email: string;
     last_login_at: string | null;
+    college_name: string | null;
+    avatar_object_key: string | null;
+    account_status: string | null;
   };
   enrollment: {
     status: string;
@@ -127,14 +130,10 @@ export function createAdminStudentDetailAdapter(
         canBiodata
           ? sb.rpc("admin_student_profile", { p_student_id: studentId })
           : Promise.resolve({ data: null, error: null }),
-        canStatus
+        canStatus && !canBiodata
           ? sb
               .from("profiles")
-              .select(
-                canBiodata
-                  ? "account_status, college_name, avatar_object_key"
-                  : "full_name, account_status"
-              )
+              .select("full_name, account_status")
               .eq("id", studentId)
               .maybeSingle()
           : Promise.resolve({ data: null, error: null }),
@@ -269,38 +268,18 @@ export function createAdminStudentDetailAdapter(
         subscriptionYearName: yearName,
       });
 
-      const profileRow = (accountRow ?? null) as {
-        full_name?: string | null;
-        account_status?: string | null;
-        college_name?: string | null;
-        avatar_object_key?: string | null;
-      } | null;
+      const profileRow = canBiodata ? p?.profile : accountRow;
+      const avatarKey = p?.profile?.avatar_object_key ?? null;
       const biodata = {
-        full_name: canBiodata
-          ? (p?.profile?.full_name ?? null)
-          : (profileRow?.full_name ?? null),
-        email: canBiodata ? (p?.profile?.email ?? null) : null,
+        full_name: profileRow?.full_name ?? null,
+        email: p?.profile?.email ?? null,
         contact_number: null as string | null,
-        college_name: null as string | null,
-        avatar_object_key: null as string | null,
-        avatar_url: null as string | null,
-        last_login_at: canBiodata ? (p?.profile?.last_login_at ?? null) : null,
-        // Never default to "active": unreadable status stays null ("—").
+        college_name: p?.profile?.college_name ?? null,
+        avatar_object_key: avatarKey,
+        avatar_url: avatarKey ? avatarProxyUrl(studentId, avatarKey) : null,
+        last_login_at: p?.profile?.last_login_at ?? null,
         account_status: canStatus ? (profileRow?.account_status ?? null) : null,
       };
-
-      if (canBiodata && profileRow) {
-        if (typeof profileRow.college_name === "string") {
-          biodata.college_name = profileRow.college_name;
-        }
-        if (typeof profileRow.avatar_object_key === "string") {
-          biodata.avatar_object_key = profileRow.avatar_object_key;
-          biodata.avatar_url = avatarProxyUrl(
-            studentId,
-            profileRow.avatar_object_key
-          );
-        }
-      }
 
       // Signup contact lives in Auth metadata. The service-role lookup runs
       // only for view_students holders (canReadBiodata), server-side, and
