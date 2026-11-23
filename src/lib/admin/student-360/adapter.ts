@@ -25,6 +25,10 @@ import {
 } from "@/lib/admin/student-account-ui";
 import { subscriptionIsLiveAt } from "@/lib/subscriptions/student-status";
 import { avatarProxyUrl } from "@/lib/profile/avatar-url";
+import {
+  fetchAllPages,
+  unavailableSections,
+} from "@/lib/admin/student-360/read-status";
 
 type Supabase = Awaited<ReturnType<typeof createClient>>;
 
@@ -103,14 +107,14 @@ export function createAdminStudentDetailAdapter(
 
       const [
         { data: rpcData, error: rpcError },
-        { data: accountRow },
-        { data: enrollmentRows },
-        { count: liveExamCount },
-        { data: recentTests },
-        { data: practiceRows },
-        { data: apps },
-        { data: subs },
-        { data: attemptStatRows },
+        { data: accountRow, error: accountError },
+        { data: enrollmentRows, error: enrollmentError },
+        { count: liveExamCount, error: liveExamError },
+        { data: recentTests, error: recentTestsError },
+        practicePages,
+        { data: apps, error: appsError },
+        { data: subs, error: subsError },
+        attemptStatPages,
       ] = await Promise.all([
         canBiodata
           ? sb.rpc("admin_student_profile", { p_student_id: studentId })
@@ -125,19 +129,19 @@ export function createAdminStudentDetailAdapter(
               )
               .eq("id", studentId)
               .maybeSingle()
-          : Promise.resolve({ data: null }),
+          : Promise.resolve({ data: null, error: null }),
         canClass
           ? sb
               .from("enrollments")
               .select("id, status, year_id, years(name)")
               .eq("student_id", studentId)
-          : Promise.resolve({ data: [] as never[] }),
+          : Promise.resolve({ data: [] as never[], error: null }),
         sb
           .from("test_attempts")
           .select("id", { count: "exact", head: true })
           .eq("student_id", studentId)
           .eq("state", "in_progress")
-          .then((r) => ({ count: r.count })),
+          .then((r) => ({ count: r.count, error: r.error })),
         visible.includes("test_history") || visible.includes("analytics")
           ? sb
               .from("test_attempts")
@@ -149,11 +153,19 @@ export function createAdminStudentDetailAdapter(
               .limit(25)
           : Promise.resolve({ data: [] as never[], error: null }),
         visible.includes("practice")
-          ? sb
-              .from("practice_answers")
-              .select("id, is_correct, subject_id")
-              .eq("student_id", studentId)
-          : Promise.resolve({ data: [] as never[], error: null }),
+          ? fetchAllPages<{
+              id: string;
+              is_correct: boolean | null;
+              subject_id: string | null;
+            }>((from, to) =>
+              sb
+                .from("practice_answers")
+                .select("id, is_correct, subject_id")
+                .eq("student_id", studentId)
+                .order("id")
+                .range(from, to)
+            )
+          : Promise.resolve({ ok: true, data: [] as never[] }),
         visible.includes("subscription") || visible.includes("payment_history")
           ? sb
               .from("subscription_applications")
@@ -177,12 +189,19 @@ export function createAdminStudentDetailAdapter(
         // Analytics-only viewers cannot call admin_student_profile: compute the
         // same aggregates (submitted attempts) from RLS-readable rows instead.
         needsAttemptStats
-          ? sb
-              .from("test_attempts")
-              .select("percentage, submitted_at")
-              .eq("student_id", studentId)
-              .eq("state", "submitted")
-          : Promise.resolve({ data: [] as never[], error: null }),
+          ? fetchAllPages<{
+              percentage: number | null;
+              submitted_at: string | null;
+            }>((from, to) =>
+              sb
+                .from("test_attempts")
+                .select("percentage, submitted_at")
+                .eq("student_id", studentId)
+                .eq("state", "submitted")
+                .order("id")
+                .range(from, to)
+            )
+          : Promise.resolve({ ok: true, data: [] as never[] }),
       ]);
 
       if (rpcError) return { ok: false, error: rpcError.message };
@@ -190,9 +209,22 @@ export function createAdminStudentDetailAdapter(
       if (canBiodata && !p?.profile) {
         return { ok: false, error: "not_found", notFound: true };
       }
-      if (!canBiodata && canStatus && !accountRow) {
+      // A failed read is "unavailable", never "not found" or a zero/empty value.
+      if (!canBiodata && canStatus && !accountError && !accountRow) {
         return { ok: false, error: "not_found", notFound: true };
       }
+      const appsOrSubsFailed = Boolean(appsError || subsError);
+      const unavailable = unavailableSections(visible, {
+        account_status: Boolean(accountError),
+        class: Boolean(enrollmentError),
+        test_history: Boolean(recentTestsError),
+        analytics: needsAttemptStats && !attemptStatPages.ok,
+        practice: !practicePages.ok,
+        subscription: appsOrSubsFailed,
+        payment_history: appsOrSubsFailed,
+      });
+      const practiceRows = practicePages.data;
+      const attemptStatRows = attemptStatPages.data;
 
       const liveClass = pickLiveEnrollment(
         (enrollmentRows ?? []) as {
@@ -418,6 +450,10 @@ export function createAdminStudentDetailAdapter(
           year_name: yearName,
           enrollment_status: classStatus,
           lock,
+          lock_known:
+            visible.includes("subscription") &&
+            !appsOrSubsFailed &&
+            !enrollmentError,
         },
         subscription,
         test_history,
@@ -429,8 +465,11 @@ export function createAdminStudentDetailAdapter(
           subject_name: a.subject_name,
           granted: a.practice_granted,
         })),
-        has_in_progress_exam: (liveExamCount ?? 0) > 0,
+        // Unknown (read failed) is treated as "in progress" so admin actions
+        // that must not interrupt a live exam stay cautious.
+        has_in_progress_exam: liveExamError ? true : (liveExamCount ?? 0) > 0,
         visible_sections: visible,
+        unavailable_sections: unavailable,
       };
 
       return { ok: true, data: detail };

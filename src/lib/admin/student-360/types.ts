@@ -57,6 +57,8 @@ export type AdminStudentDetail = {
     year_name: string | null;
     enrollment_status: string | null;
     lock: ClassLockState;
+    /** false when subscription data was not read; lock is then not shown. */
+    lock_known: boolean;
   };
   subscription: AdminStudentSubscriptionSnapshot | null;
   test_history: TestHistoryItem[];
@@ -67,6 +69,8 @@ export type AdminStudentDetail = {
   has_in_progress_exam: boolean;
   /** Which sections the caller may view. */
   visible_sections: AdminStudent360Section[];
+  /** Visible sections whose data could not be read (shown as unavailable). */
+  unavailable_sections: AdminStudent360Section[];
 };
 
 export type AdminStudentDetailResult =

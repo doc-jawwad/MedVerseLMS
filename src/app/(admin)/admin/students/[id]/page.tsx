@@ -59,7 +59,11 @@ export default async function StudentProfilePage({
   }
 
   const d = result.data;
-  const sections = new Set(d.visible_sections);
+  const unavailable = new Set(d.unavailable_sections);
+  // Sections whose read failed are not rendered with empty/zero data.
+  const sections = new Set(
+    d.visible_sections.filter((s) => !unavailable.has(s))
+  );
   const yearId = d.class.year_id;
   const hasActiveClass = Boolean(
     d.class.enrollment_status === "active" ||
@@ -134,6 +138,17 @@ export default async function StudentProfilePage({
         </div>
       </div>
 
+      {unavailable.size > 0 && (
+        <div
+          role="alert"
+          className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm"
+        >
+          Some information could not be loaded and is hidden rather than shown
+          as empty: {[...unavailable].map((u) => u.replace(/_/g, " ")).join(", ")}.
+          Reload to retry.
+        </div>
+      )}
+
       {sections.has("biodata") && (
         <Card>
           <CardHeader>
@@ -175,14 +190,16 @@ export default async function StudentProfilePage({
             <CardTitle className="text-base">Class</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-3 text-sm">
-            <div className="rounded-md border border-border bg-muted/40 p-3">
-              <Badge variant="outline">
-                {classLockBadgeLabel(d.class.lock.lock)}
-              </Badge>
-              <p className="mt-2 font-medium text-[var(--student-ink)]">
-                {classLockHeadline(d.class.lock)}
-              </p>
-            </div>
+            {d.class.lock_known && (
+              <div className="rounded-md border border-border bg-muted/40 p-3">
+                <Badge variant="outline">
+                  {classLockBadgeLabel(d.class.lock.lock)}
+                </Badge>
+                <p className="mt-2 font-medium text-[var(--student-ink)]">
+                  {classLockHeadline(d.class.lock)}
+                </p>
+              </div>
+            )}
             <Row label="Year">{d.class.year_name ?? "—"}</Row>
             <Row label="Class status">
               <Badge variant="outline">
