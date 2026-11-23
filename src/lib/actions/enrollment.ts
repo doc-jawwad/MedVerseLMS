@@ -144,6 +144,8 @@ export async function setResourceEntitlement(
     p_entitlement: entitlement,
     p_required_plan_id: requiredPlanId ?? null,
   });
+  if (error) return actionRpcResult("action", error);
+
   revalidatePath("/admin/students");
   revalidatePath("/admin/materials");
   revalidatePath("/admin/free-resources");
@@ -157,5 +159,12 @@ export async function setResourceEntitlement(
   revalidatePath("/one-liner");
   revalidatePath("/pearl-points");
   revalidatePath("/free-resources");
-  return actionRpcResult("action", error);
+  // The student Academic tree uses nested pages, not the legacy /materials
+  // route. Revalidate those exact route patterns after an entitlement change.
+  revalidatePath("/academic/[block]", "page");
+  revalidatePath("/academic/[block]/[category]", "page");
+  revalidatePath("/academic/[block]/[category]/f/[folderId]", "page");
+  revalidatePath("/academic/[block]/[category]/f/[folderId]/sf/[subfolderId]", "page");
+  revalidatePath("/free-resources/[type]", "page");
+  return actionRpcResult("action", null);
 }
