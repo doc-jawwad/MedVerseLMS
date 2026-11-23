@@ -102,7 +102,8 @@ export const STUDENT_360_ADMIT_PERMISSIONS = [
  * - account_status: roles that can read profiles
  * - class: roles that can read enrollments
  * - analytics / test_history / practice: view_students or view_analytics
- * - subscription / payment_history: subscription roles only
+ * - subscription (live status): manage_subscriptions (reads `subscriptions`)
+ * - payment_history: either subscription role (shows only the rows it can read)
  */
 export function student360SectionsForPermissions(
   perms: ReadonlySet<string>
@@ -130,6 +131,9 @@ export function student360SectionsForPermissions(
   if (canProfiles) sections.push("account_status");
   if (canEnrollments) sections.push("class");
   if (canStats) sections.push("test_history", "analytics", "practice");
-  if (canSubs) sections.push("subscription", "payment_history");
+  // RLS: manage_subscriptions reads `subscriptions`; review_subscription_
+  // applications reads `subscription_applications`. Neither reads the other.
+  if (perms.has("manage_subscriptions")) sections.push("subscription");
+  if (canSubs) sections.push("payment_history");
   return sections;
 }

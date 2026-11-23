@@ -104,6 +104,14 @@ export function createAdminStudentDetailAdapter(
       const canStatus = visible.includes("account_status");
       const canClass = visible.includes("class");
       const needsAttemptStats = !canBiodata && visible.includes("analytics");
+      // RLS: applications need review_subscription_applications, subscriptions
+      // need manage_subscriptions. Never query a table the role cannot read
+      // (RLS would return zero rows that look like "no subscription").
+      const wantsFinance =
+        visible.includes("subscription") || visible.includes("payment_history");
+      const canReadApps =
+        wantsFinance && perms.has("review_subscription_applications");
+      const canReadSubs = wantsFinance && perms.has("manage_subscriptions");
 
       const [
         { data: rpcData, error: rpcError },
@@ -166,7 +174,7 @@ export function createAdminStudentDetailAdapter(
                 .range(from, to)
             )
           : Promise.resolve({ ok: true, data: [] as never[] }),
-        visible.includes("subscription") || visible.includes("payment_history")
+        canReadApps
           ? sb
               .from("subscription_applications")
               .select(
@@ -176,7 +184,7 @@ export function createAdminStudentDetailAdapter(
               .order("created_at", { ascending: false })
               .limit(40)
           : Promise.resolve({ data: [] as never[], error: null }),
-        visible.includes("subscription") || visible.includes("payment_history")
+        canReadSubs
           ? sb
               .from("subscriptions")
               .select(
@@ -330,7 +338,7 @@ export function createAdminStudentDetailAdapter(
             ? "Active"
             : pendingApp
               ? "Pending application"
-              : "None",
+              : "No live subscription",
           plan_name: planName,
           starts_at: activeSub?.starts_at ?? null,
           ends_at: activeSub?.ends_at ?? null,
@@ -450,8 +458,11 @@ export function createAdminStudentDetailAdapter(
           year_name: yearName,
           enrollment_status: classStatus,
           lock,
+          // Lock needs enrollments + live subscription + pending application.
           lock_known:
-            visible.includes("subscription") &&
+            canClass &&
+            canReadSubs &&
+            canReadApps &&
             !appsOrSubsFailed &&
             !enrollmentError,
         },

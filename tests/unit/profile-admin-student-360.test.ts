@@ -202,16 +202,19 @@ describe("admin student 360 section permissions", () => {
     ]);
   });
 
-  it("finance roles: class + subscription + payments only", () => {
+  it("finance roles follow the table each permission can read", () => {
     for (const p of ["manage_subscriptions", "review_subscription_applications"]) {
       const s = secs(p);
-      assert.ok(s.includes("subscription"), p);
       assert.ok(s.includes("payment_history"), p);
       assert.equal(s.includes("biodata"), false, p);
       assert.equal(s.includes("analytics"), false, p);
       assert.equal(s.includes("account_status"), false, p);
     }
+    // manage_subscriptions reads subscriptions + enrollments; review reads
+    // applications only (verified against RLS in pgTAP 250).
+    assert.ok(secs("manage_subscriptions").includes("subscription"));
     assert.ok(secs("manage_subscriptions").includes("class"));
+    assert.equal(secs("review_subscription_applications").includes("subscription"), false);
     assert.equal(secs("review_subscription_applications").includes("class"), false);
   });
 
