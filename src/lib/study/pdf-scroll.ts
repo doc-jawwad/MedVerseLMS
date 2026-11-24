@@ -95,3 +95,92 @@ export async function measurePageBases(
   );
   return out;
 }
+
+
+/** Keep the same logical page and fractional position as estimated dimensions
+ * become exact (or zoom changes). Preserve the small gap between pages. */
+export function remapPdfScrollTop(
+  oldTops: readonly number[],
+  oldHeights: readonly number[],
+  newTops: readonly number[],
+  newHeights: readonly number[],
+  scrollTop: number
+): number {
+  if (!oldTops.length || oldTops.length !== newTops.length) return scrollTop;
+  const i = pageAtScrollTop(oldTops, scrollTop, 0) - 1;
+  const offset = scrollTop - oldTops[i];
+  const oldHeight = oldHeights[i];
+  const newHeight = newHeights[i];
+  if (!(oldHeight > 0) || !(newHeight > 0)) return scrollTop;
+  const nextOffset = offset < 0 ? offset
+    : offset > oldHeight ? newHeight + offset - oldHeight
+    : offset * newHeight / oldHeight;
+  return Math.max(0, newTops[i] + nextOffset);
+}
+
+type MeasureSubscriber = {
+  resolve: (value: PdfPageBaseSize | undefined) => void;
+  signal: AbortSignal;
+  abort: () => void;
+};
+type MeasureJob = { page: number; running: boolean; subscribers: Set<MeasureSubscriber> };
+
+/** Only measure pages requested near the viewport. Bound simultaneous work,
+ * share in-flight reads, and discard queued work when a page leaves view. */
+export function createPdfPageMeasureQueue(doc: PdfDocLike, concurrency = 4) {
+  const jobs = new Map<number, MeasureJob>();
+  const cache = new Map<number, PdfPageBaseSize>();
+  let active = 0;
+  const limit = Math.max(1, Math.floor(concurrency));
+
+  function pump() {
+    for (const job of jobs.values()) {
+      if (active >= limit) break;
+      if (job.running || !job.subscribers.size) continue;
+      job.running = true;
+      active++;
+      void (async () => {
+        let value: PdfPageBaseSize | undefined;
+        try {
+          const page = await doc.getPage(job.page);
+          const { width, height } = page.getViewport({ scale: 1 });
+          value = { width, height };
+          cache.set(job.page, value);
+        } catch {
+          // A failed page remains a placeholder; revisiting can retry.
+        } finally {
+          jobs.delete(job.page);
+          active--;
+          for (const sub of job.subscribers) {
+            sub.signal.removeEventListener("abort", sub.abort);
+            sub.resolve(sub.signal.aborted ? undefined : value);
+          }
+          pump();
+        }
+      })();
+    }
+  }
+
+  return (page: number, signal: AbortSignal): Promise<PdfPageBaseSize | undefined> => {
+    if (signal.aborted || page < 1 || page > doc.numPages) return Promise.resolve(undefined);
+    const cached = cache.get(page);
+    if (cached) return Promise.resolve(cached);
+    let job = jobs.get(page);
+    if (!job) {
+      job = { page, running: false, subscribers: new Set() };
+      jobs.set(page, job);
+    }
+    const entry = job;
+    return new Promise((resolve) => {
+      const sub: MeasureSubscriber = { resolve, signal, abort: () => {
+        entry.subscribers.delete(sub);
+        signal.removeEventListener("abort", sub.abort);
+        if (!entry.running && !entry.subscribers.size) jobs.delete(page);
+        resolve(undefined);
+      } };
+      entry.subscribers.add(sub);
+      signal.addEventListener("abort", sub.abort, { once: true });
+      pump();
+    });
+  };
+}

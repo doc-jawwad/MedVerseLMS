@@ -39,6 +39,7 @@ import {
   type PdfHighlightRow,
 } from "@/lib/study/pdf-highlights";
 import { clampPage } from "@/lib/study/pdf-page-clamp";
+import { readPdfOutline } from "@/lib/study/pdf-outline";
 import {
   createDebouncedPageSaver,
   loadPdfReadingPage,
@@ -53,9 +54,9 @@ import {
 } from "@/lib/study/pdf-viewer-constants";
 import {
   isSafePdfFixtureUrl,
-  measurePageBases,
+  createPdfPageMeasureQueue,
   pageAtScrollTop,
-  scrollTopAfterZoom,
+  remapPdfScrollTop,
   type PdfPageBaseSize,
 } from "@/lib/study/pdf-scroll";
 import { PdfPageSlot, type PdfPageViewport } from "./pdf-page-slot";
@@ -103,7 +104,17 @@ export function PdfViewer({
 }) {
   const columnRef = useRef<HTMLDivElement>(null);
   const viewportsRef = useRef(new Map<number, PdfPageViewport>());
-  const prevScaleRef = useRef<number | null>(null);
+  const pageMeasureRef = useRef<{
+    gen: number;
+    measure: ReturnType<typeof createPdfPageMeasureQueue>;
+  } | null>(null);
+  const layoutRef = useRef<{
+    doc: PdfDocument;
+    tops: number[];
+    heights: number[];
+    scale: number;
+  } | null>(null);
+  const scrollPositionRef = useRef(0);
   const containerRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const pdfRef = useRef<PdfDocument | null>(null);
@@ -133,8 +144,8 @@ export function PdfViewer({
     width: 612,
     height: 792,
   });
-  /** Per-page size at scale 1 — never assume every page matches page 1. */
-  const [pageBases, setPageBases] = useState<PdfPageBaseSize[]>([]);
+  /** Undefined entries use provisional layout only; never paint an estimated page. */
+  const [pageBases, setPageBases] = useState<Array<PdfPageBaseSize | undefined>>([]);
   const [page, setPage] = useState(1);
   const [pageCount, setPageCount] = useState(0);
   const [scale, setScale] = useState(1);
@@ -197,6 +208,25 @@ export function PdfViewer({
     }
   }, []);
 
+  const measureVisiblePage = useCallback(async (
+    owner: PdfDocument, pageNumber: number, signal: AbortSignal
+  ) => {
+    const queue = pageMeasureRef.current;
+    if (!queue || pdfRef.current !== owner || queue.gen !== loadGenRef.current) return;
+    const base = await queue.measure(pageNumber, signal);
+    if (!base || signal.aborted || pdfRef.current !== owner ||
+        queue.gen !== loadGenRef.current) return;
+    // Capture live scroll before changing layout; intervening scroll events
+    // and explicit navigation also update this position.
+    if (scrollRef.current) scrollPositionRef.current = scrollRef.current.scrollTop;
+    setPageBases((prev) => {
+      if (pageNumber < 1 || pageNumber > prev.length || prev[pageNumber - 1]) return prev;
+      const next = prev.slice();
+      next[pageNumber - 1] = base;
+      return next;
+    });
+  }, []);
+
   const registerViewport = useCallback(
     (pageNumber: number, viewport: PdfPageViewport | null) => {
       if (viewport) viewportsRef.current.set(pageNumber, viewport);
@@ -219,6 +249,8 @@ export function PdfViewer({
     async (opts: { preferOffline: boolean }) => {
       const gen = ++loadGenRef.current;
       setLoading(true);
+      setOutline([]);
+      setShowOutline(false);
       setError(null);
       setUsingOffline(false);
       try {
@@ -357,7 +389,10 @@ export function PdfViewer({
 
         loadingTaskRef.current?.destroy().catch(() => undefined);
         loadingTaskRef.current = loadingTask;
-        const doc = await loadingTask.promise;
+        const [doc, saved] = await Promise.all([
+          loadingTask.promise,
+          loadPdfReadingPage(materialId),
+        ]);
         if (gen !== loadGenRef.current) {
           doc.destroy().catch(() => undefined);
           return;
@@ -366,32 +401,27 @@ export function PdfViewer({
         pdfRef.current = doc;
         viewportsRef.current.clear();
         setPageCount(doc.numPages);
-        const saved = await loadPdfReadingPage(materialId);
-        if (gen !== loadGenRef.current) return;
+        // Read only the resume target's exact geometry before mounting.
         const startPage = clampPage(saved ?? 1, doc.numPages);
-
-        // Measure every page before mounting the column so mixed page sizes
-        // do not shift scroll position / resume targets when canvases paint.
-        const bases = await measurePageBases(doc);
+        const startViewport = (await doc.getPage(startPage)).getViewport({ scale: 1 });
         if (gen !== loadGenRef.current) {
           doc.destroy().catch(() => undefined);
           return;
         }
+        const base = { width: startViewport.width, height: startViewport.height };
+        const bases: Array<PdfPageBaseSize | undefined> = new Array(doc.numPages);
+        bases[startPage - 1] = base;
+        pageMeasureRef.current = { gen, measure: createPdfPageMeasureQueue(doc) };
         setPageBases(bases);
 
         let nextScale = scale;
         try {
-          const base =
-            bases[startPage - 1] ??
-            (await doc.getPage(startPage).then((p) => {
-              const v = p.getViewport({ scale: 1 });
-              return { width: v.width, height: v.height };
-            }));
+
           const scrollEl = scrollRef.current ?? containerRef.current;
           const width = scrollEl?.clientWidth ?? window.innerWidth;
           nextScale = fitWidthScale(width, base.width, 8);
           setBaseSize(base);
-          prevScaleRef.current = nextScale;
+
           setScale(nextScale);
           fittedOnceRef.current = true;
         } catch {
@@ -402,41 +432,12 @@ export function PdfViewer({
         setDoc(doc);
         pendingScrollPageRef.current = startPage;
 
-        try {
-          const rawOutline = await doc.getOutline();
-          if (rawOutline?.length) {
-            const items: Array<{ title: string; pageNumber: number }> = [];
-            for (const node of rawOutline.slice(0, 80)) {
-              try {
-                const dest = node.dest;
-                let pageIndex = 0;
-                if (typeof dest === "string") {
-                  const d = await doc.getDestination(dest);
-                  if (d) {
-                    const ref = d[0];
-                    pageIndex = await doc.getPageIndex(ref);
-                  }
-                } else if (Array.isArray(dest) && dest[0]) {
-                  pageIndex = await doc.getPageIndex(dest[0]);
-                }
-                items.push({
-                  title: String(node.title ?? "Section"),
-                  pageNumber: pageIndex + 1,
-                });
-              } catch {
-                /* skip bad outline nodes */
-              }
-            }
-            setOutline(items);
-          } else {
-            setOutline([]);
-          }
-        } catch {
-          setOutline([]);
-        }
-
+        // Optional outline metadata must not hold up first-page rendering.
         if (gen !== loadGenRef.current) return;
         setLoading(false);
+        void readPdfOutline(doc, () => gen === loadGenRef.current).then((items) => {
+          if (items !== null && gen === loadGenRef.current) setOutline(items);
+        });
         void refreshOfflineUsage();
       } catch (e) {
         if (gen !== loadGenRef.current) return;
@@ -574,11 +575,13 @@ export function PdfViewer({
     const el = col?.children[n - 1] as HTMLElement | undefined;
     if (!col || !scroller || !el) return;
     scroller.scrollTop = Math.max(0, col.offsetTop + el.offsetTop - 4);
+    scrollPositionRef.current = scroller.scrollTop;
   }, []);
 
   // Continuous scroll: derive the current page from the scroll position.
   const scrollRafRef = useRef<number | null>(null);
   const onReaderScroll = useCallback(() => {
+    if (scrollRef.current) scrollPositionRef.current = scrollRef.current.scrollTop;
     if (scrollRafRef.current != null) return;
     scrollRafRef.current = requestAnimationFrame(() => {
       scrollRafRef.current = null;
@@ -599,14 +602,6 @@ export function PdfViewer({
     };
   }, []);
 
-  // First mount of the page column: jump to the resume page.
-  useLayoutEffect(() => {
-    if (loading || !doc) return;
-    const target = pendingScrollPageRef.current;
-    if (target == null) return;
-    pendingScrollPageRef.current = null;
-    scrollToPage(target);
-  }, [loading, doc, scrollToPage]);
 
   const clearPinchPreview = useCallback(() => {
     const col = columnRef.current;
@@ -615,17 +610,31 @@ export function PdfViewer({
     col.classList.remove("is-pinch-preview");
   }, []);
 
-  // Zoom keeps the reader's place (all page heights scale together).
-  // Also drop any CSS pinch preview once the committed scale is applied.
+  // Anchor layout changes to the same logical page, not a stale pixel offset.
+  // Run before paint; browser-native anchoring is disabled on this scroller.
   useLayoutEffect(() => {
-    const prev = prevScaleRef.current;
     const scroller = scrollRef.current;
-    if (scroller && prev != null && prev !== scale) {
-      scroller.scrollTop = scrollTopAfterZoom(scroller.scrollTop, prev, scale);
+    const col = columnRef.current;
+    if (loading || !doc || !scroller || !col) {
+      layoutRef.current = null;
+      return;
     }
-    prevScaleRef.current = scale;
-    clearPinchPreview();
-  }, [scale, clearPinchPreview]);
+    const previous = layoutRef.current;
+    if (!previous || previous.scale !== scale) clearPinchPreview();
+    const tops = pageTops();
+    const heights = Array.from(col.children, (el) => (el as HTMLElement).offsetHeight);
+    const target = pendingScrollPageRef.current;
+    if (target != null) {
+      pendingScrollPageRef.current = null;
+      scrollToPage(target);
+    } else if (previous?.doc === doc) {
+      scroller.scrollTop = remapPdfScrollTop(
+        previous.tops, previous.heights, tops, heights, scrollPositionRef.current
+      );
+    }
+    scrollPositionRef.current = scroller.scrollTop;
+    layoutRef.current = { doc, tops, heights, scale };
+  }, [loading, doc, scale, pageBases, pageTops, scrollToPage, clearPinchPreview]);
 
   useEffect(() => {
     if (loading || !doc) return;
@@ -1095,6 +1104,8 @@ export function PdfViewer({
                   pageNumber={i + 1}
                   scale={scale}
                   base={pageBases[i] ?? baseSize}
+                  measured={pageBases[i] !== undefined}
+                  measurePage={measureVisiblePage}
                   highlights={highlightsByPage.get(i + 1) ?? NO_HIGHLIGHTS}
                   watermarkLine={watermarkLine}
                   scrollRootRef={scrollRef}
