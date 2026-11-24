@@ -4,6 +4,7 @@ import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { applySavedOpenListOrder } from "@/lib/dashboard/open-list-admin-order";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -208,6 +209,7 @@ export function OpenListAdmin({
                           );
                           if (error) toast.error(error);
                           else {
+                            setGroups((prev) => applySavedOpenListOrder(prev, next));
                             toast.success("Groups reordered");
                             refresh();
                           }
@@ -235,6 +237,7 @@ export function OpenListAdmin({
                           );
                           if (error) toast.error(error);
                           else {
+                            setGroups((prev) => applySavedOpenListOrder(prev, next));
                             toast.success("Groups reordered");
                             refresh();
                           }
@@ -317,6 +320,7 @@ export function OpenListAdmin({
                                   );
                                 if (error) toast.error(error);
                                 else {
+                                  setTests((prev) => applySavedOpenListOrder(prev, next));
                                   toast.success("Tests reordered");
                                   refresh();
                                 }
@@ -346,6 +350,7 @@ export function OpenListAdmin({
                                   );
                                 if (error) toast.error(error);
                                 else {
+                                  setTests((prev) => applySavedOpenListOrder(prev, next));
                                   toast.success("Tests reordered");
                                   refresh();
                                 }
