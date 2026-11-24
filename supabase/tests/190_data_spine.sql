@@ -299,15 +299,19 @@ update public.tests
 set entitlement = 'free'
 where id = (select id from t_test);
 
+-- Runner owns the temp schema. Grant only scratch-table access before
+-- invoking the real student RPC under its authenticated role.
+create temp table t_attempt(payload jsonb);
+grant select, insert on t_attempt to authenticated;
 select test_helpers.as_user(
   (select id from t_paid),
   'cccccccc-cccc-cccc-cccc-ccccccccccc1'::uuid
 );
+insert into t_attempt(payload)
 select public.start_attempt(
   (select id from t_test),
   '11111111-1111-4111-8111-111111111111'::uuid
-) as payload into temp t_attempt;
-grant select on t_attempt to authenticated;
+);
 
 select public.submit_attempt(
   ((select payload from t_attempt) ->> 'attempt_id')::uuid,
@@ -348,7 +352,7 @@ select lives_ok(
   '32 update_own_profile'
 );
 select is(
-  (select college_name from public.profiles where id = (select id from t_paid)),
+  (select college_name from public.get_own_profile()),
   'KEMU',
   '33 college persisted'
 );
@@ -359,7 +363,7 @@ select is(
 );
 select lives_ok($$select public.allocate_avatar_object_key()$$, '34 allocate avatar');
 select ok(
-  (select avatar_object_key from public.profiles where id = (select id from t_paid))
+  (select avatar_object_key from public.get_own_profile())
     like 'study-content/avatars/%',
   '35 avatar key prefix'
 );

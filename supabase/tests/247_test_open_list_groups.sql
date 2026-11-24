@@ -2,7 +2,7 @@
 -- Transaction-scoped fixtures; rolled back.
 
 begin;
-select plan(15);
+select plan(20);
 
 select test_helpers.as_runner();
 select * into temp curriculum from test_helpers.make_curriculum();
@@ -81,16 +81,23 @@ select throws_ok(
 ------------------------------------------------------------------
 -- 3–5) Main admin creates two groups, assigns, reorders placements
 ------------------------------------------------------------------
+-- Create scratch tables as the runner; authenticated must not need CREATE
+-- on the runner-owned pg_temp schema to exercise a public RPC.
+select test_helpers.as_runner();
+create temp table t_g1(id uuid);
+create temp table t_g2(id uuid);
+grant select, insert on t_g1, t_g2 to authenticated;
 select test_helpers.as_user((select id from t_admin));
+insert into t_g1
 select public.admin_create_test_open_list_group(
   (select year_id from curriculum),
-  'Group One'
-) as id into temp t_g1;
+  'OL Group One ' || (select subject_id::text from curriculum)
+);
+insert into t_g2
 select public.admin_create_test_open_list_group(
   (select year_id from curriculum),
-  'Group Two'
-) as id into temp t_g2;
-grant select on t_g1, t_g2 to authenticated;
+  'OL Group Two ' || (select subject_id::text from curriculum)
+);
 
 select isnt(
   (select id from t_g1),
@@ -123,7 +130,7 @@ select lives_ok(
 select test_helpers.as_runner();
 with ins as (
   insert into public.test_open_list_groups (year_id, name, sort_order)
-  values ((select year_id from t_year2), 'Other year group', 0)
+  values ((select year_id from t_year2), 'OL Other ' || (select subject_id::text from curriculum), 0)
   returning id
 )
 select id into temp t_g_other from ins;
@@ -146,11 +153,19 @@ select throws_ok(
 select test_helpers.as_user((select id from t_student));
 select is(
   (select count(*)::int from public.test_open_list_groups
-   where year_id = (select year_id from curriculum)),
+   where id in ((select id from t_g1), (select id from t_g2))),
   2,
   'enrolled student can read open-list groups for their year'
 );
 
+select is(
+  (select count(*)::int from public.test_open_list_groups where id=(select id from t_g_other)),
+  0, 'student cannot read another class group'
+);
+select is(
+  (select group_id from public.test_open_list_placements where test_id=(select id from t_tests where title='OL Open A')),
+  (select id from t_g1), 'student sees assigned group placement'
+);
 select throws_ok(
   format(
     'insert into public.test_open_list_groups (year_id, name) values (%L, %L)',
@@ -165,6 +180,23 @@ select throws_ok(
 -- 9–10) Delete group nulls placements (ungrouped fallback)
 ------------------------------------------------------------------
 select test_helpers.as_user((select id from t_admin));
+select lives_ok(
+  format('select public.admin_reorder_test_open_list_groups(%L, array[%L,%L]::uuid[])',
+    (select year_id from curriculum),(select id from t_g2),(select id from t_g1)),
+  'admin reorders two synthetic groups'
+);
+select is(
+  (select array_agg(id order by sort_order) from public.test_open_list_groups
+    where id in ((select id from t_g1),(select id from t_g2))),
+  array[(select id from t_g2),(select id from t_g1)]::uuid[],
+  'group order persisted'
+);
+select lives_ok(
+  format('select public.admin_reorder_test_open_list_placements(%L,%L,array[%L,%L]::uuid[])',
+    (select year_id from curriculum),(select id from t_g1),
+    (select id from t_tests where title='OL Open B'),(select id from t_tests where title='OL Open A')),
+  'admin reorders two synthetic tests in a group'
+);
 select lives_ok(
   format(
     'select public.admin_assign_test_open_list_placement(%L, %L)',
@@ -208,7 +240,7 @@ select lives_ok(
   format(
     'select public.admin_rename_test_open_list_group(%L, %L)',
     (select id from t_g1),
-    'Renamed One'
+    'OL Renamed ' || (select subject_id::text from curriculum)
   ),
   'admin can rename a group'
 );

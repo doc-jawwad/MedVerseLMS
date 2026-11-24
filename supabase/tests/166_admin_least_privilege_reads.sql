@@ -26,6 +26,11 @@ select test_helpers.make_limited_admin('F1 Zero', '{}') as id into temp t_zero;
 grant select on curriculum, t_student, t_main, t_academic, t_view, t_subs, t_year,
   t_mgr, t_zero to anon, authenticated;
 
+-- Assign the synthetic ops roles to the fixture class before testing their reads.
+select test_helpers.as_user((select id from t_main));
+select public.set_admin_year_assignments((select id from t_view), array[(select year_id from curriculum)]);
+select public.set_admin_year_assignments((select id from t_subs), array[(select year_id from curriculum)]);
+
 -- Seed one sensitive row of each kind (runner bypasses RLS).
 select test_helpers.as_runner();
 insert into public.audit_logs (actor_id, action, target_type, target_id, details)
@@ -37,24 +42,33 @@ values (
   '{}'::jsonb
 );
 
-insert into public.subscriptions (student_id, plan_id, status, starts_at, ends_at)
+insert into public.subscriptions (student_id, plan_id, status, starts_at, ends_at, year_id)
 select
   (select id from t_student),
   (select id from public.subscription_plans where is_active order by sort_order limit 1),
   'active',
   now() - interval '1 day',
-  now() + interval '30 days'
+  now() + interval '30 days',
+  (select year_id from curriculum)
 where not exists (
   select 1 from public.subscriptions
   where student_id = (select id from t_student) and status = 'active'
 );
+
+-- Seed a positive, transaction-scoped year-change request. A populated
+-- staging database can already contain requests unrelated to this fixture.
+select set_config('medverse.year_change_request_rpc','1',true);
+insert into public.year_change_requests(student_id,from_year_id,to_year_id,status)
+select (select id from t_student), (select year_id from curriculum), y.id, 'pending'
+from public.years y where y.year_number=2;
+select set_config('medverse.year_change_request_rpc','',true);
 
 ------------------------------------------------------------------
 -- 1) Main Admin can read all sensitive tables
 ------------------------------------------------------------------
 select test_helpers.as_user((select id from t_main));
 select is(
-  (select count(*)::int from public.profiles where role = 'student'),
+  (select count(*)::int from public.profiles where id = (select id from t_student)),
   1,
   'Main Admin can SELECT student profiles'
 );
@@ -116,7 +130,7 @@ select is(
 ------------------------------------------------------------------
 select test_helpers.as_user((select id from t_view));
 select is(
-  (select count(*)::int from public.profiles where role = 'student'),
+  (select count(*)::int from public.profiles where id = (select id from t_student)),
   1,
   'view_students can SELECT student profiles'
 );
@@ -146,15 +160,16 @@ select is(
   'subscription ops cannot SELECT audit_logs'
 );
 select ok(
-  (select count(*)::int from public.profiles where role = 'student') >= 1,
+  (select count(*)::int from public.profiles where id = (select id from t_student)) >= 1,
   'subscription ops can SELECT profiles for joins'
 );
 
 select test_helpers.as_user((select id from t_year));
 select is(
-  (select count(*)::int from public.year_change_requests),
-  0,
-  'manage_year_changes can SELECT year_change_requests (empty ok)'
+  (select count(*)::int from public.year_change_requests
+   where student_id=(select id from t_student)),
+  1,
+  'manage_year_changes can SELECT the synthetic year-change request'
 );
 select ok(
   public.has_permission('manage_year_changes'),
