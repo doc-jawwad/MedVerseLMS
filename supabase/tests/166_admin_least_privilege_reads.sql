@@ -55,6 +55,14 @@ where not exists (
   where student_id = (select id from t_student) and status = 'active'
 );
 
+-- Seed a positive, transaction-scoped year-change request. A populated
+-- staging database can already contain requests unrelated to this fixture.
+select set_config('medverse.year_change_request_rpc','1',true);
+insert into public.year_change_requests(student_id,from_year_id,to_year_id,status)
+select (select id from t_student), (select year_id from curriculum), y.id, 'pending'
+from public.years y where y.year_number=2;
+select set_config('medverse.year_change_request_rpc','',true);
+
 ------------------------------------------------------------------
 -- 1) Main Admin can read all sensitive tables
 ------------------------------------------------------------------
@@ -158,9 +166,10 @@ select ok(
 
 select test_helpers.as_user((select id from t_year));
 select is(
-  (select count(*)::int from public.year_change_requests),
-  0,
-  'manage_year_changes can SELECT year_change_requests (empty ok)'
+  (select count(*)::int from public.year_change_requests
+   where student_id=(select id from t_student)),
+  1,
+  'manage_year_changes can SELECT the synthetic year-change request'
 );
 select ok(
   public.has_permission('manage_year_changes'),
