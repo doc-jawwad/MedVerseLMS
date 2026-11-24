@@ -6,13 +6,14 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { EntitlementSelect } from "@/components/admin/entitlement-select";
+import { OSPE_MAX_PAGE, ospePageWindow, ospePageRows, ospePageHref } from "@/lib/admin/ospe-pagination";
 
 export const metadata = { title: "OSPE Practice — MedVerse Admin" };
 
 export default async function AdminOspeStationsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; year?: string; status?: string }>;
+  searchParams: Promise<{ q?: string; year?: string; status?: string; page?: string }>;
 }) {
   const { supabase } = await requireAdmin();
   const filters = await searchParams;
@@ -22,6 +23,10 @@ export default async function AdminOspeStationsPage({
     next: "/admin/ospe-stations",
     children: async (year) => {
       const yearId = year.id;
+      const window = ospePageWindow(filters.page);
+      const q = typeof filters.q === "string" ? filters.q.trim() : "";
+      const status = filters.status === "draft" || filters.status === "published" ? filters.status : "";
+      const pageHref = (page: number) => ospePageHref({ year: yearId, q, status }, page);
       let query = supabase
         .from("ospe_stations")
         .select(
@@ -31,15 +36,13 @@ export default async function AdminOspeStationsPage({
         .is("deleted_at", null)
         .order("sort_order")
         .order("created_at", { ascending: false })
-        .limit(200);
-      if (filters.status === "draft" || filters.status === "published") {
-        query = query.eq("status", filters.status);
-      }
-      if (filters.q?.trim()) {
-        query = query.ilike("title", `%${filters.q.trim()}%`);
-      }
+        .order("id")
+        .range(window.start, window.end);
+      if (status) query = query.eq("status", status);
+      if (q) query = query.ilike("title", `%${q}%`);
 
-      const { data: stations } = await query;
+      const { data, error } = await query;
+      const { rows: stations, hasNext } = ospePageRows(data ?? []);
 
       return (
         <div className="grid gap-6">
@@ -56,22 +59,23 @@ export default async function AdminOspeStationsPage({
                 Separate from OSPE Material packs and formal exams.
               </p>
             </div>
-            <Button asChild>
-              <Link href="/admin/ospe-stations/new">Add station</Link>
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button asChild variant="outline"><Link href={"/admin/ospe-stations/bulk?year=" + encodeURIComponent(yearId)}>Bulk add drafts</Link></Button>
+              <Button asChild><Link href={"/admin/ospe-stations/new?year=" + encodeURIComponent(yearId)}>Add station</Link></Button>
+            </div>
           </div>
 
           <form className="flex flex-wrap gap-2" action="/admin/ospe-stations">
             <input type="hidden" name="year" value={yearId} />
             <input
               name="q"
-              defaultValue={filters.q ?? ""}
+              defaultValue={q}
               placeholder="Search title…"
               className="h-9 w-64 rounded-md border bg-background px-2 text-sm"
             />
             <select
               name="status"
-              defaultValue={filters.status ?? ""}
+              defaultValue={status}
               className="h-9 rounded-md border bg-background px-2 text-sm"
             >
               <option value="">Any status</option>
@@ -83,14 +87,19 @@ export default async function AdminOspeStationsPage({
             </Button>
           </form>
 
-          {(stations ?? []).length === 0 ? (
+          {error ? (
+            <div role="alert" className="rounded-xl border p-4 text-sm text-destructive">
+              Could not load OSPE stations. <Link className="underline" href={pageHref(window.page)}>Try again</Link>.
+            </div>
+          ) : stations.length === 0 ? (
             <div className="rounded-xl border border-dashed px-6 py-12 text-center text-sm text-muted-foreground">
-              No OSPE practice stations yet. Add one with a private station
-              image and answer.
+              {window.page > 1 || q || status
+                ? "No matching stations on this page."
+                : "No OSPE practice stations yet. Add one with a private station image and answer."}
             </div>
           ) : (
             <div className="grid gap-3">
-              {(stations ?? []).map((s) => {
+              {stations.map((s) => {
                 const subject = s.subjects as unknown as { name: string } | null;
                 return (
                   <Card key={s.id} className="shadow-none">
@@ -133,6 +142,25 @@ export default async function AdminOspeStationsPage({
                 );
               })}
             </div>
+          )}
+          {!error && (window.page > 1 || hasNext) && (
+            <nav aria-label="OSPE station pagination" className="flex flex-wrap items-center justify-between gap-3" data-testid="ospe-admin-pagination">
+              <p className="text-sm text-muted-foreground">
+                Page {window.page}{stations.length > 0 ? ` · Showing ${window.start + 1}–${window.start + stations.length}` : ""}
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {window.page > 1 && (
+                  <Button asChild size="sm" variant="outline"><Link href={pageHref(window.page - 1)}>Previous</Link></Button>
+                )}
+                {hasNext && window.page < OSPE_MAX_PAGE && (
+                  <Button asChild size="sm" variant="outline"><Link href={pageHref(window.page + 1)}>Next</Link></Button>
+                )}
+                {window.page > 1 && stations.length === 0 && (
+                  <Button asChild size="sm" variant="outline"><Link href={pageHref(1)}>First page</Link></Button>
+                )}
+              </div>
+              {hasNext && window.page === OSPE_MAX_PAGE && <p className="text-sm text-muted-foreground">Refine your filters to find more stations.</p>}
+            </nav>
           )}
         </div>
       );
