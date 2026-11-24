@@ -59,9 +59,10 @@ export default async function AdminOspeStationsPage({
                 Separate from OSPE Material packs and formal exams.
               </p>
             </div>
-            <Button asChild>
-              <Link href="/admin/ospe-stations/new">Add station</Link>
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button asChild variant="outline"><Link href={"/admin/ospe-stations/bulk?year=" + encodeURIComponent(yearId)}>Bulk add drafts</Link></Button>
+              <Button asChild><Link href={"/admin/ospe-stations/new?year=" + encodeURIComponent(yearId)}>Add station</Link></Button>
+            </div>
           </div>
 
           <form className="flex flex-wrap gap-2" action="/admin/ospe-stations">
