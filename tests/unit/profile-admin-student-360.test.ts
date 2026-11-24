@@ -153,29 +153,74 @@ describe("profile validation", () => {
 });
 
 describe("admin student 360 section permissions", () => {
-  it("gates sections by permission codes", () => {
-    const studentsOnly = student360SectionsForPermissions(
-      new Set(["view_students"])
-    );
-    assert.ok(studentsOnly.includes("biodata"));
-    assert.ok(studentsOnly.includes("class"));
-    assert.ok(studentsOnly.includes("test_history"));
-    assert.ok(studentsOnly.includes("analytics"));
-    assert.equal(studentsOnly.includes("subscription"), false);
-    assert.equal(studentsOnly.includes("payment_history"), false);
+  const secs = (...p: string[]) =>
+    student360SectionsForPermissions(new Set(p));
 
-    const ops = student360SectionsForPermissions(
-      new Set(["manage_subscriptions", "review_subscription_applications"])
-    );
-    assert.ok(ops.includes("subscription"));
-    assert.ok(ops.includes("payment_history"));
-    assert.equal(ops.includes("biodata"), false);
+  it("view_students gets biodata and all student sections, not finance", () => {
+    const s = secs("view_students");
+    for (const k of [
+      "biodata",
+      "account_status",
+      "class",
+      "test_history",
+      "analytics",
+      "practice",
+    ] as const) {
+      assert.ok(s.includes(k), k);
+    }
+    assert.equal(s.includes("subscription"), false);
+    assert.equal(s.includes("payment_history"), false);
+  });
 
-    const analytics = student360SectionsForPermissions(
-      new Set(["view_analytics"])
-    );
-    assert.ok(analytics.includes("analytics"));
-    assert.ok(analytics.includes("test_history"));
-    assert.ok(analytics.includes("practice"));
+  it("biodata requires view_students only", () => {
+    for (const p of [
+      "manage_students",
+      "activate_students",
+      "restrict_students",
+      "view_analytics",
+      "manage_subscriptions",
+      "review_subscription_applications",
+      "manage_payment_settings",
+      "grant_resource_access",
+    ]) {
+      assert.equal(secs(p).includes("biodata"), false, p);
+    }
+  });
+
+  it("restrict/activate/manage students: status only, no biodata or stats", () => {
+    for (const p of ["manage_students", "activate_students", "restrict_students"]) {
+      const s = secs(p);
+      assert.deepEqual(s, ["account_status"], p);
+    }
+  });
+
+  it("analytics-only: stats sections, no biodata/status/class/finance", () => {
+    assert.deepEqual(secs("view_analytics"), [
+      "test_history",
+      "analytics",
+      "practice",
+    ]);
+  });
+
+  it("finance roles follow the table each permission can read", () => {
+    for (const p of ["manage_subscriptions", "review_subscription_applications"]) {
+      const s = secs(p);
+      assert.ok(s.includes("payment_history"), p);
+      assert.equal(s.includes("biodata"), false, p);
+      assert.equal(s.includes("analytics"), false, p);
+      assert.equal(s.includes("account_status"), false, p);
+    }
+    // manage_subscriptions reads subscriptions + enrollments; review reads
+    // applications only (verified against RLS in pgTAP 250).
+    assert.ok(secs("manage_subscriptions").includes("subscription"));
+    assert.ok(secs("manage_subscriptions").includes("class"));
+    assert.equal(secs("review_subscription_applications").includes("subscription"), false);
+    assert.equal(secs("review_subscription_applications").includes("class"), false);
+  });
+
+  it("non-admitted permissions get nothing", () => {
+    assert.deepEqual(secs("manage_payment_settings"), []);
+    assert.deepEqual(secs("grant_resource_access"), []);
+    assert.deepEqual(secs(), []);
   });
 });

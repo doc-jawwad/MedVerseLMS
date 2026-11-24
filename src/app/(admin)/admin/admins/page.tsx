@@ -1,3 +1,4 @@
+import { readDirectoryBiodata } from "@/lib/admin/student-360/read-directory-biodata";
 import { requireAdmin } from "@/lib/auth/require-user";
 import { AdminsManager } from "./admins-manager";
 import type { AdminAccountRow } from "@/lib/admin/admin-rbac-ui";
@@ -21,7 +22,7 @@ export default async function AdminsPage() {
       supabase
         .from("profiles")
         .select(
-          "id, full_name, email, account_status, is_main_admin, last_login_at"
+          "id, full_name, account_status, is_main_admin"
         )
         .eq("role", "admin")
         .order("full_name", { ascending: true }),
@@ -47,13 +48,19 @@ export default async function AdminsPage() {
     yearIdsByAdmin[row.admin_id] = list;
   }
 
+  const { data: canViewBiodata } = await supabase.rpc("has_permission", {
+    p_code: "view_students",
+  });
+  const biodata = canViewBiodata
+    ? await readDirectoryBiodata(supabase, (profiles ?? []).map((p) => p.id))
+    : null;
   const admins: AdminAccountRow[] = (profiles ?? []).map((p) => ({
     id: p.id,
     full_name: p.full_name,
-    email: p.email,
+    email: biodata?.get(p.id)?.email ?? "",
     account_status: p.account_status,
     is_main_admin: Boolean(p.is_main_admin),
-    last_login_at: p.last_login_at,
+    last_login_at: biodata?.get(p.id)?.last_login_at ?? null,
     permission_codes: codesByAdmin.get(p.id) ?? [],
   }));
 

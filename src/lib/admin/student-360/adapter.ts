@@ -1,6 +1,8 @@
 import "server-only";
 
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { resolveAdminStudentContact } from "@/lib/admin/student-360/contact";
 import { getAdminPermissionSet } from "@/lib/admin/admin-nav";
 import {
   student360SectionsForPermissions,
@@ -23,6 +25,11 @@ import {
 } from "@/lib/admin/student-account-ui";
 import { subscriptionIsLiveAt } from "@/lib/subscriptions/student-status";
 import { avatarProxyUrl } from "@/lib/profile/avatar-url";
+import {
+  fetchAllPages,
+  unavailableSections,
+  student360ScopeAllowed,
+} from "@/lib/admin/student-360/read-status";
 
 type Supabase = Awaited<ReturnType<typeof createClient>>;
 
@@ -31,6 +38,9 @@ type AdminProfileRpc = {
     full_name: string;
     email: string;
     last_login_at: string | null;
+    college_name: string | null;
+    avatar_object_key: string | null;
+    account_status: string | null;
   };
   enrollment: {
     status: string;
@@ -49,6 +59,26 @@ type AdminProfileRpc = {
     practice_granted: boolean;
   }[];
 };
+
+/** Same aggregates as admin_student_profile.performance (submitted attempts). */
+function computeAttemptStats(
+  rows: { percentage: number | null; submitted_at: string | null }[]
+): StudentAnalyticsStats {
+  const pct = rows.map((r) => Number(r.percentage ?? 0));
+  const sum = pct.reduce((a, b) => a + b, 0);
+  const last = rows
+    .map((r) => r.submitted_at)
+    .filter((v): v is string => Boolean(v))
+    .sort()
+    .pop();
+  return {
+    tests_taken: rows.length,
+    average_percentage:
+      rows.length === 0 ? 0 : Math.round((sum / rows.length) * 100) / 100,
+    highest_percentage: pct.length === 0 ? 0 : Math.max(...pct),
+    last_test_at: last ?? null,
+  };
+}
 
 export function createAdminStudentDetailAdapter(
   supabase?: Supabase
@@ -72,33 +102,62 @@ export function createAdminStudentDetailAdapter(
       if (visible.length === 0) {
         return { ok: false, error: "permission_denied" };
       }
+      // Explicitly gate every role before reading any target data. An empty
+      // RLS result is not proof the target belongs to the caller's class.
+      const scope = await sb.rpc("admin_can_read_student_class", {
+        p_student_id: studentId,
+      });
+      if (!student360ScopeAllowed(scope)) {
+        return { ok: false, error: "year_scope_denied" };
+      }
+      // Least privilege: biodata (and the admin_student_profile RPC, which
+      // requires view_students) are used only when that permission is held.
+      const canBiodata = visible.includes("biodata");
+      const canStatus = visible.includes("account_status");
+      const canClass = visible.includes("class");
+      const needsAttemptStats = !canBiodata && visible.includes("analytics");
+      // RLS: applications need review_subscription_applications, subscriptions
+      // need manage_subscriptions. Never query a table the role cannot read
+      // (RLS would return zero rows that look like "no subscription").
+      const wantsFinance =
+        visible.includes("subscription") || visible.includes("payment_history");
+      const canReadApps =
+        wantsFinance && perms.has("review_subscription_applications");
+      const canReadSubs = wantsFinance && perms.has("manage_subscriptions");
 
       const [
         { data: rpcData, error: rpcError },
-        { data: accountRow },
-        { data: enrollmentRows },
-        { count: liveExamCount },
-        { data: recentTests },
-        { data: practiceRows },
-        { data: apps },
-        { data: subs },
+        { data: accountRow, error: accountError },
+        { data: enrollmentRows, error: enrollmentError },
+        { count: liveExamCount, error: liveExamError },
+        { data: recentTests, error: recentTestsError },
+        practicePages,
+        { data: apps, error: appsError },
+        { data: subs, error: subsError },
+        attemptStatPages,
       ] = await Promise.all([
-        sb.rpc("admin_student_profile", { p_student_id: studentId }),
-        sb
-          .from("profiles")
-          .select("account_status")
-          .eq("id", studentId)
-          .maybeSingle(),
-        sb
-          .from("enrollments")
-          .select("id, status, year_id, years(name)")
-          .eq("student_id", studentId),
+        canBiodata
+          ? sb.rpc("admin_student_profile", { p_student_id: studentId })
+          : Promise.resolve({ data: null, error: null }),
+        canStatus && !canBiodata
+          ? sb
+              .from("profiles")
+              .select("full_name, account_status")
+              .eq("id", studentId)
+              .maybeSingle()
+          : Promise.resolve({ data: null, error: null }),
+        canClass
+          ? sb
+              .from("enrollments")
+              .select("id, status, year_id, years(name)")
+              .eq("student_id", studentId)
+          : Promise.resolve({ data: [] as never[], error: null }),
         sb
           .from("test_attempts")
           .select("id", { count: "exact", head: true })
           .eq("student_id", studentId)
           .eq("state", "in_progress")
-          .then((r) => ({ count: r.count })),
+          .then((r) => ({ count: r.count, error: r.error })),
         visible.includes("test_history") || visible.includes("analytics")
           ? sb
               .from("test_attempts")
@@ -110,12 +169,20 @@ export function createAdminStudentDetailAdapter(
               .limit(25)
           : Promise.resolve({ data: [] as never[], error: null }),
         visible.includes("practice")
-          ? sb
-              .from("practice_answers")
-              .select("id, is_correct, subject_id")
-              .eq("student_id", studentId)
-          : Promise.resolve({ data: [] as never[], error: null }),
-        visible.includes("subscription") || visible.includes("payment_history")
+          ? fetchAllPages<{
+              id: string;
+              is_correct: boolean | null;
+              subject_id: string | null;
+            }>((from, to) =>
+              sb
+                .from("practice_answers")
+                .select("id, is_correct, subject_id")
+                .eq("student_id", studentId)
+                .order("id")
+                .range(from, to)
+            )
+          : Promise.resolve({ ok: true, data: [] as never[] }),
+        canReadApps
           ? sb
               .from("subscription_applications")
               .select(
@@ -125,7 +192,7 @@ export function createAdminStudentDetailAdapter(
               .order("created_at", { ascending: false })
               .limit(40)
           : Promise.resolve({ data: [] as never[], error: null }),
-        visible.includes("subscription") || visible.includes("payment_history")
+        canReadSubs
           ? sb
               .from("subscriptions")
               .select(
@@ -135,11 +202,45 @@ export function createAdminStudentDetailAdapter(
               .order("created_at", { ascending: false })
               .limit(40)
           : Promise.resolve({ data: [] as never[], error: null }),
+        // Analytics-only viewers cannot call admin_student_profile: compute the
+        // same aggregates (submitted attempts) from RLS-readable rows instead.
+        needsAttemptStats
+          ? fetchAllPages<{
+              percentage: number | null;
+              submitted_at: string | null;
+            }>((from, to) =>
+              sb
+                .from("test_attempts")
+                .select("percentage, submitted_at")
+                .eq("student_id", studentId)
+                .eq("state", "submitted")
+                .order("id")
+                .range(from, to)
+            )
+          : Promise.resolve({ ok: true, data: [] as never[] }),
       ]);
 
       if (rpcError) return { ok: false, error: rpcError.message };
       const p = rpcData as AdminProfileRpc | null;
-      if (!p?.profile) return { ok: false, error: "not_found", notFound: true };
+      if (canBiodata && !p?.profile) {
+        return { ok: false, error: "not_found", notFound: true };
+      }
+      // A failed read is "unavailable", never "not found" or a zero/empty value.
+      if (!canBiodata && canStatus && !accountError && !accountRow) {
+        return { ok: false, error: "not_found", notFound: true };
+      }
+      const appsOrSubsFailed = Boolean(appsError || subsError);
+      const unavailable = unavailableSections(visible, {
+        account_status: Boolean(accountError),
+        class: Boolean(enrollmentError),
+        test_history: Boolean(recentTestsError),
+        analytics: needsAttemptStats && !attemptStatPages.ok,
+        practice: !practicePages.ok,
+        subscription: appsOrSubsFailed,
+        payment_history: appsOrSubsFailed,
+      });
+      const practiceRows = practicePages.data;
+      const attemptStatRows = attemptStatPages.data;
 
       const liveClass = pickLiveEnrollment(
         (enrollmentRows ?? []) as {
@@ -151,9 +252,9 @@ export function createAdminStudentDetailAdapter(
       );
       const yearName = liveClass
         ? yearNameFromEnrollment(liveClass)
-        : (p.enrollment?.year_name ?? null);
-      const yearId = liveClass?.year_id ?? p.enrollment?.year_id ?? null;
-      const classStatus = liveClass?.status ?? p.enrollment?.status ?? null;
+        : (p?.enrollment?.year_name ?? null);
+      const yearId = liveClass?.year_id ?? p?.enrollment?.year_id ?? null;
+      const classStatus = liveClass?.status ?? p?.enrollment?.status ?? null;
 
       const pendingApp =
         (apps ?? []).find((a) => a.status === "pending") ?? null;
@@ -176,44 +277,35 @@ export function createAdminStudentDetailAdapter(
         subscriptionYearName: yearName,
       });
 
+      const profileRow = canBiodata ? p?.profile : accountRow;
+      const avatarKey = p?.profile?.avatar_object_key ?? null;
       const biodata = {
-        full_name: p.profile.full_name,
-        email: p.profile.email,
+        full_name: profileRow?.full_name ?? null,
+        email: p?.profile?.email ?? null,
         contact_number: null as string | null,
-        college_name: null as string | null,
-        avatar_object_key: null as string | null,
-        avatar_url: null as string | null,
-        last_login_at: p.profile.last_login_at,
-        account_status:
-          (accountRow?.account_status as string | undefined) ?? "active",
+        college_name: p?.profile?.college_name ?? null,
+        avatar_object_key: avatarKey,
+        avatar_url: avatarKey ? avatarProxyUrl(studentId, avatarKey) : null,
+        last_login_at: p?.profile?.last_login_at ?? null,
+        account_status: canStatus ? (profileRow?.account_status ?? null) : null,
       };
 
-      // Soft-read planned columns if schema lane has added them.
-      const { data: extended } = await sb
-        .from("profiles")
-        .select("*")
-        .eq("id", studentId)
-        .maybeSingle();
-      if (extended && typeof extended === "object") {
-        const row = extended as Record<string, unknown>;
-        if (typeof row.contact_number === "string") {
-          biodata.contact_number = row.contact_number;
-        }
-        if (typeof row.college_name === "string") {
-          biodata.college_name = row.college_name;
-        }
-        if (typeof row.avatar_object_key === "string") {
-          biodata.avatar_object_key = row.avatar_object_key;
-          biodata.avatar_url = avatarProxyUrl(
-            studentId,
-            row.avatar_object_key
-          );
-        }
-      }
+      // Signup contact lives in Auth metadata. The service-role lookup runs
+      // only for view_students holders (canReadBiodata), server-side, and
+      // returns just the contact field.
+      biodata.contact_number = await resolveAdminStudentContact({
+        canReadBiodata: canBiodata,
+        profileContact: null,
+        loadAuthMetadata: async () => {
+          const { data, error } = await createAdminClient().auth.admin.getUserById(studentId);
+          if (error) throw error;
+          return data.user?.user_metadata ?? null;
+        },
+      });
 
       const public_identity = toLeaderboardSafeIdentity({
         id: studentId,
-        full_name: biodata.full_name,
+        full_name: biodata.full_name ?? "Student",
         college_name: biodata.college_name,
         avatar_object_key: biodata.avatar_object_key,
       });
@@ -234,7 +326,7 @@ export function createAdminStudentDetailAdapter(
             ? "Active"
             : pendingApp
               ? "Pending application"
-              : "None",
+              : "No live subscription",
           plan_name: planName,
           starts_at: activeSub?.starts_at ?? null,
           ends_at: activeSub?.ends_at ?? null,
@@ -267,12 +359,19 @@ export function createAdminStudentDetailAdapter(
       const analytics: StudentAnalyticsStats | null = visible.includes(
         "analytics"
       )
-        ? {
-            tests_taken: p.performance.tests_taken,
-            average_percentage: p.performance.average_percentage,
-            highest_percentage: p.performance.highest_percentage,
-            last_test_at: p.performance.last_test_at,
-          }
+        ? p
+          ? {
+              tests_taken: p.performance.tests_taken,
+              average_percentage: p.performance.average_percentage,
+              highest_percentage: p.performance.highest_percentage,
+              last_test_at: p.performance.last_test_at,
+            }
+          : computeAttemptStats(
+              (attemptStatRows ?? []) as {
+                percentage: number | null;
+                submitted_at: string | null;
+              }[]
+            )
         : null;
 
       let practice: PracticePerformanceSummary | null = null;
@@ -347,19 +446,29 @@ export function createAdminStudentDetailAdapter(
           year_name: yearName,
           enrollment_status: classStatus,
           lock,
+          // Lock needs enrollments + live subscription + pending application.
+          lock_known:
+            canClass &&
+            canReadSubs &&
+            canReadApps &&
+            !appsOrSubsFailed &&
+            !enrollmentError,
         },
         subscription,
         test_history,
         analytics,
         practice,
         payment_history,
-        practice_grants: (p.subject_access ?? []).map((a) => ({
+        practice_grants: (p?.subject_access ?? []).map((a) => ({
           subject_id: a.subject_id,
           subject_name: a.subject_name,
           granted: a.practice_granted,
         })),
-        has_in_progress_exam: (liveExamCount ?? 0) > 0,
+        // Unknown (read failed) is treated as "in progress" so admin actions
+        // that must not interrupt a live exam stay cautious.
+        has_in_progress_exam: liveExamError ? true : (liveExamCount ?? 0) > 0,
         visible_sections: visible,
+        unavailable_sections: unavailable,
       };
 
       return { ok: true, data: detail };

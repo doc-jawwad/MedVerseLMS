@@ -17,7 +17,7 @@ export default async function StudentLayout({
 }) {
   await bindSsrTiming();
   scheduleSsrTimingFlush();
-  const { profile, enrollment, userId } = await requireStudent();
+  const { profile, enrollment } = await requireStudent();
   const isBlockedExamContinue = isBlockedAccountStatus(profile.account_status);
 
   // Blocked accounts with leave_in_progress may only see the exam player —
@@ -25,7 +25,7 @@ export default async function StudentLayout({
   if (isBlockedExamContinue) {
     return (
       <div className="min-h-svh bg-canvas">
-        <SessionWatch userId={userId} />
+        <SessionWatch />
         <main className="p-4 md:p-8">{children}</main>
       </div>
     );
@@ -40,7 +40,6 @@ export default async function StudentLayout({
 
   return (
     <StudentShellChrome
-      userId={userId}
       userLabel={profile.full_name}
       subLabel={enrollment.year_name}
       nav={nav}

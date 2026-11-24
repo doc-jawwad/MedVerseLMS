@@ -36,7 +36,7 @@ export default async function AuditLogPage({
   let query = supabase
     .from("audit_logs")
     .select(
-      "id, action, target_type, target_id, details, created_at, profiles(full_name, email)",
+      "id, action, target_type, target_id, details, created_at, profiles(full_name)",
       { count: "exact" }
     )
     .order("created_at", { ascending: false })

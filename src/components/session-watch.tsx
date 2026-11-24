@@ -3,14 +3,11 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import {
-  SESSION_WATCH_POLL_MS,
-  shouldKickForReplacedSession,
-} from "@/lib/auth/session-watch";
+import { SESSION_WATCH_POLL_MS } from "@/lib/auth/session-watch";
 
 // Polling companion to requireUser() Layer 1 (docs/permissions.md).
 // VPS production does not run Supabase Realtime.
-export function SessionWatch({ userId }: { userId: string }) {
+export function SessionWatch() {
   const router = useRouter();
   const [supabase] = useState(() => createClient());
 
@@ -18,26 +15,10 @@ export function SessionWatch({ userId }: { userId: string }) {
     let cancelled = false;
 
     async function check() {
-      const { data: mySessionId } = await supabase.rpc("current_session_id");
-      if (cancelled) return;
-
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("active_session_id")
-        .eq("id", userId)
-        .maybeSingle();
-      if (cancelled) return;
-
-      const activeSessionId =
-        (profile?.active_session_id as string | null | undefined) ?? null;
-      if (
-        !shouldKickForReplacedSession({
-          mySessionId: mySessionId as string | null,
-          activeSessionId,
-        })
-      ) {
-        return;
-      }
+      const { data: sessionReplaced } = await supabase.rpc("current_session_id", {
+        p_require_token_session: true,
+      });
+      if (cancelled || !sessionReplaced) return;
 
       const { data: exempt } = await supabase.rpc("owns_live_attempt_session");
       if (cancelled || exempt) return;
@@ -61,7 +42,7 @@ export function SessionWatch({ userId }: { userId: string }) {
       window.clearInterval(id);
       document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, [supabase, userId, router]);
+  }, [supabase, router]);
 
   return null;
 }

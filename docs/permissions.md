@@ -76,7 +76,7 @@ A non-`active` account status must not enter student or admin shells (dashboard,
 
 VPS production **does not run Supabase Realtime**. The client companion to Layer 1 (`SessionWatch`) **MUST** poll (for example `current_session_id` / `owns_live_attempt_session` / `profiles.active_session_id`), not `postgres_changes`. Polling interval is a UX choice; it must not be treated as the security boundary — RPCs still enforce `is_active_session()`.
 
-`SessionWatch` polls `current_session_id` plus own `profiles.active_session_id` (15s, plus on tab visible). It must not subscribe to `postgres_changes`. Polling is not the security boundary — RPCs still enforce `is_active_session()`.
+`SessionWatch` polls the caller-only replacement decision from `current_session_id(p_require_token_session: true)` (15s, plus on tab visible). It must not subscribe to `postgres_changes`. Polling is not the security boundary — RPCs still enforce `is_active_session()`.
 
 ### Layer 2 — Exam session (strictest, independent)
 An `in_progress` attempt is bound to the `device_id` (and `session_id`) that started it. Exam RPCs (`start_attempt` resume / `save_answer` / `submit_attempt`) verify `device_id` and reject any other device with `attempt_locked_other_device`.

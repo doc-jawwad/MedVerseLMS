@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { readDirectoryBiodata } from "@/lib/admin/student-360/read-directory-biodata";
 import { notFound } from "next/navigation";
 import { requireAdmin } from "@/lib/auth/require-user";
 import {
@@ -66,7 +67,7 @@ export default async function TestResultsPage({
         ? supabase
             .from("test_attempts")
             .select(
-              "id, student_id, state, invalidated_reason, profiles(full_name, email)"
+              "id, student_id, state, invalidated_reason, profiles(full_name)"
             )
             .eq("test_id", id)
             .eq("state", "in_progress")
@@ -83,14 +84,18 @@ export default async function TestResultsPage({
     const { data: profiles } = await supabase
       .from("profiles")
       .select(
-        "id, college_name, email, account_status, enrollments!enrollments_student_id_fkey(id, status, year_id, years(name))"
+        "id, account_status, enrollments!enrollments_student_id_fkey(id, status, year_id, years(name))"
       )
       .in(
         "id",
         rankRows.map((r) => r.student_id)
       );
+    const profileRows = (profiles ?? []) as AdminLeaderboardProfileSource[];
+    const biodata = canViewNames
+      ? await readDirectoryBiodata(supabase, profileRows.map((row) => row.id))
+      : null;
     detailsById = mapAdminLeaderboardProfiles(
-      (profiles ?? []) as AdminLeaderboardProfileSource[]
+      profileRows.map((row) => ({ ...row, ...biodata?.get(row.id) }))
     );
   }
   const adminRows = attachAdminStudentDetails(rankRows, detailsById);
@@ -105,7 +110,7 @@ export default async function TestResultsPage({
     lowest_score: number;
   } | null;
 
-  const colCount = canExpandDetails ? 9 : 5;
+  const colCount = canViewNames ? 9 : canExpandDetails ? 7 : 5;
 
   return (
     <div className="grid gap-6">
@@ -183,8 +188,12 @@ export default async function TestResultsPage({
                 <TableHead>Student</TableHead>
                 {canExpandDetails && (
                   <>
-                    <TableHead>College</TableHead>
-                    <TableHead>Email</TableHead>
+                    {canViewNames && (
+                      <>
+                        <TableHead>College</TableHead>
+                        <TableHead>Email</TableHead>
+                      </>
+                    )}
                     <TableHead>Class</TableHead>
                     <TableHead>LMS access</TableHead>
                   </>
@@ -216,8 +225,12 @@ export default async function TestResultsPage({
                   </TableCell>
                   {canExpandDetails && (
                     <>
-                      <TableCell>{r.college_name ?? "—"}</TableCell>
-                      <TableCell>{r.email ?? "—"}</TableCell>
+                      {canViewNames && (
+                        <>
+                          <TableCell>{r.college_name ?? "—"}</TableCell>
+                          <TableCell>{r.email ?? "—"}</TableCell>
+                        </>
+                      )}
                       <TableCell>
                         <div>{r.class_name ?? "—"}</div>
                         {r.class_status && (

@@ -28,9 +28,8 @@ export default async function StudyReadPage({
   if (!catalog) notFound();
 
   const { data: bio } = await supabase
-    .from("profiles")
+    .rpc("get_own_profile")
     .select("college_name")
-    .eq("id", profile.id)
     .maybeSingle();
 
   const { data, error } = await supabase.rpc("open_study_item", {

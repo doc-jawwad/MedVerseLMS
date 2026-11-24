@@ -1,6 +1,7 @@
 "use client";
 
 import { useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { setResourceEntitlement } from "@/lib/actions/enrollment";
 import { Label } from "@/components/ui/label";
@@ -29,6 +30,7 @@ export function EntitlementSelect({
   disabled?: boolean;
 }) {
   const [pending, startTransition] = useTransition();
+  const router = useRouter();
   return (
     <div className="grid gap-1">
       <Label className="text-xs">Access</Label>
@@ -47,7 +49,11 @@ export function EntitlementSelect({
               next as "free" | "any_subscription"
             );
             if (error) toast.error(error);
-            else toast.success("Access updated");
+            else {
+              // Fetch the authoritative entitlement from the server after save.
+              router.refresh();
+              toast.success("Access updated");
+            }
           });
         }}
       >

@@ -3,7 +3,7 @@ import { describe, it } from "node:test";
 import {
   ADMIN_SUBSCRIPTION_BROWSE_LIMIT,
   ADMIN_SUBSCRIPTION_SEARCH_ROW_LIMIT,
-  adminStudentNameEmailOrFilter,
+  adminStudentNamePattern,
   adminSubscriptionMonthOptions,
   adminSubscriptionStudentScope,
   adminSubscriptionsHref,
@@ -53,7 +53,6 @@ describe("admin subscription list filters and serials", () => {
       displayStatus: "active",
       rowStatus: "active",
       fullName: "Ali Khan",
-      email: "ali@example.com",
     },
     {
       id: "b",
@@ -61,7 +60,6 @@ describe("admin subscription list filters and serials", () => {
       displayStatus: "expired",
       rowStatus: "expired",
       fullName: "Sara Ahmed",
-      email: "sara@example.com",
     },
     {
       id: "c",
@@ -69,7 +67,6 @@ describe("admin subscription list filters and serials", () => {
       displayStatus: "deactivated",
       rowStatus: "deactivated",
       fullName: "Ali Raza",
-      email: "raza@example.com",
     },
   ];
 
@@ -86,7 +83,6 @@ describe("admin subscription list filters and serials", () => {
           displayStatus: r.displayStatus,
           rowStatus: r.rowStatus,
           fullName: r.fullName,
-          email: r.email,
         })
       )
       .map((r, i) => ({ id: r.id, serial: serialNumber(i) }));
@@ -119,7 +115,7 @@ describe("admin subscription list filters and serials", () => {
     assert.equal(apply("expired", "nope").length, 0);
   });
 
-  it("skips name/email when search was already applied in the query", () => {
+  it("skips name when search was already applied in the query", () => {
     const kept = matchesAdminSubscriptionFilters({
       statusFilter: undefined,
       searchTerm: "nobody",
@@ -128,7 +124,6 @@ describe("admin subscription list filters and serials", () => {
       displayStatus: "active",
       rowStatus: "active",
       fullName: "Ali Khan",
-      email: "ali@example.com",
     });
     assert.equal(kept, true);
     const droppedByStatus = matchesAdminSubscriptionFilters({
@@ -139,7 +134,6 @@ describe("admin subscription list filters and serials", () => {
       displayStatus: "active",
       rowStatus: "active",
       fullName: "Ali Khan",
-      email: "ali@example.com",
     });
     assert.equal(droppedByStatus, false);
   });
@@ -152,15 +146,15 @@ describe("admin subscription DB student search scope", () => {
     assert.equal(normalizeAdminStudentSearchTerm(" Ali "), "ali");
   });
 
-  it("escapes LIKE wildcards and builds a quoted or-filter", () => {
+  it("escapes LIKE wildcards for safe name search", () => {
     assert.equal(escapeIlikePattern("a%b_c\\d"), "a\\%b\\_c\\\\d");
     assert.equal(
-      adminStudentNameEmailOrFilter("ali"),
-      'full_name.ilike."%ali%",email.ilike."%ali%"'
+      adminStudentNamePattern("ali"),
+      "%ali%"
     );
     assert.equal(
-      adminStudentNameEmailOrFilter('a,b"c'),
-      'full_name.ilike."%a,b\\"c%",email.ilike."%a,b\\"c%"'
+      adminStudentNamePattern('a,b"c'),
+      '%a,b"c%'
     );
   });
 

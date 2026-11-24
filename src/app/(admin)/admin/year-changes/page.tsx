@@ -18,7 +18,7 @@ import { yearChangeStatusLabel } from "@/lib/year-changes/errors";
 
 export const metadata = { title: "Year changes — MedVerse Admin" };
 
-type ProfileJoin = { full_name: string | null; email: string | null };
+type ProfileJoin = { full_name: string | null };
 type YearJoin = { name: string | null; year_number: number | null };
 
 export default async function AdminYearChangesPage({
@@ -41,7 +41,7 @@ export default async function AdminYearChangesPage({
   let query = supabase
     .from("year_change_requests")
     .select(
-      "id, status, reason, review_note, created_at, reviewed_at, student_id, from_year_id, to_year_id, profiles!year_change_requests_student_id_fkey(full_name, email), from_year:years!year_change_requests_from_year_id_fkey(name, year_number), to_year:years!year_change_requests_to_year_id_fkey(name, year_number)"
+      "id, status, reason, review_note, created_at, reviewed_at, student_id, from_year_id, to_year_id, profiles!year_change_requests_student_id_fkey(full_name), from_year:years!year_change_requests_from_year_id_fkey(name, year_number), to_year:years!year_change_requests_to_year_id_fkey(name, year_number)"
     )
     .order("created_at", { ascending: false })
     .limit(300);
@@ -53,10 +53,7 @@ export default async function AdminYearChangesPage({
   const rows = (data ?? []).filter((r) => {
     if (!term) return true;
     const p = r.profiles as unknown as ProfileJoin | null;
-    return (
-      p?.full_name?.toLowerCase().includes(term) ||
-      p?.email?.toLowerCase().includes(term)
-    );
+    return p?.full_name?.toLowerCase().includes(term);
   });
 
   return (
@@ -152,9 +149,6 @@ export default async function AdminYearChangesPage({
                       >
                         {profile?.full_name ?? "—"}
                       </Link>
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      {profile?.email}
                     </div>
                   </TableCell>
                   <TableCell>

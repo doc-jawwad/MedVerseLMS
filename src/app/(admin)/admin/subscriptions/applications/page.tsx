@@ -21,7 +21,7 @@ import {
 } from "@/components/admin/subscription-admin-nav";
 import {
   ADMIN_SUBSCRIPTION_SEARCH_STUDENT_LIMIT,
-  adminStudentNameEmailOrFilter,
+  adminStudentNamePattern,
   adminSubscriptionStudentScope,
   normalizeAdminStudentSearchTerm,
 } from "@/lib/subscriptions/admin-list-query";
@@ -29,7 +29,7 @@ import { ApplicationActions } from "../application-actions";
 
 export const metadata = { title: "Subscription applications — MedVerse Admin" };
 
-type ProfileJoin = { full_name: string | null; email: string | null };
+type ProfileJoin = { full_name: string | null };
 
 export default async function AdminApplicationsPage({
   searchParams,
@@ -55,7 +55,7 @@ export default async function AdminApplicationsPage({
           .from("profiles")
           .select("id")
           .eq("role", "student")
-          .or(adminStudentNameEmailOrFilter(term))
+          .ilike("full_name", adminStudentNamePattern(term))
           .limit(ADMIN_SUBSCRIPTION_SEARCH_STUDENT_LIMIT);
         matchedStudentIds = (matchedProfiles ?? []).map((p) => p.id as string);
       }
@@ -70,7 +70,7 @@ export default async function AdminApplicationsPage({
           : supabase
               .from("subscription_applications")
               .select(
-                "id, status, amount, currency, created_at, reviewed_at, review_note, student_id, plan_id, year_id, profiles!subscription_applications_student_id_fkey(full_name, email), subscription_plans(name)"
+                "id, status, amount, currency, created_at, reviewed_at, review_note, student_id, plan_id, year_id, profiles!subscription_applications_student_id_fkey(full_name), subscription_plans(name)"
               )
               .eq("year_id", year.id)
               .order("created_at", { ascending: false })
@@ -175,9 +175,6 @@ export default async function AdminApplicationsPage({
                         >
                           {p?.full_name || "—"}
                         </Link>
-                        <div className="text-xs text-muted-foreground">
-                          {p?.email}
-                        </div>
                       </TableCell>
                       <TableCell>{plan?.name ?? "—"}</TableCell>
                       <TableCell className="whitespace-nowrap">

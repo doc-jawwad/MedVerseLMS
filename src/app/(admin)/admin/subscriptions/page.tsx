@@ -23,7 +23,7 @@ import {
 import { SubscriptionActions } from "./subscription-actions";
 import {
   ADMIN_SUBSCRIPTION_SEARCH_STUDENT_LIMIT,
-  adminStudentNameEmailOrFilter,
+  adminStudentNamePattern,
   adminSubscriptionMonthOptions,
   adminSubscriptionStudentScope,
   adminSubscriptionsHref,
@@ -39,7 +39,6 @@ export const metadata = { title: "Subscriptions — MedVerse Admin" };
 
 type ProfileJoin = {
   full_name: string | null;
-  email: string | null;
   account_status: string | null;
 };
 
@@ -76,7 +75,7 @@ export default async function AdminSubscriptionsPage({
           .from("profiles")
           .select("id")
           .eq("role", "student")
-          .or(adminStudentNameEmailOrFilter(term))
+          .ilike("full_name", adminStudentNamePattern(term))
           .limit(ADMIN_SUBSCRIPTION_SEARCH_STUDENT_LIMIT);
         matchedStudentIds = (matchedProfiles ?? []).map((p) => p.id as string);
       }
@@ -92,7 +91,7 @@ export default async function AdminSubscriptionsPage({
           : supabase
               .from("subscriptions")
               .select(
-                "id, status, starts_at, ends_at, grace_days, paid_access_mode, student_id, plan_id, year_id, profiles!subscriptions_student_id_fkey(full_name, email, account_status), subscription_plans(name)"
+                "id, status, starts_at, ends_at, grace_days, paid_access_mode, student_id, plan_id, year_id, profiles!subscriptions_student_id_fkey(full_name, account_status), subscription_plans(name)"
               )
               .eq("year_id", year.id)
               .order("ends_at", { ascending: false })
@@ -112,7 +111,7 @@ export default async function AdminSubscriptionsPage({
           : supabase
               .from("enrollments")
               .select(
-                "student_id, status, year_id, profiles!enrollments_student_id_fkey(full_name, email, account_status, role)"
+                "student_id, status, year_id, profiles!enrollments_student_id_fkey(full_name, account_status, role)"
               )
               .eq("status", "active")
               .eq("year_id", year.id)
@@ -187,7 +186,6 @@ export default async function AdminSubscriptionsPage({
             displayStatus: r.displayStatus,
             rowStatus: r.s.status,
             fullName: r.profile?.full_name,
-            email: r.profile?.email,
           })
         );
 
@@ -316,9 +314,6 @@ export default async function AdminSubscriptionsPage({
                       >
                         {profile?.full_name || "—"}
                       </Link>
-                      <div className="text-xs text-muted-foreground">
-                        {profile?.email}
-                      </div>
                     </TableCell>
                     <TableCell>
                       <Badge variant="outline">
@@ -413,9 +408,6 @@ export default async function AdminSubscriptionsPage({
                             >
                               {profile?.full_name || "—"}
                             </Link>
-                            <div className="text-xs text-muted-foreground">
-                              {profile?.email}
-                            </div>
                           </TableCell>
                           <TableCell>
                             <Badge variant="outline">

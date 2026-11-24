@@ -20,7 +20,6 @@ import type { AcademicTreeSurface } from "@/lib/academic-tree";
  * render functions across the server→client boundary.
  */
 export function StudentShellChrome({
-  userId,
   userLabel,
   subLabel,
   nav,
@@ -33,7 +32,6 @@ export function StudentShellChrome({
   signOutAction,
   children,
 }: {
-  userId: string;
   userLabel: string;
   subLabel: string;
   nav: NavItem[];
@@ -52,7 +50,7 @@ export function StudentShellChrome({
   if (exam) {
     return (
       <div className="min-h-svh bg-canvas">
-        <SessionWatch userId={userId} />
+        <SessionWatch />
         <main className="p-4 md:p-8">{children}</main>
       </div>
     );
@@ -69,7 +67,7 @@ export function StudentShellChrome({
 
   return (
     <div className="flex h-svh overflow-hidden canvas-atmosphere">
-      <SessionWatch userId={userId} />
+      <SessionWatch />
       <aside className="hidden h-full w-64 shrink-0 flex-col overflow-y-auto border-r border-sidebar-border bg-sidebar p-4 text-sidebar-foreground md:flex">
         <div className="mb-6">
           <Logo />
