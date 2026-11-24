@@ -24,6 +24,8 @@ function PdfPageSlotImpl({
   pageNumber,
   scale,
   base,
+  measured,
+  measurePage,
   highlights,
   watermarkLine,
   scrollRootRef,
@@ -34,8 +36,10 @@ function PdfPageSlotImpl({
   pdfjs: PdfjsLib;
   pageNumber: number;
   scale: number;
-  /** Exact page size at scale 1 (pre-measured; not assumed equal to page 1). */
+  /** Exact dimensions once measured; provisional dimensions otherwise. */
   base: PdfPageBaseSize;
+  measured: boolean;
+  measurePage: (doc: PdfDocument, page: number, signal: AbortSignal) => Promise<void>;
   highlights: PdfHighlightRow[];
   watermarkLine?: string;
   scrollRootRef: RefObject<HTMLDivElement | null>;
@@ -78,6 +82,13 @@ function PdfPageSlotImpl({
   }, [pageNumber, registerViewport]);
 
   useEffect(() => {
+    if (!visible || measured) return;
+    const controller = new AbortController();
+    void measurePage(doc, pageNumber, controller.signal);
+    return () => controller.abort();
+  }, [doc, pageNumber, visible, measured, measurePage]);
+
+  useEffect(() => {
     const canvas = canvasRef.current;
     const textLayerEl = textLayerRef.current;
     const highlightLayer = highlightLayerRef.current;
@@ -96,7 +107,7 @@ function PdfPageSlotImpl({
       registerViewport(pageNumber, null);
     };
 
-    if (!visible) {
+    if (!visible || !measured) {
       free();
       return () => {
         cancelled = true;
@@ -150,7 +161,7 @@ function PdfPageSlotImpl({
       renderTask?.cancel();
       textTask?.cancel();
     };
-  }, [doc, pdfjs, pageNumber, scale, visible, registerViewport]);
+  }, [doc, pdfjs, pageNumber, scale, visible, measured, registerViewport]);
 
   useEffect(() => {
     const layer = highlightLayerRef.current;

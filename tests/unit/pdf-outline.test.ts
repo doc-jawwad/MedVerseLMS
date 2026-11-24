@@ -51,6 +51,6 @@ describe("optional PDF outline", () => {
     const viewer = readFileSync("src/components/study/pdf-viewer.tsx", "utf8");
     assert.match(viewer, /setLoading\(false\);\s*void readPdfOutline\(/);
     assert.match(viewer, /items !== null && gen === loadGenRef\.current/);
-    assert.match(viewer, /Promise\.all\(\[\s*loadPdfReadingPage\(materialId\),\s*measurePageBases\(doc\)/);
+    assert.match(viewer, /Promise\.all\(\[\s*loadingTask\.promise,\s*loadPdfReadingPage\(materialId\)/);
   });
 });

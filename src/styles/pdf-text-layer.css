@@ -80,6 +80,7 @@
 }
 
 .pdf-viewer-scroll {
+  overflow-anchor: none;
   touch-action: pan-x pan-y;
   -webkit-overflow-scrolling: touch;
 }

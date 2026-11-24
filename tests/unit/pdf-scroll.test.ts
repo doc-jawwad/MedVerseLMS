@@ -5,6 +5,8 @@ import { join } from "node:path";
 import {
   isSafePdfFixtureUrl,
   measurePageBases,
+  createPdfPageMeasureQueue,
+  remapPdfScrollTop,
   pageAtScrollTop,
   placeholderSize,
   scrollTopAfterZoom,
@@ -100,7 +102,9 @@ describe("pdf viewer continuous-scroll wiring", () => {
 
   it("renders all page slots but only decodes near-viewport pages", () => {
     assert.match(viewer, /Array\.from\(\{ length: pageCount \}/);
-    assert.match(viewer, /measurePageBases/);
+    assert.match(viewer, /createPdfPageMeasureQueue/);
+    assert.doesNotMatch(viewer, /await measurePageBases/);
+    assert.match(slot, /if \(!visible \|\| !measured\)/);
     assert.match(viewer, /pageBases\[i\]/);
     assert.match(slot, /IntersectionObserver/);
     assert.match(slot, /RENDER_ROOT_MARGIN/);
@@ -123,5 +127,62 @@ describe("pdf viewer continuous-scroll wiring", () => {
     assert.match(viewer, /loadDocument\(\{ preferOffline: false \}\)/);
     assert.match(slot, /pdf-highlight-mark/);
     assert.match(slot, /pdfjs\.TextLayer/);
+  });
+});
+
+describe("progressive page geometry", () => {
+  it("preserves logical page and fractional reading position when preceding pages resize", () => {
+    assert.equal(remapPdfScrollTop([8, 808, 1608], [792, 792, 792],
+      [8, 1008, 1516], [992, 500, 1000], 1204), 1258);
+  });
+  it("preserves the gap, initial padding and zoom anchor", () => {
+    assert.equal(remapPdfScrollTop([8, 808], [792, 792], [8, 1208], [1192, 1192], 804), 1204);
+    assert.equal(remapPdfScrollTop([8], [792], [8], [1000], 0), 0);
+    assert.equal(remapPdfScrollTop([8], [792], [8], [1584], 404), 800);
+  });
+  it("bounds concurrent reads, shares in-flight work and drops departed queued pages", async () => {
+    const calls: number[] = [];
+    const finish = new Map<number, () => void>();
+    const doc = { numPages: 20, getPage: async (page: number) => {
+      calls.push(page);
+      await new Promise<void>((resolve) => finish.set(page, resolve));
+      return { getViewport: () => ({ width: page * 100, height: 800 }) };
+    } };
+    const measure = createPdfPageMeasureQueue(doc, 1);
+    const a = new AbortController(), b = new AbortController(), c = new AbortController();
+    const first = measure(8, a.signal);
+    const shared = measure(8, b.signal);
+    const departed = measure(1, c.signal);
+    const next = measure(9, a.signal);
+    assert.deepEqual(calls, [8]);
+    c.abort();
+    assert.equal(await departed, undefined);
+    finish.get(8)!();
+    assert.deepEqual(await first, { width: 800, height: 800 });
+    assert.deepEqual(await shared, { width: 800, height: 800 });
+    assert.deepEqual(calls, [8, 9]);
+    finish.get(9)!();
+    assert.deepEqual(await next, { width: 900, height: 800 });
+    assert.deepEqual(await measure(8, a.signal), { width: 800, height: 800 });
+    assert.deepEqual(calls, [8, 9]);
+  });
+  it("does not publish a cancelled in-flight result and can retry a failed page", async () => {
+    let finish!: () => void;
+    let count = 0;
+    const doc = { numPages: 2, getPage: async (page: number) => {
+      count++;
+      if (page === 1) await new Promise<void>((resolve) => { finish = resolve; });
+      else if (count === 2) throw new Error("temporary");
+      return { getViewport: () => ({ width: 600, height: 800 }) };
+    } };
+    const measure = createPdfPageMeasureQueue(doc, 1);
+    const a = new AbortController();
+    const pending = measure(1, a.signal);
+    a.abort();
+    assert.equal(await pending, undefined);
+    finish();
+    const b = new AbortController();
+    assert.equal(await measure(2, b.signal), undefined);
+    assert.deepEqual(await measure(2, b.signal), { width: 600, height: 800 });
   });
 });
