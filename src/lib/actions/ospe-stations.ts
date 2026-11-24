@@ -13,6 +13,7 @@ import { deleteR2Object, putR2Object } from "@/lib/r2/presign";
 import { isOspeStationImageFile } from "@/lib/study/upload-rules";
 import { allocateStudyObjectKey } from "@/lib/actions/study-content";
 import { moveContentToBin } from "@/lib/actions/content-bin";
+import { validateOspeBulkItem, matchesOspeBulkReplay } from "@/lib/admin/ospe-bulk";
 
 function revalidateOspe(id?: string) {
   revalidatePath("/admin/ospe-stations");
@@ -43,7 +44,7 @@ export type OspeStationInput = {
   sortOrder?: number;
 };
 
-export async function createOspeStation(formData: FormData) {
+async function createOspeStationRecord(formData: FormData, requestId?: string): Promise<{ id: string } | { error: string }> {
   const selectedYearId = await readAdminSelectedYearId();
   if (!selectedYearId) {
     return { error: "Select a class before creating an OSPE station." };
@@ -53,10 +54,11 @@ export async function createOspeStation(formData: FormData) {
   const answer = String(formData.get("answer") ?? "").trim();
   const subjectId = String(formData.get("subjectId") ?? "");
   const status =
-    String(formData.get("status") ?? "draft") === "published"
+    !requestId && String(formData.get("status") ?? "draft") === "published"
       ? "published"
       : "draft";
-  const sortOrder = Number(formData.get("sortOrder") ?? 0) || 0;
+  const parsedSortOrder = Number(formData.get("sortOrder") ?? 0);
+  const sortOrder = requestId ? parsedSortOrder : parsedSortOrder || 0;
   const file = formData.get("image");
 
   if (!title || !answer || !subjectId) {
@@ -68,6 +70,13 @@ export async function createOspeStation(formData: FormData) {
   const imageErr = isOspeStationImageFile(file);
   if (imageErr) return { error: imageErr };
 
+  if (requestId) {
+    const validation = validateOspeBulkItem({ requestId, title, answer, sortOrder });
+    if (validation) return { error: validation };
+    if (String(formData.get("yearId") ?? "") !== selectedYearId) {
+      return { error: "Selected class changed. Reopen the bulk import for the correct class." };
+    }
+  }
   const supabase = await createClient();
   const { data: subject } = await supabase
     .from("subjects")
@@ -78,8 +87,32 @@ export async function createOspeStation(formData: FormData) {
     return { error: "Subject must belong to the selected class." };
   }
 
+  const { data: { user } } = await supabase.auth.getUser();
+  if (requestId) {
+    if (!user) return { error: "Sign in again before retrying the batch." };
+    const [permission, classAccess] = await Promise.all([
+      supabase.rpc("has_permission", { p_code: "manage_materials" }),
+      supabase.rpc("admin_can_access_year", { p_year_id: selectedYearId }),
+    ]);
+    if (permission.error || permission.data !== true || classAccess.error || classAccess.data !== true) {
+      return { error: "You cannot create OSPE stations in the selected class." };
+    }
+    const prior = await supabase.rpc("get_ospe_station_for_admin", { p_station_id: requestId });
+    if (prior.data) {
+      const active = await supabase.from("ospe_stations").select("id").eq("id", requestId)
+        .is("deleted_at", null).maybeSingle();
+      if (!active.error && active.data && matchesOspeBulkReplay(prior.data, {
+        requestId, userId: user.id, yearId: selectedYearId, subjectId, title, answer,
+        sortOrder, contentType: file.type, byteSize: file.size,
+      })) return { id: requestId };
+      return { error: "This import ID already exists with different details. Check the station list." };
+    }
+    if (prior.error?.message !== "ospe_not_found") {
+      return { error: "Could not verify this import ID. Retry the same row after checking access." };
+    }
+  }
   const allocated = await allocateStudyObjectKey();
-  if ("error" in allocated && allocated.error) return allocated;
+  if ("error" in allocated && allocated.error) return { error: allocated.error };
   if (!("key" in allocated)) return { error: "study_object_denied" };
   const key = allocated.key;
 
@@ -93,13 +126,10 @@ export async function createOspeStation(formData: FormData) {
     return clientActionFailed("createOspeStation.put", uploaded.error);
   }
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
   const { data, error } = await supabase
     .from("ospe_stations")
     .insert({
+      ...(requestId ? { id: requestId } : {}),
       title,
       answer,
       year_id: selectedYearId,
@@ -115,12 +145,26 @@ export async function createOspeStation(formData: FormData) {
     .single();
 
   if (error) {
-    await discardStudyKey(supabase, key);
-    return { error: toClientActionError(error, "createOspeStation.insert") };
+    // Do not delete a possibly committed image after an ambiguous response.
+    if (!requestId || /^(22|23|42)[0-9A-Z]{3}$/.test(error.code ?? "")) {
+      await discardStudyKey(supabase, key);
+    }
+    return { error: requestId
+      ? "Station save not confirmed. Retry this same row to reconcile its import ID."
+      : toClientActionError(error, "createOspeStation.insert") };
   }
-
   revalidateOspe();
-  redirect(`/admin/ospe-stations/${data.id}`);
+  return { id: data.id };
+}
+export async function createOspeStation(formData: FormData) {
+  const result = await createOspeStationRecord(formData);
+  if ("error" in result) return result;
+  redirect(`/admin/ospe-stations/${result.id}`);
+}
+export async function createOspeStationDraft(formData: FormData) {
+  const requestId = String(formData.get("requestId") ?? "");
+  if (!requestId) return { error: "Missing import ID." };
+  return createOspeStationRecord(formData, requestId);
 }
 
 export async function updateOspeStation(id: string, formData: FormData) {
@@ -151,6 +195,13 @@ export async function updateOspeStation(id: string, formData: FormData) {
     r2_object_key: string;
     year_id: string;
   };
+  const [subject, classAccess] = await Promise.all([
+    supabase.from("subjects").select("year_id").eq("id", subjectId).maybeSingle(),
+    supabase.rpc("admin_can_access_year", { p_year_id: yearId }),
+  ]);
+  if (subject.error || subject.data?.year_id !== yearId || classAccess.error || classAccess.data !== true) {
+    return { error: "Subject must belong to a class you can manage." };
+  }
 
   let nextKey = existing.r2_object_key;
   let nextType: string | undefined;
