@@ -266,7 +266,8 @@ async function fetchStudyContentRange(
   url: string,
   begin: number,
   endExclusive: number,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  revision?: string
 ): Promise<Uint8Array> {
   // PDF.js end is exclusive; HTTP Range end is inclusive.
   const endInclusive = Math.max(begin, endExclusive - 1);
@@ -278,10 +279,11 @@ async function fetchStudyContentRange(
         method: "GET",
         credentials: "same-origin",
         cache: "no-store",
-        headers: { Range: `bytes=${begin}-${endInclusive}` },
+        headers: { Range: `bytes=${begin}-${endInclusive}`, ...(revision ? { "X-Pdf-Revision": revision } : {}) },
         signal,
       });
       if (res.status === 403) throw new Error("study_object_denied");
+      if (res.status === 409 || (revision && res.ok && res.headers.get("x-pdf-revision") !== revision)) throw new Error("pdf_revision_changed");
       if (res.status !== 206 && res.status !== 200) {
         lastErr = `online_range_failed:${res.status}`;
         await new Promise((r) => setTimeout(r, 200 * (attempt + 1)));
@@ -293,7 +295,7 @@ async function fetchStudyContentRange(
       out.set(buf);
       return out;
     } catch (e) {
-      if (e instanceof Error && e.message === "study_object_denied") throw e;
+      if (e instanceof Error && (e.message === "study_object_denied" || e.message === "pdf_revision_changed")) throw e;
       if (e instanceof Error && e.name === "AbortError") {
         throw new Error("online_range_aborted");
       }
@@ -319,6 +321,7 @@ export async function createOnlinePdfRangeTransport(
     materialId: string;
     length: number;
     signal?: AbortSignal;
+    revision?: string;
   }
 ): Promise<{
   transport: InstanceType<PdfjsModule["PDFDataRangeTransport"]>;
@@ -334,7 +337,8 @@ export async function createOnlinePdfRangeTransport(
     url,
     0,
     initialLen,
-    options.signal
+    options.signal,
+    options.revision
   );
 
   const Base = pdfjs.PDFDataRangeTransport;
@@ -350,7 +354,8 @@ export async function createOnlinePdfRangeTransport(
             url,
             begin,
             end,
-            options.signal
+            options.signal,
+            options.revision
           );
           this.onDataRange(begin, chunk);
         } catch {

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { createHash } from "node:crypto";
 import { createClient } from "@/lib/supabase/server";
 import {
   fetchR2ObjectStream,
@@ -20,6 +21,11 @@ async function authorizeKey(materialId: string) {
   });
   if (error || typeof key !== "string" || !key) return null;
   return key;
+}
+
+// Match the private ink revision RPC; object keys are immutable per replacement.
+function contentRevision(key: string) {
+  return createHash("md5").update(key, "utf8").digest("hex");
 }
 
 const COMMON_HEADERS: Record<string, string> = {
@@ -50,6 +56,7 @@ export async function HEAD(
     headers: {
       ...COMMON_HEADERS,
       "Content-Length": String(head.contentLength),
+      "X-Pdf-Revision": contentRevision(key),
     },
   });
 }
@@ -64,6 +71,11 @@ export async function GET(
     return NextResponse.json({ error: "study_object_denied" }, { status: 403 });
   }
 
+  const revision = contentRevision(key);
+  const expected = request.headers.get("x-pdf-revision");
+  if (expected !== null && expected !== revision) {
+    return NextResponse.json({ error: "pdf_revision_changed" }, { status: 409, headers: { "Cache-Control": "private, no-store" } });
+  }
   const rangeHeader = request.headers.get("range");
   // Unscoped GET must NOT stream the full object through Next/Caddy (starves
   // concurrent Range readers on large PDFs). Cap to a leading probe window.
@@ -83,6 +95,7 @@ export async function GET(
   }
 
   const headers = new Headers(COMMON_HEADERS);
+  headers.set("X-Pdf-Revision", revision);
   const pass = [
     "content-length",
     "content-range",

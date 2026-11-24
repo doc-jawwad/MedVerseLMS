@@ -1,6 +1,8 @@
 "use client";
 
 import { memo, useEffect, useRef, useState, type RefObject } from "react";
+import { PdfInkLayer } from "./pdf-ink-layer";
+import type { PdfInkController } from "./use-pdf-ink";
 import {
   pdfRectsToViewportBoxes,
   type PdfHighlightRow,
@@ -31,6 +33,7 @@ function PdfPageSlotImpl({
   scrollRootRef,
   registerViewport,
   onRemoveHighlight,
+  ink,
 }: {
   doc: PdfDocument;
   pdfjs: PdfjsLib;
@@ -45,6 +48,7 @@ function PdfPageSlotImpl({
   scrollRootRef: RefObject<HTMLDivElement | null>;
   registerViewport: (pageNumber: number, viewport: PdfPageViewport | null) => void;
   onRemoveHighlight: (id: string) => void;
+  ink?: PdfInkController;
 }) {
   const stageRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -58,6 +62,7 @@ function PdfPageSlotImpl({
 
   const [visible, setVisible] = useState(false);
   const [paintTick, setPaintTick] = useState(0);
+  const [inkPaint, setInkPaint] = useState<{ doc: PdfDocument; viewport: PdfPageViewport } | null>(null);
 
   useEffect(() => {
     const stage = stageRef.current;
@@ -151,6 +156,7 @@ function PdfPageSlotImpl({
         viewportRef.current = viewport;
         registerViewport(pageNumber, viewport);
         setPaintTick((t) => t + 1);
+        setInkPaint({ doc, viewport });
       } catch {
         /* cancelled renders and transient page errors: slot stays blank */
       }
@@ -213,6 +219,9 @@ function PdfPageSlotImpl({
         className="pdf-highlight-layer"
         data-testid="pdf-highlight-layer"
       />
+      {ink?.enabled && visible && measured && inkPaint?.doc === doc && inkPaint.viewport.scale === scale && (
+        <PdfInkLayer key={scale} viewport={inkPaint.viewport} ink={ink} />
+      )}
       {watermarkLine ? (
         <div
           className="pointer-events-none absolute inset-x-0 bottom-3 z-[3] text-center text-[11px] font-medium tracking-wide text-black/25 select-none"

@@ -60,6 +60,8 @@ import {
   type PdfPageBaseSize,
 } from "@/lib/study/pdf-scroll";
 import { PdfPageSlot, type PdfPageViewport } from "./pdf-page-slot";
+import { usePdfInk } from "./use-pdf-ink";
+import { PdfInkToolbar } from "./pdf-ink-toolbar";
 import "@/styles/pdf-text-layer.css";
 
 type PdfjsLib = typeof import("pdfjs-dist");
@@ -163,6 +165,9 @@ export function PdfViewer({
   const [pendingSaveSize, setPendingSaveSize] = useState<number | null>(null);
   const [offlineUsageLabel, setOfflineUsageLabel] = useState("");
   const [usingOffline, setUsingOffline] = useState(false);
+  const [inkRevision, setInkRevision] = useState<string | null>(null);
+  const [showInk, setShowInk] = useState(false);
+  const ink = usePdfInk(materialId, inkRevision, page, !loading && !error && !usingOffline && !!doc);
   const [highlights, setHighlights] = useState<PdfHighlightRow[]>([]);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [chromeVisible, setChromeVisible] = useState(true);
@@ -253,6 +258,7 @@ export function PdfViewer({
       setShowOutline(false);
       setError(null);
       setUsingOffline(false);
+      setInkRevision(null);
       try {
         await purgeExpiredOffline();
         if (gen !== loadGenRef.current) return;
@@ -332,6 +338,9 @@ export function PdfViewer({
             throw new Error("You do not have access to this PDF.");
           }
           if (!probe.ok) throw new Error("Could not load this PDF.");
+          const header = probe.headers.get("x-pdf-revision");
+          const revision = header && /^[0-9a-f]{32}$/.test(header) ? header : null;
+          setInkRevision(revision);
 
           const rev =
             probe.headers.get("etag") ||
@@ -373,6 +382,7 @@ export function PdfViewer({
             materialId,
             length: contentLength,
             signal: onlineAc.signal,
+            revision: revision ?? undefined,
           });
           if (gen !== loadGenRef.current) {
             onlineAc.abort();
@@ -884,6 +894,7 @@ export function PdfViewer({
   };
 
   const onColumnPointerUp = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (ink.mode !== "read" && ink.enabled) return;
     if (!(e.target as HTMLElement | null)?.closest?.(".textLayer")) return;
     // Defer so the selection is finalized after the pointerup.
     window.setTimeout(() => captureSelectionForHighlight(), 0);
@@ -1111,6 +1122,7 @@ export function PdfViewer({
                   scrollRootRef={scrollRef}
                   registerViewport={registerViewport}
                   onRemoveHighlight={(id) => void removeHighlight(id)}
+                  ink={i + 1 === page ? ink : undefined}
                 />
               ))
             : null}
@@ -1290,6 +1302,12 @@ export function PdfViewer({
               {offlineUsageLabel ? ` · ${offlineUsageLabel}` : ""}
             </p>
             <div className="flex flex-wrap gap-1.5">
+              <Button type="button" size="sm" variant="secondary" data-testid="pdf-ink-open" onClick={() => {
+                setShowInk(true);
+                setShowMore(false);
+                setPendingHighlight(null);
+                window.getSelection()?.removeAllRanges();
+              }}>Pen tools</Button>
               {offlineUi === "saving" ? (
                 <Button type="button" size="sm" variant="secondary" onClick={cancelOfflineSave}>
                   Cancel save
@@ -1410,6 +1428,11 @@ export function PdfViewer({
         ) : null}
       </div>
 
+      {(showInk || ink.pending) && !pendingHighlight && <PdfInkToolbar ink={ink} page={page} onMode={mode => {
+        ink.setMode(mode);
+        setPendingHighlight(null);
+        window.getSelection()?.removeAllRanges();
+      }} onClose={() => { ink.setMode("read"); setShowInk(false); }} />}
       {pendingHighlight ? (
         <div className="pointer-events-auto absolute inset-x-0 bottom-0 z-30 flex flex-wrap items-center gap-2 bg-neutral-950/85 px-3 py-2 text-white backdrop-blur-sm pdf-safe-bottom">
           <span className="min-w-0 flex-1 truncate text-xs text-white/80">
