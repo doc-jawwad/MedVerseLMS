@@ -28,6 +28,7 @@ import { avatarProxyUrl } from "@/lib/profile/avatar-url";
 import {
   fetchAllPages,
   unavailableSections,
+  student360ScopeAllowed,
 } from "@/lib/admin/student-360/read-status";
 
 type Supabase = Awaited<ReturnType<typeof createClient>>;
@@ -100,6 +101,14 @@ export function createAdminStudentDetailAdapter(
       const visible = student360SectionsForPermissions(perms);
       if (visible.length === 0) {
         return { ok: false, error: "permission_denied" };
+      }
+      // Explicitly gate every role before reading any target data. An empty
+      // RLS result is not proof the target belongs to the caller's class.
+      const scope = await sb.rpc("admin_can_read_student_class", {
+        p_student_id: studentId,
+      });
+      if (!student360ScopeAllowed(scope)) {
+        return { ok: false, error: "year_scope_denied" };
       }
       // Least privilege: biodata (and the admin_student_profile RPC, which
       // requires view_students) are used only when that permission is held.

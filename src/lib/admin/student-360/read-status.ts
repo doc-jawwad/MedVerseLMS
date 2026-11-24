@@ -36,3 +36,8 @@ export function unavailableSections(
 ): AdminStudent360Section[] {
   return visible.filter((s) => failed[s]);
 }
+
+/** A missing or failed authorization answer is never an empty-data success. */
+export function student360ScopeAllowed(result: { data: unknown; error: unknown }): boolean {
+  return !result.error && result.data === true;
+}

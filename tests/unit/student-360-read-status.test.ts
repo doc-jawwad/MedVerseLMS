@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import {
   fetchAllPages,
   unavailableSections,
+  student360ScopeAllowed,
 } from "../../src/lib/admin/student-360/read-status.ts";
 
 describe("Student 360 read status", () => {
@@ -51,5 +52,13 @@ describe("Student 360 read status", () => {
       analytics: true,
     });
     assert.deepEqual(out, ["practice"]);
+  });
+
+  it("requires explicit class authorization and fails closed on errors", () => {
+    assert.equal(student360ScopeAllowed({ data: true, error: null }), true);
+    assert.equal(student360ScopeAllowed({ data: false, error: null }), false);
+    assert.equal(student360ScopeAllowed({ data: null, error: null }), false);
+    assert.equal(student360ScopeAllowed({ data: true, error: { message: "failed" } }), false);
+    assert.equal(student360ScopeAllowed({ data: "true", error: null }), false);
   });
 });
