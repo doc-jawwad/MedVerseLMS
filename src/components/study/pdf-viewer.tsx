@@ -39,6 +39,7 @@ import {
   type PdfHighlightRow,
 } from "@/lib/study/pdf-highlights";
 import { clampPage } from "@/lib/study/pdf-page-clamp";
+import { readPdfOutline } from "@/lib/study/pdf-outline";
 import {
   createDebouncedPageSaver,
   loadPdfReadingPage,
@@ -219,6 +220,8 @@ export function PdfViewer({
     async (opts: { preferOffline: boolean }) => {
       const gen = ++loadGenRef.current;
       setLoading(true);
+      setOutline([]);
+      setShowOutline(false);
       setError(null);
       setUsingOffline(false);
       try {
@@ -366,17 +369,16 @@ export function PdfViewer({
         pdfRef.current = doc;
         viewportsRef.current.clear();
         setPageCount(doc.numPages);
-        const saved = await loadPdfReadingPage(materialId);
-        if (gen !== loadGenRef.current) return;
-        const startPage = clampPage(saved ?? 1, doc.numPages);
-
-        // Measure every page before mounting the column so mixed page sizes
-        // do not shift scroll position / resume targets when canvases paint.
-        const bases = await measurePageBases(doc);
+        // Keep exact mixed-page dimensions, but read saved progress concurrently.
+        const [saved, bases] = await Promise.all([
+          loadPdfReadingPage(materialId),
+          measurePageBases(doc),
+        ]);
         if (gen !== loadGenRef.current) {
           doc.destroy().catch(() => undefined);
           return;
         }
+        const startPage = clampPage(saved ?? 1, doc.numPages);
         setPageBases(bases);
 
         let nextScale = scale;
@@ -402,41 +404,12 @@ export function PdfViewer({
         setDoc(doc);
         pendingScrollPageRef.current = startPage;
 
-        try {
-          const rawOutline = await doc.getOutline();
-          if (rawOutline?.length) {
-            const items: Array<{ title: string; pageNumber: number }> = [];
-            for (const node of rawOutline.slice(0, 80)) {
-              try {
-                const dest = node.dest;
-                let pageIndex = 0;
-                if (typeof dest === "string") {
-                  const d = await doc.getDestination(dest);
-                  if (d) {
-                    const ref = d[0];
-                    pageIndex = await doc.getPageIndex(ref);
-                  }
-                } else if (Array.isArray(dest) && dest[0]) {
-                  pageIndex = await doc.getPageIndex(dest[0]);
-                }
-                items.push({
-                  title: String(node.title ?? "Section"),
-                  pageNumber: pageIndex + 1,
-                });
-              } catch {
-                /* skip bad outline nodes */
-              }
-            }
-            setOutline(items);
-          } else {
-            setOutline([]);
-          }
-        } catch {
-          setOutline([]);
-        }
-
+        // Optional outline metadata must not hold up first-page rendering.
         if (gen !== loadGenRef.current) return;
         setLoading(false);
+        void readPdfOutline(doc, () => gen === loadGenRef.current).then((items) => {
+          if (items !== null && gen === loadGenRef.current) setOutline(items);
+        });
         void refreshOfflineUsage();
       } catch (e) {
         if (gen !== loadGenRef.current) return;
