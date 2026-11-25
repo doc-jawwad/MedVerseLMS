@@ -159,7 +159,9 @@ describe("supabase clients do not use sb_* as PostgREST Bearer", () => {
     assert.match(src, /assertCronAuthorized/);
     const helper = read("src/lib/cron/assert-cron-auth.ts");
     assert.match(helper, /cron_secret_unconfigured/);
-    assert.match(helper, /!cronSecret/);
+    // Helper normalises the secret into `configured`; empty => 503.
+    assert.match(helper, /!configured/);
+    assert.match(helper, /status:\s*503/);
   });
 
   it("R2 probe does not log secret charset or length metadata", () => {
