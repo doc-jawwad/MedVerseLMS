@@ -38,6 +38,8 @@ declare
 begin
   if jsonb_typeof(p_points) <> 'array' then return false; end if;
   if jsonb_array_length(p_points) not between 1 and 512 then return false; end if;
+  -- Bound payload size even for direct callers supplying arbitrary numeric precision.
+  if octet_length(p_points::text) > 32768 then return false; end if;
   for v_point in select value from jsonb_array_elements(p_points) loop
     if jsonb_typeof(v_point) <> 'array' then return false; end if;
     if jsonb_array_length(v_point) <> 2 then return false; end if;
@@ -61,7 +63,12 @@ create table public.pdf_ink_strokes (
   points jsonb not null check (public.pdf_ink_points_valid(points)),
   color text not null check (color in ('#dc2626', '#2563eb', '#111827', '#16a34a')),
   width numeric(4,2) not null check (width between 0.5 and 12),
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  -- A unique bounded slot is a hard capacity invariant even under MVCC races.
+  -- The client cannot supply or change this internal slot.
+  page_slot smallint not null check (page_slot between 1 and 200),
+  constraint pdf_ink_strokes_page_capacity unique
+    (student_id, material_id, content_revision, page_number, page_slot)
 );
 create index pdf_ink_strokes_owner_page_idx
   on public.pdf_ink_strokes (student_id, material_id, content_revision, page_number, created_at, id);
@@ -93,6 +100,45 @@ using (
   then content_revision = public.pdf_ink_revision(material_id)
   else false end
 );
+
+-- SECURITY INVOKER: allocation sees only rows the caller is permitted to read.
+-- The uniqueness constraint remains the authority if concurrent writers pick
+-- the same free slot; one can retry, but neither can exceed capacity.
+create function public.assign_pdf_ink_page_slot()
+returns trigger
+language plpgsql
+security invoker
+set search_path = pg_catalog, pg_temp
+as $$
+declare
+  v_used_slots smallint[];
+begin
+  if new.student_id is distinct from auth.uid()
+     or new.tenant_id is distinct from public.default_tenant()
+     or new.content_revision is distinct from public.pdf_ink_revision(new.material_id) then
+    raise exception using errcode = '42501', message = 'pdf_ink_access_denied';
+  end if;
+  -- Read visible slots once; avoid repeated entitlement evaluation per candidate.
+  select coalesce(array_agg(s.page_slot), '{}'::smallint[]) into v_used_slots
+  from public.pdf_ink_strokes s
+  where s.student_id = new.student_id
+    and s.material_id = new.material_id
+    and s.content_revision = new.content_revision
+    and s.page_number = new.page_number;
+  select n into new.page_slot
+  from generate_series(1, 200) as candidate(n)
+  where not (n = any(v_used_slots))
+  order by n limit 1;
+  if new.page_slot is null then
+    raise exception using errcode = '23514', message = 'pdf_ink_page_capacity';
+  end if;
+  return new;
+end;
+$$;
+revoke all on function public.assign_pdf_ink_page_slot() from public, anon, authenticated, service_role;
+create trigger pdf_ink_assign_page_slot
+before insert on public.pdf_ink_strokes
+for each row execute function public.assign_pdf_ink_page_slot();
 
 comment on table public.pdf_ink_strokes is
   'Private immutable PDF pen strokes for the current authorized object revision; no staff read override.';

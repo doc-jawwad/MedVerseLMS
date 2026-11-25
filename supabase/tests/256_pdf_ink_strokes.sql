@@ -1,6 +1,6 @@
 -- Private online pen stroke persistence, active session and entitlement.
 begin;
-select plan(32);
+select plan(43);
 select test_helpers.as_runner();
 select * into temp ink_curr from test_helpers.make_curriculum();
 select test_helpers.make_student((select year_id from ink_curr),'Ink Owner') id into temp ink_owner;
@@ -75,5 +75,23 @@ select is((select student_id from public.pdf_ink_strokes where id=(select c from
 select ok(not has_function_privilege('anon','public.save_pdf_ink_stroke(uuid,uuid,uuid,text,integer,jsonb,text,numeric)','EXECUTE'),'anonymous cannot invoke save');
 select ok(not has_function_privilege('service_role','public.save_pdf_ink_stroke(uuid,uuid,uuid,text,integer,jsonb,text,numeric)','EXECUTE'),'service role has no save grant');
 select ok(not (select prosecdef from pg_proc where oid='public.save_pdf_ink_stroke(uuid,uuid,uuid,text,integer,jsonb,text,numeric)'::regprocedure),'save is security invoker');
+-- Hard database limits also cover clients bypassing the toolbar and RPC.
+select ok(not has_column_privilege('authenticated','public.pdf_ink_strokes','page_slot','INSERT'),'caller cannot choose internal slot');
+select ok(not public.pdf_ink_points_valid((select jsonb_agg(('[0.'||repeat('1',80)||',0]')::jsonb) from generate_series(1,512))),'numeric precision cannot bypass payload bound');
+select ok(public.pdf_ink_points_valid((select jsonb_agg('[-999999.999,999999.999]'::jsonb) from generate_series(1,512))),'full normal geometry fits payload budget');
+select lives_ok($$insert into public.pdf_ink_strokes(id,material_id,content_revision,page_number,points,color,width)
+ select gen_random_uuid(),(select id from ink_mat),public.pdf_ink_revision((select id from ink_mat)),1,'[[1,2]]','#dc2626',2 from generate_series(1,199)$$,'direct batch fills remaining page capacity');
+select is((select count(*)::int from public.pdf_ink_strokes where page_number=1),200,'exact page cap reached');
+select throws_ok($$insert into public.pdf_ink_strokes(id,material_id,content_revision,page_number,points,color,width)
+ values (gen_random_uuid(),(select id from ink_mat),public.pdf_ink_revision((select id from ink_mat)),1,'[[1,2]]','#dc2626',2)$$,'23514','pdf_ink_page_capacity','direct overflow rejected');
+select throws_ok($$select public.save_pdf_ink_stroke((select id from ink_owner),gen_random_uuid(),(select id from ink_mat),public.pdf_ink_revision((select id from ink_mat)),1,'[[1,2]]','#dc2626',2)$$,'23514','pdf_ink_page_capacity','RPC overflow rejected');
+select lives_ok($$insert into public.pdf_ink_strokes(id,material_id,content_revision,page_number,points,color,width)
+ values (gen_random_uuid(),(select id from ink_mat),public.pdf_ink_revision((select id from ink_mat)),2,'[[1,2]]','#dc2626',2)$$,'different page has its own capacity');
+delete from public.pdf_ink_strokes where id=(select c from ink_ids);
+select lives_ok($$select public.save_pdf_ink_stroke((select id from ink_owner),(select c from ink_ids),(select id from ink_mat),public.pdf_ink_revision((select id from ink_mat)),1,'[[1,2]]','#dc2626',2)$$,'deletion frees capacity for new stroke');
+select test_helpers.as_user((select id from ink_peer),(select peer_sid from ink_sessions));
+select lives_ok($$insert into public.pdf_ink_strokes(id,material_id,content_revision,page_number,points,color,width)
+ values (gen_random_uuid(),(select id from ink_mat),public.pdf_ink_revision((select id from ink_mat)),1,'[[1,2]]','#dc2626',2)$$,'peer has separate capacity');
+select is((select count(*)::int from public.pdf_ink_strokes),1,'peer still sees only own stroke at owner capacity');
 select * from finish();
 rollback;
