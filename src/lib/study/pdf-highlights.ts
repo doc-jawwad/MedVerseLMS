@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/client";
+import { confirmPdfHighlightDeleted } from "@/lib/study/pdf-highlight-delete-result";
 import {
   normalizeHighlightRects,
   type PdfHighlightRect,
@@ -86,6 +87,13 @@ export async function createPdfHighlight(input: {
 
 export async function deletePdfHighlight(id: string): Promise<void> {
   const supabase = createClient();
-  const { error } = await supabase.from("pdf_highlights").delete().eq("id", id);
+  // PostgREST may return no error when RLS blocks a DELETE or the row is gone.
+  // Confirm a matching row was actually removed before reporting success.
+  const { data, error } = await supabase
+    .from("pdf_highlights")
+    .delete()
+    .eq("id", id)
+    .select("id");
   if (error) throw error;
+  confirmPdfHighlightDeleted(data, id);
 }
