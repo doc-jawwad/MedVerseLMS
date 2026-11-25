@@ -96,3 +96,31 @@ using (
 
 comment on table public.pdf_ink_strokes is
   'Private immutable PDF pen strokes for the current authorized object revision; no staff read override.';
+
+-- Bind the expected actor to the same authenticated request as the insert.
+-- SECURITY INVOKER retains the table's existing grants and RLS; this is not
+-- an elevated write path. The caller cannot set student_id or tenant_id.
+create function public.save_pdf_ink_stroke(
+  p_expected_owner uuid, p_id uuid, p_material_id uuid,
+  p_content_revision text, p_page_number integer, p_points jsonb,
+  p_color text, p_width numeric
+)
+returns jsonb
+language plpgsql
+security invoker
+set search_path = public, pg_temp
+as $$
+declare
+  v_row public.pdf_ink_strokes;
+begin
+  if auth.uid() is null or auth.uid() is distinct from p_expected_owner then
+    raise exception using errcode = '42501', message = 'pdf_ink_actor_mismatch';
+  end if;
+  insert into public.pdf_ink_strokes(id, material_id, content_revision, page_number, points, color, width)
+  values (p_id, p_material_id, p_content_revision, p_page_number, p_points, p_color, p_width)
+  returning * into v_row;
+  return to_jsonb(v_row);
+end;
+$$;
+revoke all on function public.save_pdf_ink_stroke(uuid, uuid, uuid, text, integer, jsonb, text, numeric) from public, anon, authenticated, service_role;
+grant execute on function public.save_pdf_ink_stroke(uuid, uuid, uuid, text, integer, jsonb, text, numeric) to authenticated;

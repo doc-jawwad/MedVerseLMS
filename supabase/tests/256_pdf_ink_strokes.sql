@@ -1,6 +1,6 @@
 -- Private online pen stroke persistence, active session and entitlement.
 begin;
-select plan(24);
+select plan(32);
 select test_helpers.as_runner();
 select * into temp ink_curr from test_helpers.make_curriculum();
 select test_helpers.make_student((select year_id from ink_curr),'Ink Owner') id into temp ink_owner;
@@ -65,5 +65,15 @@ select is((select count(*)::int from public.pdf_ink_strokes),0,'replacement hide
 select lives_ok($$insert into public.pdf_ink_strokes(id,material_id,content_revision,page_number,points,color,width)
  values ((select c from ink_ids),(select id from ink_mat),public.pdf_ink_revision((select id from ink_mat)),1,'[[1,2]]','#2563eb',3)$$,'new revision can be annotated');
 with gone as (delete from public.pdf_ink_strokes where id=(select c from ink_ids) returning id) select is((select count(*)::int from gone),1,'owner deletes current stroke');
+select test_helpers.as_user((select id from ink_peer),(select peer_sid from ink_sessions));
+select throws_ok($$select public.save_pdf_ink_stroke((select id from ink_owner),(select c from ink_ids),(select id from ink_mat),public.pdf_ink_revision((select id from ink_mat)),1,'[[1,2]]','#dc2626',2)$$,'42501','pdf_ink_actor_mismatch','switched account cannot save previous owner drawing');
+select is((select count(*)::int from public.pdf_ink_strokes),0,'switched account did not create a row');
+select test_helpers.as_user((select id from ink_owner),(select owner_sid from ink_sessions));
+select throws_ok($$select public.save_pdf_ink_stroke(null,(select c from ink_ids),(select id from ink_mat),public.pdf_ink_revision((select id from ink_mat)),1,'[[1,2]]','#dc2626',2)$$,'42501','pdf_ink_actor_mismatch','null expected actor denied');
+select lives_ok($$select public.save_pdf_ink_stroke((select id from ink_owner),(select c from ink_ids),(select id from ink_mat),public.pdf_ink_revision((select id from ink_mat)),1,'[[1,2]]','#dc2626',2)$$,'atomic owner write succeeds');
+select is((select student_id from public.pdf_ink_strokes where id=(select c from ink_ids)),(select id from ink_owner),'atomic write stored for expected owner');
+select ok(not has_function_privilege('anon','public.save_pdf_ink_stroke(uuid,uuid,uuid,text,integer,jsonb,text,numeric)','EXECUTE'),'anonymous cannot invoke save');
+select ok(not has_function_privilege('service_role','public.save_pdf_ink_stroke(uuid,uuid,uuid,text,integer,jsonb,text,numeric)','EXECUTE'),'service role has no save grant');
+select ok(not (select prosecdef from pg_proc where oid='public.save_pdf_ink_stroke(uuid,uuid,uuid,text,integer,jsonb,text,numeric)'::regprocedure),'save is security invoker');
 select * from finish();
 rollback;
