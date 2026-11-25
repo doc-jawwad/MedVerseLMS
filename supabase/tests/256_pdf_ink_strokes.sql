@@ -1,7 +1,17 @@
 -- Private online pen stroke persistence, active session and entitlement.
 begin;
-select plan(43);
+select plan(51);
 select test_helpers.as_runner();
+select ok(not has_schema_privilege('anon','pdf_ink_private','USAGE')
+  and not has_schema_privilege('authenticated','pdf_ink_private','USAGE')
+  and not has_schema_privilege('service_role','pdf_ink_private','USAGE'),'private allocator schema not exposed to clients');
+select ok(not has_function_privilege('anon','pdf_ink_private.assign_pdf_ink_page_slot()','EXECUTE'),'anon cannot invoke allocator');
+select ok(not has_function_privilege('authenticated','pdf_ink_private.assign_pdf_ink_page_slot()','EXECUTE'),'authenticated cannot invoke allocator');
+select ok(not has_function_privilege('service_role','pdf_ink_private.assign_pdf_ink_page_slot()','EXECUTE'),'service role cannot invoke allocator');
+select ok((select prosecdef and proconfig @> array['search_path=pg_catalog, pg_temp']
+  from pg_proc where oid='pdf_ink_private.assign_pdf_ink_page_slot()'::regprocedure),'allocator definer has fixed trusted search path');
+select ok((select tgfoid='pdf_ink_private.assign_pdf_ink_page_slot()'::regprocedure and tgenabled='O'
+  from pg_trigger where tgrelid='public.pdf_ink_strokes'::regclass and tgname='pdf_ink_assign_page_slot'),'allocation trigger uses private function');
 select * into temp ink_curr from test_helpers.make_curriculum();
 select test_helpers.make_student((select year_id from ink_curr),'Ink Owner') id into temp ink_owner;
 select test_helpers.make_student((select year_id from ink_curr),'Ink Peer') id into temp ink_peer;
@@ -58,6 +68,11 @@ select test_helpers.as_user((select id from ink_admin),(select admin_sid from in
 select public.set_resource_entitlement('materials_folder',(select id from ink_folder),'free');
 select test_helpers.as_user((select id from ink_owner),(select stale_sid from ink_sessions));
 select is((select count(*)::int from public.pdf_ink_strokes),0,'stale session cannot read');
+select throws_ok($$insert into public.pdf_ink_strokes(id,material_id,content_revision,page_number,points,color,width)
+ values (gen_random_uuid(),(select id from ink_mat),md5('study-content/ink-qa/first.pdf'),1,'[[1,2]]','#dc2626',2)$$,'42501','pdf_ink_access_denied','stale session cannot allocate');
+select test_helpers.as_user((select id from ink_owner),(select owner_sid from ink_sessions));
+select throws_ok($$insert into public.pdf_ink_strokes(id,material_id,content_revision,page_number,points,color,width)
+ values (gen_random_uuid(),(select id from ink_mat),md5('wrong-revision'),1,'[[1,2]]','#dc2626',2)$$,'42501','pdf_ink_access_denied','wrong revision cannot allocate');
 select test_helpers.as_runner();
 update public.materials set r2_object_key='study-content/ink-qa/replaced.pdf' where id=(select id from ink_mat);
 select test_helpers.as_user((select id from ink_owner),(select owner_sid from ink_sessions));

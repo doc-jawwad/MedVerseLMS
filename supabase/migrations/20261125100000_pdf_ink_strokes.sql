@@ -101,29 +101,39 @@ using (
   else false end
 );
 
--- SECURITY INVOKER: allocation sees only rows the caller is permitted to read.
--- The uniqueness constraint remains the authority if concurrent writers pick
--- the same free slot; one can retry, but neither can exceed capacity.
-create function public.assign_pdf_ink_page_slot()
+-- Internal allocation only: canonical authorization precedes a precisely scoped
+-- slot read. Avoid evaluating the full entitlement policy for every occupied slot.
+-- RLS and the uniqueness constraint remain independent enforcement boundaries.
+create schema pdf_ink_private;
+revoke all on schema pdf_ink_private from public, anon, authenticated, service_role;
+
+create function pdf_ink_private.assign_pdf_ink_page_slot()
 returns trigger
 language plpgsql
-security invoker
+security definer
 set search_path = pg_catalog, pg_temp
 as $$
 declare
+  v_actor uuid := auth.uid();
+  v_revision text;
   v_used_slots smallint[];
 begin
-  if new.student_id is distinct from auth.uid()
+  if v_actor is null
+     or new.student_id is distinct from v_actor
      or new.tenant_id is distinct from public.default_tenant()
-     or new.content_revision is distinct from public.pdf_ink_revision(new.material_id) then
+     or new.content_revision is null then
     raise exception using errcode = '42501', message = 'pdf_ink_access_denied';
   end if;
-  -- Read visible slots once; avoid repeated entitlement evaluation per candidate.
+  v_revision := public.pdf_ink_revision(new.material_id);
+  if v_revision is null or new.content_revision is distinct from v_revision then
+    raise exception using errcode = '42501', message = 'pdf_ink_access_denied';
+  end if;
   select coalesce(array_agg(s.page_slot), '{}'::smallint[]) into v_used_slots
   from public.pdf_ink_strokes s
-  where s.student_id = new.student_id
+  where s.student_id = v_actor
+    and s.tenant_id = new.tenant_id
     and s.material_id = new.material_id
-    and s.content_revision = new.content_revision
+    and s.content_revision = v_revision
     and s.page_number = new.page_number;
   select n into new.page_slot
   from generate_series(1, 200) as candidate(n)
@@ -135,10 +145,10 @@ begin
   return new;
 end;
 $$;
-revoke all on function public.assign_pdf_ink_page_slot() from public, anon, authenticated, service_role;
+revoke all on function pdf_ink_private.assign_pdf_ink_page_slot() from public, anon, authenticated, service_role;
 create trigger pdf_ink_assign_page_slot
 before insert on public.pdf_ink_strokes
-for each row execute function public.assign_pdf_ink_page_slot();
+for each row execute function pdf_ink_private.assign_pdf_ink_page_slot();
 
 comment on table public.pdf_ink_strokes is
   'Private immutable PDF pen strokes for the current authorized object revision; no staff read override.';
