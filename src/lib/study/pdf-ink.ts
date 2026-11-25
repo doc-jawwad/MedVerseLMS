@@ -55,10 +55,14 @@ export async function saveInkStroke(stroke: PdfInkStroke): Promise<PdfInkStroke>
   const client = createClient();
   await verifyRevision(client, stroke.materialId, stroke.revision);
   await verifyActor(client, stroke.ownerId);
-  const payload = { id: stroke.id, material_id: stroke.materialId, content_revision: stroke.revision,
-    page_number: stroke.page, points: stroke.points, color: stroke.color, width: stroke.width };
-  // The same ID is retained on retry. Never upsert or overwrite an existing row.
-  const { data, error } = await client.from("pdf_ink_strokes").insert(payload).select(COLUMNS).single();
+  // Bind the intended owner in the same authenticated database request as the
+  // insert: the session may change after getUser() and before the RPC is sent.
+  // Keep the same ID on retry; never upsert or overwrite an existing row.
+  const { data, error } = await client.rpc("save_pdf_ink_stroke", {
+    p_expected_owner: stroke.ownerId, p_id: stroke.id, p_material_id: stroke.materialId,
+    p_content_revision: stroke.revision, p_page_number: stroke.page, p_points: stroke.points,
+    p_color: stroke.color, p_width: stroke.width,
+  });
   if (!error) {
     const row = parseInkRow(data);
     if (row && sameInkStroke(row, stroke)) return row;

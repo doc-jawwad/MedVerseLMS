@@ -23,21 +23,30 @@ type Stroke = { id:string; ownerId:string; materialId:string; revision:string; p
 const stroke: Stroke={id:"ink-1",ownerId:"owner",materialId:"doc",revision,page:1,points:[[12,34],[56,78]],color:"#dc2626",width:2};
 function inkHarness() {
   const state={ revision:revision as string|null, actor:"owner", insertError:false, prior:row as unknown,
-    deleteRows:[{id:"ink-1"}], listRows:[row] as unknown[] };
+    deleteRows:[{id:"ink-1"}], listRows:[row] as unknown[], switchBeforeSave:false, savedOwners:[] as string[] };
   const events:string[]=[];
   const chain = {
     eq(k:string,v:unknown){events.push("eq:"+k+"="+v);return this;},
     order(){return this;},
     limit(n:number){events.push("limit:"+n);return Promise.resolve({data:state.listRows,error:null});},
     select(){return this;},
-    single:async()=>({data:state.insertError?null:row,error:state.insertError?{message:"lost"}:null}),
     maybeSingle:async()=>({data:state.prior,error:null}),
     then(resolve:(v:unknown)=>unknown){return Promise.resolve({data:state.deleteRows,error:null}).then(resolve);},
   };
-  const client={rpc:async()=>({data:state.revision,error:null}),auth:{getUser:async()=>({data:{user:{id:state.actor}},error:null})},
+  const client={rpc:async(name:string,payload:Record<string,unknown>)=>{
+    if(name==="pdf_ink_revision")return {data:state.revision,error:null};
+    assert.equal(name,"save_pdf_ink_stroke");
+    assert.equal(payload.p_expected_owner,stroke.ownerId);
+    assert.equal(payload.p_id,stroke.id);
+    assert.deepEqual(payload.p_points,stroke.points);
+    events.push("save");
+    if(state.switchBeforeSave)state.actor="peer";
+    if(state.actor!==payload.p_expected_owner)return {data:null,error:{message:"pdf_ink_actor_mismatch"}};
+    if(!state.insertError)state.savedOwners.push(state.actor);
+    return {data:state.insertError?null:row,error:state.insertError?{message:"lost"}:null};
+  },auth:{getUser:async()=>({data:{user:{id:state.actor}},error:null})},
     from:(name:string)=>{assert.equal(name,"pdf_ink_strokes");return {
       select:()=>chain,
-      insert:(payload:Record<string,unknown>)=>{events.push("insert");assert.equal(payload.id,stroke.id);assert.ok(!("student_id" in payload));return chain;},
       delete:()=>{events.push("delete");return chain;},
     }}};
   const api=load("src/lib/study/pdf-ink.ts",{"@/lib/supabase/client":{createClient:()=>client},"@/lib/study/pdf-ink-geometry":geometry}) as {
@@ -65,6 +74,14 @@ describe("actual private ink client with closed-set database doubles",()=>{
     await assert.rejects(h.api.saveInkStroke(stroke),/Account changed/);
     await assert.rejects(h.api.removeInkStroke(stroke),/Account changed/);
     assert.deepEqual(h.events,[]);
+  });
+  it("binds the expected actor even if the account changes after getUser",async()=>{
+    const h=inkHarness();
+    h.state.switchBeforeSave=true;
+    h.state.prior=null;
+    await assert.rejects(h.api.saveInkStroke(stroke),/not confirmed/);
+    assert.deepEqual(h.state.savedOwners,[]);
+    assert.ok(h.events.includes("save"));
   });
   it("requires one confirmed deleted row and scopes requests",async()=>{
     const h=inkHarness();await h.api.removeInkStroke(stroke);
