@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { listInkPage, removeInkStroke, saveInkStroke, type PdfInkStroke } from "@/lib/study/pdf-ink";
+import { listInkPage, removeInkStroke, saveInkStroke, PdfInkPageCapacityError, type PdfInkStroke } from "@/lib/study/pdf-ink";
 import type { PdfInkColor, PdfInkPoint } from "@/lib/study/pdf-ink-geometry";
 
 export type PdfInkMode = "read" | "pen" | "erase";
@@ -91,8 +91,12 @@ export function usePdfInk(materialId: string, revision: string | null, page: num
       setPending(null);
       setMessage("Drawing saved");
       setRefresh(n => n + 1);
-    } catch {
-      if (actorRef.current === stroke.ownerId) setMessage("Save not confirmed. Retry the same drawing before drawing again.");
+    } catch (error) {
+      if (actorRef.current === stroke.ownerId) {
+        setMessage(error instanceof PdfInkPageCapacityError
+          ? error.message
+          : "Save not confirmed. Retry the same drawing before drawing again.");
+      }
     } finally { lock.current = false; setBusy(false); }
   }
 

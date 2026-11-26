@@ -2,6 +2,15 @@ import { createClient } from "@/lib/supabase/client";
 import { PDF_INK_COLORS, parsePdfInkPoints, type PdfInkColor, type PdfInkPoint } from "@/lib/study/pdf-ink-geometry";
 
 export const PDF_INK_PAGE_LIMIT = 200;
+
+// A capacity rejection is not proof that an earlier attempt did not commit.
+// Keep the pending ID until the user explicitly retries or discards locally.
+export class PdfInkPageCapacityError extends Error {
+  constructor() {
+    super("Page drawing limit reached. Discard locally, then refresh and erase a saved stroke before drawing again.");
+    this.name = "PdfInkPageCapacityError";
+  }
+}
 export type PdfInkStroke = {
   id: string; ownerId: string; materialId: string; revision: string; page: number;
   points: PdfInkPoint[]; color: PdfInkColor; width: number;
@@ -72,6 +81,12 @@ export async function saveInkStroke(stroke: PdfInkStroke): Promise<PdfInkStroke>
     .eq("id", stroke.id).eq("student_id", stroke.ownerId).eq("material_id", stroke.materialId).eq("content_revision", stroke.revision).maybeSingle();
   const row = parseInkRow(prior.data);
   if (!prior.error && row && sameInkStroke(row, stroke)) return row;
+  // Only the precise server capacity error and an empty successful lookup
+  // warrant capacity-specific guidance. Other outcomes remain unconfirmed.
+  if (!prior.error && prior.data === null &&
+      error?.code === "23514" && error.message === "pdf_ink_page_capacity") {
+    throw new PdfInkPageCapacityError();
+  }
   throw new Error("Drawing save not confirmed. Retry the same drawing.");
 }
 export async function removeInkStroke(stroke: PdfInkStroke): Promise<void> {

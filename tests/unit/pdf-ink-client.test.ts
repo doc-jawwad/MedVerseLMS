@@ -22,7 +22,7 @@ type Stroke = { id:string; ownerId:string; materialId:string; revision:string; p
   points:geometry.PdfInkPoint[];color:geometry.PdfInkColor;width:number };
 const stroke: Stroke={id:"ink-1",ownerId:"owner",materialId:"doc",revision,page:1,points:[[12,34],[56,78]],color:"#dc2626",width:2};
 function inkHarness() {
-  const state={ revision:revision as string|null, actor:"owner", insertError:false, prior:row as unknown,
+  const state={ revision:revision as string|null, actor:"owner", insertError:false, saveError:{message:"lost"} as {code?:string;message:string}, prior:row as unknown, priorError:null as {message:string}|null,
     deleteRows:[{id:"ink-1"}], listRows:[row] as unknown[], switchBeforeSave:false, savedOwners:[] as string[] };
   const events:string[]=[];
   const chain = {
@@ -30,7 +30,7 @@ function inkHarness() {
     order(){return this;},
     limit(n:number){events.push("limit:"+n);return Promise.resolve({data:state.listRows,error:null});},
     select(){return this;},
-    maybeSingle:async()=>({data:state.prior,error:null}),
+    maybeSingle:async()=>({data:state.prior,error:state.priorError}),
     then(resolve:(v:unknown)=>unknown){return Promise.resolve({data:state.deleteRows,error:null}).then(resolve);},
   };
   const client={rpc:async(name:string,payload:Record<string,unknown>)=>{
@@ -43,7 +43,7 @@ function inkHarness() {
     if(state.switchBeforeSave)state.actor="peer";
     if(state.actor!==payload.p_expected_owner)return {data:null,error:{message:"pdf_ink_actor_mismatch"}};
     if(!state.insertError)state.savedOwners.push(state.actor);
-    return {data:state.insertError?null:row,error:state.insertError?{message:"lost"}:null};
+    return {data:state.insertError?null:row,error:state.insertError?state.saveError:null};
   },auth:{getUser:async()=>({data:{user:{id:state.actor}},error:null})},
     from:(name:string)=>{assert.equal(name,"pdf_ink_strokes");return {
       select:()=>chain,
@@ -64,6 +64,25 @@ describe("actual private ink client with closed-set database doubles",()=>{
     h.state.prior={...row,student_id:"peer"};
     await assert.rejects(h.api.saveInkStroke(stroke),/not confirmed/);
     h.state.prior={...row,points:[[1,2]]};
+    await assert.rejects(h.api.saveInkStroke(stroke),/not confirmed/);
+  });
+  it("shows page capacity guidance only after precise rejection and empty lookup",async()=>{
+    const h=inkHarness();
+    h.state.insertError=true;
+    h.state.saveError={code:"23514",message:"pdf_ink_page_capacity"};
+    h.state.prior=null;
+    await assert.rejects(h.api.saveInkStroke(stroke),{name:"PdfInkPageCapacityError",message:/Discard locally.*erase a saved stroke/});
+    h.state.prior=row;
+    assert.deepEqual(await h.api.saveInkStroke(stroke),stroke);
+    h.state.prior={...row,points:[[1,2]]};
+    await assert.rejects(h.api.saveInkStroke(stroke),/not confirmed/);
+    h.state.prior=null;
+    h.state.priorError={message:"lookup interrupted"};
+    await assert.rejects(h.api.saveInkStroke(stroke),/not confirmed/);
+    h.state.priorError=null;
+    h.state.saveError={code:"23514",message:"other_constraint"};
+    await assert.rejects(h.api.saveInkStroke(stroke),/not confirmed/);
+    h.state.saveError={code:"23505",message:"pdf_ink_page_capacity"};
     await assert.rejects(h.api.saveInkStroke(stroke),/not confirmed/);
   });
   it("rejects changed revision and changed actor before mutation",async()=>{

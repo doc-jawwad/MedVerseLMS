@@ -28,12 +28,13 @@ export function PdfInkToolbar({ ink, page, onMode, onClose }: {
     {ink.pending && !ink.busy && <>
       <Button type="button" size="sm" variant="secondary" disabled={!ink.enabled || !ink.pendingMatches}
         onClick={ink.retry}>Retry save</Button>
-      <Button type="button" size="sm" variant="ghost" className="text-white" onClick={ink.discard}>Discard unsaved</Button>
+      <Button type="button" size="sm" variant="ghost" className="text-white" onClick={ink.discard}>Discard locally</Button>
     </>}
     <Button type="button" size="sm" variant="ghost" className="text-white" onClick={onClose} disabled={!!ink.pending || ink.busy}>Close</Button>
     <span className="basis-full text-xs text-white/80" role="status" data-testid="pdf-ink-status">
       {!ink.enabled ? "Pen editing requires the online PDF."
         : ink.pending && !ink.pendingMatches ? "Document changed. Discard the unconfirmed drawing."
+        : ink.pending ? ink.message || "Save not confirmed. Retry or discard locally."
         : ink.error ?? (ink.full ? "Page drawing limit reached. Erase a stroke to continue."
         : ink.message || (ink.ready ? "Draw on page " + page + " · Read mode to scroll" : "Loading drawings…"))}
     </span>
