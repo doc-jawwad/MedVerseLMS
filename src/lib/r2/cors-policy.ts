@@ -22,6 +22,7 @@ export const MEDVERSE_R2_CORS_RULES = [
     AllowedMethods: ["GET", "PUT", "HEAD"],
     AllowedHeaders: [
       "Content-Type",
+      "If-None-Match",
       "Content-Length",
       "x-amz-content-sha256",
       "x-amz-date",

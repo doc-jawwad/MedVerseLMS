@@ -111,6 +111,7 @@ export async function beginStudyPdfUpload(input: {
       method: "PUT",
       key,
       contentType: STUDY_PDF_CONTENT_TYPE,
+      createOnly: true,
       expiresSeconds: STUDY_PDF_UPLOAD_SESSION_TTL_SECONDS,
     });
     if ("error" in signed) {
