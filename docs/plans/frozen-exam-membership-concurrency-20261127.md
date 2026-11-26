@@ -1,106 +1,195 @@
 # Plan — frozen exam membership, publication and year-change concurrency (#38, PR39)
 
-Status: **PLAN ONLY — PENDING_R2.** Not approved for implementation until the doc delta (D1) is approved and an independent R2 review accepts this plan. Prevention-only. Base: PR39 head `79040940950c809a7ccc38f7f8c3333160647e4c` (on PR13 `40635334cc969abbbca115b1dfb2c317d0706a17`).
+Status: **PLAN ONLY — PENDING_R2.** Revision **r2** (amends r1 `2dc24bb`). This revision responds to the independent R2 plan review (#38 comment 7204897998). Implementation needs two things first: D1 founder approval (§4) and R2 acceptance of this revision. Prevention-only. Base: PR39 `79040940950c809a7ccc38f7f8c3333160647e4c` on PR13 `40635334cc969abbbca115b1dfb2c317d0706a17`.
 
-Hard limits (unchanged): no change to historical exam rows, scores, attempts, answers, frozen `question_version_id`s, or the **21 existing wrong-year links across 3 tests**. No backfill or validation scan. No staging/production migration, no permission or RLS widening, no paid CI, no unrelated refactor. Disposable local PostgreSQL only.
+Hard limits (unchanged):
+- No change to historical exam rows, scores, attempts, answers, frozen `question_version_id`s, or the **21 existing wrong-year links across 3 tests**.
+- No backfill, no validation scan, no DML on existing rows.
+- No staging or production migration.
+- No permission, RLS, grant or role change, either widening or narrowing.
+- No paid CI and no unrelated refactor. Disposable local PostgreSQL only.
+
+## r2 change log (review → resolution)
+
+| Review finding | r1 problem | r2 resolution |
+|---|---|---|
+| Parent/child lock-order inversion | r1 had publish lock the `tests` row first and then UPDATE child links. A direct UPDATE/DELETE on `test_questions` locks the **child tuple before** its BEFORE ROW trigger runs, and the trigger then waits on the parent. The two cycle. | §2 adopts a **child-first protocol**: links → test → questions. Every RPC that writes a test's links locks them child-first, in ascending `id` (L0–L4). The remaining multi-statement residuals are scoped as abort-safe in §2.3. |
+| Per-row parent sort ≠ tx-wide order | Sorting `{old,new}` parents inside one row's trigger does not order a whole statement or transaction. | §2.3 separates two cases. Per-row parent ordering is kept only where it is enough: a single-row reparent, where the only child is already held. Multi-row and multi-statement direct writes are scoped as abort-safe and proven by tests (R14–R16). `reorder_test_question` (the one multi-row RPC) is made id-ordered (L4). |
+| Lock questions before validation | r1 locked questions after `validate_test`, so approval, deletion and version checks could go stale. | L1 locks member questions **before** `validate_test`, and `require_permission('publish_tests')` stays the first statement, before any lock. |
+| Direct status publication bypass | Not addressed. RLS `tests_admin_update` lets a `publish_tests` admin `update tests set status='published'` directly. That skips `validate_test` and the freeze; only PR13's year trigger runs. A direct `published → draft` also skips `return_to_draft_test`'s no-attempts/unopened checks and unfreezes the membership. | **G1/G2** (§2.2): stateless status-transition triggers. They re-check the RPC preconditions inside every transition into `published` or `draft`, by any path. They change no grants. |
+| Race coverage | Not covered. | §5 adds R14–R22: publish-first vs existing-link UPDATE/DELETE in both orders, multi-row opposite order, concurrent question-state change, and the direct-status bypass. Each one waits on `pg_blocking_pids`, and the deadlock victim is pinned. |
 
 ## 1. Verified source facts (effective definitions)
 
 | # | Fact | Source |
 |---|------|--------|
-| F1 | `publish_test` reads `tests.status` with a plain SELECT and takes **no row lock** until its final `update tests set status`. | `20261005010000_publish_test_validate_permission.sql` |
-| F2 | Link triggers read `tests.status` / `tests.year_id` and `questions.year_id` with plain SELECTs (no lock). The year trigger (`test_questions_enforce_year_on_link`) fires **before** `test_questions_protect` (alphabetical). | `20261122213827_…` (PR13/PR39) |
-| F3 | The only lock a link INSERT takes on `tests` is the FK `FOR KEY SHARE`, which does **not** conflict with publish's status UPDATE (`FOR NO KEY UPDATE`). ⇒ **attach ∥ publish race is real**: an uncommitted attach is invisible to the publish freeze/year scan; both commit; the published test holds an unfrozen (`question_version_id is null`) and possibly wrong-year link. Same for DELETE and draft→draft reparent. | PG row-lock matrix + F1/F2 |
-| F4 | `sync_test_question_count` (AFTER INSERT/DELETE) already does `update tests …` on every attach/detach, so concurrent attaches to one test **already serialize on the tests row** — but only *after* the BEFORE checks ran. It does **not** fire on `UPDATE OF test_id` ⇒ draft reparent leaves both counts stale. | `20260912000017_test_question_count.sql` |
-| F5 | `questions.year_id` is a denormalized copy set by `questions_sync_ancestors` only on `topic_id` change; a direct `year_id` update is also possible (RLS `edit_questions`). Upstream taxonomy edits (subject/book/chapter/topic) do **not** cascade to `questions.year_id`. No guard exists for a question's year changing while linked. | `20260912000008`, `20260912000003` |
-| F6 | `tests.year_id` is frozen only when `old.status <> 'draft'` (`protect_published_test`). Draft year change with links is unchecked until publish. | `20261012090000_test_max_attempts.sql` |
-| F7 | `test_questions` write RLS = `has_permission('publish_tests')` for insert/update/delete (USING old row, CHECK new row). No year scope on tests for admins today. App never reparents (`src/lib/actions/tests.ts` only inserts/updates marks/positions); reparent is reachable only by direct PostgREST. | `20260915033122_admin_permissions.sql` |
-| F8 | `start_attempt`, `return_to_draft_test`, `reuse_test_as_draft`, `delete_draft_test`, close paths already lock `tests … for update`. | multiple |
-| F9 | Two-session harness pattern exists: `tests/db/start-attempt-resume-race.mjs`, `start-attempt-reattempt-concurrent.mjs`, `import-question-batch-concurrent.mjs` (pg clients, `assertNotCloudProduction`, synthetic users). | `tests/db/` |
+| F1 | `publish_test` reads `tests.status` with a plain SELECT, validates, and then freezes. It takes no row lock until its status UPDATE. | `20261005010000_publish_test_validate_permission.sql` |
+| F2 | The link triggers read `tests.status`, `tests.year_id` and `questions.year_id` without locks. `test_questions_enforce_year_on_link` (definer) fires before `test_questions_protect` (invoker). | `20261122213827_…` |
+| F3 | A link INSERT only holds the FK `KEY SHARE` on `tests`, which doesn't conflict with publish's status UPDATE. So attach, delete or reparent racing publish can leave an unfrozen or wrong-year link on a published test. | PG lock matrix + F1/F2 |
+| F4 | `sync_test_question_count` (AFTER INSERT/DELETE) updates the `tests` row on each attach/detach. It does not fire on `UPDATE OF test_id`, so a reparent leaves both counts stale. | `20260912000017` |
+| F5 | `questions.year_id` is denormalized. `questions_sync_ancestors` sets it on a `topic_id` change, and a direct update is also possible. Upstream taxonomy edits do not cascade. | `20260912000008`, `20260912000003` |
+| F6 | `tests.year_id` is frozen only when `old.status <> 'draft'`. App `updateTestConfig` allows `year_id` but not `status` (`src/lib/tests/test-config-update.ts`). | `20261012090000`, src |
+| F7 | `test_questions` and `tests` write RLS is `has_permission('publish_tests')`. There is **no status-transition guard** on `tests`: the only status trigger is PR13's year check. Every app status change uses an RPC: `publish_test`, `return_to_draft_test`, `close_test_now`, `invalidate_test`, `delete_draft_test`, `reuse_test_as_draft`. | `20260915033122`, src grep |
+| F8 | Child-tuple-first writers: direct PostgREST UPDATE/DELETE, `void_test_question` (one row), app `setQuestionMarks` and remove (one row), and `reorder_test_question` (two rows, arbitrary order). Parent-then-child writers: `return_to_draft_test` (`tests for update`, then UPDATE links), `delete_draft_test` (`tests for update`, then cascade DELETE links). Parent-only: `close_test_now`, `invalidate_test`, `start_attempt*`. | migrations |
+| F9 | In READ COMMITTED, a BEFORE ROW UPDATE/DELETE trigger runs **after** the executor has locked the target tuple. A BEFORE ROW INSERT trigger runs before the tuple exists. | PG trigger semantics; confirmed by R14/R15 negative controls |
+| F10 | Two-session harness: `tests/db/start-attempt-resume-race.mjs` and siblings (pg clients, `assertNotCloudProduction`, synthetic users). The runner connects as superuser, so it can `SET deadlock_timeout` per session before `set role authenticated`. | `tests/db/` |
 
-## 2. Design — one serialization point plus a fixed lock order
+## 2. Design
 
-**Lock order (global, documented):** `tests` rows (ascending `id`) **→** `questions` rows (ascending `id`). There are no new lock types, advisory locks or isolation-level changes. The plan reuses the tests-row lock that F4 already takes, only earlier.
+### 2.1 Lock protocol (documented in `docs/database.md`)
 
-| Change | What | Why |
-|---|---|---|
-| **L1** `publish_test` | First statement: `select status into … from tests where id = p_test_id for update`; `not found or status <> 'draft'` → existing `'only draft tests can be published'`. After validation and **before** freeze: `perform 1 from questions q join test_questions tq … where tq.test_id = p_test_id order by q.id for no key update of q`. Rest unchanged (same definer, ACL, search_path, messages, audit). | Closes F3 from the publish side. Question locks make the freeze and year scan read committed years/versions, and the later `used_in_test` update needs no lock upgrade. Ordered ⇒ two publishes that share questions serialize instead of deadlocking. |
-| **L2** link triggers | `enforce_test_question_year_on_link` (definer, fires first) and `protect_published_test_questions` (invoker, keep PR39 body/ACL/search_path) read the parent test(s) with `for no key update`. For a reparent, lock `{old.test_id,new.test_id}` `order by id`. Status/year are read **from the locked row**. In protect, *not found* on INSERT/UPDATE → raise `'questions of a published test are frozen'` (fail-closed against RLS filtering). *Not found* on DELETE keeps today's behaviour (cascade from `delete_draft_test`). | Closes F3 from the writer side. After waiting, READ COMMITTED re-reads the row ⇒ a writer that queued behind publish sees `published` and is rejected. Uses the same lock strength F4 already takes ⇒ no new contention and no share→update upgrade deadlock. |
-| **C1** count | Extend `test_questions_sync_count` to `after insert or delete or update of test_id`. On UPDATE, recompute **both** old and new test (ascending id). | Fixes F4 reparent drift. Rows are already locked by L2. |
-| **Y1** question year guard | New definer trigger `questions_zz_guard_linked_year` (name sorts **after** `questions_sync_ancestors`, so it sees the derived year): `before update on questions for each row when (new.year_id is distinct from old.year_id)`. It raises `test_question_year_mismatch` (23514) if any link exists to a test with `t.year_id = old.year_id and t.year_id is distinct from new.year_id` (all statuses). Reads tests **without** locking, so the lock order is kept. | Prevents *new* mismatches from topic moves or direct year edits, published or draft. Existing wrong-year links (`t.year_id <> old.year_id`) never trigger it ⇒ the 21 historical links stay as they are, and those questions stay editable. |
-| **Y2** draft test year guard | New definer trigger on `tests`: `before update of year_id … when (old.status = 'draft' and new.year_id is distinct from old.year_id)`. It raises 23514 if any linked question has `q.year_id = old.year_id and q.year_id is distinct from new.year_id`. It runs under the test row lock that the UPDATE itself takes, so it serializes with L2 attachers. | Rejects a future mismatch at the point it would be created, instead of only at publish. |
-| **B1** backstop | Keep PR13's `tests_enforce_question_year_before_publish` unchanged. With L1 it now scans committed links and locked question years. | **Authoritative** guard. The only race left unblocked at change time is question-year change ∥ draft attach (Y1 can't see an uncommitted link, and the attacher holds only FK KEY SHARE on the question). That produces at most a *draft* mismatch, which B1 then deterministically refuses to publish. |
-| **A1** app UX only | `src/lib/actions/questions.ts` (question edit/move) and the test-config update map `test_question_year_mismatch` to a friendly message, reusing the existing `publish-test-errors` mapping helper. No logic. | DB is the only enforcement. |
+**Order: a test's `test_questions` rows (ascending `tq.id`) → the `tests` row → `questions` rows (ascending `q.id`).** It uses only existing PG row locks: no advisory locks, no isolation-level changes.
 
-Attempt integrity: no change to `start_attempt` or scoring. Published membership is frozen under L2+L1, and attempts already lock the test row (F8). The tests assert that attempts, answers and scores are unchanged.
+Why child-first: F9 forces direct UPDATE/DELETE writers to hold their child before any trigger can act. Putting every other path in the same order means **single-row direct writers, multi-row INSERTs and all RPCs never form a cycle**.
 
-Authorization (verify, **no widening**): RLS stays as F7. The plan adds tests only: anon, student and `edit_questions`-only admins cannot insert, update or delete `test_questions`. A `publish_tests` admin can reparent draft→draft only. A non-draft endpoint is rejected in both directions (PR39). L2's invoker `FOR NO KEY UPDATE` requires the tests UPDATE policy, which every legitimate `test_questions` writer already satisfies (same `publish_tests` predicate, or a definer RPC).
+| Change | Definition |
+|---|---|
+| **L0** helper | `private_lock_test_links(p_test_id uuid)`: definer, `search_path = public, pg_temp`. Body: `perform 1 from test_questions where test_id = p_test_id order by id for no key update`. **Revoked from public, anon, authenticated and service_role.** Only owner-run definer functions and triggers call it, so no new callable surface. |
+| **L1** `publish_test` | Steps, in order: (1) `require_permission('publish_tests')`, unchanged and first; (2) L0; (3) `select … from tests where id = p for update`, where not found or not `draft` gives the existing `'only draft tests can be published'`; (4) L0 again, to pick up rows inserted and committed between (2) and (3), whose inserters held the test row; (5) `perform 1 from questions q join test_questions tq … order by q.id for no key update of q`; (6) `validate_test` (existing loop and messages); (7) freeze, status, `used_in_test`, audit, unchanged. Same definer, ACL, `search_path` and error contract. |
+| **L2** link triggers | Both triggers read the parent row(s) `for no key update`. For a reparent, `{old,new}` are locked `order by id`; the only child involved is already held, so the order is total for that row. Status and year are read **from the locked row**. In `protect`, not-found on INSERT/UPDATE raises `'questions of a published test are frozen'` (fail-closed). Not-found on DELETE keeps current behaviour (cascade from `delete_draft_test`). PR39's invoker, ACL and `search_path` are preserved. |
+| **L3** parent-first RPCs | `return_to_draft_test` and `delete_draft_test` insert L0 **after** `require_permission` and **before** their existing `tests … for update`. All other logic and messages stay unchanged. |
+| **L4** `reorder_test_question` | After locating `v_a` and `v_b`, run `perform 1 from test_questions where id in (v_a.id, v_b.id) order by id for no key update`, then the existing two UPDATEs. |
+| **C1** count | `test_questions_sync_count` becomes `after insert or delete or update of test_id`. On UPDATE it recomputes both tests (rows already locked by L2). |
+
+### 2.2 Year and status guards
+
+| Change | Definition |
+|---|---|
+| **Y1** question year | Definer trigger `questions_zz_guard_linked_year`, named so it sorts after `questions_sync_ancestors`. `before update … when (new.year_id is distinct from old.year_id)`. Raises `test_question_year_mismatch` (23514) if a link exists to a test with `t.year_id = old.year_id and t.year_id is distinct from new.year_id` (any status). It holds only the question row and reads tests unlocked, so the protocol is kept. Historical wrong-year links never match, so the 21 links and their questions are unaffected. |
+| **Y2** draft test year | Definer trigger: `before update of year_id on tests … when (old.status = 'draft' and new.year_id is distinct from old.year_id)`. Raises 23514 if any linked question has `q.year_id = old.year_id and q.year_id is distinct from new.year_id`. It runs under the test-row lock taken by the UPDATE, with no child locks: link writers that queued on the test row have not yet applied anything. |
+| **G1** → `published` | Definer trigger `tests_guard_publish_preconditions`: `before update of status … when (new.status = 'published' and old.status is distinct from 'published')`. Under the test-row lock (held for every caller): (a) `old.status` must be `draft`, else `'only draft tests can be published'`; (b) lock member questions `order by q.id for no key update` (a no-op re-lock inside `publish_test`); (c) every link has `question_version_id is not null`, `qv.question_id = tq.question_id` and `= q.current_version_id`, else `'validation failed: question versions freeze'`; (d) every `validate_test(new.id)` item passes, else `'validation failed: <check>'`. A direct status flip without the RPC's freeze fails (c). A hand-frozen direct flip still has to pass (d) with the current snapshot. Either way, no bypass of validation or freeze is possible. |
+| **G2** → `draft` | Same trigger family: `when (new.status = 'draft' and old.status is distinct from 'draft')`. Applies `return_to_draft_test`'s own preconditions verbatim: `old.status = 'published'`, `opens_at > now()`, and zero `test_attempts`, using the existing error strings. It serializes with `start_attempt`, which locks the test row `for update` (F8). |
+| **B1** | PR13's `tests_enforce_question_year_before_publish` stays unchanged. It is the authoritative year backstop. |
+| **A1** UX only | Map `test_question_year_mismatch` in the question edit/move and test-config actions, and map `40P01` to "Another change to this test was in progress — please retry", using the existing `publish-test-errors` helper. No logic change. |
+
+G1/G2 check invariants, not caller identity, so they cannot be spoofed and need no GUC or grant change. `validate_test` inside G1 runs its existing `require_permission('publish_tests')`. Every legitimate caller already holds that permission (RLS), so this adds nothing. The plan does not cover other transitions (`closed`, `archived`, `invalidated`), which are not membership-mutating.
+
+### 2.3 Deadlock analysis and scoped residuals
+
+These paths are **cycle-free by construction**:
+- Every RPC: `publish_test`, `return_to_draft_test`, `delete_draft_test`, `reorder_test_question`, `void_test_question`, `start_attempt*`, `close_test_now`, `invalidate_test`.
+- Every app write: single-row UPDATE/DELETE, single- or multi-row INSERT, config UPDATE.
+- Single-row reparent.
+- Question writers (Y1, approval, soft delete, new version), which hold only question rows and never wait on tests or links.
+
+`R1`–`R13` and `R17`–`R22` assert **no 40P01** on these paths.
+
+**Accepted residuals.** All of these are abort-safe: PostgreSQL detects the cycle and rolls back one whole transaction.
+
+| Residual | Reachable only by |
+|---|---|
+| X1. A direct multi-row or multi-statement UPDATE/DELETE that touches one test's links out of ascending-`id` order, concurrent with an L0 holder. | A hand-written PostgREST call or SQL session. The app never issues one. |
+| X2. A direct multi-row write that spans two tests, concurrent with another such write in the opposite order. | Same as X1. |
+| X3. Three concurrent operations: a draft insert commits between L1 steps (2) and (3), and a second direct writer grabs that new row before step (4). | A rare three-way overlap. |
+| X4. Questions locked in an unspecified scan order by existing bulk MCQ RPCs (`for update of q` over `= any(v_ids)`) against L1(5). | Pre-existing pattern. It is not modified here, to keep scope. |
+
+**Why no invariant is lost in X1–X4:**
+1. Every completing transaction has made its status, year and validation decision on locked rows, re-read after any wait.
+2. A deadlock victim is rolled back in full. Publication is one transaction, so there is no partial freeze or partial publish.
+3. Neither side of a cycle can commit before the other aborts.
+
+Removing X1–X2 entirely would require revoking direct `test_questions`/`tests` DML in favour of RPCs. That is an **access change**, which the plan excludes; it can be offered later as a separate founder decision.
+
+Attempt integrity: `start_attempt` and scoring are unchanged. Published membership is frozen under L1/L2/G1/G2, and R13/R21 assert that attempt, answer and score rows are hash-identical.
+
+Authorization (verify only, no change): the R-suite and pgTAP matrix confirm the following. Anon, students and `edit_questions`-only admins cannot write `test_questions` or `tests.status`. `publish_tests` admins can reparent draft→draft only. Every RPC still raises its permission error **before** taking any lock: a role without the permission, calling while a lock is held elsewhere, returns the permission error without blocking (R22).
 
 ## 3. Migration packaging
 
-- **New** migration `supabase/migrations/20261127120000_frozen_exam_membership_concurrency.sql`, layered on PR39. It contains only `create or replace` of `publish_test`, the two link-trigger functions and `sync_test_question_count`, plus a trigger re-create (C1) and two new triggers (Y1, Y2). The PR13/PR39 file is not edited again. That keeps PR39's reviewed delta stable and avoids any "already applied" ambiguity.
-- Preserve every existing invoker/definer choice, `search_path`, volatility, `revoke … from public, anon, authenticated` on trigger functions, and the `publish_test` grants. The new functions use `set search_path = public, pg_temp`.
-- No DML on existing rows. No `alter table`, no index, no validation scan.
+- **New** migration `supabase/migrations/20261127120000_frozen_exam_membership_concurrency.sql`, layered on PR39. It contains:
+  - L0 (new, revoked);
+  - `create or replace` of `publish_test`, `return_to_draft_test`, `delete_draft_test`, `reorder_test_question`, both link-trigger functions and `sync_test_question_count`, each starting from the **effective** current body;
+  - a re-create of the count trigger (C1);
+  - the new Y1, Y2 and G1/G2 triggers.
+- The PR13/PR39 file is not edited again.
+- Preserved: every existing invoker/definer choice, `search_path`, volatility, grant and revoke, and error string. New functions use `set search_path = public, pg_temp` and `revoke all … from public, anon, authenticated`.
+- No DML, no `alter table`, no index, no scan.
 
-## 4. Doc first (approval gate D1)
+## 4. Doc first (approval gate D1, still pending)
 
-Before any code, append to `docs/test-rules.md` (§ Question-year consistency) and `docs/database.md` (trigger/lock inventory):
-1. Membership writers and `publish_test` serialize on the `tests` row. Lock order is tests→questions, ascending id.
-2. A question's `year_id` cannot change while it is linked to any test of its current year (any status). Remove it from draft tests first.
+Before code, `docs/test-rules.md` (§ Question-year consistency, § Publish = snapshot) and `docs/database.md` (lock and trigger inventory) gain these rules:
+1. The child-first lock protocol (§2.1), with residuals X1–X4 being abort-and-retry only.
+2. A question's `year_id` cannot change while it is linked to any test of its current year. Remove it from draft tests first.
 3. A draft test's `year_id` cannot change while it holds questions of its current year.
-4. The publish-time guard is authoritative. A transient draft mismatch from concurrent edits cannot publish.
-5. Draft reparent is draft→draft only and keeps both `question_count`s exact.
+4. Any transition into `published` must satisfy full validation plus a current-version freeze. Any transition into `draft` must satisfy the return-to-draft preconditions, whatever the call path.
+5. Draft reparent is draft→draft only, and both counts stay exact.
 
-**Founder approval is needed for rules 2–3.** They are new user-visible restrictions. If they are declined, drop Y1/Y2 and rely on B1 alone. Y1 must then still be replaced by "question year frozen while linked to a non-draft test", because otherwise published history can drift with no detection.
+Rules 2–3 are new user-visible restrictions; the reviewer recommends approving them. Rule 4 codifies what the RPCs already promise. **Founder approval is pending.** If rules 2–3 are declined, drop Y2 and narrow Y1 to "question year frozen while linked to a non-draft test".
 
 ## 5. Tests (deterministic; local disposable PG only)
 
-**Sequential pgTAP:** extend `supabase/tests/248_test_question_year_consistency.sql` (currently `plan(10)`). Add:
-- Y1: reject a move that breaks a matching draft link and one that breaks a published link. Allow the move after the question is removed from the draft. Allow non-year edits.
-- Y2: reject a draft year change that breaks links. Allow it on an empty draft.
-- C1: both counts are exact after a draft→draft reparent.
-- Authorization matrix (anon, student, `edit_questions`-only, `publish_tests`).
-- **Historical fixture:** a published test with a wrong-year link, inserted as runner with the guards temporarily disabled inside the rolled-back tx (existing 248 pattern). Assert it stays byte-identical (link, version, attempt, score rows). Its question can still get a non-year edit. A *draft* copy of it still cannot publish.
+**pgTAP:** extend `supabase/tests/248_test_question_year_consistency.sql` (currently `plan(10)`):
+- Y1/Y2 accept and reject cases.
+- C1 reparent counts.
+- **G1:** a direct `status='published'` on an unfrozen draft fails freeze; a wrong-version hand freeze fails; an unapproved or soft-deleted member fails validation; the RPC publish still passes.
+- **G2:** a direct `published→draft` with attempts, or once opened, fails; the RPC path is unchanged.
+- The authorization matrix.
+- A historical wrong-year fixture that stays byte-identical and remains editable for non-year fields, plus a draft copy of it that cannot publish.
 
-Keep 245 (58) green.
+`245` (58 assertions) must stay green.
 
-**Two-session races:** new `tests/db/frozen-exam-membership-concurrent.mjs`, cloned from the F9 harness (same env guard, synthetic users, fixture cleanup). Determinism:
-- Session A opens a tx and runs step 1 without committing.
-- Session B's statement is launched un-awaited.
-- The runner polls `select pg_blocking_pids($B_pid) @> array[$A_pid]` until it is true (≤5 s). The case fails if B is **not** blocked where blocking is expected, or if B **is** blocked where it is not expected.
-- A then commits or rolls back, B is awaited and the outcome is asserted.
-- Each session sets `lock_timeout = '10s'`, so a regression cannot hang the run. Any `40P01` fails the case.
+**Races:** new `tests/db/frozen-exam-membership-concurrent.mjs`, cloned from the F10 harness.
 
-| Case | A (holds) | B (blocked?) | Expected |
+Determinism protocol:
+- A runs its step without committing.
+- B's statement is launched un-awaited.
+- The runner polls `pg_blocking_pids(B) @> {A}` and fails if B is not blocked where blocking is expected, or is blocked where it is not.
+- A commits or rolls back, and B is awaited.
+
+Every session sets `lock_timeout = '10s'`. For deadlock cases, A sets `deadlock_timeout = '50ms'` and B sets `'10s'`, which pins A as the victim. After every case, the runner asserts:
+- every link of every published fixture has a frozen version equal to its question's version at publish;
+- `question_count` equals the actual count;
+- `tests.year_id` equals `questions.year_id` for all new links;
+- the losing transaction left nothing behind.
+
+| Case | A (holds) | B | Expected |
 |---|---|---|---|
-| R1 | attach Q→X (draft) | `publish_test(X)` — blocked | commit A ⇒ B succeeds; **every** X link frozen (`question_version_id` not null); `question_count` = actual |
-| R2 | `publish_test(X)` | attach to X — blocked | B fails `frozen`; X membership = pre-publish set |
-| R3 | `publish_test(X)` | reparent X→Y (draft) — blocked | B fails; X membership intact; counts exact |
-| R4 | `publish_test(Y)` | reparent X→Y — blocked | B fails; Y frozen set unchanged |
-| R5 | delete link from X | `publish_test(X)` — blocked | commit A ⇒ B publishes the reduced set; count exact |
-| R6 | question Q year change (Q in X, matching) | — | A fails immediately (Y1) |
-| R7 | Q year change (Q linked nowhere) | attach Q→X — **not** blocked, passes (old year) | both commit ⇒ draft mismatch ⇒ `publish_test(X)` fails 23514 and rolls back (B1). This documents the accepted residual |
-| R8 | `publish_test(X)` | Q year change, Q∈X — blocked | B fails Y1 |
-| R9 | Q (a draft-mismatched member of X, from R7) moved **to** X's year (Y1 allows it) | `publish_test(X)` — blocked on Q's row (L1) | commit A ⇒ B re-reads Q and publishes; variant: rollback A ⇒ B fails 23514. This proves publish reads the locked, committed year |
-| R10 | draft X year change | attach to X — blocked | B fails 23514 (year read from the locked row) |
-| R11 | reparent X→Y (draft) | insert into Y — blocked | both counts exact |
-| R12 | `publish_test(X)` | `publish_test(Z)` sharing Q — blocked | both succeed, no deadlock |
-| R13 | `start_attempt` on published X | attach/delete/reparent on X | all rejected; attempt/answer/score rows hash-identical before vs after |
+| R1 | attach Q→X | `publish_test(X)`, blocked on the test row | commit A ⇒ B publishes; all links frozen, count exact |
+| R2 | `publish_test(X)` | attach to X, blocked | B fails `frozen`; membership unchanged |
+| R3 | `publish_test(X)` | reparent X→Y, blocked on the child | B fails; X intact; counts exact; **no 40P01** |
+| R4 | `publish_test(Y)` | reparent X→Y, blocked on Y | B fails; Y set unchanged |
+| R5 | delete a link from X | `publish_test(X)`, blocked on the child (L0) | commit A ⇒ B publishes the reduced set; **no 40P01** |
+| R6 | Q year change, Q∈X matching | — | A fails at once (Y1) |
+| R7 | Q year change, Q unlinked | attach Q→X, **not** blocked | both commit ⇒ draft mismatch ⇒ `publish_test(X)` fails 23514 (B1); the documented residual |
+| R8 | `publish_test(X)` | Q year change, Q∈X, blocked on Q | B fails (Y1) |
+| R9 | Q (a mismatched member of X from R7) moved **to** X's year | `publish_test(X)`, blocked on Q (L1 step 5) | commit A ⇒ B publishes; rollback A ⇒ B fails 23514 |
+| R10 | draft X year change | attach to X, blocked | B fails 23514 |
+| R11 | reparent X→Y | insert into Y, blocked | counts exact |
+| R12 | `publish_test(X)` | `publish_test(Z)`, sharing Q, blocked | both succeed; no 40P01 |
+| R13 | attempt started on published X | attach, delete or reparent on X | all rejected; attempt, answer and score rows hash-identical |
+| **R14** | `publish_test(X)` (holds links and test) | direct UPDATE of an **existing** X link's marks, then DELETE of another, blocked on the child | B fails `frozen` / `only voiding…` after A commits; no 40P01. **Negative control:** running the r1 design (publish locks the test first) on the same fixture must deadlock |
+| **R15** | direct UPDATE of an existing X link (holds the child, then the test via L2) | `publish_test(X)`, blocked in L0 | commit A ⇒ B publishes, freezing the updated row; rollback A ⇒ same, with the original row; **no 40P01** |
+| **R16** | one tx: UPDATE link `hi`, then (after B blocks) UPDATE link `lo` on X | `publish_test(X)`, holding `lo` and blocked on `hi` | X1 residual: exactly A gets 40P01 (pinned) and is fully rolled back; B publishes; invariants hold |
+| **R17** | `reorder_test_question(X, …)` | `publish_test(X)`, blocked | serialized; no 40P01; frozen positions match the post-reorder order |
+| **R18** | `return_to_draft_test(X)` (L3) | direct UPDATE of a link's marks on X, blocked on the child | A commits ⇒ B succeeds on the draft; reverse order is also serialized; no 40P01 |
+| **R19** | `delete_draft_test(X)` (L3) | direct DELETE of an X link, blocked | serialized; no 40P01 |
+| **R20** | question state change on Q∈X: approve→`needs_revision`, soft delete, or new version | `publish_test(X)`, blocked on Q (step 5, **before** validation) | commit A ⇒ B fails `validation failed: <check>`, or freezes the **new** version; never a stale approval or version |
+| **R21** | `start_attempt(X)` on published, open X (holds the test row); fixture `opens_at` is then moved to the future as runner to isolate the attempt check | direct `update tests set status='draft'`, blocked | commit A ⇒ B fails G2 (`test_has_attempts`); attempt rows unchanged. Sequential variant: a direct `draft` flip on a test with no attempts but already opened fails `test_already_open_or_unscheduled` |
+| **R22** | `publish_test(X)` holds | B (an `edit_questions`-only role) calls `publish_test(X)` / `return_to_draft_test(X)` | B gets the permission error **without blocking** (`pg_blocking_pids(B)` stays empty) |
 
-Release gates (all required, none authorized by this plan):
-1. D1 approved.
-2. 248 + 245 + the race script pass on a fresh disposable clone, with a rollback-baseline check.
-3. Full `npm run test:db` pass on disposable PG.
-4. Independent R2 review of the implementation diff.
-5. Separate explicit approval for any staging or production apply.
+## 6. Release gates (none authorized by this plan)
 
-## 6. Implementation wave (single Sonnet wave, ordered)
+1. D1 founder approval.
+2. Independent R2 acceptance of this r2 plan.
+3. On a fresh disposable clone: 248, 245 and the full race script pass, with a rollback-baseline check. R14's negative control must show the r1 design deadlocking.
+4. Full `npm run test:db` on disposable PG.
+5. Independent R2 review of the implementation diff.
+6. Separate explicit approval for any staging or production apply.
+
+## 7. Implementation wave (single Sonnet wave, ordered; not authorized yet)
 
 1. Docs D1 (after approval).
-2. Migration (L1, L2, C1, Y1, Y2).
-3. pgTAP 248 extension.
-4. Race script R1–R13.
-5. A1 error mapping and its unit test in `tests/unit/publish-test-errors.test.ts`.
-6. Local disposable run: record exact counts. Commit, non-force push, checkpoint. Review stays **PENDING_R2**.
+2. Migration: L0–L4, C1, Y1, Y2, G1/G2.
+3. pgTAP 248.
+4. Race script R1–R22.
+5. A1 mapping and its unit test (`tests/unit/publish-test-errors.test.ts`).
+6. Local disposable run with exact counts, then commit, non-force push and checkpoint. Review stays PENDING_R2.
 
-Out of scope: repairing the 21 links, any attempt/score recompute, admin year-scoped RLS for tests, the `used_in_test` semantics, changes to `reorder_test_question` (already safe under L2: same test row).
+Out of scope:
+- repairing the 21 links;
+- attempt or score recompute;
+- any RLS, grant or role change, including revoking direct DML (the only way to remove X1/X2);
+- year-scoped admin RLS;
+- `used_in_test` semantics;
+- re-ordering locks inside the bulk MCQ RPCs (X4);
+- transitions other than into `published` or `draft`.
