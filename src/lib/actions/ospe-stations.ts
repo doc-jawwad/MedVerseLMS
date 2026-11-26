@@ -35,6 +35,11 @@ async function discardStudyKey(
   await deleteR2Object({ key });
 }
 
+// Distinguish an explicit statement rejection from losing its response.
+function isDefinitiveDbRejection(error: { code?: string }): boolean {
+  return /^(22|23|42)[0-9A-Z]{3}$/.test(error.code ?? "");
+}
+
 export type OspeStationInput = {
   title: string;
   answer: string;
@@ -146,12 +151,16 @@ async function createOspeStationRecord(formData: FormData, requestId?: string): 
 
   if (error) {
     // Do not delete a possibly committed image after an ambiguous response.
-    if (!requestId || /^(22|23|42)[0-9A-Z]{3}$/.test(error.code ?? "")) {
-      await discardStudyKey(supabase, key);
-    }
+    const rejected = isDefinitiveDbRejection(error);
+    if (rejected) await discardStudyKey(supabase, key);
     return { error: requestId
       ? "Station save not confirmed. Retry this same row to reconcile its import ID."
-      : toClientActionError(error, "createOspeStation.insert") };
+      : rejected
+        ? toClientActionError(error, "createOspeStation.insert")
+        : "Station save not confirmed. Check the station list before retrying." };
+  }
+  if (!data?.id || (requestId && data.id !== requestId)) {
+    return { error: "Station save not confirmed. Check the station list before retrying." };
   }
   revalidateOspe();
   return { id: data.id };
@@ -231,7 +240,7 @@ export async function updateOspeStation(id: string, formData: FormData) {
     nextSize = file.size;
   }
 
-  const { error } = await supabase
+  const { data: saved, error } = await supabase
     .from("ospe_stations")
     .update({
       title,
@@ -244,13 +253,23 @@ export async function updateOspeStation(id: string, formData: FormData) {
       ...(nextType ? { r2_content_type: nextType } : {}),
       ...(nextSize != null ? { r2_byte_size: nextSize } : {}),
     })
-    .eq("id", id);
+    .eq("id", id)
+    .select("id,r2_object_key")
+    .maybeSingle();
 
   if (error) {
-    if (previousKey && nextKey !== previousKey) {
+    const rejected = isDefinitiveDbRejection(error);
+    if (rejected && previousKey && nextKey !== previousKey) {
       await discardStudyKey(supabase, nextKey);
     }
-    return { error: toClientActionError(error, "updateOspeStation") };
+    return { error: rejected
+      ? toClientActionError(error, "updateOspeStation")
+      : "Station update not confirmed. Reload the station before retrying." };
+  }
+
+  // Do not discard either image or claim success without row confirmation.
+  if (saved?.id !== id || saved.r2_object_key !== nextKey) {
+    return { error: "Station update not confirmed. Reload the station before retrying." };
   }
 
   if (previousKey && previousKey !== nextKey) {

@@ -19,7 +19,7 @@ function harness() {
   const events: string[] = [];
   let sequence = 0;
   const state = { year: YEAR, subjectYear: YEAR, permission: true, classAccess: true,
-    authenticated: true, failPut: false, insert: "normal", readError: false, deleted: false };
+    authenticated: true, failPut: false, insert: "normal", update: "normal", readError: false, deleted: false };
   const db = {
     auth: { getUser: async () => ({ data: { user: state.authenticated ? { id: "admin-1" } : null } }) },
     rpc: async (name: string, args: Record<string, string>) => {
@@ -51,7 +51,23 @@ function harness() {
             ? { data: null, error: { code: "FETCH_ERROR" } }
             : { data: { id }, error: null };
         } }) }),
-        update: () => { throw Error("Unexpected update"); },
+        update: (fields: Stored) => ({ eq: (_column: string, id: string) => {
+          events.push("update:" + id);
+          const row = records.get(id);
+          let result: { data: Stored | null; error: { code: string } | null };
+          if (state.update === "reject") result = { data: null, error: { code: "23514" } };
+          else if (!row || state.update === "zero-row") result = { data: null, error: null };
+          else {
+            const updated = { ...row, ...fields, id };
+            records.set(id, updated);
+            result = state.update === "ambiguous-commit"
+              ? { data: null, error: { code: "FETCH_ERROR" } }
+              : { data: updated, error: null };
+          }
+          return Object.assign(Promise.resolve(result), {
+            select: () => ({ maybeSingle: async () => result }),
+          });
+        } }),
       };
     },
   };
@@ -76,7 +92,7 @@ function harness() {
   return { records, objects, events, state, actions: mod.exports as {
     createOspeStationDraft: (fd: FormData) => Promise<Result>;
     createOspeStation: (fd: FormData) => Promise<Result>;
-    updateOspeStation: (id: string, fd: FormData) => Promise<Result>;
+    updateOspeStation: (id: string, fd: FormData) => Promise<{ error?: string }>;
   } };
 }
 function form(changes: Record<string, string | File> = {}) {
@@ -145,6 +161,58 @@ describe("actual OSPE action with isolated storage/database doubles", () => {
     assert.equal(h.objects.size, 1);
     assert.ok(h.objects.has(String(h.records.get(ID)?.r2_object_key)));
     assert.deepEqual(await h.actions.createOspeStationDraft(form()), { id: ID });
+  });
+  it("retains the single-create image after response loss", async () => {
+    const h = harness(); h.state.insert = "ambiguous-commit";
+    assert.ok("error" in await h.actions.createOspeStation(form()));
+    assert.equal(h.records.size, 1);
+    assert.ok(h.objects.has(String(h.records.get("single-id")?.r2_object_key)));
+    assert.equal(h.events.filter(x => x.startsWith("delete:")).length, 0);
+  });
+  it("cleans single-create allocation on definitive rejection", async () => {
+    const h = harness(); h.state.insert = "reject";
+    assert.ok("error" in await h.actions.createOspeStation(form()));
+    assert.equal(h.records.size, 0);
+    assert.equal(h.objects.size, 0);
+  });
+  it("retains both images after ambiguous committed update", async () => {
+    const h = harness();
+    await h.actions.createOspeStationDraft(form());
+    const oldKey = String(h.records.get(ID)?.r2_object_key);
+    h.state.update = "ambiguous-commit";
+    assert.ok((await h.actions.updateOspeStation(ID, form())).error);
+    const newKey = String(h.records.get(ID)?.r2_object_key);
+    assert.notEqual(newKey, oldKey);
+    assert.ok(h.objects.has(oldKey));
+    assert.ok(h.objects.has(newKey));
+  });
+  it("does not report success or discard images on zero-row update", async () => {
+    const h = harness();
+    await h.actions.createOspeStationDraft(form());
+    const oldKey = String(h.records.get(ID)?.r2_object_key);
+    h.state.update = "zero-row";
+    assert.ok((await h.actions.updateOspeStation(ID, form())).error);
+    assert.equal(h.records.get(ID)?.r2_object_key, oldKey);
+    assert.ok(h.objects.has(oldKey));
+    assert.equal(h.objects.size, 2);
+  });
+  it("cleans definitively rejected replacement", async () => {
+    const h = harness();
+    await h.actions.createOspeStationDraft(form());
+    const oldKey = String(h.records.get(ID)?.r2_object_key);
+    h.state.update = "reject";
+    assert.ok((await h.actions.updateOspeStation(ID, form())).error);
+    assert.deepEqual([...h.objects], [oldKey]);
+    assert.equal(h.records.get(ID)?.r2_object_key, oldKey);
+  });
+  it("removes old image only after matching updated row", async () => {
+    const h = harness();
+    await h.actions.createOspeStationDraft(form());
+    const oldKey = String(h.records.get(ID)?.r2_object_key);
+    assert.deepEqual(await h.actions.updateOspeStation(ID, form()), {});
+    const newKey = String(h.records.get(ID)?.r2_object_key);
+    assert.notEqual(oldKey, newKey);
+    assert.deepEqual([...h.objects], [newKey]);
   });
   it("preserves original single create redirect and rejects cross-year replacement", async () => {
     const h = harness();
