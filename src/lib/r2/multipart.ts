@@ -64,7 +64,7 @@ function canonicalQuery(pairs: QueryPairs): string {
   return sorted.map(([k, v]) => `${awsEncode(k)}=${awsEncode(v)}`).join("&");
 }
 
-/** Query-string presign for UploadPart / single PUT with optional Content-Type. */
+/** Query-string presign for UploadPart / single PUT with optional Content-Type and create-only precondition. */
 export function presignR2Upload(options: {
   method: "PUT";
   key: string;
@@ -73,6 +73,8 @@ export function presignR2Upload(options: {
   query?: Record<string, string>;
   /** If set, browser MUST send this Content-Type; it is signed. */
   contentType?: string;
+  /** Sign If-None-Match: * for a new object, never for UploadPart. */
+  createOnly?: boolean;
   now?: Date;
   config?: R2Config;
 }): { url: string } | { error: string } {
@@ -86,9 +88,14 @@ export function presignR2Upload(options: {
   const host = new URL(config.endpoint).host;
   const credential = `${config.accessKeyId}/${dateStamp}/${config.region}/s3/aws4_request`;
 
-  const signedHeaderNames = options.contentType
-    ? "content-type;host"
-    : "host";
+  if (options.createOnly && options.query && Object.keys(options.query).length > 0) {
+    return { error: "invalid_create_only_query" };
+  }
+  const headerMap: Record<string, string> = { host };
+  if (options.contentType) headerMap["content-type"] = options.contentType;
+  if (options.createOnly) headerMap["if-none-match"] = "*";
+  const headerKeys = Object.keys(headerMap).sort();
+  const signedHeaderNames = headerKeys.join(";");
   const query: QueryPairs = [
     ["X-Amz-Algorithm", "AWS4-HMAC-SHA256"],
     ["X-Amz-Credential", credential],
@@ -99,9 +106,7 @@ export function presignR2Upload(options: {
   ];
   const canonicalQueryStr = canonicalQuery(query);
   const canonicalUri = `/${encodePath(`${config.bucket}/${options.key}`)}`;
-  const canonicalHeaders = options.contentType
-    ? `content-type:${options.contentType}\nhost:${host}\n`
-    : `host:${host}\n`;
+  const canonicalHeaders = headerKeys.map(k => `${k}:${headerMap[k]}\n`).join("");
   const canonicalRequest = [
     options.method,
     canonicalUri,
@@ -247,7 +252,7 @@ export async function completeMultipartUpload(options: {
     method: "POST",
     key: options.key,
     query: { uploadId: options.uploadId },
-    headers: { "content-type": "application/xml" },
+    headers: { "content-type": "application/xml", "if-none-match": "*" },
     body,
     config: options.config,
   });

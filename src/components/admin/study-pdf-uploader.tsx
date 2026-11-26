@@ -48,12 +48,14 @@ async function putWithProgress(
   body: Blob,
   contentType: string | undefined,
   onProgress: (loaded: number) => void,
-  signal: AbortSignal
+  signal: AbortSignal,
+  createOnly = false
 ): Promise<{ etag: string | null }> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open("PUT", url);
     if (contentType) xhr.setRequestHeader("Content-Type", contentType);
+    if (createOnly) xhr.setRequestHeader("If-None-Match", "*");
     xhr.upload.onprogress = (ev) => {
       if (ev.lengthComputable) onProgress(ev.loaded);
     };
@@ -196,7 +198,8 @@ export function StudyPdfUploader({
             partLoadedRef.current.set(1, loaded);
             refreshProgress();
           },
-          abort.signal
+          abort.signal,
+          true
         );
         partLoadedRef.current.set(1, file.size);
         refreshProgress();
