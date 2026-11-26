@@ -1,6 +1,6 @@
 -- Run against a candidate schema; every fixture and assertion rolls back.
 begin;
-select plan(33);
+select plan(36);
 create temp table scope_fixture(k text primary key, id uuid not null default gen_random_uuid());
 insert into scope_fixture(k) values ('same'),('cross'),('no_class'),('limited'),('main');
 insert into public.profiles(id,full_name,email,role,is_main_admin,account_status)
@@ -10,6 +10,15 @@ select id,'E2E scope '||k,'e2e-scope-'||id||'@test.invalid',
 insert into public.enrollments(student_id,year_id,status)
 select f.id,y.id,'active' from scope_fixture f join public.years y
 on y.year_number=case f.k when 'same' then 1 when 'cross' then 3 end;
+-- Reverse history: an assigned active Year 1 and a newer unassigned pending Year 3.
+insert into public.enrollments(student_id,year_id,status,created_at)
+select f.id,y.id,'pending',now()+interval '1 second'
+from scope_fixture f cross join public.years y where f.k='same' and y.year_number=3;
+insert into public.subjects(year_id,name)
+select id,'E2E scope private subject '||gen_random_uuid()::text from public.years where year_number=3;
+create temp table scope_private_subjects as
+select s.id from public.subjects s join public.years y on y.id=s.year_id where y.year_number=3;
+grant select on scope_private_subjects to authenticated;
 -- An expired Year-1 enrollment must not make a current Year-3 student readable.
 insert into public.enrollments(student_id,year_id,status)
 select f.id,y.id,'expired' from scope_fixture f cross join public.years y
@@ -46,6 +55,9 @@ select is((select count(*)::int from public.profiles where id=(select id from sc
 select is((select count(*)::int from public.enrollments where student_id=(select id from scope_fixture where k='cross')),0,'cross enrollment history denied');
 select is((select count(*)::int from public.enrollments where student_id=(select id from scope_fixture where k='same')),1,'same enrollment retained');
 select lives_ok(format('select public.admin_student_profile(%L::uuid)',(select id from scope_fixture where k='same')),'same profile RPC retained');
+select is((public.admin_student_profile((select id from scope_fixture where k='same'))->'enrollment'->>'status'),'active','RPC projects current active enrollment rather than newer unassigned record');
+select is((public.admin_student_profile((select id from scope_fixture where k='same'))->'enrollment'->>'year_id'),(select id::text from public.years where year_number=1),'RPC returns assigned active year');
+select is((select count(*)::int from jsonb_array_elements(public.admin_student_profile((select id from scope_fixture where k='same'))->'subject_access') a join scope_private_subjects s on s.id=(a->>'subject_id')::uuid),0,'RPC does not project unassigned pending class subjects');
 select throws_ok(format('select public.admin_student_profile(%L::uuid)',(select id from scope_fixture where k='cross')),'P0001','year_scope_denied','cross RPC denied before Auth fallback');
 select is((select count(*)::int from public.profiles where id=(select id from scope_fixture where k='limited')),1,'admin own profile retained');
 select is((select count(*)::int from public.test_attempts where student_id=(select id from scope_fixture where k='same')),1,'same attempts retained');
