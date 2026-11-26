@@ -11,6 +11,7 @@ const MESSAGES: Record<string, string> = {
   pdf_empty: "Choose a PDF file.",
   pdf_magic_invalid: "That file is not a valid PDF.",
   pdf_size_mismatch: "Uploaded file size did not match. Try again.",
+  pdf_save_unconfirmed: "PDF save was not confirmed. Check the folder before uploading again.",
   cover_type_invalid: "Cover images must be JPEG, PNG, or WebP.",
   cover_too_large: "That cover image is larger than 2 MB.",
   ospe_image_type_invalid: "Station images must be JPEG, PNG, or WebP.",

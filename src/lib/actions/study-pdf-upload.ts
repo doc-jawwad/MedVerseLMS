@@ -4,10 +4,10 @@ import { revalidatePath } from "next/cache";
 import {
   actionRpcResult,
   clientActionFailed,
-  toClientActionError,
+
 } from "@/lib/errors/safe-action-error";
 import { createClient } from "@/lib/supabase/server";
-import { deleteR2Object, putR2Object } from "@/lib/r2/presign";
+import { putR2Object } from "@/lib/r2/presign";
 import {
   abortMultipartUpload,
   completeMultipartUpload,
@@ -32,17 +32,6 @@ import { STUDY_REVALIDATE_PATHS } from "@/lib/library/types";
 
 function revalidateStudy() {
   for (const path of STUDY_REVALIDATE_PATHS) revalidatePath(path);
-}
-
-async function discardStudyKey(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  key: string
-) {
-  const { error } = await supabase.rpc("authorize_study_object_discard", {
-    p_object_key: key,
-  });
-  if (error) return;
-  await deleteR2Object({ key });
 }
 
 async function requireAdminFolder(folderId: string) {
@@ -114,7 +103,6 @@ export async function beginStudyPdfUpload(input: {
       expiresSeconds: STUDY_PDF_UPLOAD_SESSION_TTL_SECONDS,
     });
     if ("error" in signed) {
-      await discardStudyKey(supabase, key);
       return clientActionFailed("beginStudyPdfUpload.putSign", signed.error);
     }
     const sealed = sealStudyPdfUploadSession({
@@ -131,7 +119,6 @@ export async function beginStudyPdfUpload(input: {
       exp,
     });
     if ("error" in sealed) {
-      await discardStudyKey(supabase, key);
       return sealed;
     }
     return {
@@ -150,7 +137,6 @@ export async function beginStudyPdfUpload(input: {
     contentType: STUDY_PDF_CONTENT_TYPE,
   });
   if ("error" in created) {
-    await discardStudyKey(supabase, key);
     return clientActionFailed("beginStudyPdfUpload.multipart", created.error);
   }
 
@@ -169,7 +155,6 @@ export async function beginStudyPdfUpload(input: {
   });
   if ("error" in sealed) {
     await abortMultipartUpload({ key, uploadId: created.uploadId });
-    await discardStudyKey(supabase, key);
     return sealed;
   }
 
@@ -309,7 +294,7 @@ export async function completeStudyPdfUpload(input: {
 
     const verified = await verifyPdfObject(session);
     if (verified.error) {
-      await cleanupFailedUpload(supabase, session);
+      await abortPendingMultipart(session);
       return { error: verified.error };
     }
 
@@ -317,7 +302,7 @@ export async function completeStudyPdfUpload(input: {
     if (input.cover instanceof File && input.cover.size > 0) {
       const coverErr = isStudyCoverFile(input.cover);
       if (coverErr) {
-        await cleanupFailedUpload(supabase, session);
+        await abortPendingMultipart(session);
         return { error: coverErr };
       }
       const { data: cKey, error: cAlloc } = await supabase.rpc(
@@ -325,7 +310,7 @@ export async function completeStudyPdfUpload(input: {
         { p_folder_id: session.folderId }
       );
       if (cAlloc || typeof cKey !== "string") {
-        await cleanupFailedUpload(supabase, session);
+        await abortPendingMultipart(session);
         return { error: "study_object_denied" };
       }
       coverKey = cKey;
@@ -335,8 +320,8 @@ export async function completeStudyPdfUpload(input: {
         contentType: input.cover.type,
       });
       if (coverPut.error) {
-        await discardStudyKey(supabase, coverKey);
-        await cleanupFailedUpload(supabase, session);
+        // A lost PUT response may still leave a completed cover.
+        await abortPendingMultipart(session);
         return clientActionFailed("completeStudyPdfUpload.cover", coverPut.error);
       }
     }
@@ -357,14 +342,14 @@ export async function completeStudyPdfUpload(input: {
       reference_text: (input.referenceText ?? "").trim(),
     });
     if (error) {
-      if (coverKey) await discardStudyKey(supabase, coverKey);
-      await cleanupFailedUpload(supabase, session);
-      return { error: toClientActionError(error, "completeStudyPdfUpload.insert") };
+      // The insert may have committed even when its response was lost.
+      await abortPendingMultipart(session);
+      return { error: "pdf_save_unconfirmed" };
     }
     revalidateStudy();
     return { ok: true as const, key: session.key, byteSize: session.declaredSize };
   } catch (e) {
-    await cleanupFailedUpload(supabase, session);
+    await abortPendingMultipart(session);
     return clientActionFailed(
       "completeStudyPdfUpload",
       e instanceof Error ? e.message : "upload_failed"
@@ -383,19 +368,18 @@ export async function abortStudyPdfUpload(input: { sessionToken: string }) {
   }
   if (gate.user.id !== session.uid) return { error: "permission_denied" };
 
-  await cleanupFailedUpload(gate.supabase, session);
+  await abortPendingMultipart(session);
   return { ok: true as const };
 }
 
-async function cleanupFailedUpload(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  session: StudyPdfUploadSessionPayload
-) {
+// An upload session is not proof that its final key is unreferenced.
+// Abort only pending multipart parts; never delete a completed object here.
+// A durable, reference-aware reconciliation process must own orphan cleanup.
+async function abortPendingMultipart(session: StudyPdfUploadSessionPayload) {
   if (session.mode === "multipart" && session.uploadId) {
     await abortMultipartUpload({
       key: session.key,
       uploadId: session.uploadId,
     });
   }
-  await discardStudyKey(supabase, session.key);
 }
