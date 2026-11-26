@@ -1,7 +1,7 @@
 -- Future-test year integrity guards. Run ONLY on disposable PostgreSQL.
 -- All synthetic fixtures and temporary trigger toggles roll back.
 begin;
-select plan(6);
+select plan(10);
 
 select test_helpers.as_runner();
 select * into temp t_year1 from test_helpers.make_curriculum();
@@ -113,5 +113,30 @@ select is(
   0, 'failed publication rolls back all frozen question snapshots'
 );
 
+-- Published links must not be moved between exams, even within the same year.
+select test_helpers.make_question((select topic_id from t_year1)) as id into temp t_question3;
+create temp table t_move_tests(k text primary key,id uuid not null default gen_random_uuid());
+insert into t_move_tests(k) values ('frozen'),('draft_source'),('draft_target');
+insert into public.tests(id,title,year_id,subject_id,status,opens_at,closes_at,duration_minutes,negative_mark,min_questions)
+select m.id,'PGTAP frozen-link '||m.k,y.year_id,(select subject_id from t_exam_subject),'draft',
+  now()-interval '1 minute',now()+interval '2 hours',60,0,1
+from t_move_tests m cross join t_year1 y;
+insert into public.test_audiences(test_id,year_id)
+select id,(select year_id from t_year1) from t_move_tests;
+insert into public.test_questions(test_id,question_id,position)
+values ((select id from t_move_tests where k='frozen'),(select id from t_question1),1),
+       ((select id from t_move_tests where k='draft_source'),(select id from t_question3),1);
+grant select on t_move_tests,t_question1,t_question3 to authenticated;
+select test_helpers.as_user((select id from t_admin), gen_random_uuid());
+select public.publish_test((select id from t_move_tests where k='frozen'));
+select throws_ok(format('update public.test_questions set test_id=%L where test_id=%L and question_id=%L',
+ (select id from t_move_tests where k='draft_target'),(select id from t_move_tests where k='frozen'),(select id from t_question1)),
+ 'P0001','questions of a published test are frozen','published question cannot move to a draft');
+select throws_ok(format('update public.test_questions set test_id=%L where test_id=%L and question_id=%L',
+ (select id from t_move_tests where k='frozen'),(select id from t_move_tests where k='draft_source'),(select id from t_question3)),
+ 'P0001','questions of a published test are frozen','draft question cannot move into published test');
+select test_helpers.as_runner();
+select is((select count(*)::int from public.test_questions where test_id=(select id from t_move_tests where k='frozen') and question_id=(select id from t_question1) and question_version_id is not null),1,'frozen original snapshot retained');
+select is((select count(*)::int from public.test_questions where test_id=(select id from t_move_tests where k='draft_source') and question_id=(select id from t_question3)),1,'draft source retained');
 select * from finish();
 rollback;
