@@ -74,3 +74,36 @@ create trigger tests_enforce_question_year_before_publish
   for each row
   when (new.status = 'published' and old.status is distinct from new.status)
   execute function public.enforce_test_question_year_on_publish();
+
+-- Existing frozen-link protection: check both ends of a reparent.
+create or replace function public.protect_published_test_questions()
+returns trigger language plpgsql set search_path = public as $$
+declare
+  v_status text;
+begin
+  select status into v_status from public.tests
+  where id = coalesce(new.test_id, old.test_id);
+
+  -- A reparent changes both source and destination exam membership.
+  if tg_op = 'UPDATE' and new.test_id is distinct from old.test_id then
+    if v_status is distinct from 'draft' or not exists (
+      select 1 from public.tests t
+      where t.id = old.test_id and t.status = 'draft'
+    ) then
+      raise exception 'questions of a published test are frozen';
+    end if;
+  end if;
+
+  if v_status <> 'draft' then
+    if tg_op in ('INSERT', 'DELETE') then
+      raise exception 'questions of a published test are frozen';
+    end if;
+    if new.question_id is distinct from old.question_id
+       or new.question_version_id is distinct from old.question_version_id
+       or new.position is distinct from old.position
+       or new.marks is distinct from old.marks then
+      raise exception 'only voiding may change on a published test';
+    end if;
+  end if;
+  return coalesce(new, old);
+end; $$;

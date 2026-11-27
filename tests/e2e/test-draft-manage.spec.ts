@@ -5,49 +5,21 @@ import {
   createDraftTestForBuilder,
   deletePublishedTest,
   provisionQuestionPoolFixture,
+  publishDraftTestViaRpc,
   teardownQuestionPoolFixture,
 } from "./fixtures";
-import { loadE2EEnv, isJwtSecret } from "./load-e2e-env";
 
 // Draft Edit + Delete on the Tests list / builder. Isolated fixture; tears down
 // leftover rows created here.
 
+/**
+ * Published sibling via publish_test (#38: a direct status PATCH is rejected
+ * by the lifecycle guard). Uses its own one-question pool so the draft under
+ * test keeps the main pool to itself.
+ */
 async function markTestPublished(testId: string) {
-  const e2e = loadE2EEnv();
-  const rest = e2e.restUrl.replace(/\/$/, "");
-  // Prefer JWT service role; otherwise admin password grant (same as fixtures).
-  let bearer = e2e.serviceRoleKey;
-  if (!isJwtSecret(bearer)) {
-    const auth = e2e.authUrl.replace(/\/$/, "");
-    const tok = await fetch(`${auth}/auth/v1/token?grant_type=password`, {
-      method: "POST",
-      headers: {
-        apikey: e2e.anonKey,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        email: e2e.adminEmail,
-        password: e2e.adminPassword,
-      }),
-    }).then((r) => r.json());
-    bearer = tok.access_token;
-    if (!bearer) throw new Error(`admin token failed: ${JSON.stringify(tok)}`);
-  }
-  // Draft → published via UPDATE is allowed by protect_published_test (gate is
-  // on old.status <> draft). Avoids full validate_test checklist for sibling.
-  const patch = await fetch(`${rest}/rest/v1/tests?id=eq.${testId}`, {
-    method: "PATCH",
-    headers: {
-      apikey: e2e.anonKey,
-      Authorization: `Bearer ${bearer}`,
-      "Content-Type": "application/json",
-      Prefer: "return=minimal",
-    },
-    body: JSON.stringify({ status: "published" }),
-  });
-  if (!patch.ok) {
-    throw new Error(`mark published failed: ${patch.status} ${await patch.text()}`);
-  }
+  const siblingPool = await provisionQuestionPoolFixture({ questionCount: 1 });
+  await publishDraftTestViaRpc(siblingPool, testId, siblingPool.questionIds[0]);
 }
 
 test.describe("Test draft management — Edit + Delete", () => {

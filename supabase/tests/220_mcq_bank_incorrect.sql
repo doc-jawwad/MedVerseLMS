@@ -273,14 +273,17 @@ select ok(
   '14 unfavorite preserves Incorrect + Done'
 );
 
--- 15) Answer history still appended
-select ok(
+-- 15) Preserve both distinct selections; repeated B is deduplicated by
+-- 20261011090000, while the incorrect cursor still reflects the latest answer.
+select is(
   (
-    select count(*)::int >= 3 from public.practice_answers
+    select array_agg(selected_key::text order by selected_key)
+    from public.practice_answers
     where student_id = (select id from t_paid)
       and question_version_id = (select id from t_q_a_ver)
   ),
-  '15 practice_answers history retained'
+  array['A','B']::text[],
+  '15 distinct practice answer history retained without duplicate B'
 );
 
 -- 16–17) Folder isolation
