@@ -1218,6 +1218,147 @@ async function main() {
       }
     });
 
+
+    // R28: moving the reorder target to another draft must never let
+    // the old-test reorder overwrite that moved link's position.
+    await runCase("R28", async () => {
+      const x = await makeDraft(r, y1, 2);
+      const y = await makeDraft(r, y1, 1);
+      const A = await open(admin);
+      const B = await open(admin);
+      try {
+        await A.c.query("begin");
+        await A.c.query(
+          `update public.test_questions set test_id = $1, position = 9
+           where test_id = $2 and question_id = $3`,
+          [y.testId, x.testId, x.qids[1]]
+        );
+        const pB = settle(B.c.query(
+          `select public.reorder_test_question($1, $2, 'up')`, [x.testId, x.qids[1]]
+        ));
+        check("R28: reorder waits on concurrent reparent", await blockedOn(r, B.pid, A.pid));
+        await A.c.query("commit");
+        const b = await pB;
+        check("R28: moved target no longer belongs to source", !b.ok && /question not found in this test/.test(b.message), b);
+      } finally {
+        await close(A, B);
+      }
+      const moved = (await r.query(
+        `select test_id, position from public.test_questions where question_id = $1`, [x.qids[1]]
+      )).rows[0];
+      check("R28: destination position untouched", moved?.test_id === y.testId && moved.position === 9, moved);
+      const remaining = (await r.query(
+        `select position from public.test_questions where test_id = $1 and question_id = $2`, [x.testId, x.qids[0]]
+      )).rows[0];
+      check("R28: source position untouched", remaining?.position === 1, remaining);
+      await invariants(r, "R28", [x.testId, y.testId]);
+    });
+
+    // R29: a deleted neighbor must be reselected under locks; at the new
+    // boundary this is an ordinary no-op, not a stale NULL-position write.
+    await runCase("R29", async () => {
+      const x = await makeDraft(r, y1, 2);
+      const A = await open(admin);
+      const B = await open(admin);
+      try {
+        await A.c.query("begin");
+        await A.c.query(
+          `delete from public.test_questions where test_id = $1 and question_id = $2`,
+          [x.testId, x.qids[0]]
+        );
+        const pB = settle(B.c.query(
+          `select public.reorder_test_question($1, $2, 'up')`, [x.testId, x.qids[1]]
+        ));
+        check("R29: reorder waits on neighbor deletion", await blockedOn(r, B.pid, A.pid));
+        await A.c.query("commit");
+        const b = await pB;
+        check("R29: new boundary is a safe no-op", b.ok, b);
+      } finally {
+        await close(A, B);
+      }
+      const rows = (await r.query(
+        `select question_id, position from public.test_questions where test_id = $1`, [x.testId]
+      )).rows;
+      check("R29: remaining position unchanged", rows.length === 1 && rows[0].question_id === x.qids[1] && rows[0].position === 2, rows);
+      await invariants(r, "R29", [x.testId]);
+    });
+
+    // R30: competing reorders must choose adjacency from committed positions.
+    await runCase("R30", async () => {
+      const x = await makeDraft(r, y1, 3);
+      const A = await open(admin);
+      const B = await open(admin);
+      try {
+        await A.c.query("begin");
+        await A.c.query(`select public.reorder_test_question($1, $2, 'up')`, [x.testId, x.qids[1]]);
+        const pB = settle(B.c.query(
+          `select public.reorder_test_question($1, $2, 'up')`, [x.testId, x.qids[2]]
+        ));
+        check("R30: second reorder waits", await blockedOn(r, B.pid, A.pid));
+        await A.c.query("commit");
+        const b = await pB;
+        check("R30: second reorder succeeds", b.ok, b);
+      } finally {
+        await close(A, B);
+      }
+      const order = (await r.query(
+        `select question_id from public.test_questions where test_id = $1 order by position`,
+        [x.testId]
+      )).rows.map(o => o.question_id);
+      check("R30: both reorders use current adjacent links", order.join() === [x.qids[1], x.qids[2], x.qids[0]].join(), order);
+      await invariants(r, "R30", [x.testId]);
+    });
+
+    // R31: direct unauthorized INSERT must not wait on the protected parent
+    // or disclose its year, even when a matching or mismatching question exists.
+    await runCase("R31", async () => {
+      const x = await makeDraft(r, y1, 1);
+      const same = await makeQuestion(r, y1.topic);
+      const wrong = await makeQuestion(r, y2.topic);
+      for (const [label, user] of [["student", ctx.student], ["limited admin", ctx.limited], ["anon", null]]) {
+        for (const [year, question] of [["matching", same], ["wrong", wrong]]) {
+          const A = await open(admin);
+          const B = await open(user);
+          try {
+            if (label === "anon") await B.c.query("set role anon");
+            await A.c.query("begin");
+            await A.c.query(`select 1 from public.tests where id = $1 for update`, [x.testId]);
+            const pB = settle(B.c.query(
+              `insert into public.test_questions (test_id, question_id, position) values ($1,$2,2)`,
+              [x.testId, question]
+            ));
+            check(`R31 ${label} ${year}: rejects without parent-lock wait`, await settlesWithin(pB, 2000));
+            await A.c.query("commit");
+            const b = await pB;
+            check(`R31 ${label} ${year}: 42501, no year oracle`, !b.ok && b.code === "42501" && !/year_mismatch/.test(b.message), b);
+          } finally {
+            await close(A, B);
+          }
+        }
+      }
+      const n = (await r.query(
+        `select count(*)::int n from public.test_questions where test_id = $1`, [x.testId]
+      )).rows[0].n;
+      check("R31: unauthorized inserts changed nothing", n === 1, n);
+      const service = await open();
+      try {
+        await service.c.query("set role service_role");
+        const a = await settle(service.c.query(
+          `insert into public.test_questions (test_id, question_id, position) values ($1,$2,2)`,
+          [x.testId, same]
+        ));
+        check("R31: privileged fixture insert remains valid", a.ok, a);
+        const b = await settle(service.c.query(
+          `insert into public.test_questions (test_id, question_id, position) values ($1,$2,3)`,
+          [x.testId, wrong]
+        ));
+        check("R31: privileged fixture still subject to year guard", !b.ok && b.code === "23514", b);
+      } finally {
+        await close(service);
+      }
+      await invariants(r, "R31", [x.testId]);
+    });
+
     // ---------------- Sequential guards (reproduce baseline gaps) ----------
     await runCase("S1", async () => {
       const x = await makeDraft(r, y1, 1);
