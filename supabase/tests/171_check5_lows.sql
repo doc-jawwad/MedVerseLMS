@@ -1,6 +1,6 @@
 -- Check 5 Lows: payment discard authorize, drive_url https CHECK, log_audit EXECUTE revoke.
 begin;
-select plan(13);
+select plan(14);
 
 select test_helpers.as_runner();
 select * into temp curriculum from test_helpers.make_curriculum();
@@ -108,6 +108,10 @@ values (
   'free'
 );
 
+select test_helpers.as_user((select id from t_mats), gen_random_uuid());
+select throws_ok($$insert into public.materials (folder_id, title, drive_url) values ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'::uuid, 'unassigned', 'https://drive.google.com/file/d/c5-low-unassigned')$$, '42501', 'new row violates row-level security policy for table "materials"', 'manage_materials without class assignment cannot insert');
+select test_helpers.as_user((select id from t_main));
+select public.set_admin_year_assignments((select id from t_mats), array[(select year_id from curriculum)]);
 select test_helpers.as_user((select id from t_mats), gen_random_uuid());
 select lives_ok(
   $$insert into public.materials (folder_id, title, drive_url)

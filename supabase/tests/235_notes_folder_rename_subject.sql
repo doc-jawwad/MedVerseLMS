@@ -1,6 +1,6 @@
 -- Notes folder Rename + Change Subject seals.
 begin;
-select plan(10);
+select plan(11);
 
 select test_helpers.as_runner();
 select * into temp curriculum from test_helpers.make_curriculum();
@@ -117,11 +117,14 @@ select is(
   (select id from t_folder),
   'C1. material folder_id unchanged'
 );
+select throws_ok($$select r2_object_key from public.materials where id = (select id from t_mat)$$, '42501', 'permission denied for table materials', 'limited admin cannot read private R2 key directly');
+select test_helpers.as_runner();
 select is(
   (select r2_object_key from public.materials where id = (select id from t_mat)),
   (select r2_object_key from t_mat),
   'C2. r2 key unchanged'
 );
+select test_helpers.as_user((select id from t_mats));
 select ok(
   (select deleted_at is null from public.material_folders where id = (select id from t_folder)),
   'C3. folder not binned'
@@ -172,6 +175,7 @@ select ok(
   'G. year/library/surface preserved'
 );
 
+select test_helpers.as_runner();
 select is(
   (select count(*)::int from public.r2_purge_queue
    where object_key = (select r2_object_key from t_mat)

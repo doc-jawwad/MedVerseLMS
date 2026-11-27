@@ -1,6 +1,6 @@
 -- F1: admin least-privilege sensitive reads (PostgREST RLS + DEFINER RPCs).
 begin;
-select plan(32);
+select plan(33);
 
 select test_helpers.as_runner();
 select * into temp curriculum from test_helpers.make_curriculum();
@@ -37,10 +37,11 @@ values (
   '{}'::jsonb
 );
 
-insert into public.subscriptions (student_id, plan_id, status, starts_at, ends_at)
+insert into public.subscriptions (student_id, plan_id, year_id, status, starts_at, ends_at)
 select
   (select id from t_student),
-  (select id from public.subscription_plans where is_active order by sort_order limit 1),
+  (select id from public.subscription_plans where is_active and year_id = (select year_id from curriculum) order by sort_order, id limit 1),
+  (select year_id from curriculum),
   'active',
   now() - interval '1 day',
   now() + interval '30 days'
@@ -54,7 +55,7 @@ where not exists (
 ------------------------------------------------------------------
 select test_helpers.as_user((select id from t_main));
 select is(
-  (select count(*)::int from public.profiles where role = 'student'),
+  (select count(*)::int from public.profiles where role = 'student' and id = (select id from t_student)),
   1,
   'Main Admin can SELECT student profiles'
 );
@@ -116,7 +117,7 @@ select is(
 ------------------------------------------------------------------
 select test_helpers.as_user((select id from t_view));
 select is(
-  (select count(*)::int from public.profiles where role = 'student'),
+  (select count(*)::int from public.profiles where role = 'student' and id = (select id from t_student)),
   1,
   'view_students can SELECT student profiles'
 );
@@ -132,9 +133,13 @@ select is(
 );
 
 select test_helpers.as_user((select id from t_subs));
+select is((select count(*)::int from public.subscriptions where student_id = (select id from t_student)), 0, 'manage_subscriptions without assigned class cannot read fixture subscription');
+select test_helpers.as_user((select id from t_main));
+select public.set_admin_year_assignments((select id from t_subs), array[(select year_id from curriculum)]);
+select test_helpers.as_user((select id from t_subs));
 select ok(
-  (select count(*)::int from public.subscriptions) >= 1,
-  'manage_subscriptions can SELECT subscriptions'
+  (select count(*)::int from public.subscriptions where student_id = (select id from t_student)) >= 1,
+  'manage_subscriptions can SELECT subscriptions in assigned class'
 );
 select ok(
   (select count(*)::int from public.payment_settings) >= 1,

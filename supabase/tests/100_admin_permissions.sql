@@ -1,6 +1,6 @@
 -- Granular admin permissions (Step 8C). Transaction-scoped fixtures.
 begin;
-select plan(52);
+select plan(54);
 
 select test_helpers.as_runner();
 select * into temp curriculum from test_helpers.make_curriculum();
@@ -30,9 +30,9 @@ grant select on curriculum, t_student, t_student_b, t_main, t_zero, t_academic,
 -- 1) Seeded catalog
 ------------------------------------------------------------------
 select is(
-  (select count(*)::int from public.permissions),
-  16,
-  'all approved permission codes are seeded'
+  (select array_agg(code::text order by code) from public.permissions),
+  array['activate_students','edit_questions','grant_resource_access','import_questions','manage_admins','manage_curriculum','manage_materials','manage_payment_settings','manage_students','manage_subscriptions','manage_system_settings','manage_year_changes','publish_tests','restrict_students','review_subscription_applications','view_analytics','view_students']::text[],
+  'exact approved permission codes are seeded'
 );
 
 ------------------------------------------------------------------
@@ -125,7 +125,7 @@ select throws_ok(
 );
 select throws_ok(
   format('update public.profiles set is_main_admin = true where id = %L', (select id from t_student)),
-  'is_main_admin changes require admin',
+  'is_main_admin changes require Main Admin',
   'student cannot set is_main_admin'
 );
 select throws_ok(
@@ -210,9 +210,14 @@ select lives_ok(
 -- 11) Existing legitimate admin actions still work where permission exists
 ------------------------------------------------------------------
 select test_helpers.as_user((select id from t_year));
+select throws_ok(format('select public.promote_student(%L)', (select id from t_student)),
+  'year_scope_denied', 'manage_year_changes without class scope cannot promote');
+select test_helpers.as_user((select id from t_main));
+select public.set_admin_year_assignments((select id from t_year), array[(select year_id from curriculum), (select id from public.years where year_number = 2)]);
+select test_helpers.as_user((select id from t_year));
 select lives_ok(
   format('select public.promote_student(%L)', (select id from t_student)),
-  'admin with manage_year_changes can promote_student'
+  'admin with manage_year_changes and both classes can promote_student'
 );
 
 select test_helpers.as_user((select id from t_activate));
@@ -383,17 +388,23 @@ select is(
 );
 
 ------------------------------------------------------------------
--- Curriculum: existing is_admin() writes preserved (pending owner decision)
+-- Curriculum: dedicated manage_curriculum permission required.
 ------------------------------------------------------------------
 select test_helpers.as_user((select id from t_zero));
-select lives_ok(
+select throws_ok(
   format(
     'insert into public.subjects (year_id, name) values (%L, %L)',
     (select year_id from curriculum),
     'PGTAP_curr_' || (select id from t_zero)::text
   ),
-  'curriculum writes still allowed for any admin until a dedicated code exists'
+  '42501', 'new row violates row-level security policy for table "subjects"',
+  'admin without manage_curriculum cannot insert subjects'
 );
+select test_helpers.as_runner();
+select test_helpers.make_limited_admin('Perm Curriculum', array['manage_curriculum']) as id into temp t_curr;
+grant select on t_curr to authenticated;
+select test_helpers.as_user((select id from t_curr));
+select lives_ok(format('insert into public.subjects (year_id, name) values (%L, %L)', (select year_id from curriculum), 'PGTAP_curr_' || (select id from t_curr)::text), 'manage_curriculum permits curriculum write');
 
 ------------------------------------------------------------------
 -- grant_access RPC
