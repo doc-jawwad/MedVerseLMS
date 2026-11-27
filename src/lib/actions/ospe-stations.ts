@@ -249,7 +249,9 @@ export async function updateOspeStation(id: string, formData: FormData) {
       subject_id: subjectId,
       status,
       sort_order: sortOrder,
-      r2_object_key: nextKey,
+      // Metadata-only edits must not restore a stale image key loaded before
+      // a concurrent replacement. Only write image fields for a new upload.
+      ...(previousKey !== null ? { r2_object_key: nextKey } : {}),
       ...(nextType ? { r2_content_type: nextType } : {}),
       ...(nextSize != null ? { r2_byte_size: nextSize } : {}),
     })
@@ -268,7 +270,7 @@ export async function updateOspeStation(id: string, formData: FormData) {
   }
 
   // Do not discard either image or claim success without row confirmation.
-  if (saved?.id !== id || saved.r2_object_key !== nextKey) {
+  if (saved?.id !== id || (previousKey !== null && saved.r2_object_key !== nextKey)) {
     return { error: "Station update not confirmed. Reload the station before retrying." };
   }
 

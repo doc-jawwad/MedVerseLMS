@@ -18,6 +18,7 @@ function harness() {
   const objects = new Set<string>();
   const events: string[] = [];
   let sequence = 0;
+  const hooks: { beforeUpdate?: (id: string) => void } = {};
   const state = { year: YEAR, subjectYear: YEAR, permission: true, classAccess: true,
     authenticated: true, failPut: false, insert: "normal", update: "normal", readError: false, deleted: false };
   const db = {
@@ -53,6 +54,7 @@ function harness() {
         } }) }),
         update: (fields: Stored) => ({ eq: (_column: string, id: string) => {
           events.push("update:" + id);
+          hooks.beforeUpdate?.(id);
           const row = records.get(id);
           let result: { data: Stored | null; error: { code: string } | null };
           if (state.update === "reject") result = { data: null, error: { code: "23514" } };
@@ -89,7 +91,7 @@ function harness() {
   const mod = { exports: {} };
   const load = (name: string) => { assert.ok(Object.hasOwn(mocks, name), "Unexpected module: " + name); return mocks[name]; };
   new Function("require", "module", "exports", compiled)(load, mod, mod.exports);
-  return { records, objects, events, state, actions: mod.exports as {
+  return { records, objects, events, state, hooks, actions: mod.exports as {
     createOspeStationDraft: (fd: FormData) => Promise<Result>;
     createOspeStation: (fd: FormData) => Promise<Result>;
     updateOspeStation: (id: string, fd: FormData) => Promise<{ error?: string }>;
@@ -213,6 +215,29 @@ describe("actual OSPE action with isolated storage/database doubles", () => {
     const newKey = String(h.records.get(ID)?.r2_object_key);
     assert.notEqual(oldKey, newKey);
     assert.deepEqual([...h.objects], [newKey]);
+  });
+  it("metadata-only edit cannot restore an obsolete image after concurrent replacement", async () => {
+    const h = harness();
+    await h.actions.createOspeStationDraft(form());
+    const oldKey = String(h.records.get(ID)?.r2_object_key);
+    const currentKey = "study-content/test/admin/concurrent-replacement";
+    h.hooks.beforeUpdate = (id) => {
+      // Interleave another committed replacement after this edit loaded
+      // its snapshot, before the metadata update reaches the database.
+      h.hooks.beforeUpdate = undefined;
+      h.records.set(id, { ...h.records.get(id), r2_object_key: currentKey,
+        r2_content_type: "image/png", r2_byte_size: 42 });
+      h.objects.add(currentKey);
+      h.objects.delete(oldKey);
+    };
+    const fd = form({ title: "Metadata edited" });
+    fd.delete("image");
+    assert.deepEqual(await h.actions.updateOspeStation(ID, fd), {});
+    assert.equal(h.records.get(ID)?.title, "Metadata edited");
+    assert.equal(h.records.get(ID)?.r2_object_key, currentKey);
+    assert.equal(h.records.get(ID)?.r2_content_type, "image/png");
+    assert.equal(h.records.get(ID)?.r2_byte_size, 42);
+    assert.deepEqual([...h.objects], [currentKey]);
   });
   it("preserves original single create redirect and rejects cross-year replacement", async () => {
     const h = harness();
