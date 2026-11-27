@@ -71,3 +71,37 @@ Pre-existing failing files, unchanged by this change: 010_rls (1), 100_admin_per
 ## Residuals (accepted design, unchanged)
 
 X1–X4 per plan §2.3 are abort-safe. X1 is proven by R16. X3 is exercised by R25 but was never observed deadlocking. X2 and X4 are documented only.
+
+## Addendum — R2 implementation review corrections (#38 comment 7206144469)
+
+The correction commit `6ecc2e2` (migration `20261127121000_frozen_exam_reorder_insert_guard.sql`, race cases R28–R31) was verified on a fresh disposable clone of the same synthetic R1 source. Verification also added three sequential 248 assertions.
+
+**Clone sequence:**
+1. PR39 baseline.
+2. New synthetic history fixture: 3 tests, 21 wrong-year links, 6 attempts, 42 answers. Pre-hash `tests 8:4628bad9…9c3f`, `test_questions 21:58b41533…9c06`, `test_attempts 6:7f5a8acd…372d`, `attempt_answers 42:a76cd779…7d1a`.
+3. `20261127120000` only, which is the `1fedec3` state.
+4. `20261127121000`.
+
+**Reproduced on the `1fedec3` state, with real lock barriers:**
+- **Finding 1 (reorder):**
+  - R28: after a concurrent draft reparent, `reorder_test_question` rewrote the moved link inside the *other* draft (position 9 → 1) and set the source link to 9.
+  - R29: a concurrent neighbor delete led to a NULL-position write (23502).
+  - R30: competing reorders used stale adjacency and produced the wrong order.
+- **Finding 2 (unauthorized direct insert):**
+  - R31: a student or `edit_questions`-only admin *waited* on a locked parent, and a wrong-year insert returned `test_question_year_mismatch` (23514) instead of 42501.
+  - 248 #51 and #55 show the same year oracle sequentially.
+  - 248 #52 shows an additional frozen-state oracle: an unauthorized attach to a published test returned `questions of a published test are frozen` instead of 42501.
+
+**After `20261127121000`:**
+- Race suite: 284/284 on three consecutive runs (R1–R31, R14-NC, S1–S6). R25 again landed in class (i) 20/20.
+- 248: 62/62. 245: 58/58.
+- Full pgTAP: 1672 `ok`, 22 failures, a set identical to the PR39 baseline.
+- History: hash-identical after both migrations and after the full suite.
+- ACLs:
+  - `reorder_test_question` ACL is unchanged.
+  - `require_test_question_insert_permission` is invoker with EXECUTE for `postgres` only. As a trigger function it is not callable through the API.
+- Trigger order: `test_questions_aa_require_insert_permission` < `…_enforce_year_on_link` < `…_protect` < `…_sync_count`.
+
+**Wording correction:** R21 rejects on either G2 precondition. The schedule check fires first for an opened test. It therefore proves that a direct published → draft flip serializes behind `start_attempt` and is rejected. It does **not** isolate the attempt-count check under concurrency. That check is proven sequentially by 248 ("G2: direct draft flip of a test with attempts is rejected").
+
+Still not run: Playwright e2e, staging, production. Pre-existing unit (`deploy-config`) and `tsc` (`LayoutProps`) failures are unchanged, and no app code changed in this delta.

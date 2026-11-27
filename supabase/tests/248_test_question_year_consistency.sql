@@ -1,7 +1,7 @@
 -- Future-test year integrity guards. Run ONLY on disposable PostgreSQL.
 -- All synthetic fixtures and temporary trigger toggles roll back.
 begin;
-select plan(59);
+select plan(62);
 
 select test_helpers.as_runner();
 select * into temp t_year1 from test_helpers.make_curriculum();
@@ -167,7 +167,7 @@ insert into public.test_questions(test_id,question_id,position) values
   ((select id from t38 where k='d1'),(select id from t38q where k='qb'),2),
   ((select id from t38 where k='pub_future'),(select id from t38q where k='qc'),1),
   ((select id from t38 where k='legacy'),(select id from t38q where k='qh'),1);
-grant select on t38, t38q, t_editor, t_student, t_topic2, t_year1, t_year2 to authenticated;
+grant select on t38, t38q, t_editor, t_student, t_topic2, t_year1, t_year2, t_question2 to authenticated;
 
 select test_helpers.as_user((select id from t_admin), gen_random_uuid());
 select public.publish_test((select id from t38 where k='pub_future'));
@@ -362,6 +362,15 @@ select throws_ok(
   format('insert into public.test_questions(test_id,question_id,position) values (%L,%L,9)',
     (select id from t38 where k='empty'), (select id from t38q where k='qc')),
   '42501', null, 'auth: edit_questions-only admin cannot attach');
+-- R2 finding 2: no year / frozen-state oracle for unauthorized direct inserts.
+select throws_ok(
+  format('insert into public.test_questions(test_id,question_id,position) values (%L,%L,9)',
+    (select id from t38 where k='empty'), (select id from t_question2)),
+  '42501', null, 'auth: edit_questions-only wrong-year attach gets 42501, not a year error');
+select throws_ok(
+  format('insert into public.test_questions(test_id,question_id,position) values (%L,%L,9)',
+    (select id from t38 where k='d2'), (select id from t38q where k='qc')),
+  '42501', null, 'auth: edit_questions-only attach to a published test gets 42501, not frozen');
 select throws_ok(
   format('select public.publish_test(%L)', (select id from t38 where k='empty')),
   'P0001', 'permission_denied', 'auth: edit_questions-only admin cannot publish');
@@ -371,6 +380,10 @@ select throws_ok(
   format('insert into public.test_questions(test_id,question_id,position) values (%L,%L,9)',
     (select id from t38 where k='empty'), (select id from t38q where k='qc')),
   '42501', null, 'auth: student cannot attach');
+select throws_ok(
+  format('insert into public.test_questions(test_id,question_id,position) values (%L,%L,9)',
+    (select id from t38 where k='empty'), (select id from t_question2)),
+  '42501', null, 'auth: student wrong-year attach gets 42501, not a year error');
 select test_helpers.as_anon();
 select throws_ok(
   'insert into public.test_questions(test_id,question_id,position) values (gen_random_uuid(),gen_random_uuid(),9)',
