@@ -39,9 +39,10 @@ where not exists (
   where year_id = (select id from t_fy) and name = 'Surgery I'
 );
 
--- Remove Medicine/Surgery/Pediatrics product rows if a prior seed created them,
--- so this file exercises the ensure path (only when product_key matches).
-delete from public.subjects
+-- Simulate missing product rows without deleting the referenced seeded IDs.
+-- Preserve FK targets; transaction rollback restores their names and keys.
+update public.subjects
+set name = 'PGTAP hidden ' || id::text, product_key = null
 where year_id = (select id from t_fy)
   and product_key in ('medicine', 'surgery', 'pediatrics');
 

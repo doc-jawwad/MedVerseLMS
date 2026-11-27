@@ -61,6 +61,29 @@ begin
 end;
 $$;
 
+-- FIXTURE-ONLY (#38). Older suites build published/closed/archived tests by
+-- direct INSERT/UPDATE to exercise unrelated features. The lifecycle guards
+-- (tests_zz_guard_initial_status / tests_zz_guard_status_transition) now
+-- reject that on every path, so such files call this once, as runner, right
+-- after plan(). ALTER TABLE is transactional and every pgTAP file ROLLBACKs,
+-- so the guards are back the moment the file ends. Never call it from the
+-- suites that prove those guards (248, tests/db/frozen-exam-*.mjs).
+create or replace function test_helpers.allow_direct_test_status()
+returns void language plpgsql as $$
+begin
+  if exists (select 1 from pg_trigger
+             where tgrelid = 'public.tests'::regclass
+               and tgname = 'tests_zz_guard_initial_status') then
+    alter table public.tests disable trigger tests_zz_guard_initial_status;
+  end if;
+  if exists (select 1 from pg_trigger
+             where tgrelid = 'public.tests'::regclass
+               and tgname = 'tests_zz_guard_status_transition') then
+    alter table public.tests disable trigger tests_zz_guard_status_transition;
+  end if;
+end;
+$$;
+
 -- Create a real (transaction-scoped) auth.users row so handle_new_user()
 -- fires normally, then an active enrollment in the given year.
 create or replace function test_helpers.make_student(p_year_id uuid, p_name text default 'Test Student')

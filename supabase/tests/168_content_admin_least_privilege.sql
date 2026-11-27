@@ -1,6 +1,6 @@
 -- Check 4 F3: answer keys / material URLs require curriculum|materials permissions.
 begin;
-select plan(17);
+select plan(18);
 
 select test_helpers.as_runner();
 select * into temp curriculum from test_helpers.make_curriculum();
@@ -119,6 +119,10 @@ select is(
   'publish_tests alone does not grant answer-key SELECT'
 );
 
+select test_helpers.as_user((select id from t_mats));
+select throws_ok($$select public.open_material('dddddddd-dddd-dddd-dddd-dddddddddddd'::uuid)$$, 'material_access_denied', 'manage_materials without class assignment cannot open material');
+select test_helpers.as_user((select id from t_main));
+select public.set_admin_year_assignments((select id from t_mats), array[(select year_id from curriculum)]);
 select test_helpers.as_user((select id from t_mats));
 select is(
   public.open_material('dddddddd-dddd-dddd-dddd-dddddddddddd'::uuid),

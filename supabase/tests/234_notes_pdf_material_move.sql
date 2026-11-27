@@ -1,6 +1,6 @@
 -- Notes PDF Move: identity/R2 preservation + year/library/surface/permission seals.
 begin;
-select plan(14);
+select plan(15);
 
 select test_helpers.as_runner();
 select * into temp curriculum from test_helpers.make_curriculum();
@@ -165,11 +165,14 @@ select is(
   (select id from t_fb),
   'A2. folder_id updated'
 );
+select throws_ok($$select r2_object_key from public.materials where id = (select id from t_mat)$$, '42501', 'permission denied for table materials', 'limited admin cannot read private R2 key directly');
+select test_helpers.as_runner();
 select is(
   (select r2_object_key from public.materials where id = (select id from t_mat)),
   (select r2_object_key from t_key),
   'A3. r2_object_key unchanged'
 );
+select test_helpers.as_user((select id from t_mats));
 select ok(
   (select deleted_at is null from public.materials where id = (select id from t_mat)),
   'A4. not binned'
@@ -258,6 +261,7 @@ select ok(
   )->>'folder_id') = (select id::text from t_fa)),
   'H1. move back to source'
 );
+select test_helpers.as_runner();
 select is(
   (select r2_object_key from public.materials where id = (select id from t_mat)),
   (select r2_object_key from t_key),
@@ -270,6 +274,7 @@ select is(
   0,
   'H3. no open r2 purge for this key'
 );
+select test_helpers.as_user((select id from t_mats));
 select ok(
   (select deleted_at is null from public.materials where id = (select id from t_mat)),
   'H4. still not binned'

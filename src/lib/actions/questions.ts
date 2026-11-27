@@ -1,6 +1,7 @@
 "use server";
 
 import { actionRpcResult, toClientActionError } from "@/lib/errors/safe-action-error";
+import { testIntegrityErrorMessage } from "@/lib/tests/publish-test-errors";
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
@@ -117,6 +118,8 @@ export async function updateQuestionMeta(
     .eq("id", questionId);
   revalidatePath(`/admin/questions/${questionId}`);
   revalidatePath("/admin/questions");
+  const integrity = error ? testIntegrityErrorMessage(error.message) : null;
+  if (integrity) return { error: integrity };
   return actionRpcResult("action", error);
 }
 

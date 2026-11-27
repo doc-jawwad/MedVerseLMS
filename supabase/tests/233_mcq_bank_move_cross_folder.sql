@@ -214,15 +214,7 @@ select throws_ok(
 
 -- G. deleted destination rejected
 select test_helpers.as_user((select id from t_main));
--- empty Sub B for soft-delete: move questions out first
-select test_helpers.as_user((select id from t_edit));
-select public.admin_bulk_move_mcq_bank_subfolder_questions(
-  (select id from t_sb),
-  (select id from t_sa),
-  null,
-  true
-);
-select test_helpers.as_user((select id from t_main));
+-- D already emptied Sub B. Do not call a bulk move on an empty selection.
 select public.admin_soft_delete_mcq_bank_subfolder((select id from t_sb));
 
 select test_helpers.as_user((select id from t_edit));
