@@ -60,6 +60,8 @@ describe("getPublicOrigin", () => {
 
   it("prefers configured public LMS origin over localhost request.url", () => {
     const prev = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const prevSite = process.env.NEXT_PUBLIC_SITE_URL;
+    delete process.env.NEXT_PUBLIC_SITE_URL;
     process.env.NEXT_PUBLIC_SUPABASE_URL = "https://lms.medversepk.com";
     try {
       const origin = getPublicOrigin(
@@ -71,11 +73,15 @@ describe("getPublicOrigin", () => {
     } finally {
       if (prev === undefined) delete process.env.NEXT_PUBLIC_SUPABASE_URL;
       else process.env.NEXT_PUBLIC_SUPABASE_URL = prev;
+      if (prevSite === undefined) delete process.env.NEXT_PUBLIC_SITE_URL;
+      else process.env.NEXT_PUBLIC_SITE_URL = prevSite;
     }
   });
 
   it("ignores supabase.co configured URL and uses forwarded host", () => {
     const prev = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const prevSite = process.env.NEXT_PUBLIC_SITE_URL;
+    delete process.env.NEXT_PUBLIC_SITE_URL;
     process.env.NEXT_PUBLIC_SUPABASE_URL =
       "https://pxoxijlhcvbrostrquft.supabase.co";
     try {
@@ -90,6 +96,8 @@ describe("getPublicOrigin", () => {
     } finally {
       if (prev === undefined) delete process.env.NEXT_PUBLIC_SUPABASE_URL;
       else process.env.NEXT_PUBLIC_SUPABASE_URL = prev;
+      if (prevSite === undefined) delete process.env.NEXT_PUBLIC_SITE_URL;
+      else process.env.NEXT_PUBLIC_SITE_URL = prevSite;
     }
   });
 });

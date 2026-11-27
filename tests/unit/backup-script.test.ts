@@ -13,14 +13,11 @@ const restoreScript = path.join(root, "deploy", "scripts", "restore-from-r2.sh")
 const bash = process.platform === "win32" ? "bash" : "bash";
 
 function runBackup(extra, args = []) {
-  const assignments = Object.entries(extra)
-    .map(([k, v]) => `${k}='${String(v).replace(/'/g, `'\\''`)}'`)
-    .join(" ");
-  const cmdline = `${assignments} ./deploy/scripts/backup-to-r2.sh ${args.join(" ")}`;
-  return spawnSync(bash, ["-c", cmdline], {
+  // Invoke through bash; Git archives retain non-executable script modes.
+  return spawnSync(bash, [script, ...args], {
     cwd: root,
     encoding: "utf8",
-    env: process.env,
+    env: { ...process.env, ...extra },
   });
 }
 
@@ -177,14 +174,11 @@ describe("backup-to-r2.sh behaviour", () => {
 });
 
 function runRestore(extra, args = []) {
-  const assignments = Object.entries(extra)
-    .map(([k, v]) => `${k}='${String(v).replace(/'/g, `'\\''`)}'`)
-    .join(" ");
-  const cmdline = `${assignments} ./deploy/scripts/restore-from-r2.sh ${args.join(" ")}`;
-  return spawnSync(bash, ["-c", cmdline], {
+  // Invoke through bash; Git archives retain non-executable script modes.
+  return spawnSync(bash, [restoreScript, ...args], {
     cwd: root,
     encoding: "utf8",
-    env: process.env,
+    env: { ...process.env, ...extra },
   });
 }
 
