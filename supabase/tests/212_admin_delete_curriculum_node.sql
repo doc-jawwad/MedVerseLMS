@@ -7,6 +7,8 @@ select * into temp curriculum from test_helpers.make_curriculum();
 select test_helpers.make_admin('Curr Del Admin') as id into temp t_admin;
 select test_helpers.make_question((select topic_id from curriculum), 'A') as id
   into temp t_q;
+-- Expose only rollback-scoped fixture identifiers to impersonated roles.
+grant select on curriculum, t_admin, t_q to anon, authenticated;
 
 ------------------------------------------------------------------
 -- Permission gate
@@ -18,8 +20,9 @@ select throws_ok(
     'topics',
     (select topic_id from curriculum)
   ),
-  'not_authenticated',
-  'anon cannot delete curriculum'
+  '42501',
+  'permission denied for function admin_delete_curriculum_node',
+  'anon cannot execute curriculum deletion RPC'
 );
 
 select test_helpers.make_student((select year_id from curriculum)) as id

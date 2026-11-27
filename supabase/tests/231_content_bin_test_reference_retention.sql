@@ -15,7 +15,7 @@ grant select on curriculum, t_admin, t_student to authenticated, anon;
 ------------------------------------------------------------------
 -- a) Unreferenced soft-deleted question becomes purgeable after eligibility
 ------------------------------------------------------------------
-select test_helpers.make_question((select topic_id from curriculum), 'Unref') as id
+select test_helpers.make_question((select topic_id from curriculum), 'A') as id
   into temp t_unref;
 grant select on t_unref to authenticated, anon;
 
@@ -52,7 +52,7 @@ select ok(
 ------------------------------------------------------------------
 -- b) Test-referenced soft-deleted question remains protected
 ------------------------------------------------------------------
-select test_helpers.make_question((select topic_id from curriculum), 'DraftRef') as id
+select test_helpers.make_question((select topic_id from curriculum), 'A') as id
   into temp t_draft_q;
 grant select on t_draft_q to authenticated, anon;
 
@@ -104,7 +104,7 @@ select ok(
 ------------------------------------------------------------------
 -- c) published test cannot be created/published with deleted question
 ------------------------------------------------------------------
-select test_helpers.make_question((select topic_id from curriculum), 'PubBlock') as id
+select test_helpers.make_question((select topic_id from curriculum), 'A') as id
   into temp t_pub_q;
 grant select on t_pub_q to authenticated, anon;
 
@@ -202,7 +202,7 @@ select is(
 -- f) existing published/attempt history remains untouched
 ------------------------------------------------------------------
 select test_helpers.as_runner();
-select test_helpers.make_question((select topic_id from curriculum), 'Hist') as id
+select test_helpers.make_question((select topic_id from curriculum), 'A') as id
   into temp t_hist_q;
 grant select on t_hist_q to authenticated, anon;
 

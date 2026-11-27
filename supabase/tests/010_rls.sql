@@ -132,8 +132,26 @@ select test_helpers.make_published_test(
 -- a SECOND year with no audience/grant for our students, to prove isolation
 select test_helpers.as_runner();
 select id as id into temp t_other_year from public.years where year_number = 2;
+-- Build a real Year-2 question taxonomy; cross-year audience denial must
+-- not depend on an invalid cross-year question attachment.
+with added as (
+  insert into public.subjects (year_id, name)
+  select id, 'PGTAP RLS other ' || gen_random_uuid()::text from t_other_year returning id
+) select id into temp t_other_subject from added;
+with added as (
+  insert into public.books (subject_id, name)
+  select id, 'PGTAP RLS other book' from t_other_subject returning id
+) select id into temp t_other_book from added;
+with added as (
+  insert into public.chapters (book_id, name)
+  select id, 'PGTAP RLS other chapter' from t_other_book returning id
+) select id into temp t_other_chapter from added;
+with added as (
+  insert into public.topics (chapter_id, name)
+  select id, 'PGTAP RLS other topic' from t_other_chapter returning id
+) select id into temp t_other_topic from added;
 select test_helpers.make_published_test(
-  (select topic_id from curriculum), (select id from t_other_year), 2
+  (select id from t_other_topic), (select id from t_other_year), 2
 ) as id into temp t_other_test;
 
 grant select on t_test, t_other_year, t_other_test to anon, authenticated;

@@ -1,6 +1,6 @@
 -- Last active Main Admin cannot be blocked; admin targets need manage_admins.
 begin;
-select plan(6);
+select plan(8);
 
 select test_helpers.as_runner();
 select test_helpers.make_admin('Protect Main') as id into temp t_main;
@@ -62,6 +62,8 @@ select lives_ok(
   'second Main Admin can be granted when one already exists'
 );
 
+-- The surviving active Main Admin is the actor, not the account being blocked.
+select test_helpers.as_user((select id from t_second));
 select lives_ok(
   format(
     'select public.set_account_status(%L, %L)',
@@ -70,7 +72,9 @@ select lives_ok(
   ),
   'a Main Admin can be blocked when another active Main Admin remains'
 );
-
+select test_helpers.as_runner();
+select is((select account_status from public.profiles where id = (select id from t_main)), 'suspended', 'target is actually suspended');
+select test_helpers.as_user((select id from t_second));
 select lives_ok(
   format(
     'select public.set_account_status(%L, %L)',
@@ -79,6 +83,8 @@ select lives_ok(
   ),
   'blocked Main Admin can be restored'
 );
+select test_helpers.as_runner();
+select is((select account_status from public.profiles where id = (select id from t_main)), 'active', 'target is actually restored');
 
 select * from finish();
 rollback;

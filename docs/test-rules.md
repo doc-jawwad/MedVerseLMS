@@ -44,6 +44,21 @@ Checklist order:
 
 Student audience **Neither** is a UI gate on Publish (stay draft); it is not a separate `validate_test` row.
 
+**Question-year consistency (future-prevention guard):** `test_questions` attachment and the `draft → published` status transition enforce `questions.year_id = tests.year_id`. Test audience groups are a presentation overlay, not a substitute for this content invariant. Departmental question subjects may differ from the product Block/clinical `tests.subject_id`, so subject-ID equality is **not** required. A mismatched draft cannot publish even if its links predate the guard; a failed publish rolls back frozen versions. The guard does not change historical published question links, scores or attempts, which require separate reviewed remediation.
+
+**Year changes while linked (#38, approved D1):** a question's `year_id` cannot change — by topic move or direct edit — while it is linked to **any** test (any status) whose `year_id` equals the question's current year; remove it from the affected draft test(s) first. A **draft** test's `year_id` cannot change while it holds questions of its current year. Both reject with `test_question_year_mismatch`. Links that were already mismatched before the guard never trigger it, so historical wrong-year links and their questions are untouched and stay editable. The publish-time year check remains the authoritative backstop: a transient draft mismatch produced by concurrent edits can never publish.
+
+**Lifecycle guards on every path (#38):** whatever the caller (RPC, PostgREST, SQL):
+- tests are created as `draft` (`tests_must_be_created_as_draft`);
+- a draft leaves `draft` only by publication (`only draft tests can be published`);
+- a status change into `published` or `draft` must change nothing but `status` (`test_status_change_must_be_isolated`), so validation always checks the persisted config being published;
+- a change into `published` must pass the full `validate_test` checklist, the year check (re-run after locking member questions) and a freeze of every link to its own question's **current** version;
+- a change into `draft` must meet the `return_to_draft_test` preconditions above (published, unopened, zero attempts).
+
+Transitions into `closed` / `archived` / `invalidated` from a non-draft state are unchanged. Draft reparent of a link is draft → draft only, and both tests' `question_count` stay exact.
+
+**Concurrency:** membership writers and publication serialize on the `tests` row with a fixed lock order (see [database.md](database.md) Tests). A rare multi-statement out-of-order direct write can be aborted with a deadlock error; the whole transaction rolls back and nothing is published or changed partially — retry.
+
 **Soft-deleted questions (Content Bin):** a question with `deleted_at is not null` may still appear on a **draft** test (admins can remove it deliberately; there is no automatic detach). It must **not** pass publish: `validate_test` fails “no soft-deleted questions”, and `publish_test` refuses. This is a **prevention rule for future publishing only** — it does not rewrite already-published tests or their frozen history. Hard purge of Bin questions that still have any `test_questions` reference remains blocked (`question_referenced_by_test`); see [database.md](database.md) Content bin retention.
 
 ## Publish = snapshot

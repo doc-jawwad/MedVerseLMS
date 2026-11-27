@@ -992,6 +992,41 @@ export async function createDraftTestForBuilder(
   return String(id);
 }
 
+/**
+ * Publish a builder draft through the real publish_test RPC. A direct
+ * `PATCH tests {status:'published'}` is rejected by the lifecycle guard
+ * (#38: any transition into published must pass validation + freeze), so
+ * give the draft one fixture question and a year audience first.
+ */
+export async function publishDraftTestViaRpc(
+  fixture: QuestionPoolFixture,
+  testId: string,
+  questionId: string = fixture.questionIds[fixture.questionIds.length - 1]
+): Promise<void> {
+  requireUuid(testId, "testId");
+  requireUuid(questionId, "questionId");
+  const link = await fetch(`${REST}/rest/v1/test_questions`, {
+    method: "POST",
+    headers: await svcHeaders({ Prefer: "return=minimal" }),
+    body: JSON.stringify({ test_id: testId, question_id: questionId, position: 1 }),
+  });
+  if (!link.ok) {
+    throw new Error(`attach fixture question failed: ${link.status} ${await link.text()}`);
+  }
+  const audience = await fetch(`${REST}/rest/v1/test_audiences`, {
+    method: "POST",
+    headers: await svcHeaders({ Prefer: "return=minimal" }),
+    body: JSON.stringify({ test_id: testId, year_id: fixture.yearId }),
+  });
+  if (!audience.ok) {
+    throw new Error(`add test audience failed: ${audience.status} ${await audience.text()}`);
+  }
+  const res = await adminRpc("publish_test", { p_test_id: testId });
+  if (!res.ok) {
+    throw new Error(`publish_test failed: ${res.status} ${res.text}`);
+  }
+}
+
 // Only deletes the test row (if any). question_versions are immutable —
 // forbid_version_mutation() blocks UPDATE/DELETE unconditionally, for every
 // role including service_role, with no bypass reachable via the Data API

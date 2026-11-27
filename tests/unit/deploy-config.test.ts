@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
+import { assertCronAuthorized } from "../../src/lib/cron/assert-cron-auth.ts";
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -156,12 +157,14 @@ describe("supabase clients do not use sb_* as PostgREST Bearer", () => {
 
   it("HTTP auto-submit fail-closes when CRON_SECRET is unset", () => {
     const src = read("src/app/api/cron/auto-submit/route.ts");
-    assert.match(src, /assertCronAuthorized/);
-    const helper = read("src/lib/cron/assert-cron-auth.ts");
-    assert.match(helper, /cron_secret_unconfigured/);
-    // Helper normalises the secret into `configured`; empty => 503.
-    assert.match(helper, /!configured/);
-    assert.match(helper, /status:\s*503/);
+    assert.match(src, /const cronAuth = assertCronAuthorized\(request\.headers\.get\("authorization"\)\)/);
+    assert.match(src, /if \(!cronAuth\.ok\)\s*\{\s*return NextResponse\.json\(\{ error: cronAuth\.error \}, \{ status: cronAuth\.status \}\)/);
+    // Exercise the actual gate, rather than coupling the assertion to a local variable name.
+    for (const secret of [undefined, null, ""]) {
+      assert.deepEqual(assertCronAuthorized("Bearer test-only", secret), {
+        ok: false, status: 503, error: "cron_secret_unconfigured",
+      });
+    }
   });
 
   it("R2 probe does not log secret charset or length metadata", () => {
