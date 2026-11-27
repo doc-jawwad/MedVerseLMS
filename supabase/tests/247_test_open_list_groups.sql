@@ -2,7 +2,7 @@
 -- Transaction-scoped fixtures; rolled back.
 
 begin;
-select plan(15);
+select plan(16);
 -- Fixture-only direct status setup (rolled back with this file); see 000_helpers.
 select test_helpers.allow_direct_test_status();
 
@@ -148,9 +148,16 @@ select throws_ok(
 select test_helpers.as_user((select id from t_student));
 select is(
   (select count(*)::int from public.test_open_list_groups
-   where year_id = (select year_id from curriculum)),
+   where year_id = (select year_id from curriculum)
+      and id in ((select id from t_g1), (select id from t_g2))),
   2,
-  'enrolled student can read open-list groups for their year'
+  'enrolled student can read both fixture open-list groups for their year'
+);
+select is(
+  (select count(*)::int from public.test_open_list_groups
+   where id = (select id from t_g_other)),
+  0,
+  'enrolled student cannot read other-year fixture group'
 );
 
 select throws_ok(

@@ -25,8 +25,9 @@ select test_helpers.make_published_test(
 
 select id as id into temp t_std
   from public.subscription_plans
-  where is_complimentary = false
-  order by sort_order, name
+  where is_complimentary = false and is_active
+    and year_id = (select year_id from curriculum)
+  order by sort_order, name, id
   limit 1;
 
 update public.tests
@@ -315,10 +316,18 @@ select ok(
 ------------------------------------------------------------------
 -- Renewal: summary unchanged; review unlocks (8J-A)
 ------------------------------------------------------------------
+-- Promotion moved the student to Year 2; renew against its active plan.
+select test_helpers.as_runner();
+select sp.id into temp t_renewal_plan
+from public.subscription_plans sp
+join public.years y on y.id = sp.year_id
+where y.year_number = 2 and sp.is_active and not sp.is_complimentary
+order by sp.sort_order, sp.name, sp.id limit 1;
+grant select on t_renewal_plan to authenticated;
 select test_helpers.as_user((select id from t_admin));
 select public.activate_subscription(
   (select id from t_student),
-  (select id from t_std),
+  (select id from t_renewal_plan),
   now(),
   now() + interval '20 days',
   null,
