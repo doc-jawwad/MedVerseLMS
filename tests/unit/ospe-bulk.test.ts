@@ -36,7 +36,9 @@ describe("OSPE bulk draft import", () => {
     assert.ok(create.indexOf('rpc("admin_can_access_year"') < create.indexOf("await allocateStudyObjectKey()"));
     assert.ok(create.indexOf("matchesOspeBulkReplay") < create.indexOf("await allocateStudyObjectKey()"));
     assert.match(create, /\.\.\.\(requestId \? \{ id: requestId \}/);
-    assert.match(create, /!requestId \|\| \/\^\(22\|23\|42\)/);
+    assert.match(source, /function isDefinitiveDbRejection[\s\S]*?\/\^\(22\|23\|42\)/);
+    assert.match(create, /const rejected = isDefinitiveDbRejection\(error\);\s*if \(rejected\) await discardStudyKey\(supabase, key\)/);
+    assert.doesNotMatch(create, /!requestId \|\|/);
     const update = source.slice(source.indexOf("export async function updateOspeStation"), source.indexOf("export async function setOspeStationStatus"));
     assert.ok(update.indexOf("subject.data?.year_id !== yearId") < update.indexOf("await allocateStudyObjectKey()"));
   });
