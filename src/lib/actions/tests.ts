@@ -21,7 +21,10 @@ import {
   resolveMcqBankScope,
   type RandomSelectionFilter,
 } from "@/lib/tests/random-selection-scope";
-import { publishTestErrorMessage } from "@/lib/tests/publish-test-errors";
+import {
+  publishTestErrorMessage,
+  testIntegrityErrorMessage,
+} from "@/lib/tests/publish-test-errors";
 import { lifecycleTestErrorMessage } from "@/lib/tests/lifecycle-test-errors";
 
 // Types only — "use server" modules must not re-export sync helpers/constants.
@@ -111,6 +114,8 @@ export async function updateTestConfig(
   const supabase = await createClient();
   const { error } = await supabase.from("tests").update(picked).eq("id", testId);
   reval(testId);
+  const integrity = error ? testIntegrityErrorMessage(error.message) : null;
+  if (integrity) return { error: integrity };
   return actionRpcResult("action", error);
 }
 

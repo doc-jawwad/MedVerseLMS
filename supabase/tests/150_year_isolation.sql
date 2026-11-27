@@ -3,6 +3,8 @@
 
 begin;
 select plan(12);
+-- Fixture-only direct status setup (rolled back with this file); see 000_helpers.
+select test_helpers.allow_direct_test_status();
 
 select test_helpers.as_runner();
 
